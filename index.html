@@ -1,1 +1,35 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#173d2a"><title>SOLI-N Field</title><link rel="manifest" href="manifest.webmanifest"><link rel="stylesheet" href="styles.css"><link rel="apple-touch-icon" href="icon-192.png"></head><body><div id="app"></div><script src="app.js"></script></body></html>
+<!doctype html><html lang="ru"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#173d2a"><title>SOLI-N Field</title>
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-192.png"><link rel="stylesheet" href="styles.css">
+</head><body>
+<div class="app">
+ <header class="topbar"><img class="logo" src="icon-192.png"><div class="grow"><h1>SOLI-N Field</h1><div class="sub">Мобильная карточка таксации · логика SOLI-N</div></div><button class="smallbtn" onclick="show('refsScreen')">Справочники</button></header>
+ <nav class="classicMenu"><button onclick="show('home')">Главная</button><button onclick="show('quartersScreen')">Карточки таксации</button><button onclick="show('refsScreen')">Справочники</button><button onclick="show('dbScreen')">Структура БД</button></nav>
+
+ <section id="home" class="screen active">
+  <div class="panel hero"><h2>Бугетсайское лесничество</h2><div class="sub">Карабутакское государственное учреждение лесного хозяйства · 2026</div>
+   <div class="stats"><div class="stat"><b id="qcount">—</b><small>кварталов</small></div><div class="stat"><b id="vcount">—</b><small>выделов</small></div><div class="stat"><b id="area">—</b><small>га</small></div><div class="stat"><b id="rcount">—</b><small>справочников</small></div></div>
+  </div>
+  <div class="panel"><h3>Рабочие разделы</h3><div class="grid2">
+   <button class="action" onclick="show('quartersScreen')"><b>Карточки таксации</b><small>Квартал → выдел → макеты</small></button>
+   <button class="action" onclick="show('refsScreen')"><b>Справочники SOLI-N</b><small><span id="rrows">—</span> строк из Solim.mdb</small></button>
+   <button class="action" onclick="show('dbScreen')"><b>Таблицы объекта</b><small>Transf_213_2_2026.mdb</small></button>
+   <button class="action" onclick="locate()"><b>GPS</b><small>Полевое положение</small></button>
+  </div></div>
+  <div class="panel"><h3>Основные справочники</h3><div id="quickRefs"></div></div>
+ </section>
+
+ <section id="quartersScreen" class="screen"><div class="windowTitle">Карточки таксации</div><div class="toolbar"><input id="quarterFilter" placeholder="Квартал…" oninput="renderQuarters(this.value)"><button class="btn" onclick="renderQuarters('')">Все</button></div><div id="quarters"></div></section>
+
+ <section id="card" class="screen"><div class="windowTitle">Карточка таксации</div><div class="panel"><div class="recordHead"><div class="grow"><h2 id="cardTitle"></h2><div id="cardSub" class="sub"></div></div><button class="btn2" onclick="show('quartersScreen')">Назад</button></div><div class="recordNav"><button onclick="prevRecord()">◀</button><span id="recordPos">—</span><button onclick="nextRecord()">▶</button><button class="savebtn" onclick="saveCurrent()">Сохранить</button></div><div id="childTabs" class="tabs"></div><div id="editContent"></div><div id="childContent"></div></div></section>
+
+ <section id="refsScreen" class="screen"><div class="windowTitle">Справочники</div><div class="panel"><div class="toolbar"><input id="globalRefSearch" placeholder="Шифр или наименование во всех справочниках…" oninput="searchEveryRef(this.value)"></div><div id="refSearchResults"></div></div><div class="panel"><div class="toolbar"><input placeholder="Название таблицы…" oninput="renderRefs(this.value)"></div><div id="refTables"></div></div></section>
+
+ <section id="dbScreen" class="screen"><div class="windowTitle">Структура базы объекта</div><div class="panel"><p class="note">Связь дочерних макетов: POS → LESN → KV → KGLF → VD.</p><div id="dbTables" class="list"></div></div></section>
+</div>
+
+<div id="lookupModal" class="modal hidden"><div class="modalCard"><div class="modalHead"><div><b id="lookupTitle">Справочник</b><div class="sub" id="lookupHint"></div></div><button class="closeBtn" onclick="closeLookup()">×</button></div><input id="lookupSearch" placeholder="Поиск…" oninput="renderLookup()"><div id="lookupRows" class="lookupRows"></div></div></div>
+
+<div class="bottomNav"><button class="nav active" data-s="home" onclick="show('home')">Главная</button><button class="nav" data-s="quartersScreen" onclick="show('quartersScreen')">Кварталы</button><button class="nav" data-s="refsScreen" onclick="show('refsScreen')">Справочники</button><button class="nav" data-s="dbScreen" onclick="show('dbScreen')">БД</button></div>
+<div class="gpsbar"><span id="gpsDot" class="gpsdot"></span><div class="grow"><b>GPS</b><small id="gpsText">Точка не записана</small></div><button class="gpsbtn" onclick="locate()">⌖</button></div><div id="toast" class="toast"></div><script src="app.js"></script></body></html>
