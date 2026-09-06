@@ -15,35 +15,23 @@ jobs:
           mkdir -p /tmp/cmx /tmp/apks
           unzip -q /tmp/carrymap.xapk -d /tmp/cmx
           for a in /tmp/cmx/*.apk; do d=/tmp/apks/$(basename "$a" .apk); mkdir -p "$d"; unzip -q "$a" -d "$d" || true; done
-          echo '=== native libraries ==='
-          find /tmp/apks -type f -name '*.so' -print
-      - name: Locate CarryMap CMF2 native implementation
+          cp /tmp/apks/config.armeabi_v7a/lib/armeabi-v7a/libcarrymap.interop.so /tmp/carrymap-core.so
+          file /tmp/carrymap-core.so
+      - name: ARM disassembly around CarryMap internals
         run: |
           set -euxo pipefail
-          LIB=''
-          while IFS= read -r f; do
-            if strings -a "$f" | grep -q 'N8CarryMap12CarryMapFile12SpatialBlockE'; then LIB="$f"; break; fi
-          done < <(find /tmp/apks -type f -name '*.so')
-          echo "LIB=$LIB"
-          test -n "$LIB"
-          file "$LIB"
-          ls -lh "$LIB"
-          echo '=== dynamic symbols ==='
-          nm -D -C "$LIB" 2>/dev/null | grep -E 'CarryMap::(IO::LZ4Stream|CarryMapFile::SpatialBlock|IO::DeflateStream|IO::Archive)' | head -500 || true
-          echo '=== symbol table ==='
-          readelf -Ws "$LIB" 2>/dev/null | c++filt | grep -E 'CarryMap::(IO::LZ4Stream|CarryMapFile::SpatialBlock|IO::DeflateStream|IO::Archive)' | head -500 || true
-          echo '=== nearby strings ==='
-          strings -a -t x "$LIB" | grep -Ei 'LZ4D|Lz4C|PSTG|SpatialBlock|LZ4Stream|cmf2 must|Not a cmf2|SQLite format' | head -500 || true
-          echo '=== sections ==='
-          readelf -S "$LIB" | head -120
-          cp "$LIB" /tmp/carrymap-core.so
-      - name: Disassemble candidate native routines
-        run: |
-          set -euxo pipefail
-          LIB=/tmp/carrymap-core.so
-          objdump -d -C "$LIB" > /tmp/disasm.txt || true
-          grep -n -E 'CarryMap::IO::LZ4Stream|CarryMap::CarryMapFile::SpatialBlock|LZ4Stream|SpatialBlock::Load' /tmp/disasm.txt | head -200 || true
-          echo '=== LZ4 constants/calls ==='
-          objdump -T -C "$LIB" | grep -Ei 'LZ4|compress|decompress|inflate|deflate' | head -300 || true
-          echo '=== selected raw symbol strings ==='
-          strings -a "$LIB" | grep -E '^_?ZN8CarryMap(2IO9LZ4Stream|12CarryMapFile12SpatialBlock)' | head -300 || true
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq binutils-arm-linux-gnueabihf
+          arm-linux-gnueabihf-objdump -d /tmp/carrymap-core.so > /tmp/carrymap-arm-disasm.txt
+          strings -a -t x /tmp/carrymap-core.so | grep -Ei 'LZ4D|Lz4C|PSTG|SpatialBlock|LZ4Stream|cmf2 must|Not a cmf2|SQLite format' > /tmp/carrymap-strings.txt || true
+          arm-linux-gnueabihf-objdump -T /tmp/carrymap-core.so | c++filt | grep -Ei 'LZ4|compress|decompress|inflate|deflate' > /tmp/carrymap-symbols.txt || true
+          ls -lh /tmp/carrymap-core.so /tmp/carrymap-arm-disasm.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: carrymap-native-analysis
+          path: |
+            /tmp/carrymap-core.so
+            /tmp/carrymap-strings.txt
+            /tmp/carrymap-symbols.txt
+            /tmp/carrymap-arm-disasm.txt
+          retention-days: 1
