@@ -1,32 +1,42 @@
-name: CarryMap Windows installer
+name: Wine loaders
 on:
   push:
     paths:
       - '.github/workflows/carrymap-inspect.yml'
   workflow_dispatch:
 jobs:
-  download:
+  bundle:
     runs-on: ubuntu-latest
     steps:
-      - name: Download official CarryMap installer
+      - name: Install Wine and collect loaders
         run: |
           set -euxo pipefail
-          mkdir -p /tmp/cmwin
-          curl -L --retry 3 -A 'Mozilla/5.0' 'https://carrymap.com/licenses/DownloadFileNoRegistration?fileName=CarryMap.En' -o /tmp/cmwin/carrymap-download
-          file /tmp/cmwin/carrymap-download | tee /tmp/cmwin/file.txt
-          ls -lh /tmp/cmwin/carrymap-download | tee /tmp/cmwin/size.txt
-          sha256sum /tmp/cmwin/carrymap-download | tee /tmp/cmwin/sha256.txt
+          sudo dpkg --add-architecture i386
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq wine64 wine32 xvfb xdotool
+          mkdir -p /tmp/wineloaders/usr/lib/wine /tmp/wineloaders/deps
+          cp -a /usr/lib/wine/. /tmp/wineloaders/usr/lib/wine/
+          ldd /usr/lib/wine/wine64 | tee /tmp/wineloaders/ldd64.txt || true
+          ldd /usr/lib/wine/wine | tee /tmp/wineloaders/ldd32.txt || true
           python3 - <<'PY'
-          from pathlib import Path
-          p=Path('/tmp/cmwin/carrymap-download')
-          b=p.read_bytes()[:32]
-          print('magic',b)
-          if b[:2]==b'MZ': p.rename('/tmp/cmwin/CarryMapSetup.exe')
-          elif b[:4]==bytes.fromhex('D0CF11E0'): p.rename('/tmp/cmwin/CarryMapSetup.msi')
+          import re, pathlib, shutil, subprocess
+          out=pathlib.Path('/tmp/wineloaders/deps')
+          for exe in ['/usr/lib/wine/wine64','/usr/lib/wine/wine']:
+              try: s=subprocess.check_output(['ldd',exe],text=True)
+              except Exception: continue
+              for line in s.splitlines():
+                  m=re.search(r'=>\s+(/[^ ]+)',line) or re.match(r'\s*(/[^ ]+)',line)
+                  if m:
+                      p=pathlib.Path(m.group(1))
+                      if p.exists():
+                          d=out / p.relative_to('/')
+                          d.parent.mkdir(parents=True,exist_ok=True)
+                          shutil.copy2(p,d)
           PY
-          ls -lh /tmp/cmwin
+          tar -C /tmp/wineloaders -czf /tmp/wine-loaders.tar.gz .
+          ls -lh /tmp/wine-loaders.tar.gz /usr/lib/wine/wine64
       - uses: actions/upload-artifact@v4
         with:
-          name: carrymap-windows-installer
-          path: /tmp/cmwin
+          name: wine-loaders
+          path: /tmp/wine-loaders.tar.gz
           retention-days: 1
