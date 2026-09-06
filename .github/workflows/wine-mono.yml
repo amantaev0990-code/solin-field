@@ -1,0 +1,20 @@
+name: Wine Mono runtime
+on:
+  push:
+    paths:
+      - '.github/workflows/wine-mono.yml'
+  workflow_dispatch:
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Wine Mono
+        run: |
+          set -euxo pipefail
+          curl -L --retry 3 'https://github.com/wine-mono/wine-mono/releases/download/wine-mono-11.3.0/wine-mono-11.3.0-x86.msi' -o /tmp/wine-mono.msi
+          ls -lh /tmp/wine-mono.msi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wine-mono
+          path: /tmp/wine-mono.msi
+          retention-days: 1
