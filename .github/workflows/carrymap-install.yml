@@ -21,8 +21,9 @@ jobs:
           unzip -q /tmp/carrymap.zip -d /tmp/cmsetup
           MSI=$(find /tmp/cmsetup -iname '*.msi' | head -1)
           echo "MSI=$MSI"
-          export WINEPREFIX=/tmp/cmprefix
+          export WINEPREFIX="$HOME/cmprefix"
           export WINEDEBUG=-all
+          mkdir -p "$WINEPREFIX"
           xvfb-run -a wineboot -u
           xvfb-run -a wine msiexec /i "$MSI" /qn /norestart || { echo 'silent install failed, retry basic'; xvfb-run -a wine msiexec /i "$MSI" /qb /norestart; }
           echo '=== installed CarryMap files ==='
