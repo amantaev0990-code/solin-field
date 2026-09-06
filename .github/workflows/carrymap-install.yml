@@ -1,0 +1,40 @@
+name: Install CarryMap Windows
+on:
+  push:
+    paths:
+      - '.github/workflows/carrymap-install.yml'
+  workflow_dispatch:
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Wine
+        run: |
+          set -euxo pipefail
+          sudo dpkg --add-architecture i386
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq wine64 wine32 xvfb
+      - name: Download and install official CarryMap
+        run: |
+          set -euxo pipefail
+          curl -L --retry 3 -A 'Mozilla/5.0' 'https://carrymap.com/licenses/DownloadFileNoRegistration?fileName=CarryMap.En' -o /tmp/carrymap.zip
+          unzip -q /tmp/carrymap.zip -d /tmp/cmsetup
+          MSI=$(find /tmp/cmsetup -iname '*.msi' | head -1)
+          echo "MSI=$MSI"
+          export WINEPREFIX=/tmp/cmprefix
+          export WINEDEBUG=-all
+          xvfb-run -a wineboot -u
+          xvfb-run -a wine msiexec /i "$MSI" /qn /norestart || { echo 'silent install failed, retry basic'; xvfb-run -a wine msiexec /i "$MSI" /qb /norestart; }
+          echo '=== installed CarryMap files ==='
+          find "$WINEPREFIX/drive_c" -type f | grep -Ei 'carrymap|\.exe$|\.dll$' | head -500
+          mkdir -p /tmp/cm-installed
+          cp -a "$WINEPREFIX/drive_c/Program Files" /tmp/cm-installed/ProgramFiles 2>/dev/null || true
+          cp -a "$WINEPREFIX/drive_c/Program Files (x86)" /tmp/cm-installed/ProgramFilesX86 2>/dev/null || true
+          find /tmp/cm-installed -type f | grep -Ei 'carrymap|\.exe$|\.dll$' | head -500 > /tmp/cm-installed/files.txt || true
+          tar -C /tmp -czf /tmp/carrymap-installed.tar.gz cm-installed
+          ls -lh /tmp/carrymap-installed.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: carrymap-installed
+          path: /tmp/carrymap-installed.tar.gz
+          retention-days: 1
