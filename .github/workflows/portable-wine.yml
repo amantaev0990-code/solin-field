@@ -1,0 +1,21 @@
+name: Portable Wine runtime
+on:
+  push:
+    paths:
+      - '.github/workflows/portable-wine.yml'
+  workflow_dispatch:
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download portable Wine
+        run: |
+          set -euxo pipefail
+          curl -L --retry 3 'https://github.com/Kron4ek/Wine-Builds/releases/download/11.17/wine-11.17-amd64-wow64.tar.xz' -o /tmp/wine.tar.xz
+          sha256sum /tmp/wine.tar.xz
+          ls -lh /tmp/wine.tar.xz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: portable-wine
+          path: /tmp/wine.tar.xz
+          retention-days: 1
