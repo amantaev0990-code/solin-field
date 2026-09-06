@@ -1,0 +1,26 @@
+name: CarryMap format inspection
+on:
+  push:
+    paths:
+      - '.github/workflows/carrymap-inspect.yml'
+  workflow_dispatch:
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download CarryMap Android package
+        run: |
+          set -euxo pipefail
+          curl -L --retry 3 -A 'Mozilla/5.0' 'https://d.apkpure.net/b/XAPK/com.dataeast.carrymap?version=latest' -o /tmp/carrymap.xapk
+          file /tmp/carrymap.xapk
+          ls -lh /tmp/carrymap.xapk
+      - name: Inspect package for CMF2 implementation clues
+        run: |
+          set -euxo pipefail
+          mkdir -p /tmp/cmx
+          unzip -q /tmp/carrymap.xapk -d /tmp/cmx
+          find /tmp/cmx -type f | head -100
+          echo '=== native libraries ==='
+          find /tmp/cmx -type f -name '*.so' -print
+          echo '=== CMF2 / PSTG / compression strings ==='
+          find /tmp/cmx -type f \( -name '*.so' -o -name '*.dex' -o -name '*.apk' \) -print0 | xargs -0 -r strings -a 2>/dev/null | grep -Ei 'CMF2|PSTG|sqlite|lz4|zstd|snappy|deflate|geometr|spatial|geopackage' | sort -u | head -2000 || true
