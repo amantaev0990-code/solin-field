@@ -1,37 +1,36 @@
-name: CarryMap format inspection
+name: CarryMap Windows runtime
 on:
   push:
     paths:
       - '.github/workflows/carrymap-inspect.yml'
   workflow_dispatch:
 jobs:
-  inspect:
+  prepare:
     runs-on: ubuntu-latest
     steps:
-      - name: Download and unpack CarryMap Android package
+      - name: Discover official CarryMap Windows installer
         run: |
           set -euxo pipefail
-          curl -L --retry 3 -A 'Mozilla/5.0' 'https://d.apkpure.net/b/XAPK/com.dataeast.carrymap?version=latest' -o /tmp/carrymap.xapk
-          mkdir -p /tmp/cmx /tmp/apks
-          unzip -q /tmp/carrymap.xapk -d /tmp/cmx
-          for a in /tmp/cmx/*.apk; do d=/tmp/apks/$(basename "$a" .apk); mkdir -p "$d"; unzip -q "$a" -d "$d" || true; done
-          cp /tmp/apks/config.armeabi_v7a/lib/armeabi-v7a/libcarrymap.interop.so /tmp/carrymap-core.so
-          file /tmp/carrymap-core.so
-      - name: ARM disassembly around CarryMap internals
+          mkdir -p /tmp/cmwin
+          curl -L --retry 3 -A 'Mozilla/5.0' 'https://carrymap.com/en/download/carrymap/' -o /tmp/cmwin/download.html
+          grep -Eoi 'https?[^"'"'"' <>]+\.(exe|msi)(\?[^"'"'"' <>]+)?' /tmp/cmwin/download.html | sort -u | tee /tmp/cmwin/direct-links.txt || true
+          grep -Eoi 'href=["'"'][^"'"']+["'"']' /tmp/cmwin/download.html | grep -Ei 'download|windows|carrymap|exe|msi' | head -200 | tee /tmp/cmwin/hrefs.txt || true
+          grep -Ein 'download|windows|exe|msi|carrymap' /tmp/cmwin/download.html | head -300 | tee /tmp/cmwin/page-lines.txt || true
+      - name: Install and bundle Wine runtime
         run: |
           set -euxo pipefail
+          sudo dpkg --add-architecture i386
           sudo apt-get update -qq
-          sudo apt-get install -y -qq binutils-arm-linux-gnueabihf
-          arm-linux-gnueabihf-objdump -d /tmp/carrymap-core.so > /tmp/carrymap-arm-disasm.txt
-          strings -a -t x /tmp/carrymap-core.so | grep -Ei 'LZ4D|Lz4C|PSTG|SpatialBlock|LZ4Stream|cmf2 must|Not a cmf2|SQLite format' > /tmp/carrymap-strings.txt || true
-          arm-linux-gnueabihf-objdump -T /tmp/carrymap-core.so | c++filt | grep -Ei 'LZ4|compress|decompress|inflate|deflate' > /tmp/carrymap-symbols.txt || true
-          ls -lh /tmp/carrymap-core.so /tmp/carrymap-arm-disasm.txt
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq wine64 wine32 xvfb xdotool cabextract
+          mkdir -p /tmp/winebundle/bin /tmp/winebundle/lib
+          cp -a /usr/bin/wine* /tmp/winebundle/bin/ || true
+          cp -a /usr/lib/x86_64-linux-gnu/wine /tmp/winebundle/lib/ || true
+          cp -a /usr/lib/i386-linux-gnu/wine /tmp/winebundle/lib/ || true
+          wine --version | tee /tmp/cmwin/wine-version.txt
+          tar -C /tmp -czf /tmp/cmwin/winebundle.tar.gz winebundle
+          ls -lh /tmp/cmwin/winebundle.tar.gz
       - uses: actions/upload-artifact@v4
         with:
-          name: carrymap-native-analysis
-          path: |
-            /tmp/carrymap-core.so
-            /tmp/carrymap-strings.txt
-            /tmp/carrymap-symbols.txt
-            /tmp/carrymap-arm-disasm.txt
+          name: carrymap-windows-runtime
+          path: /tmp/cmwin
           retention-days: 1
