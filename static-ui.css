@@ -3,49 +3,15 @@ html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none}
 body{position:fixed;inset:0;width:100%}
 .app{height:100dvh;max-height:100dvh;overflow:hidden;display:flex;flex-direction:column;margin:0 auto;padding:calc(env(safe-area-inset-top,0px) + 6px) 10px calc(env(safe-area-inset-bottom,0px) + 6px)}
 .topbar,.forestCard,.quickActions,.sectionTabs{flex:0 0 auto}
-
-/* The permanent information block is deliberately about half the old height. */
 .topbar{margin-bottom:5px;min-height:48px}.brand{gap:8px}.brand h1{font-size:22px}.brand p{font-size:12px;margin-top:0}.tree{font-size:27px}.topactions{gap:6px}.topactions .iconbtn{width:42px;height:42px;font-size:19px;border-radius:13px}
 .forestCard{padding:9px 10px;margin-bottom:6px;border-radius:16px}.forestTitle{gap:8px}.forestIcon{font-size:27px}.forestTitle h2{font-size:18px;margin:0}.forestTitle p{font-size:10px;line-height:1.15}.stats{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-top:7px}.stat{padding:6px 7px;border-radius:10px;min-width:0}.stat span{font-size:15px}.stat b{font-size:17px;margin-top:1px;line-height:1.05}.stat small{font-size:9px;line-height:1.05;display:block;margin-top:2px}
 .quickActions{grid-template-columns:1.4fr 1fr;gap:7px;margin-bottom:6px}.quickActions .primary,.quickActions .secondary{padding:10px 8px;border-radius:13px;font-size:14px;min-height:44px}.quickActions .secondary{grid-column:auto}
 .sectionTabs{margin:0 -10px 6px;padding:3px 5px 0;min-height:52px}.sectionTab{padding:5px 2px 7px;font-size:16px}.sectionTab span{font-size:10px;margin-top:2px}
-
-/* Only the active section scrolls. The application frame itself stays still. */
-.screen{min-height:0;overflow:hidden}
-.screen.active{display:block;flex:1 1 0;min-height:0;overflow-y:auto!important;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;touch-action:pan-y;scrollbar-gutter:stable}
-.screen.active>.workspace{margin-bottom:10px}
-#quartersScreen.active,#allCompsScreen.active,#refsScreen.active,#menuScreen.active,#card.active{padding-bottom:24px}
-
-/* MAP MODE: fold away everything above the red line except the forestry name. */
-body.map-mode .topbar{display:none}
-body.map-mode .forestCard{padding:6px 10px;margin-bottom:4px;border-radius:12px;background:#082315}
-body.map-mode .forestCard .forestIcon,body.map-mode .forestCard .forestTitle p,body.map-mode .forestCard .change,body.map-mode .forestCard .stats{display:none!important}
-body.map-mode .forestCard .forestTitle{min-height:30px}
-body.map-mode .forestCard .forestTitle h2{font-size:17px;line-height:30px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-body.map-mode .quickActions{display:none}
-body.map-mode .sectionTabs{margin-bottom:4px}
-#mapScreen.active{display:flex;flex:1 1 0;min-height:0;overflow:hidden!important;padding:0;touch-action:none}
-#mapScreen .workspace{height:100%;min-height:0;display:flex;flex-direction:column;margin:0;padding:6px}
-#mapScreen .screenHead{margin-bottom:4px}#mapScreen .screenHead h2{font-size:20px}#mapScreen .screenHead p{display:none}
-#mapScreen .mapToolbar{flex:0 0 auto;margin:2px 0 5px;gap:5px;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none}#mapScreen .mapToolbar::-webkit-scrollbar{display:none}
-#mapScreen .mapMode,#mapScreen .mapLocate{padding:8px 9px;font-size:12px;border-radius:10px}
-#mapScreen .mapOfflineHint{flex:0 0 auto;font-size:10px;line-height:1.15;padding:0 2px 5px;max-height:32px;overflow:hidden}
-#mapScreen .mapWrap{flex:1 1 auto;min-height:0;height:auto}
-#mapScreen .mapWrap #fieldMap{height:100%!important;min-height:0!important;border-radius:12px}
-
+.screen{min-height:0;overflow:hidden}.screen.active{display:block;flex:1 1 0;min-height:0;overflow-y:auto!important;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;touch-action:pan-y;scrollbar-gutter:stable}.screen.active>.workspace{margin-bottom:10px}#quartersScreen.active,#allCompsScreen.active,#refsScreen.active,#menuScreen.active,#card.active{padding-bottom:24px}
+body.map-mode .topbar{display:none}body.map-mode .forestCard{padding:6px 10px;margin-bottom:4px;border-radius:12px;background:#082315}body.map-mode .forestCard .forestIcon,body.map-mode .forestCard .forestTitle p,body.map-mode .forestCard .change,body.map-mode .forestCard .stats{display:none!important}body.map-mode .forestCard .forestTitle{min-height:30px}body.map-mode .forestCard .forestTitle h2{font-size:17px;line-height:30px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}body.map-mode .quickActions{display:none}body.map-mode .sectionTabs{margin-bottom:4px}
+#mapScreen.active{display:flex;flex:1 1 0;min-height:0;overflow:hidden!important;padding:0;touch-action:none}#mapScreen .workspace{height:100%;min-height:0;display:flex;flex-direction:column;margin:0;padding:6px}#mapScreen .screenHead{margin-bottom:4px}#mapScreen .screenHead h2{font-size:20px}#mapScreen .screenHead p{display:none}#mapScreen .mapToolbar{flex:0 0 auto;margin:2px 0 5px;gap:5px;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none}#mapScreen .mapToolbar::-webkit-scrollbar{display:none}#mapScreen .mapMode,#mapScreen .mapLocate{padding:8px 9px;font-size:12px;border-radius:10px}#mapScreen .mapOfflineHint{flex:0 0 auto;font-size:10px;line-height:1.15;padding:0 2px 5px;max-height:32px;overflow:hidden}#mapScreen .mapWrap{flex:1 1 auto;min-height:0;height:auto}#mapScreen .mapWrap #fieldMap{height:100%!important;min-height:0!important;border-radius:12px}
 button{transform:none!important}button:active{transform:none!important}
-
-/* White object card: opens only on object tap, stays put, closes only with X. */
-.cmfSheet{position:absolute;left:0;right:0;bottom:0!important;height:min(72%,660px);max-height:72%;overflow:auto;background:#fff;color:#1b1b1b;z-index:900;border-radius:18px 18px 0 0;box-shadow:0 -10px 28px rgba(0,0,0,.34);padding:10px 16px 28px;transition:none!important;touch-action:pan-y;display:none}
-.cmfSheet.open,.cmfSheet.peek{display:block;bottom:0!important}.cmfSheet.dragging{transition:none!important}.cmfCardHandle{display:none!important}
-.cmfSheetClose{position:absolute;top:10px;right:10px;float:none;z-index:4;width:38px;height:38px;border-radius:50%;border:1px solid #d7d7d7;background:#f2f2f2;color:#222;font-size:24px;line-height:34px}.cmfCoord{padding-right:52px}
-.mapLayerPanel,.leaflet-control{transition:none!important}
-
-@media(max-width:700px){
-  .app{padding-left:7px;padding-right:7px}
-  .topbar{min-height:44px}.brand h1{font-size:20px}.brand p{font-size:11px}.tree{font-size:24px}
-  .forestCard{padding:8px}.forestTitle h2{font-size:17px}.stats{gap:4px}.stat{padding:5px}.stat b{font-size:16px}.stat small{font-size:8.5px}
-  .quickActions .primary,.quickActions .secondary{min-height:42px;padding:8px 6px;font-size:13px}
-  .sectionTabs{margin-left:-7px;margin-right:-7px;grid-template-columns:repeat(5,minmax(64px,1fr));overflow:hidden}
-  .cmfSheet{height:68%;max-height:68%;padding-left:14px;padding-right:14px;border-radius:16px 16px 0 0}
-}
+.cmfSheet{position:absolute;left:0;right:0;bottom:0!important;height:min(72%,660px);max-height:72%;overflow:auto;background:#fff;color:#1b1b1b;z-index:900;border-radius:18px 18px 0 0;box-shadow:0 -10px 28px rgba(0,0,0,.34);padding:10px 16px 28px;transition:none!important;touch-action:pan-y;display:none}.cmfSheet.open,.cmfSheet.peek{display:block;bottom:0!important}.cmfSheet.dragging{transition:none!important}.cmfCardHandle{display:none!important}.cmfSheetClose{position:absolute;top:10px;right:10px;float:none;z-index:4;width:38px;height:38px;border-radius:50%;border:1px solid #d7d7d7;background:#f2f2f2;color:#222;font-size:24px;line-height:34px}.cmfCoord{padding-right:52px}.mapLayerPanel,.leaflet-control{transition:none!important}
+/* Map labels: stands show only stand number; quarters show quarter number with quarter area underneath. */
+.quarterPermanentLabel{background:rgba(5,25,12,.72)!important;border:1px solid rgba(255,255,255,.75)!important;border-radius:5px!important;box-shadow:none!important;color:#fff!important;font-size:15px!important;font-weight:900!important;line-height:1.12!important;text-align:center!important;white-space:pre-line!important;padding:3px 5px!important;text-shadow:0 1px 2px #000!important}.quarterPermanentLabel:before{display:none!important}
+@media(max-width:700px){.app{padding-left:7px;padding-right:7px}.topbar{min-height:44px}.brand h1{font-size:20px}.brand p{font-size:11px}.tree{font-size:24px}.forestCard{padding:8px}.forestTitle h2{font-size:17px}.stats{gap:4px}.stat{padding:5px}.stat b{font-size:16px}.stat small{font-size:8.5px}.quickActions .primary,.quickActions .secondary{min-height:42px;padding:8px 6px;font-size:13px}.sectionTabs{margin-left:-7px;margin-right:-7px;grid-template-columns:repeat(5,minmax(64px,1fr));overflow:hidden}.cmfSheet{height:68%;max-height:68%;padding-left:14px;padding-right:14px;border-radius:16px 16px 0 0}.quarterPermanentLabel{font-size:13px!important}}
