@@ -1,6 +1,15 @@
-// SOLI-N Field: fixed CarryMap-style selection card.
-// The card opens only from an object click and remains fixed until the X is pressed.
+// SOLI-N Field: compact fixed shell + fixed CarryMap-style selection card.
 (function(){
+  // Toggle the very compact header when the map section is opened.
+  const previousShow=window.show;
+  window.show=function(id){
+    previousShow(id);
+    document.body.classList.toggle('map-mode',id==='mapScreen');
+    const active=document.getElementById(id);
+    if(active&&id!=='mapScreen') active.scrollTop=0;
+    if(id==='mapScreen') setTimeout(()=>window.fieldMap?.invalidateSize?.(),80);
+  };
+
   window.bindCmfSheetDrag=function(){ /* dragging intentionally disabled */ };
 
   window.showCmfSheet=function(feature,latlng,layer){
@@ -26,10 +35,6 @@
     sheet.style.bottom='';
   };
 
-  // Stop the browser page itself from rubber-banding on iPhone.
-  document.addEventListener('touchmove',function(e){
-    const target=e.target;
-    if(target?.closest?.('.screen.active,.cmfSheet,.mapLayerPanel,.leaflet-container'))return;
-    if(e.cancelable)e.preventDefault();
-  },{passive:false});
+  // Initial state (quarters is the default screen).
+  document.body.classList.toggle('map-mode',document.getElementById('mapScreen')?.classList.contains('active'));
 })();
