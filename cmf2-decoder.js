@@ -1,68 +1,10 @@
-/* CMF2 browser decoder v2: structural metadata + exact file extent. No fabricated layer geometry. */
+/* Universal CMF2 metadata reader. Geometry is never fabricated. */
 (function(){
-  function asciiAt(u8,off,len){let s='';for(let i=off;i<Math.min(u8.length,off+len);i++)s+=String.fromCharCode(u8[i]);return s}
-  function findAscii(u8,needle){const n=[...needle].map(c=>c.charCodeAt(0)),out=[];outer:for(let i=0;i<=u8.length-n.length;i++){for(let j=0;j<n.length;j++)if(u8[i+j]!==n[j])continue outer;out.push(i)}return out}
-  function utm40ToWgs84(easting,northing){
-    const a=6378137,eccSquared=0.00669438,k0=0.9996,lonOrigin=57;
-    const eccPrimeSquared=eccSquared/(1-eccSquared),M=northing/k0,mu=M/(a*(1-eccSquared/4-3*eccSquared*eccSquared/64-5*Math.pow(eccSquared,3)/256));
-    const e1=(1-Math.sqrt(1-eccSquared))/(1+Math.sqrt(1-eccSquared));
-    const phi1Rad=mu+(3*e1/2-27*Math.pow(e1,3)/32)*Math.sin(2*mu)+(21*e1*e1/16-55*Math.pow(e1,4)/32)*Math.sin(4*mu)+(151*Math.pow(e1,3)/96)*Math.sin(6*mu);
-    const N1=a/Math.sqrt(1-eccSquared*Math.sin(phi1Rad)*Math.sin(phi1Rad)),T1=Math.tan(phi1Rad)*Math.tan(phi1Rad),C1=eccPrimeSquared*Math.cos(phi1Rad)*Math.cos(phi1Rad),R1=a*(1-eccSquared)/Math.pow(1-eccSquared*Math.sin(phi1Rad)*Math.sin(phi1Rad),1.5),D=(easting-500000)/(N1*k0);
-    const lat=phi1Rad-(N1*Math.tan(phi1Rad)/R1)*(D*D/2-(5+3*T1+10*C1-4*C1*C1-9*eccPrimeSquared)*Math.pow(D,4)/24+(61+90*T1+298*C1+45*T1*T1-252*eccPrimeSquared-3*C1*C1)*Math.pow(D,6)/720);
-    const lon=(D-(1+2*T1+C1)*Math.pow(D,3)/6+(5-2*C1+28*T1-3*C1*C1+8*eccPrimeSquared+24*T1*T1)*Math.pow(D,5)/120)/Math.cos(phi1Rad);
-    return [lat*180/Math.PI,lonOrigin+lon*180/Math.PI]
-  }
-  function readKnownExtent(view){
-    if(view.byteLength<2168)return null;
-    const vals=[2126,2138,2150,2162].map(o=>view.getFloat64(o,true));
-    const [xmin,ymin,xmax,ymax]=vals;
-    if(!(xmin>100000&&xmin<900000&&xmax>xmin&&ymin>4000000&&ymin<7000000&&ymax>ymin))return null;
-    const sw=utm40ToWgs84(xmin,ymin),ne=utm40ToWgs84(xmax,ymax);
-    return {utm:{xmin,ymin,xmax,ymax},wgs84:{south:sw[0],west:sw[1],north:ne[0],east:ne[1]}}
-  }
-  async function decode(file){
-    const buf=await file.arrayBuffer(),u8=new Uint8Array(buf),view=new DataView(buf);
-    if(u8.length<4||asciiAt(u8,0,4)!=='CMF2')throw new Error('Это не файл CMF2');
-    const utf8=new TextDecoder('utf-8',{fatal:false}).decode(u8),utf16=new TextDecoder('utf-16le',{fatal:false}).decode(u8),hay=utf8+'\n'+utf16;
-    const known=(window.cmf2Layers||[]).filter(x=>hay.includes(x.source));
-    const generic=[...new Set((hay.match(/[\wА-Яа-яЁё]+(?:_[\wА-Яа-яЁё]+){1,8}_(?:region|polyline|text|point)/g)||[]))].slice(0,100);
-    const layers=known.length?known:generic.map(source=>({source,name:source,type:''}));
-    const proj=(hay.match(/\+proj=utm[^\x00\r\n]{0,180}/)||[])[0]?.trim()||'';
-    return {layers,projection:proj||'UTM',pstgBlocks:findAscii(u8,'PSTG').length,sqliteHeaders:findAscii(u8,'SQLite format 3').length,extent:readKnownExtent(view),size:u8.length};
-  }
-  window.inspectCmf2=decode;
-
-  function removeAccept(){const i=document.getElementById('mapFileInput');if(i)i.removeAttribute('accept')}
-  window.addEventListener('DOMContentLoaded',()=>setTimeout(removeAccept,0));
-  const oldEnsure=window.ensureMapFileUi;
-  if(typeof oldEnsure==='function')window.ensureMapFileUi=function(){oldEnsure();removeAccept()};
-
-  const oldHandle=window.handleMapFiles;
-  if(typeof oldHandle==='function')window.handleMapFiles=async function(input){
-    const all=[...(input?.files||[])];
-    const cmfs=all.filter(f=>/\.cmf2$/i.test(f.name));
-    const rest=all.filter(f=>!/\.cmf2$/i.test(f.name));
-    for(const file of cmfs){
-      try{
-        const info=await decode(file);
-        const key=`${file.name}|${file.size}|${file.lastModified}`;
-        let entry=(window.importedMapLayers||[]).find(x=>x.cmf2&&x.key===key);
-        if(!entry){
-          entry={name:file.name,cmf2:true,key,count:info.layers.length,projection:info.projection,visible:true,info};
-          if(info.extent?.wgs84&&window.L&&window.fieldMap){
-            const e=info.extent.wgs84,b=[[e.south,e.west],[e.north,e.east]];
-            entry.layer=L.rectangle(b,{weight:2,fillOpacity:0,dashArray:'7 6',interactive:false}).addTo(fieldMap);
-            fieldMap.fitBounds(b,{padding:[12,12]});
-          }
-          window.importedMapLayers?.push(entry);
-        }else if(entry.info?.extent?.wgs84&&window.fieldMap){
-          const e=entry.info.extent.wgs84;fieldMap.fitBounds([[e.south,e.west],[e.north,e.east]],{padding:[12,12]});
-        }
-        if(typeof window.toast==='function')toast(`CMF2: ${info.layers.length} слоёв · территория найдена`);
-      }catch(e){console.error(e);if(typeof window.toast==='function')toast(`${file.name}: ${e.message||'ошибка CMF2'}`)}
-    }
-    if(rest.length&&oldHandle){const dt=new DataTransfer();rest.forEach(f=>dt.items.add(f));const fake={files:dt.files,value:''};await oldHandle(fake)}
-    if(typeof window.renderMapLayerList==='function')renderMapLayerList();
-    if(input)input.value='';
-  };
+ function asciiAt(u8,o,n){let s='';for(let i=o;i<Math.min(u8.length,o+n);i++)s+=String.fromCharCode(u8[i]);return s}
+ function findAscii(u8,needle){const n=[...needle].map(c=>c.charCodeAt(0)),out=[];outer:for(let i=0;i<=u8.length-n.length;i++){for(let j=0;j<n.length;j++)if(u8[i+j]!==n[j])continue outer;out.push(i)}return out}
+ function utmToWgs84(easting,northing,zone){const a=6378137,e2=.00669438,k0=.9996,ep=e2/(1-e2),M=northing/k0,mu=M/(a*(1-e2/4-3*e2*e2/64-5*Math.pow(e2,3)/256)),e1=(1-Math.sqrt(1-e2))/(1+Math.sqrt(1-e2)),p=mu+(3*e1/2-27*Math.pow(e1,3)/32)*Math.sin(2*mu)+(21*e1*e1/16-55*Math.pow(e1,4)/32)*Math.sin(4*mu)+(151*Math.pow(e1,3)/96)*Math.sin(6*mu),N=a/Math.sqrt(1-e2*Math.sin(p)**2),T=Math.tan(p)**2,C=ep*Math.cos(p)**2,R=a*(1-e2)/Math.pow(1-e2*Math.sin(p)**2,1.5),D=(easting-500000)/(N*k0),lat=p-(N*Math.tan(p)/R)*(D**2/2-(5+3*T+10*C-4*C*C-9*ep)*D**4/24+(61+90*T+298*C+45*T*T-252*ep-3*C*C)*D**6/720),lon=(D-(1+2*T+C)*D**3/6+(5-2*C+28*T-3*C*C+8*ep+24*T*T)*D**5/120)/Math.cos(p),origin=(zone-1)*6-180+3;return[lat*180/Math.PI,origin+lon*180/Math.PI]}
+ function layerNames(hay){const rx=/[\wА-Яа-яЁё .-]{1,80}_(?:region|polyline|text|point)\b/g;return[...new Set(hay.match(rx)||[])].map(source=>({source,name:source,type:source.split('_').pop()})).slice(0,250)}
+ function extent(view,zone){if(view.byteLength<2168||!zone)return null;const [xmin,ymin,xmax,ymax]=[2126,2138,2150,2162].map(o=>view.getFloat64(o,true));if(!(xmin>100000&&xmin<900000&&xmax>xmin&&ymin>0&&ymax>ymin))return null;const sw=utmToWgs84(xmin,ymin,zone),ne=utmToWgs84(xmax,ymax,zone);return{utm:{xmin,ymin,xmax,ymax},wgs84:{south:sw[0],west:sw[1],north:ne[0],east:ne[1]}}}
+ async function decode(file){const buf=await file.arrayBuffer(),u8=new Uint8Array(buf),view=new DataView(buf);if(u8.length<4||asciiAt(u8,0,4)!=='CMF2')throw new Error('Это не CMF2');const a=new TextDecoder('utf-8',{fatal:false}).decode(u8),b=new TextDecoder('utf-16le',{fatal:false}).decode(u8),hay=a+'\n'+b,projection=(hay.match(/\+proj=utm[^\x00\r\n]{0,180}/)||[])[0]?.trim()||'',zone=Number((projection.match(/\+zone=(\d+)/)||[])[1])||null;return{layers:layerNames(hay),projection:projection||'CMF2',zone,pstgBlocks:findAscii(u8,'PSTG').length,sqliteHeaders:findAscii(u8,'SQLite format 3').length,extent:extent(view,zone),size:u8.length}}
+ window.inspectCmf2=decode;
 })();
