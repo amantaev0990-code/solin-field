@@ -1,4 +1,4 @@
-/* Universal CMF2 structure reader. Reads real metadata and probes the real CarryMap LZ4 spatial stream; never fabricates geometry. */
+/* Universal CMF2 structure reader. Reads real metadata and probes CarryMap LZ4 SpatialBlock payload; never fabricates geometry. */
 (function(){
  function asciiAt(u8,o,n){let s='';for(let i=o;i<Math.min(u8.length,o+n);i++)s+=String.fromCharCode(u8[i]);return s}
  function findAscii(u8,needle){const n=[...needle].map(c=>c.charCodeAt(0)),out=[];outer:for(let i=0;i<=u8.length-n.length;i++){for(let j=0;j<n.length;j++)if(u8[i+j]!==n[j])continue outer;out.push(i)}return out}
@@ -6,30 +6,20 @@
  function niceName(source){return source.replace(/^(?:\d+_)+/,'').replace(/_(region|polyline|text|point)$/i,'').replace(/_/g,' ')}
  function layerNames(hay){const rx=/[0-9A-Za-zА-Яа-яЁё .()\-]{1,96}_(?:region|polyline|text|point)\b/g;return[...new Set(hay.match(rx)||[])].map((source,index)=>{const type=source.match(/_(region|polyline|text|point)$/i)?.[1]?.toLowerCase()||'';return{index,source,name:niceName(source),type}}).slice(0,500)}
  function readExtent(view,zone,south){if(view.byteLength<2168||!zone)return null;const [xmin,ymin,xmax,ymax]=[2126,2138,2150,2162].map(o=>view.getFloat64(o,true));if(!(xmin>100000&&xmin<900000&&xmax>xmin&&ymin>0&&ymax>ymin))return null;const sw=utmToWgs84(xmin,ymin,zone,south),ne=utmToWgs84(xmax,ymax,zone,south);return{utm:{xmin,ymin,xmax,ymax},wgs84:{south:Math.min(sw[0],ne[0]),west:Math.min(sw[1],ne[1]),north:Math.max(sw[0],ne[0]),east:Math.max(sw[1],ne[1])}}}
- function storageBlocks(u8,layers){const pstg=findAscii(u8,'PSTG'),sqlite=findAscii(u8,'SQLite format 3');return pstg.map((offset,i)=>{let records=null;if(offset+13<u8.length){let n=0;for(let b=0;b<8;b++)n+=u8[offset+5+b]*2**(8*b);if(Number.isSafeInteger(n)&&n>0&&n<1e8)records=n}return{index:i,offset,records,sqliteOffset:sqlite.find(x=>x>offset&&(i===pstg.length-1||x<pstg[i+1]))??null,layer:layers[i]?.source||null}})}
+ function storageBlocks(u8,layers){const pstg=findAscii(u8,'PSTG'),sqlite=findAscii(u8,'SQLite format 3');return pstg.map((offset,i)=>({index:i,offset,sqliteOffset:sqlite.find(x=>x>offset&&(i===pstg.length-1||x<pstg[i+1]))??null,layer:layers[i]?.source||null}))}
  function schemaHints(hay){const known=['FID_','gShape_','Лесничество','Леснич','КатЗащ','Nкварт','Nвыд','Площ','КатЗем','Бонитет','Тип_леса','Порода','Тон','ХозРасп'];return known.filter(x=>hay.includes(x))}
-
- // CarryMap CMF2 uses a raw LZ4 stream for the spatial payload. This decoder follows the actual LZ4 token format.
  function lz4Raw(u8,start,maxOut=4*1024*1024){let i=start;const out=[];try{while(i<u8.length&&out.length<maxOut){const token=u8[i++];let lit=token>>>4;if(lit===15){let x;do{x=u8[i++];if(x==null)throw 0;lit+=x}while(x===255)}if(i+lit>u8.length)throw 0;for(let k=0;k<lit;k++)out.push(u8[i++]);if(i>=u8.length)break;if(i+1>=u8.length)throw 0;const off=u8[i]|(u8[i+1]<<8);i+=2;if(!off||off>out.length)throw 0;let m=token&15;if(m===15){let x;do{x=u8[i++];if(x==null)throw 0;m+=x}while(x===255)}m+=4;for(let k=0;k<m;k++){out.push(out[out.length-off]);if(out.length>=maxOut)break}}}catch(_){ }return{bytes:new Uint8Array(out),inputEnd:i,inputLength:Math.max(0,i-start),outputLength:out.length}}
- function hasAscii(u8,s){const n=[...s].map(c=>c.charCodeAt(0));outer:for(let i=0;i<=u8.length-n.length;i++){for(let j=0;j<n.length;j++)if(u8[i+j]!==n[j])continue outer;return true}return false}
+ function hasAscii(u8,s){return findAscii(u8,s).length>0}
+ function u32le(u8,o){return o+4<=u8.length?(u8[o]|u8[o+1]<<8|u8[o+2]<<16|u8[o+3]<<24)>>>0:null}
+ function inspectLogical(bytes){const pstg=findAscii(bytes,'PSTG'),sqlite=findAscii(bytes,'SQLite format 3');const h=[0,4,8,12].map(o=>u32le(bytes,o));return{headerU32:h,vertexLikeCount:h[0]||null,indexLikeCount:h[1]||null,partLikeCount:h[2]||null,pageSizeHint:h[3]||null,pstgOffsets:pstg,sqliteOffsets:sqlite,spatialPayloadBytes:pstg.length?pstg[0]:bytes.length,tailBytes:pstg.length?bytes.length-pstg[0]:0}}
  function probeSpatialStream(u8,pstgOffsets){if(!pstgOffsets.length)return null;const first=pstgOffsets[0],from=Math.max(1024,first-180000),to=first;let best=null;
-  // First pass is deliberately sparse so an iPhone does not freeze on large files.
-  for(let s=from;s<to;s+=4){const p=lz4Raw(u8,s,256*1024);if(p.outputLength<32768)continue;if(!hasAscii(p.bytes,'PSTG'))continue;if(!hasAscii(p.bytes,'SQLite format 3'))continue;if(!best||p.outputLength>best.outputLength)best={start:s,...p}}
+  for(let s=from;s<to;s+=4){const p=lz4Raw(u8,s,256*1024);if(p.outputLength<32768||!hasAscii(p.bytes,'PSTG')||!hasAscii(p.bytes,'SQLite format 3'))continue;if(!best||p.outputLength>best.outputLength)best={start:s,...p}}
   if(!best)return null;
-  // Refine the exact byte boundary around the sparse hit.
-  let refined=best;for(let s=Math.max(from,best.start-4);s<=Math.min(to-1,best.start+4);s++){const p=lz4Raw(u8,s,512*1024);if(p.outputLength>=refined.outputLength&&hasAscii(p.bytes,'PSTG')&&hasAscii(p.bytes,'SQLite format 3'))refined={start:s,...p}}
-  return{start:refined.start,inputEnd:refined.inputEnd,compressedBytes:refined.inputLength,logicalBytes:refined.outputLength,pstgInLogical:findAscii(refined.bytes,'PSTG')[0]??null,sqliteInLogical:findAscii(refined.bytes,'SQLite format 3')[0]??null};
+  let refined=best;for(let s=Math.max(from,best.start-8);s<=Math.min(to-1,best.start+8);s++){const p=lz4Raw(u8,s,768*1024);if(p.outputLength>=refined.outputLength&&hasAscii(p.bytes,'PSTG')&&hasAscii(p.bytes,'SQLite format 3'))refined={start:s,...p}}
+  const logical=inspectLogical(refined.bytes);
+  return{start:refined.start,inputEnd:refined.inputEnd,compressedBytes:refined.inputLength,logicalBytes:refined.outputLength,...logical};
  }
- async function decode(file){
-  const buf=await file.arrayBuffer(),u8=new Uint8Array(buf),view=new DataView(buf);
-  if(u8.length<4||asciiAt(u8,0,4)!=='CMF2')throw new Error('Это не CMF2');
-  const a=new TextDecoder('utf-8',{fatal:false}).decode(u8),b=new TextDecoder('utf-16le',{fatal:false}).decode(u8),hay=a+'\n'+b;
-  const projection=(hay.match(/\+proj=utm[^\x00\r\n]{0,220}/)||[])[0]?.trim()||'';
-  const zone=Number((projection.match(/\+zone=(\d+)/)||[])[1])||null,south=/\+south\b/.test(projection);
-  const layers=layerNames(hay),blocks=storageBlocks(u8,layers),pstg=blocks.map(x=>x.offset);
-  const spatialStream=probeSpatialStream(u8,pstg);
-  return{format:'CMF2',layers,projection:projection||'CMF2',zone,south,pstgBlocks:blocks.length,sqliteHeaders:findAscii(u8,'SQLite format 3').length,blocks,fields:schemaHints(hay),extent:readExtent(view,zone,south),spatialStream,size:u8.length};
- }
+ async function decode(file){const buf=await file.arrayBuffer(),u8=new Uint8Array(buf),view=new DataView(buf);if(u8.length<4||asciiAt(u8,0,4)!=='CMF2')throw new Error('Это не CMF2');const a=new TextDecoder('utf-8',{fatal:false}).decode(u8),b=new TextDecoder('utf-16le',{fatal:false}).decode(u8),hay=a+'\n'+b;const projection=(hay.match(/\+proj=utm[^\x00\r\n]{0,220}/)||[])[0]?.trim()||'',zone=Number((projection.match(/\+zone=(\d+)/)||[])[1])||null,south=/\+south\b/.test(projection),layers=layerNames(hay),blocks=storageBlocks(u8,layers),spatialStream=probeSpatialStream(u8,blocks.map(x=>x.offset));return{format:'CMF2',layers,projection:projection||'CMF2',zone,south,pstgBlocks:blocks.length,sqliteHeaders:findAscii(u8,'SQLite format 3').length,blocks,fields:schemaHints(hay),extent:readExtent(view,zone,south),spatialStream,size:u8.length}}
  window.inspectCmf2=decode;
- window.SolinCmf2Lz4={decodeRaw:lz4Raw};
+ window.SolinCmf2Lz4={decodeRaw:lz4Raw,inspectLogical};
 })();
