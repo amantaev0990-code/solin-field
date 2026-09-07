@@ -1,0 +1,17 @@
+name: Wine Mono tar
+on:
+  push:
+    paths: ['.github/workflows/wine-mono-tar.yml']
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download tar
+        run: |
+          curl -L --retry 3 'https://github.com/wine-mono/wine-mono/releases/download/wine-mono-11.3.0/wine-mono-11.3.0-x86.tar.xz' -o /tmp/wine-mono-x86.tar.xz
+          ls -lh /tmp/wine-mono-x86.tar.xz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wine-mono-tar
+          path: /tmp/wine-mono-x86.tar.xz
+          retention-days: 1
