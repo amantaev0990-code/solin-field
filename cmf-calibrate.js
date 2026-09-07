@@ -1,0 +1,15 @@
+/* Visual CMF2 alignment in meters. Persists per opened CMF2 file. */
+(function(){
+ let east=0,north=0,step=20,current=null;
+ function shiftLatLngs(v,de,dn){if(Array.isArray(v)){if(v.length&&v[0]&&typeof v[0].lat==='number'){for(const ll of v){const dLat=dn/111320,dLon=de/(111320*Math.cos(ll.lat*Math.PI/180));ll.lat+=dLat;ll.lng+=dLon}return v}for(const x of v)shiftLatLngs(x,de,dn)}return v}
+ function shiftLayer(layer,de,dn){if(layer?.eachLayer)layer.eachLayer(l=>shiftLayer(l,de,dn));else if(layer?.getLatLngs&&layer?.setLatLngs){const a=layer.getLatLngs();shiftLatLngs(a,de,dn);layer.setLatLngs(a)}else if(layer?.getLatLng&&layer?.setLatLng){const ll=layer.getLatLng(),dLat=dn/111320,dLon=de/(111320*Math.cos(ll.lat*Math.PI/180));layer.setLatLng([ll.lat+dLat,ll.lng+dLon])}}
+ function activeEntry(){for(let i=importedMapLayers.length-1;i>=0;i--)if(importedMapLayers[i]?.cmf2)return importedMapLayers[i];return null}
+ function save(){if(!current)return;const key=current.info?._cmfFileKey;if(key)window.SolinCmfRuntime?.saveAlignmentByKey?.(key,east,north)}
+ function move(de,dn){current=activeEntry();if(!current)return toast('Сначала открой CMF2');for(const g of current.geometryEntries||[])shiftLayer(g.layer,de,dn);if(current.layer)shiftLayer(current.layer,de,dn);east+=de;north+=dn;save();update();}
+ function update(){const s=document.getElementById('cmfCalStatus');if(s)s.textContent=`E ${Math.round(east)} м · N ${Math.round(north)} м · шаг ${step} м`}
+ function open(){current=activeEntry();if(!current)return toast('Сначала открой CMF2');const a=current.info?.carryAlignment||{east:0,north:0};east=Number(a.east)||0;north=Number(a.north)||0;let p=document.getElementById('cmfCalPanel');if(!p){p=document.createElement('div');p.id='cmfCalPanel';p.className='cmfCalPanel';p.innerHTML='<b>Совмещение CMF2 со спутником</b><small id="cmfCalStatus"></small><div class="cmfCalGrid"><button onclick="CmfCal.move(0,CmfCal.step())">↑</button><button onclick="CmfCal.move(-CmfCal.step(),0)">←</button><button onclick="CmfCal.move(CmfCal.step(),0)">→</button><button onclick="CmfCal.move(0,-CmfCal.step())">↓</button></div><div class="cmfCalSteps"><button onclick="CmfCal.setStep(5)">5 м</button><button onclick="CmfCal.setStep(20)">20 м</button><button onclick="CmfCal.setStep(100)">100 м</button><button onclick="CmfCal.close()">Готово</button></div>';document.querySelector('#mapScreen .mapWrap')?.appendChild(p)}p.classList.add('open');update()}
+ function close(){document.getElementById('cmfCalPanel')?.classList.remove('open')}
+ function install(){const tb=document.querySelector('#mapScreen .mapToolbar');if(!tb||document.getElementById('cmfCalBtn'))return;const b=document.createElement('button');b.id='cmfCalBtn';b.className='mapMode';b.textContent='⇆ Совместить';b.onclick=open;tb.appendChild(b)}
+ window.CmfCal={open,close,move,setStep:n=>{step=n;update()},step:()=>step};
+ setTimeout(install,100);document.addEventListener('visibilitychange',()=>setTimeout(install,0));
+})();
