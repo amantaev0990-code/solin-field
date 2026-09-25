@@ -1,0 +1,10 @@
+{
+  "name": "SOLI-N Field",
+  "short_name": "SOLI-N Field",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#04150b",
+  "theme_color": "#04150b",
+  "description": "Полевая таксация SOLI-N",
+  "orientation": "portrait-primary"
+}
