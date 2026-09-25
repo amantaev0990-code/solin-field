@@ -1,0 +1,43 @@
+name: Build Flutter preview
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "flutter_app/**"
+      - ".github/workflows/flutter-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Get packages
+        working-directory: flutter_app
+        run: flutter pub get
+
+      - name: Build web
+        working-directory: flutter_app
+        run: flutter build web --release --base-href /solin-field/flutter/
+
+      - name: Publish preview into repository
+        run: |
+          rm -rf flutter
+          mkdir -p flutter
+          cp -R flutter_app/build/web/. flutter/
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add flutter
+          git diff --cached --quiet && exit 0
+          git commit -m "Build Flutter web preview"
+          git push
