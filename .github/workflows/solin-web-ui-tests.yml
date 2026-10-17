@@ -1,0 +1,108 @@
+name: SOLI-N exact offline website runtime smoke test
+
+on:
+  push:
+    branches:
+      - android-exact-web-20261017
+    paths:
+      - ".github/workflows/solin-web-ui-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bundle original app as shipped in the APK
+        run: python3 android_web_clone/prepare_assets.py
+      - name: Inject test harness in temporary copy only
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('android_web_clone/app/src/main/assets/www/index.html')
+          html=p.read_text()
+          probe="""<script>
+          window.addEventListener('load',()=>{setTimeout(async()=>{
+            const r={};
+            try {
+              r.title=document.querySelector('.brand h1')?.textContent==='SOLI-N Field';
+              r.qcount=document.querySelector('#qcount')?.textContent?.trim();
+              r.vcount=document.querySelector('#vcount')?.textContent?.trim();
+              r.quartercards=document.querySelectorAll('#quarters .quarterCard').length;
+              r.nativeBridge=typeof window.SolinAndroid!=='undefined';
+              r.localLeaflet=typeof L !=='undefined' && typeof L.map==='function';
+              openQuarter('1');
+              r.compCard=document.querySelectorAll('#qComps .compCard').length>0;
+              document.querySelector('#qComps .compCard')?.click();
+              r.taxationCard=!!document.querySelector('#humanContent .humanField');
+              show('refsScreen');
+              r.refs=document.querySelectorAll('#friendlyRefs .refCard').length>0;
+              openMapScreen();
+              r.map=!!fieldMap;
+              openQuarterForm();
+              document.querySelector('#newKV').value='9973';
+              createQuarter();
+              r.localSave=!!JSON.parse(localStorage.getItem('solin_user_data_v1')).quarters['9973'];
+              r.afterCreate=document.querySelector('#qcount')?.textContent.trim();
+            }catch(e){r.error=String(e)}
+            document.body.dataset.solinTest=btoa(JSON.stringify(r));
+          },900)});
+          </script>"""
+          html=html.replace('</body>',probe+'</body>')
+          p.write_text(html)
+          PY
+      - name: Boot website with local HTTP server; evaluate Chrome DOM
+        shell: bash
+        run: |
+          set -e
+          cd android_web_clone/app/src/main/assets/www
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/solin-http.log 2>&1 &
+          SERVER=$!
+          trap 'kill "$SERVER" || true' EXIT
+          sleep 3
+          CHROME=$(command -v google-chrome || command -v chromium || command -v chromium-browser)
+          echo "Browser: $CHROME"
+          timeout 65 "$CHROME" --headless --no-sandbox --disable-dev-shm-usage --disable-gpu \
+            --window-size=390,850 --virtual-time-budget=16000 \
+            --dump-dom http://127.0.0.1:8765/index.html > /tmp/solin-dom.html 2>/tmp/solin-chrome.log
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          import base64,json
+          class Reader(HTMLParser):
+            def __init__(self):
+              super().__init__()
+              self.result=None
+            def handle_starttag(self,tag,attrs):
+              if tag=='body':
+                self.result=dict(attrs).get('data-solin-test')
+          parser=Reader()
+          parser.feed(open('/tmp/solin-dom.html').read())
+          assert parser.result,'Smoke test did not execute browser JavaScript'
+          result=json.loads(base64.b64decode(parser.result))
+          print('Browser runtime results:',json.dumps(result,ensure_ascii=False,indent=2))
+          assert result['title'], 'Site original heading'
+          assert result['qcount']=='70', '70 quarters'
+          assert result['vcount']=='471', '471 compartments'
+          assert result['quartercards']==70, 'quarter list'
+          assert result['localLeaflet'], 'offline Leaflet'
+          assert result['compCard'] and result['taxationCard'], 'taxation card'
+          assert result['refs'], 'reference tables'
+          assert result['map'], 'map initialized'
+          assert result['localSave'] and result['afterCreate']=='71', 'localStorage edit persists'
+          print('PASS: original offline web app functional smoke checks')
+          PY
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SOLIN-Web-Runtime-Evidence
+          path: |
+            /tmp/solin-dom.html
+            /tmp/solin-chrome.log
+            /tmp/solin-http.log
+          if-no-files-found: warn
