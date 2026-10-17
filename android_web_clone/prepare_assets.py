@@ -64,9 +64,13 @@ shutil.copy2(HERE / "solin-android-bridge.js", OUT / "solin-android-bridge.js")
 # Replace with local location only when vendor library and sql.js WASM exist.
 gpkg = OUT / "gpkg-loader.js"
 if gpkg.exists() and "https://unpkg.com/@ngageoint/geopackage@4.2.6/dist/geopackage.min.js" in success:
-    # geo package may require extra wasm from its own dist; keep the original
-    # dynamic wasm resolver until those resources are verified.
-    pass
+    # Use the packaged SQL.js WASM binary instead of the network CDN.
+    text = gpkg.read_text(encoding="utf-8")
+    text = text.replace(
+        "f=>'https://unpkg.com/@ngageoint/geopackage@4.2.6/dist/'+f",
+        "f=>'./vendor/'+f",
+    )
+    gpkg.write_text(text, encoding="utf-8")
 
 assert (OUT / "index.html").exists()
 assert (OUT / "app.js").exists()
