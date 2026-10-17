@@ -1,0 +1,61 @@
+name: Test SOLI-N on Android emulator
+
+on:
+  push:
+    branches:
+      - android-exact-web-20261017
+    paths:
+      - "android_web_clone/**"
+      - ".github/workflows/solin-emulator-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Bundle exact original website and libraries
+        run: python3 android_web_clone/prepare_assets.py
+      - name: Compile app and Android instrumented tests
+        run: gradle -p android_web_clone --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Test fully offline on emulated Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          arch: x86_64
+          profile: pixel_4
+          target: google_apis
+          emulator-options: -no-window -no-snapshot -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          script: |
+            adb shell svc wifi disable
+            adb shell svc data disable
+            gradle -p android_web_clone --no-daemon :app:connectedDebugAndroidTest
+            mkdir -p android_web_clone/emulator-evidence
+            adb shell svc wifi enable
+            adb shell am start -n kz.solin.field/.MainActivity
+            sleep 8
+            adb shell screencap -p /sdcard/solin-home.png
+            adb pull /sdcard/solin-home.png android_web_clone/emulator-evidence/home.png
+      - name: Upload test reports, screenshot and APK even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SOLIN-Android-Emulator-Test-Results
+          if-no-files-found: warn
+          path: |
+            android_web_clone/app/build/reports/androidTests/**
+            android_web_clone/app/build/outputs/androidTest-results/**
+            android_web_clone/emulator-evidence/**
+            android_web_clone/app/build/outputs/apk/debug/app-debug.apk
