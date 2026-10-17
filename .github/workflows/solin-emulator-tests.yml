@@ -29,6 +29,9 @@ jobs:
         run: python3 android_web_clone/prepare_assets.py
       - name: Compile app and Android instrumented tests
         run: gradle -p android_web_clone --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Enable hardware accelerated Android emulator
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; ls -l /dev/kvm; else echo 'No KVM available'; fi
       - name: Test fully offline on emulated Android
         uses: reactivecircus/android-emulator-runner@v2
         with:
