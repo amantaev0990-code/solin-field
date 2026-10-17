@@ -44,7 +44,7 @@ public class MainActivity extends Activity {
         getWindow().setNavigationBarColor(Color.rgb(6, 37, 20));
 
         WebViewAssetLoader assets = new WebViewAssetLoader.Builder()
-            .addPathHandler("/assets/www/", new WebViewAssetLoader.AssetsPathHandler(this))
+            .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
             .build();
         web = new WebView(this);
         WebSettings s = web.getSettings();
