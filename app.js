@@ -5,7 +5,7 @@ const childNames={Макет10:'Древостой',Макет11:'Лесные �
 async function getJSON(u){const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw new Error(u);return r.json()}
 function esc(v){if(v===null||v===undefined||v==='')return '—';return String(v).replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[m]||m))}function num(v,d=1){const n=Number(v);return Number.isFinite(n)?n.toLocaleString('ru-RU',{maximumFractionDigits:d}):'—'}
 function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),1800)}
-function show(id){$$('.screen').forEach(x=>x.classList.remove('active'));$('#'+id)?.classList.add('active');$$('.nav').forEach(x=>x.classList.toggle('active',x.dataset.s===id));scrollTo({top:0,behavior:'smooth'})}
+function show(id){$$('.screen').forEach(x=>x.classList.remove('active'));$('#'+id)?.classList.add('active');$('.sectionTab').forEach(x=>x.classList.toggle('active',x.dataset.s===id));scrollTo({top:0,behavior:'smooth'})}
 function lookup(k,v){const maps=D?.fieldLookups||{};const aliases={M3Pr:'POR',PORP:'POR',P15:'POR',PRP1:'POR',PRP2:'POR',PRP3:'POR',PLP1:'POR',PLP2:'POR',PLP3:'POR'};const m=maps[k]||maps[aliases[k]];return m?.[String(v)]??v}
 function landName(v){return lookup('KU',v)||''}function speciesName(v){return lookup('POR',v)||''}
 function saveLocal(){const obj={quarters:{}};for(const[k,q]of Object.entries(D.quarters))if(q._local||q.compartments.some(x=>x._local))obj.quarters[k]={_local:q._local||false,meta:q.meta||{},compartments:q.compartments.filter(x=>x._local)};localStorage.setItem('solin_user_data_v1',JSON.stringify(obj))}
@@ -31,4 +31,4 @@ function renderFriendlyRefs(q=''){q=q.trim().toLowerCase();const box=$('#friendl
 function renderDb(){const box=$('#dbTables');if(!box||!D)return;box.innerHTML=Object.entries(D.transfSchema||{}).map(([n,cols])=>`<div class="dbRow"><b>${childNames[n]||n.replace('Макет','Макет ')}</b><small>${cols.length} полей</small></div>`).join('')}
 function locate(){if(!navigator.geolocation)return toast('GPS недоступен');navigator.geolocation.getCurrentPosition(p=>{gps={lat:p.coords.latitude,lon:p.coords.longitude,acc:p.coords.accuracy};toast(`GPS: ${gps.lat.toFixed(5)}, ${gps.lon.toFixed(5)}`)},()=>toast('Разреши доступ к геопозиции'),{enableHighAccuracy:true,timeout:10000})}
 function exportLocal(){const s=localStorage.getItem('solin_user_data_v1')||'{}';const blob=new Blob([s],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='solin-field-local.json';a.click();URL.revokeObjectURL(a.href);toast('Экспорт готов')}
-window.addEventListener('DOMContentLoaded',boot);if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+window.addEventListener('DOMContentLoaded',()=>boot());if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
