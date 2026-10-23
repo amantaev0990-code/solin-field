@@ -3,7 +3,7 @@
  async function openGpkg(file){
   if(!window.GeoPackage) throw new Error('Модуль GeoPackage не загрузился');
   const api=window.GeoPackage.GeoPackageAPI||window.GeoPackage.GeoPackageManager||window.GeoPackage;
-  if(window.GeoPackage.setSqljsWasmLocateFile) window.GeoPackage.setSqljsWasmLocateFile(f=>'https://unpkg.com/@ngageoint/geopackage@4.2.6/dist/'+f);
+  if(window.GeoPackage.setSqljsWasmLocateFile) window.GeoPackage.setSqljsWasmLocateFile(f=>'./vendor/'+f);
   const bytes=new Uint8Array(await file.arrayBuffer());
   const gp=await (api.open?api.open(bytes):window.GeoPackage.open(bytes));
   const names=gp.getFeatureTables?gp.getFeatureTables():[];

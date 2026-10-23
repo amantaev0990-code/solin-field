@@ -4,12 +4,12 @@
 'use strict';
 const STORE="solin_field_overrides_v3";
 function saved(){try{return JSON.parse(localStorage.getItem(STORE)||"{}")}catch{return{}}}
-function key(row){return String(row.KV)+"::"+String(row.VD)}
+function key(row){return ['POS','LESN','KV','KGLF','VD'].map(k=>row[k]??D?.lesnichestvo?.[0]?.[k]??'').join('::')}
 function applyOverrides(){
- if(typeof D==="undefined"||!D?.quarters)return;
+ if(typeof D==="undefined"||!D?.quarters||localStorage.getItem('solin_field_checkpoint_v2'))return;
  const changes=saved();
  for(const q of Object.values(D.quarters||{}))for(const row of q.compartments||[]){
-  const patch=changes[key(row)];if(!patch)continue;
+  const patch=changes[key(row)]||(Object.values(D.quarters).flatMap(q=>q.compartments).filter(v=>String(v.KV)===String(row.KV)&&String(v.VD)===String(row.VD)).length===1?changes[String(row.KV)+"::"+String(row.VD)]:null);if(!patch)continue;
   Object.assign(row,patch.fields||{});
   if(patch.m10){row._children=row._children||{};const a=row._children.Макет10||(row._children.Макет10=[{}]);if(!a.length)a.push({});Object.assign(a[0],patch.m10);}
  }
@@ -76,7 +76,7 @@ window.solinOpenPhoto=()=>{
 };
 window.solinRenderPhotos=async()=>{
  const r=cur(),box=document.getElementById('solinPhotoList');if(!box||!r)return;
- const photos=(await dbGetAll('photos')).filter(x=>x.rowKey===key(r));
+ const photos=(await dbGetAll('photos')).filter(x=>x.rowKey===key(r)||(x.rowKey===String(r.KV)+'::'+String(r.VD)&&Object.values(D.quarters).flatMap(q=>q.compartments).filter(v=>String(v.KV)===String(r.KV)&&String(v.VD)===String(r.VD)).length===1));
  box.replaceChildren();
  if(!photos.length)return;
  const h=document.createElement('h3');h.textContent='Фото выдела ('+photos.length+')';box.appendChild(h);
