@@ -119,6 +119,7 @@ if(!confirm('Удалить только эту запись '+m+' №'+(index+1
 const before=JSON.stringify(r);r._children[m]=rowsOf(r,m).filter((_,i)=>i!==index);
 try{saveAll(r);openMaket(m);notify('Запись удалена локально');}catch(e){Object.assign(r,JSON.parse(before));notify(e.message);}}
 function editBase(){const r=record();if(!r)return;
+if(window.SolinCardEditor)return window.SolinCardEditor.open(r);
 openModal('Выдел '+r.VD+' · квартал '+r.KV,'<div class="wf-form-note">Редактирование основной таблицы «Выдел»; состав макетов редактируется в отдельных разделах.</div><div class="formGrid wf-formgrid">'+humanInputs(EDIT_FIELDS,r,'wfb','ВыделВ')+'</div><div class="formActions"><button class="secondary" onclick="closeModal()">Отмена</button><button class="primary" id="wfSaveBase">Сохранить выдел</button></div>');
 document.querySelector('#wfSaveBase').onclick=()=>{
  let fields;try{fields=bindInputs(document.querySelector('#modalBody'),EDIT_FIELDS,'wfb',r);}catch(e){notify(e.message);return;}
