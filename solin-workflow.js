@@ -109,7 +109,7 @@ target[m]=list;
 try{saveAll(r);}catch(e){notify('Не удалось сохранить: '+e.message);return;}
 closeModal();openMaket(m);notify('Сохранено: '+m);
 };}
-function saveAll(r){const makets={};for(const m of CORE){const list=rowsOf(r,m);if(list.length)makets[m]=list.map(row=>({...row}));}store(r,{makets,base:Object.fromEntries(EDIT_FIELDS.filter(k=>r[k]!=null).map(k=>[k,r[k]]))});}
+function saveAll(r){const makets={};for(const m of CORE){const list=rowsOf(r,m);if(list.length)makets[m]=list.map(row=>({...row}));}store(r,{makets,base:Object.fromEntries(EDIT_FIELDS.map(k=>[k,r[k]??null]))});}
 function deleteMaket(m,index){const r=record();if(!r)return;
 if(!confirm('Удалить только эту запись '+m+' №'+(index+1)+' из локальной мобильной копии?'))return;
 r._children[m]=rowsOf(r,m).filter((_,i)=>i!==index);
@@ -171,9 +171,23 @@ if(route==='audit'){openModal('Статус точного переноса','<p
 function setup(){
  enhancedMenu();
  const prev=window.renderComp;
- if(typeof prev==='function')window.renderComp=function(){prev();currentMaket='Макет10';cardToolbar();openMaket(currentMaket);};
+ if(typeof prev==='function')window.renderComp=function(){if(record())localPatch(record());prev();currentMaket='Макет10';cardToolbar();openMaket(currentMaket);};
  const oldQuarter=window.openQuarter;
  if(typeof oldQuarter==='function')window.openQuarter=function(k){oldQuarter(k);quarterToolbar(k);};
+ const mapShow=window.showCmfSheet;
+ if(typeof mapShow==='function')window.showCmfSheet=function(feature,latlng,layer){
+   mapShow(feature,latlng,layer);
+   const p=feature?.properties||{},kv=p.Nкварт??p.KV??p.Квартал,vd=p.Nвыд??p.VD??p.Выдел;
+   if(kv==null||vd==null)return;
+   const button=document.createElement('button');button.className='wf-card-from-map';button.type='button';
+   button.textContent='▦ Открыть карточку таксации '+kv+'-'+vd;
+   button.onclick=()=>{
+     const q=db()?.quarters?.[String(kv)],r=q?.compartments?.find(x=>String(x.VD)===String(vd));
+     if(!r){notify('Выдел '+kv+'-'+vd+' есть на карте, но не найден в текущей базе таксации');return;}
+     current=r;if(typeof renderComp==='function')renderComp();if(typeof show==='function')show('card');
+   };
+   document.querySelector('#cmfSheet .cmfCard')?.appendChild(button);
+ };
  const oldBoot=window.boot;
  if(typeof oldBoot==='function')window.boot=async function(){await oldBoot();apply();if(typeof refresh==='function')refresh();};
  window.solinWorkflow={openMaket,checkData,editBase,editMaket,printCard,showWholeCard,exitCard,saveAll};
