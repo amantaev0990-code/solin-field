@@ -192,5 +192,5 @@ function setup(){
  if(typeof oldBoot==='function')window.boot=async function(){await oldBoot();apply();if(typeof refresh==='function')refresh();};
  window.solinWorkflow={openMaket,checkData,editBase,editMaket,printCard,showWholeCard,exitCard,saveAll};
 }
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});else setup();
+if(document.querySelector('#menuScreen .workspace'))setup();else document.addEventListener('DOMContentLoaded',setup,{once:true});
 })();
