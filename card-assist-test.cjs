@@ -1,0 +1,63 @@
+/* Regression: readable mobile editor while keeping desktop SOLI-N coordinates. */
+'use strict';
+const {chromium}=require(process.env.PLAYWRIGHT_PATH||'playwright');
+const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const root=__dirname;
+const mime={'.html':'text/html; charset=utf-8','.js':'application/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.wasm':'application/wasm'};
+const server=http.createServer((req,res)=>{const rel=decodeURIComponent(req.url.split('?')[0]||'/');const file=path.resolve(root,'.'+rel);if(!file.startsWith(root+path.sep)&&file!==root){res.writeHead(403);return res.end('forbidden');}try{const target=fs.statSync(file).isDirectory()?path.join(file,'index.html'):file;res.setHeader('Content-Type',mime[path.extname(target)]||'application/octet-stream');res.end(fs.readFileSync(target));}catch{res.writeHead(404);res.end('not found');}});
+(async()=>{let browser;
+ try{
+  await new Promise(r=>server.listen(8129,'127.0.0.1',r));
+  browser=await chromium.launch({headless:true});
+  const page=await browser.newPage({viewport:{width:390,height:844},acceptDownloads:true,hasTouch:true,isMobile:true});
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+  await page.goto('http://127.0.0.1:8129/');
+  await page.waitForFunction(()=>window.SolinWorkspace&&window.SOLIN_REFS&&window.SolinCardAssist);
+  await page.evaluate(()=>SolinWorkspace.ready);
+  await page.evaluate(async()=>{const f=(await SolinWorkspace.list())[0];await SolinWorkspace.activate(f.id);current=Object.values(D.quarters).flatMap(q=>q.compartments).find(r=>r._children?.Макет10?.length)||Object.values(D.quarters).flatMap(q=>q.compartments)[0];renderComp();show('card');});
+  await page.locator('#wfEditBase').click();
+  await page.locator('#ce-form').waitFor();
+  assert.equal(await page.locator('.dt-board').evaluate(el=>el.offsetWidth),1200);
+  assert.equal(await page.locator('.dt-board').evaluate(el=>el.offsetHeight),704);
+  assert.equal(await page.locator('#ce-section-10').evaluate(el=>el.offsetTop),406);
+  assert(await page.locator('[data-ce-assist-find]').isVisible());
+  assert(await page.locator('[data-ce-assist-row]').isVisible());
+  const original=await page.locator('[data-ce-scope="base"][data-ce-field="PLV"]').inputValue();
+  await page.locator('[data-ce-assist-find]').click();
+  await page.locator('#ce-assist-query').fill('Площадь');
+  await page.locator('[data-ce-assist-pick]').first().click();
+  await page.locator('#ce-assist-value').fill('23,75');
+  await page.locator('[data-ce-assist-apply]').click();
+  assert.equal(await page.locator('[data-ce-field="PLV"]').inputValue(),'23,75');
+  assert(await page.locator('#ce-assist').isHidden());
+  await page.locator('[data-ce-assist-find]').click();
+  await page.locator('#ce-assist-query').fill('Категория угодий');
+  await page.locator('[data-ce-assist-pick]').first().click();
+  await page.locator('#ce-assist-query').fill('пастбище');
+  assert(await page.locator('[data-ce-assist-option]').count()>0);
+  await page.locator('[data-ce-assist-option]').first().click();
+  assert(await page.locator('[data-ce-field="KU"]').inputValue());
+  await page.locator('[data-ce-assist-row]').click();
+  assert(await page.locator('.ce-assist-row-field').count()>=10);
+  await page.locator('[data-ce-assist-row-field="3"]').click();
+  assert(await page.locator('#ce-assist-value').isVisible());
+  await page.locator('#ce-assist-value').fill('61');
+  await page.locator('[data-ce-assist-apply]').click();
+  assert(await page.locator('.ce-assist-row-field').count()>=10);
+  await page.locator('[data-ce-assist-done]').click();
+  for(const width of [390,320]){
+    await page.setViewportSize({width,height:844});
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'page overflow at '+width);
+    await page.locator('[data-ce-assist-find]').click();
+    assert(await page.locator('.ce-assist-panel').evaluate(el=>{const r=el.getBoundingClientRect();return r.left>=-1&&r.right<=innerWidth+1&&r.top>=-1&&r.bottom<=innerHeight+1;}),'overlay escaped screen');
+    await page.locator('[data-ce-assist-close]').click();
+    await page.locator('[data-ce-zoom="fit"]').click();
+    assert(await page.locator('.dt-board').evaluate(el=>el.getBoundingClientRect().width<=innerWidth+1));
+  }
+  await page.locator('#ce-cancel').click();
+  assert(await page.locator('#ce-form').isHidden());
+  assert.equal(await page.evaluate(()=>current.PLV).then(Number),Number(original.replace(',','.')),'Cancel must discard edited values');
+  assert.deepEqual(errors,[]);
+  console.log('PASS desktop geometry, fixed narrow viewports, code lookup, text entry, stand row editing, cancellation, no page exceptions');
+ }catch(e){console.error(e.stack||e);process.exitCode=1;}finally{await browser?.close();server.close();}
+})();
