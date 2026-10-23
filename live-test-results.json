@@ -1,0 +1,77 @@
+{
+  "target": "https://amantaev0990-code.github.io/solin-field/",
+  "results": [
+    {
+      "name": "boot",
+      "status": "PASS",
+      "quarters": 70,
+      "stands": 471
+    },
+    {
+      "name": "navigation",
+      "status": "PASS"
+    },
+    {
+      "name": "maket numeric comma/save",
+      "status": "PASS"
+    },
+    {
+      "name": "persistence after reload",
+      "status": "PASS"
+    },
+    {
+      "name": "delete final maket row persists",
+      "status": "PASS"
+    },
+    {
+      "name": "Transfer includes all 90 quarter rows, current records/maket16",
+      "status": "PASS",
+      "rows": 471
+    },
+    {
+      "name": "backup restore and invalid input rejection",
+      "status": "PASS"
+    },
+    {
+      "name": "Access rule subset/null",
+      "status": "PASS"
+    },
+    {
+      "name": "154 reference datasets and 554 form definitions",
+      "status": "PASS"
+    },
+    {
+      "name": "K04/K39 fixtures, KGLF branches, code96 priority, missing refs",
+      "status": "PASS"
+    },
+    {
+      "name": "reference content search and lazy rows",
+      "status": "PASS"
+    },
+    {
+      "name": "filter to tax card",
+      "status": "PASS"
+    },
+    {
+      "name": "quarter edit preserves separate KGLF rows",
+      "status": "PASS"
+    },
+    {
+      "name": "map uppercase attributes to tax card",
+      "status": "PASS"
+    },
+    {
+      "name": "GeoJSON import",
+      "status": "PASS"
+    },
+    {
+      "name": "offline reload, data, all references and map libraries",
+      "status": "PASS"
+    },
+    {
+      "name": "mobile browser no uncaught errors",
+      "status": "PASS"
+    }
+  ],
+  "errors": []
+}
