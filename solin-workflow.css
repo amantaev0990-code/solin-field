@@ -1,0 +1,38 @@
+/* SOLI-N Field audited workflow layer — touch-first forms, readable 15-maket navigation. */
+#wfMenu{padding:4px 0 12px}#wfMenu h3{margin:12px 4px 10px;color:#d6ffe2}
+.wf-toolbar{display:flex;flex-wrap:wrap;gap:8px;padding:8px 0 14px}
+.wf-toolbar button,.wf-action,.wf-section-head button,.wf-summary-row button{min-height:40px;cursor:pointer;border:1px solid #397e53;background:#102e20;color:#e5f8e9;border-radius:10px;padding:10px 12px;font-size:13px;font-weight:700}
+.wf-toolbar .wf-primary,.wf-section-head .wf-primary{background:#2bc567;color:#092113;border-color:#38b969}
+.wf-maket-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 2px 9px;color:#e9f9ed}
+.wf-maket-head b{font-size:17px;display:block}.wf-maket-head small{display:block;color:#9ebdac;font-size:11px;margin-top:3px}
+.wf-maket-nav{display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;padding:6px 1px 14px;scroll-snap-type:x proximity}
+.wf-makbtn{position:relative;flex:0 0 125px;min-height:92px;border-radius:13px;padding:10px 10px 12px;background:#13351f;color:#e9f9ed;text-align:left;border:1px solid #2d6041;scroll-snap-align:start;cursor:pointer}
+.wf-makbtn.on{background:#254f31;border:2px solid #56ec8d}
+.wf-makbtn b{font-size:21px;display:block;line-height:1.1;color:#75e7a0}
+.wf-makbtn small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:10px;line-height:1.2;margin-top:5px;opacity:.95}
+.wf-makbtn i{position:absolute;right:7px;top:7px;background:#2a5337;color:#dcffe5;border-radius:12px;padding:1px 6px;font-size:10px;font-style:normal}
+.wf-maket-view{padding:13px;background:#10271b;border:1px solid #2b613f;border-radius:15px;margin:4px 0 15px}
+.wf-section-head{display:flex;justify-content:space-between;align-items:center;gap:9px;padding:3px 0 12px}.wf-section-head h3{font-size:18px;margin:5px 0}.wf-eyebrow{color:#85c9a0;font-size:11px;letter-spacing:.04em;text-transform:uppercase}
+.wf-muted{color:#a1bbac;font-size:12px;line-height:1.5}
+.wf-empty{border:1px dashed #51805b;border-radius:11px;background:#173424;padding:18px;color:#d5f4dc;margin:14px 0;font-size:13px}
+.wf-row{margin:12px 0;background:#173525;border:1px solid #315e40;border-radius:12px;padding:11px}
+.wf-rowhead{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-bottom:9px;margin-bottom:9px;border-bottom:1px solid #35604a}
+.wf-rowhead button{padding:8px 10px;border:1px solid #568c64;color:#e5fff0;background:#234b31;border-radius:8px;font-size:12px;margin-left:5px}
+.wf-rowhead button.wf-danger{background:#452327;color:#ffd7dc;border-color:#a3505b}
+.wf-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.wf-kv{min-width:0;background:#0b281a;border:1px solid #214a31;border-radius:9px;padding:10px}
+.wf-kv span{display:block;color:#91b89f;font-size:11px;margin-bottom:6px;word-break:break-word}
+.wf-kv b{font-size:14px;color:#eefff0;overflow-wrap:anywhere}
+.wf-form-note{border-radius:11px;padding:11px;margin:11px 0;background:#133525;color:#b6e1c1;font-size:12px;line-height:1.5;border:1px solid #326446}
+.wf-formgrid{gap:11px}
+.wf-field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.wf-field span{color:#d0e4d4;font-size:12px}
+.wf-field small{opacity:.65;margin-left:4px;font-family:monospace;font-size:10px}
+.wf-field input,.wf-field select{width:100%;min-width:0;padding:10px;background:#0e2b1d;color:#f4fff6;border:1px solid #47785a;border-radius:9px;font-size:16px}
+.wf-summary-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;border-bottom:1px solid #295338;padding:13px 0}
+.wf-summary-row b{font-size:12px}.wf-summary-row span{font-size:11px;color:#9db6a7}.wf-summary-row button{grid-column:1/-1;justify-self:start;padding:8px 10px}
+.wf-check{padding:10px;margin:6px 0;border-radius:8px;font-size:13px;background:#4a2b2b;color:#ffd9d9}
+.wf-check.warn{background:#4a3b20;color:#ffe5b0}.wf-check.ok{background:#245039;color:#e0ffdf}
+#childTabs.chips{display:block!important;overflow:visible!important;min-height:0!important}
+#childContent{min-width:0}
+@media(max-width:420px){.wf-toolbar button{font-size:12px;flex:1 1 calc(50% - 8px)}.wf-grid{grid-template-columns:1fr}.wf-maket-head{align-items:flex-start}.wf-section-head{align-items:flex-start}.wf-formgrid{grid-template-columns:1fr}.wf-makbtn{flex-basis:115px}}
