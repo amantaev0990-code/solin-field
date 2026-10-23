@@ -56,7 +56,7 @@ const server=http.createServer((req,res)=>{const rel=decodeURIComponent(req.url.
   }
   await page.locator('#ce-cancel').click();
   assert(await page.locator('#ce-form').isHidden());
-  assert.equal(await page.evaluate(()=>current.PLV).then(Number),Number(original.replace(',','.')),'Cancel must discard edited values');
+  assert(Math.abs(Number(await page.evaluate(()=>current.PLV))-Number(original.replace(',','.')))<0.00001,'Cancel must discard edited values (float32 precision)');
   assert.deepEqual(errors,[]);
   console.log('PASS desktop geometry, fixed narrow viewports, code lookup, text entry, stand row editing, cancellation, no page exceptions');
  }catch(e){console.error(e.stack||e);process.exitCode=1;}finally{await browser?.close();server.close();}
