@@ -1,0 +1,109 @@
+{
+  "target": "http://127.0.0.1:8135/",
+  "source": "Transf_213_1_2026.mdb",
+  "sourceSha256": "a6d2ce90473d18c8aa49d9e1b798bee5ec1a204c0ce1d0d6f09d55c3456bb0be",
+  "mobileEmulation": true,
+  "physicalPhoneTested": false,
+  "results": [
+    {
+      "name": "original forest available before import",
+      "status": "PASS",
+      "id": "213::2",
+      "org": {
+        "POS": 213,
+        "LESN": 2,
+        "GodT": 2026,
+        "KTO": 150000000,
+        "territoryType": 6,
+        "PR": 2.3,
+        "PR25": 0,
+        "MIN": 2,
+        "UOS": 2,
+        "Район": 0,
+        "Исп": 0,
+        "PLOB": null,
+        "PLPOKR": null,
+        "GodPU": 2015,
+        "NLX": "Карабутакское государственное учреждение лесного хозяйства",
+        "NOS": "Бугетсайское",
+        "Адрес": null,
+        "Тел": null,
+        "Емаил": null,
+        "ФИО": null
+      },
+      "quarterRows": 90,
+      "quarters": 70,
+      "stands": 471
+    },
+    {
+      "name": "actual MDB file read locally and previewed by the import UI",
+      "status": "PASS",
+      "file": "Transf_213_1_2026.mdb",
+      "bytes": 3891200
+    },
+    {
+      "name": "actual imported forest has the expected owner, 611 stands and 115 quarter rows",
+      "status": "PASS",
+      "id": "213::1",
+      "org": {
+        "POS": 213,
+        "LESN": 1,
+        "GodT": 2026,
+        "KTO": 150000000,
+        "territoryType": 6,
+        "PR": 2.3,
+        "PR25": 0,
+        "MIN": 2,
+        "UOS": 2,
+        "NLX": "Карабутакское государственное учреждение лесного хозяйства",
+        "NOS": "Комсомольское",
+        "Район": 0,
+        "Адрес": null,
+        "Тел": null,
+        "Емаил": null,
+        "ФИО": null,
+        "Исп": 0,
+        "PLOB": null,
+        "PLPOKR": null,
+        "GodPU": 2015
+      },
+      "quarterRows": 115,
+      "quarters": 102,
+      "stands": 611
+    },
+    {
+      "name": "UI switching isolates the original 471 stands and imported 611 stands",
+      "status": "PASS"
+    },
+    {
+      "name": "actual MDB forest persists after browser reload",
+      "status": "PASS"
+    },
+    {
+      "name": "backup JSON import UI preserves GPS, macro rows and extra tables",
+      "status": "PASS"
+    },
+    {
+      "name": "restored GPS and extra tables remain in a fresh backup",
+      "status": "PASS"
+    },
+    {
+      "name": "replacement preview backs up the affected forest instead of another active forest",
+      "status": "PASS"
+    },
+    {
+      "name": "offline reload and UI switching preserve all three independent forests",
+      "status": "PASS"
+    },
+    {
+      "name": "source MDB unchanged",
+      "status": "PASS",
+      "sha256": "a6d2ce90473d18c8aa49d9e1b798bee5ec1a204c0ce1d0d6f09d55c3456bb0be"
+    },
+    {
+      "name": "no uncaught JavaScript errors",
+      "status": "PASS"
+    }
+  ],
+  "errors": []
+}

@@ -26,7 +26,7 @@ GZ:'Год закладки',KLD:'Количество',KU_St:'Прежняя к
 };
 const FORM_LABELS={KU:'Категория угодий',PLV:'Площадь, га',KlxrVD:'Хозяйственная секция',M3Pr:'Главная порода',M3B:'Класс бонитета',M3TL:'Тип леса',M3TLU:'Тип лесорастительных условий',M2PM1:'Проектируемое мероприятие',M2Pr:'Интенсивность, %',Fzona:'Функциональная зона',OZU:'Особо защитный участок',CkKr:'Крутизна склона',CkEk:'Экспозиция склона',VNUM:'Высота над уровнем моря',M4ZO:'Общая захламлённость',M4ZL:'Ликвидная захламлённость',M4SS:'Сухостой'};
 const EDIT_FIELDS=["KlxrVD","Fzona","PLV","KU","PP","CR","ARE","OZU","CkEk","CkKr","VNUM","ErV","ErCt","M2PM1","M2Pr","PTK1","M22","PTK2","M23","PTK3","M2Cp","M3Pr","M3B","M3TL","M3TLU","M3G","M3KP","M3KPC","M3D","M3TR","M4ZO","M4ZL","M4SS","M4TX","NE2A","AKL","AGR","AGR1","STUR","STUR1","Vsost","PRkol","PRH","PRA","PRK1","PRP1","PRK2","PRP2","PRK3","PRP3","PROC","PLG","PLP1","PLP2","PLP3"];
-const DECIMAL=new Set(['RAS','Koef16','Voz16','H16','Ur16','Sbor','VZ','SHR','PRT','SHT','KLD','PLV','PH','PD2','POL','SPS','ZAP','PR','M2Pr','SHR','PL','PL15','PTR1','PTR2','PTR3','PTR4','P20','ZPR','PRH','STUR1','KOL','KOEF','AV','ZO','LIK','DEL','PLP']);
+const DECIMAL=new Set(['RAS','Koef16','Voz16','H16','Ur16','Sbor','VZ','SHR','PRT','SHT','KLD','PLV','PH','PD2','POL','SPS','ZAP','PR','M2Pr','SHR','PL','PL15','PTR1','PTR2','PTR3','PTR4','ZPR','PRH','STUR1','KOL','KOEF','AV','ZO','LIK','DEL','PLP']);
 const MULTIPLE=new Set(['Макет10','Макет11','Макет12','Макет13','Макет15','Макет16','Макет20','Макет25']);
 const h=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','"':'&quot;',"'":'&#39;'}[c]));
 const record=()=>typeof current!=='undefined'?current:null;
@@ -40,20 +40,23 @@ function localPatch(r){const data=read()[rowKey(r)];if(!data)return;Object.assig
 function apply(){const database=db();if(!database?.quarters)return;for(const q of Object.values(database.quarters))for(const r of q.compartments||[])localPatch(r);}
 let currentMaket='Макет10',activeMakEdit=null;
 function findLookups(field,form){
+ const exact=window.SolinHuman?.lookup(form,field);if(exact)return exact;
  if(form&&db()?.scopedLookups?.[form]?.[field])return db().scopedLookups[form][field];
  const database=db();let mapping={POR:'POR',P15:'POR',PORP:'POR',M3Pr:'POR',PRP1:'POR',KU:'KU',KU_St:'KU',TB:'TB',TR:'TR',IAR:'IAR',M3B:'M3B',M2PM1:'M2PM1'}[field];
  return mapping?database?.fieldLookups?.[mapping]:null;
 }
 function fieldInput(name,value='',prefix='wf',form='ВыделВ'){
- const label=LABELS[name]||FORM_LABELS[name]||db()?.fieldLabels?.[name]||name;
+ if(window.SolinHuman?.input)return SolinHuman.input(name,value,prefix,form);
+ const label=window.SolinHuman?.label(form,name)||LABELS[name]||FORM_LABELS[name]||db()?.fieldLabels?.[name]||name;
  const id=prefix+'_'+name,lookup=findLookups(name,form),str=String(value??'');
  if(lookup){
- const options=Object.entries(lookup).filter(([k,v])=>k!==''&&v!=null).map(([k,v])=>'<option value="'+h(k)+'"'+(String(k)===str?' selected':'')+'>'+h(k+' — '+v)+'</option>').join('');
- return '<label class="wf-field"><span>'+h(label)+' <small>'+h(name)+'</small></span><select id="'+h(id)+'" data-wffield="'+h(name)+'"><option value="">— не указано —</option>'+options+'</select></label>';
+ const options=Object.entries(lookup).filter(([k,v])=>k!==''&&v!=null).map(([k,v])=>'<option value="'+h(k)+'"'+(String(k)===str?' selected':'')+'>'+h(v)+'</option>').join('');
+ return '<label class="wf-field"><span>'+h(label)+' <small>'+h('')+'</small></span><select id="'+h(id)+'" data-wffield="'+h(name)+'"><option value="">— не указано —</option>'+options+'</select></label>';
  }
  const numeric=DECIMAL.has(name)||['LET','VNUM','PRA','PRkol','KOEF','PH','PD2','ZAP','POL','MTC','G15','GZ'].includes(name);
- return '<label class="wf-field"><span>'+h(label)+' <small>'+h(name)+'</small></span><input id="'+h(id)+'" data-wffield="'+h(name)+'" '+(numeric?'inputmode="decimal"':'')+' autocomplete="off" value="'+h(str)+'" placeholder="—"></label>';
+ return '<label class="wf-field"><span>'+h(label)+' <small>'+h('')+'</small></span><input id="'+h(id)+'" data-wffield="'+h(name)+'" '+(numeric?'inputmode="decimal"':'')+' autocomplete="off" value="'+h(str)+'" placeholder="—"></label>';
 }
+function humanInputs(fields,values,prefix,form){const isTech=f=>window.SolinHuman?.isTechnical(form,f);const main=fields.filter(f=>!isTech(f)).map(f=>fieldInput(f,values[f]??'',prefix,form)).join('');const technical=fields.filter(isTech).map(f=>fieldInput(f,values[f]??'',prefix,form)).join('');return main+(technical?'<details class="human-technical"><summary>Служебные поля · значения сохранены</summary><div class="formGrid">'+technical+'</div></details>':'');}
 function bindInputs(root,schema,prefix,values){const obj={};for(const key of schema){const el=root.querySelector('#'+prefix+'_'+key);if(!el)continue;const raw=el.value.trim();if(raw===''){obj[key]=null;continue;}
 if((DECIMAL.has(key)||['LET','VNUM','PRA','PRkol','MTC','G15','GZ','PH','PD2','ZAP','POL'].includes(key))&&!Number.isFinite(Number(raw.replace(',','.'))))throw Error('Проверь число: '+(LABELS[key]||key));
 obj[key]=DECIMAL.has(key)||['LET','VNUM','PRA','PRkol','MTC','G15','GZ','PH','PD2','ZAP','POL'].includes(key)?Number(raw.replace(',','.')):raw;
@@ -65,8 +68,8 @@ function maketSummary(r,m){const rows=rowsOf(r,m),length=rows.length;
  return length?length+' записей':'Нет данных';
 }
 function cardToolbar(){const host=document.querySelector('#childTabs');if(!host||!record())return;
-const tabs='<div class="wf-maket-head"><div><b>Таксационные макеты</b><small>По структуре оригинальной SOLI-N · 15 разделов</small></div><button type="button" class="wf-action" id="wfShowComplete">КТ · Все макеты</button></div>'+
-'<div class="wf-maket-nav">'+CORE.map(m=>'<button type="button" class="wf-makbtn '+(currentMaket===m?'on':'')+'" data-maket="'+m+'"><b>'+m.replace('Макет','')+'</b><small>'+h(NAMES[m])+'</small><i>'+rowsOf(record(),m).length+'</i></button>').join('')+'</div>';
+const tabs='<div class="wf-maket-head"><div><b>Характеристики выдела</b><small>Данные и полевые наблюдения</small></div><button type="button" class="wf-action" id="wfShowComplete">Все разделы</button></div>'+
+'<div class="wf-maket-nav">'+CORE.map(m=>'<button type="button" class="wf-makbtn '+(currentMaket===m?'on':'')+'" data-maket="'+m+'"><b>'+h(window.SolinHuman?.formName(m)||NAMES[m])+'</b><i>'+rowsOf(record(),m).length+'</i></button>').join('')+'</div>';
 host.innerHTML=tabs;host.querySelectorAll('[data-maket]').forEach(b=>b.onclick=()=>openMaket(b.dataset.maket));
 host.querySelector('#wfShowComplete').onclick=showWholeCard;
 const oldBar=document.querySelector('#humanContent .solinEditBar');
@@ -79,17 +82,17 @@ content.prepend(bar);
 bar.querySelector('#wfEditBase').onclick=editBase;bar.querySelector('#wfCardCheck').onclick=()=>checkData(record(),true);
 bar.querySelector('#wfCardPrint').onclick=printCard;bar.querySelector('#wfCardExit').onclick=exitCard;
 }}
-function showWholeCard(){const r=record();if(!r)return;document.querySelector('#childContent').innerHTML='<div class="wf-maket-view"><h3>Краткая карточка таксации · КТ</h3><p class="wf-muted">Аналог сводного просмотра ВыделКрат. Данные отображаются без расчёта исходных Access-отчётов.</p>'+CORE.map(m=>'<div class="wf-summary-row"><b>'+m.replace('Макет','')+' · '+h(NAMES[m])+'</b><span>'+h(maketSummary(r,m))+'</span><button data-cardmak="'+m+'">Открыть →</button></div>').join('')+'</div>';
+function showWholeCard(){const r=record();if(!r)return;document.querySelector('#childContent').innerHTML='<div class="wf-maket-view"><h3>Краткая карточка таксации · КТ</h3><p class="wf-muted">Аналог сводного просмотра ВыделКрат. Данные отображаются без расчёта исходных Access-отчётов.</p>'+CORE.map(m=>'<div class="wf-summary-row"><b>'+m.replace('Макет','')+' · '+h(window.SolinHuman?.formName(m)||NAMES[m])+'</b><span>'+h(maketSummary(r,m))+'</span><button data-cardmak="'+m+'">Открыть →</button></div>').join('')+'</div>';
 document.querySelectorAll('[data-cardmak]').forEach(b=>b.onclick=()=>openMaket(b.dataset.cardmak));}
 function openMaket(m){const r=record();if(!r||!CORE.includes(m))return;currentMaket=m;cardToolbar();
 const rs=rowsOf(r,m),fields=(db()?.transfSchema?.[m]||[]).filter(n=>!KEY_FIELDS.includes(n));
 const wrap=document.querySelector('#childContent');if(!wrap)return;
-let html='<div class="wf-maket-view"><div class="wf-section-head"><div><div class="wf-eyebrow">'+h(m)+' · '+rs.length+' записей</div><h3>'+h(NAMES[m])+'</h3></div><button class="wf-primary" id="wfAddRow">＋ Строка</button></div>';
-html+='<p class="wf-muted">Поля взяты из структуры таблицы '+h(m)+'. Списки показывают исходные коды без динамических ограничений Access. Изменения сохраняются локально; сложные проверки оригинальной SOLI-N ещё не реализованы.</p>';
-if(!rs.length)html+='<div class="wf-empty">В этом выделе нет записей. Нажми «＋ Строка», чтобы заполнить '+h(m)+'.</div>';
+let html='<div class="wf-maket-view"><div class="wf-section-head"><div><div class="wf-eyebrow">'+rs.length+' записей</div><h3>'+h(window.SolinHuman?.formName(m)||NAMES[m])+'</h3></div><button class="wf-primary" id="wfAddRow">＋ Строка</button></div>';
+html+='<p class="wf-muted">Выберите запись для изменения или добавьте новую.</p>';
+if(!rs.length)html+='<div class="wf-empty">Здесь пока нет записей. Добавьте первую.</div>';
 rs.forEach((row,i)=>{
- const values=fields.map(k=>row[k]!==null&&row[k]!==undefined&&row[k]!==''?'<div class="wf-kv"><span>'+h(LABELS[k]||FORM_LABELS[k]||k)+'</span><b>'+h(findLookups(k,m)?.[String(row[k])]||fmt(row[k]))+'</b></div>':'').filter(Boolean).join('');
- html+='<article class="wf-row"><div class="wf-rowhead"><b>Запись '+(i+1)+'</b><span><button data-edit="'+i+'">Изменить</button><button class="wf-danger" data-del="'+i+'">Удалить</button></span></div><div class="wf-grid">'+(values||'<div class="wf-muted">Запись без заполненных полей</div>')+'</div></article>';
+ const renderValue=k=>row[k]!==null&&row[k]!==undefined&&row[k]!==''?'<div class="wf-kv"><span>'+h(window.SolinHuman?.label(m,k)||LABELS[k]||FORM_LABELS[k]||k)+'</span><b>'+h(window.SolinHuman?SolinHuman.value(m,k,row[k],row):findLookups(k,m)?.[String(row[k])]||fmt(row[k]))+'</b></div>':'';const values=fields.filter(k=>!window.SolinHuman?.isTechnical(m,k)).map(renderValue).filter(Boolean).join('');const raw=fields.filter(k=>window.SolinHuman?.isTechnical(m,k)).map(renderValue).filter(Boolean).join('');
+ html+='<article class="wf-row"><div class="wf-rowhead"><b>Запись '+(i+1)+'</b><span><button data-edit="'+i+'">Изменить</button><button class="wf-danger" data-del="'+i+'">Удалить</button></span></div><div class="wf-grid">'+(values||'<div class="wf-muted">Запись без заполненных полей</div>')+(raw?'<details class="human-source"><summary>Служебные данные</summary>'+raw+'</details>':'')+'</div></article>';
 });
 html+='</div>';wrap.innerHTML=html;
 wrap.querySelector('#wfAddRow').onclick=()=>editMaket(m,rs.length);
@@ -99,8 +102,8 @@ wrap.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>deleteMaket(m,Numbe
 function editMaket(m,index){const r=record();if(!r)return;
 const fields=(db()?.transfSchema?.[m]||[]).filter(n=>!KEY_FIELDS.includes(n)),existing=rowsOf(r,m)[index]||{};
 if(typeof openModal!=='function')return;
-openModal((index===rowsOf(r,m).length?'Новая запись · ':'Изменение · ')+m,
-'<div class="wf-form-note">Данные сохраняются только в SOLI-N Field. Оригинальные базы SOLI-N не изменяются.</div><div class="formGrid wf-formgrid">'+fields.map(f=>fieldInput(f,existing[f]??'','wf',m)).join('')+'</div><div class="formActions"><button class="secondary" onclick="closeModal()">Отмена</button><button class="primary" id="wfSaveMaket">Сохранить '+h(m)+'</button></div>');
+openModal((index===rowsOf(r,m).length?'Новая запись · ':'Изменение · ')+(window.SolinHuman?.formName(m)||NAMES[m]),
+'<div class="wf-form-note">Данные сохраняются только в SOLI-N Field. Оригинальные базы SOLI-N не изменяются.</div><div class="formGrid wf-formgrid">'+humanInputs(fields,existing,'wf',m)+'</div><div class="formActions"><button class="secondary" onclick="closeModal()">Отмена</button><button class="primary" id="wfSaveMaket">Сохранить</button></div>');
 document.querySelector('#wfSaveMaket').onclick=()=>{const container=document.querySelector('#modalBody');let values;try{values=bindInputs(container,fields,'wf',existing);}catch(e){notify(e.message);return;}
 const before=JSON.stringify(r);const failures=window.solinCore?.validateRow(m,values,r)||[];if(failures.length){notify(failures.join("; "));return;}const target=(r._children=r._children||{});
 const list=[...rowsOf(r,m)],base={...existing,...values};
@@ -116,7 +119,7 @@ if(!confirm('Удалить только эту запись '+m+' №'+(index+1
 const before=JSON.stringify(r);r._children[m]=rowsOf(r,m).filter((_,i)=>i!==index);
 try{saveAll(r);openMaket(m);notify('Запись удалена локально');}catch(e){Object.assign(r,JSON.parse(before));notify(e.message);}}
 function editBase(){const r=record();if(!r)return;
-openModal('Выдел '+r.VD+' · квартал '+r.KV,'<div class="wf-form-note">Редактирование основной таблицы «Выдел»; состав макетов редактируется в отдельных разделах.</div><div class="formGrid wf-formgrid">'+EDIT_FIELDS.map(field=>fieldInput(field,r[field]??'','wfb')).join('')+'</div><div class="formActions"><button class="secondary" onclick="closeModal()">Отмена</button><button class="primary" id="wfSaveBase">Сохранить выдел</button></div>');
+openModal('Выдел '+r.VD+' · квартал '+r.KV,'<div class="wf-form-note">Редактирование основной таблицы «Выдел»; состав макетов редактируется в отдельных разделах.</div><div class="formGrid wf-formgrid">'+humanInputs(EDIT_FIELDS,r,'wfb','ВыделВ')+'</div><div class="formActions"><button class="secondary" onclick="closeModal()">Отмена</button><button class="primary" id="wfSaveBase">Сохранить выдел</button></div>');
 document.querySelector('#wfSaveBase').onclick=()=>{
  let fields;try{fields=bindInputs(document.querySelector('#modalBody'),EDIT_FIELDS,'wfb',r);}catch(e){notify(e.message);return;}
  const p=Number(String(fields.PLV).replace(',','.'));if(!Number.isFinite(p)||p<=0){notify('Площадь выдела должна быть положительной');return;}
@@ -139,8 +142,8 @@ const seen=new Map();for(const m of CORE){for(const [i,row]of rowsOf(r,m).entrie
 if(modal)openModal('Контроль выдела '+r.KV+'-'+r.VD,html);
 return msgs;}
 function printCard(){const r=record();if(!r)return;let html='<h1>Карточка таксации SOLI-N Field</h1><p>Лесничество: '+h(db()?.source?.forestDistrict||'')+'</p><p><b>Квартал '+h(r.KV)+' · Выдел '+h(r.VD)+'</b> · Площадь '+h(r.PLV)+' га</p>';
-html+='<h2>Основные сведения</h2><table>'+EDIT_FIELDS.filter(k=>r[k]!=null&&r[k]!=='').map(k=>'<tr><th>'+h(FORM_LABELS[k]||k)+'</th><td>'+h(r[k])+'</td></tr>').join('')+'</table>';
-for(const m of CORE){const rows=rowsOf(r,m);if(!rows.length)continue;html+='<h2>'+h(m)+' · '+h(NAMES[m])+'</h2>';rows.forEach((row,i)=>{html+='<h3>Запись '+(i+1)+'</h3><table>'+Object.entries(row).filter(([k,v])=>!KEY_FIELDS.includes(k)&&v!==null&&v!==undefined&&v!=='').map(([k,v])=>'<tr><th>'+h(LABELS[k]||k)+'</th><td>'+h(v)+'</td></tr>').join('')+'</table>';});}
+html+='<h2>Основные сведения</h2><table>'+EDIT_FIELDS.filter(k=>r[k]!=null&&r[k]!=='').map(k=>'<tr><th>'+h(window.SolinHuman?.label('ВыделВ',k)||FORM_LABELS[k]||k)+'</th><td>'+h(r[k])+'</td></tr>').join('')+'</table>';
+for(const m of CORE){const rows=rowsOf(r,m);if(!rows.length)continue;html+='<h2>'+h(m)+' · '+h(window.SolinHuman?.formName(m)||NAMES[m])+'</h2>';rows.forEach((row,i)=>{html+='<h3>Запись '+(i+1)+'</h3><table>'+Object.entries(row).filter(([k,v])=>!KEY_FIELDS.includes(k)&&v!==null&&v!==undefined&&v!=='').map(([k,v])=>'<tr><th>'+h(window.SolinHuman?.label(m,k)||LABELS[k]||k)+'</th><td>'+h(v)+'</td></tr>').join('')+'</table>';});}
 const win=window.open('','_blank');if(!win){notify('Разреши открытие нового окна для печати');return;}
 win.document.write('<!doctype html><html lang="ru"><meta charset="utf-8"><title>Таксационная карточка</title><style>body{font:14px Arial;padding:20px;color:#17251d}table{border-collapse:collapse;width:100%;margin-bottom:10px}th,td{border:1px solid #b7c9ba;padding:6px;text-align:left}th{width:44%;background:#eef5ec}h2{border-bottom:1px solid #b4cab5;padding:8px 0}h3{font-size:14px}@media print{button{display:none}}</style><button onclick="print()">Печать</button>'+html+'<p><small>Предварительная мобильная карточка, не официальный отчёт Access.</small></p></html>');
 win.document.close();}

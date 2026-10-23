@@ -28,7 +28,7 @@ let photos=document.createElement('div');photos.id='solinPhotoList';container.ap
 const mapOpenOld=window.openMapScreen;
 if(typeof mapOpenOld==="function"){window.openMapScreen=function(){mapOpenOld();const openBtn=[...document.querySelectorAll('#mapScreen .mapToolbar button')].find(b=>b.textContent.includes('Открыть файл'));if(openBtn)openBtn.textContent='📂 Открыть CMF2 / КМФ2';const placeholder=document.querySelector('#mapLayerList .mapLayerRow:not(label)');if(placeholder&&!window.importedMapLayers?.length){placeholder.style.cursor='pointer';placeholder.onclick=window.openMapFilePicker;}if(!window.__solinMapRestored){window.__solinMapRestored=true;setTimeout(()=>window.solinRestoreMaps().catch(console.warn),1100);}}}
 const handleOld=window.handleMapFiles;
-if(typeof handleOld==="function"){window.handleMapFiles=async function(input){const files=Array.from(input?.files||[]);await handleOld(input);for(const f of files){if(f.size<=36*1024*1024){try{await dbPut('maps',{id:f.name+'|'+f.size+'|'+f.lastModified,file:f,name:f.name,date:Date.now()});}catch(err){console.warn('Save map cache',err);}}}};}
+if(typeof handleOld==="function"){window.handleMapFiles=function(input){const forest=window.SolinWorkspace?.activeId;const files=Array.from(input?.files||[]);const operation=(async()=>{await handleOld(input);for(const f of files){if(f.size<=36*1024*1024){try{await dbPut('maps',{id:(forest||'legacy')+'|'+f.name+'|'+f.size+'|'+f.lastModified,forestId:forest,file:f,name:f.name,date:Date.now()});}catch(err){console.warn('Save map cache',err);}}}})();window.__solinMapImportPromise=operation;return operation;};}
 const mkdir=()=>new Promise((resolve,reject)=>{const r=indexedDB.open("SOLIN_FIELD_OFFLINE_V3",1);
  r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains("maps"))r.result.createObjectStore("maps",{keyPath:"id"});if(!r.result.objectStoreNames.contains("photos"))r.result.createObjectStore("photos",{keyPath:"id"});};
  r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);
@@ -87,8 +87,8 @@ window.solinRenderPhotos=async()=>{
 window.solinRestoreMaps=async()=>{
  let rows=[];try{rows=await dbGetAll('maps');}catch(e){console.warn('Offline cache:',e);return;}
  if(!rows.length)return;
- rows.sort((a,b)=>b.date-a.date);const list=rows.slice(0,3);toast('Восстанавливаю карты: '+list.length);
- if(typeof window.handleMapFiles==="function"){for(const item of list){const file=item.file;if(!file)continue;const f=file instanceof File?file:new File([file],item.name,{lastModified:Date.now()});try{await handleOld({files:[f],value:''})}catch(e){console.warn('Map restore',e)}}}
+ rows=rows.filter(r=>r.forestId===window.SolinWorkspace?.activeId||(!r.forestId&&window.SolinWorkspace?.activeId==='213::2'));rows.sort((a,b)=>b.date-a.date);const list=rows.slice(0,3);toast('Восстанавливаю карты: '+list.length);
+ if(typeof window.handleMapFiles==="function"){for(const item of list){const file=item.file;if(!file)continue;const f=file instanceof File?file:new File([file],item.name,{lastModified:Date.now()});try{await window.handleMapFiles({files:[f],value:''})}catch(e){console.warn('Map restore',e)}}}
 };
 window.solinClearCachedMaps=async()=>{if(!confirm('Удалить сохранённые локальные файлы карт из браузера?'))return;await dbClear('maps');toast('Кэш карт очищен');};
 window.solinExportEdits=()=>{

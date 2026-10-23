@@ -1,0 +1,103 @@
+{
+  "target": "http://127.0.0.1:8134/",
+  "browser": "Headless Edge / Chromium",
+  "mobileEmulation": true,
+  "physicalPhoneTested": false,
+  "results": [
+    {
+      "name": "startup home screen with forest chooser",
+      "status": "PASS",
+      "forests": 1
+    },
+    {
+      "name": "mobile home at 390 px",
+      "status": "PASS",
+      "width": 390,
+      "scroll": 390
+    },
+    {
+      "name": "existing forest opens with its own name and data",
+      "status": "PASS",
+      "quarters": 70,
+      "stands": 471
+    },
+    {
+      "name": "create a genuinely empty forest with independent owner and address",
+      "status": "PASS"
+    },
+    {
+      "name": "empty forest survives restart and still loads reference dictionaries",
+      "status": "PASS"
+    },
+    {
+      "name": "new quarter and stand inherit the selected forest address",
+      "status": "PASS"
+    },
+    {
+      "name": "core checkpoint persists only the active forest across immediate switches",
+      "status": "PASS"
+    },
+    {
+      "name": "IndexedDB restores a new forest and edits after reload",
+      "status": "PASS"
+    },
+    {
+      "name": "mobile populated card at 390 px",
+      "status": "PASS",
+      "width": 390,
+      "scroll": 390
+    },
+    {
+      "name": "maket saves stay isolated between forests",
+      "status": "PASS"
+    },
+    {
+      "name": "Transfer preview groups two districts without modifying data",
+      "status": "PASS"
+    },
+    {
+      "name": "Transfer preserves full POS / LESN / KV / KGLF / VD addresses and child rows",
+      "status": "PASS",
+      "forests": 2,
+      "stands": 3
+    },
+    {
+      "name": "Transfer export includes only the active forest and preserves KGLF variants",
+      "status": "PASS"
+    },
+    {
+      "name": "duplicate full stand address rejected atomically",
+      "status": "PASS",
+      "message": "Дублируется полный адрес выдела в Transfer"
+    },
+    {
+      "name": "map to card resolves the complete address inside the active forest",
+      "status": "PASS"
+    },
+    {
+      "name": "offline restart and switching restore original, created and imported forests",
+      "status": "PASS"
+    },
+    {
+      "name": "mobile forest list with four workspaces at 390 px",
+      "status": "PASS",
+      "width": 390,
+      "scroll": 390
+    },
+    {
+      "name": "narrow mobile forest list at 320 px",
+      "status": "PASS",
+      "width": 320,
+      "scroll": 320
+    },
+    {
+      "name": "existing v2 user edits migrate once to IndexedDB without data loss",
+      "status": "PASS"
+    },
+    {
+      "name": "no uncaught JavaScript errors",
+      "status": "PASS"
+    }
+  ],
+  "errors": []
+}
