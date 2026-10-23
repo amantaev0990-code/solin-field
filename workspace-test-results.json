@@ -1,5 +1,5 @@
 {
-  "target": "http://127.0.0.1:8134/",
+  "target": "https://amantaev0990-code.github.io/solin-field/",
   "browser": "Headless Edge / Chromium",
   "mobileEmulation": true,
   "physicalPhoneTested": false,

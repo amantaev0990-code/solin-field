@@ -1,5 +1,5 @@
 {
-  "target": "http://127.0.0.1:8135/",
+  "target": "https://amantaev0990-code.github.io/solin-field/",
   "source": "Transf_213_1_2026.mdb",
   "sourceSha256": "a6d2ce90473d18c8aa49d9e1b798bee5ec1a204c0ce1d0d6f09d55c3456bb0be",
   "mobileEmulation": true,
