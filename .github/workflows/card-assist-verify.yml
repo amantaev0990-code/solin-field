@@ -1,0 +1,37 @@
+name: SOLI-N Field mobile card
+on:
+  push:
+    paths:
+      - "card-assist-test.cjs"
+      - "solin-card-assist.js"
+      - "solin-card-assist.css"
+      - "solin-card-editor.js"
+      - "solin-card-editor.css"
+      - "index.html"
+      - "sw.js"
+      - ".github/workflows/card-assist-verify.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mobile-card:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install Playwright
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Syntax checks
+        run: |
+          node --check solin-card-editor.js
+          node --check solin-card-assist.js
+          node --check card-assist-test.cjs
+      - name: Test card on a phone-sized browser
+        run: node card-assist-test.cjs
