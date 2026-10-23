@@ -36,3 +36,5 @@
 #childTabs.chips{display:block!important;overflow:visible!important;min-height:0!important}
 #childContent{min-width:0}
 @media(max-width:420px){.wf-toolbar button{font-size:12px;flex:1 1 calc(50% - 8px)}.wf-grid{grid-template-columns:1fr}.wf-maket-head{align-items:flex-start}.wf-section-head{align-items:flex-start}.wf-formgrid{grid-template-columns:1fr}.wf-makbtn{flex-basis:115px}}
+
+.wf-card-from-map{display:block;width:100%;margin:10px 0 5px;background:#287d4b!important;color:#fff!important;border:1px solid #5bbd78;border-radius:10px;padding:12px 10px;min-height:46px;font-weight:750}
