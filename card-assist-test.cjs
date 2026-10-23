@@ -37,6 +37,11 @@ const server=http.createServer((req,res)=>{const rel=decodeURIComponent(req.url.
   assert(await page.locator('[data-ce-assist-option]').count()>0);
   await page.locator('[data-ce-assist-option]').first().click();
   assert(await page.locator('[data-ce-field="KU"]').inputValue());
+  // A real touch on a tiny original-form field must open the fixed, readable editor.
+  await page.locator('[data-ce-zoom="actual"]').click();
+  await page.locator('[data-ce-scope="base"][data-ce-field="PRH"]').tap();
+  assert(await page.locator('#ce-assist-value').isVisible(),'touch did not open large editor');
+  await page.locator('[data-ce-assist-close]').click();
   await page.locator('[data-ce-assist-row]').click();
   assert(await page.locator('.ce-assist-row-field').count()>=10);
   await page.locator('[data-ce-assist-row-field="3"]').click();
