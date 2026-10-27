@@ -24,7 +24,7 @@ check('TEXT VD retains leading zeroes, different addresses and exact child mappi
  const p=payload({'Выдел':[a,b],'Макет10':[child(a),child(b,{IAR:2})]});
  const snapshot=JSON.stringify(p);
  const result=preview(p)[0].quarters['11'].compartments;
- assert.deepEqual(result.map(r=>r.VD),['001','1']);
+ assert.deepEqual([...result.map(r=>r.VD)],['001','1']);
  assert.equal(result[0]._children.Макет10[0].VD,'001');
  assert.equal(result[1]._children.Макет10[0].IAR,2);
  assert.equal(JSON.stringify(p),snapshot,'preview may not edit input');
@@ -47,8 +47,8 @@ check('Same quarter/KGLF with different Klxr or Fzona stays distinct',()=>{
  const a=q(base),b=q(base,{Klxr:17}),c=q(base,{Fzona:2});
  const result=preview(payload({'Квартал':[a,b,c],'Выдел':[stand(base,'001')]}))[0].quarters['11'];
  assert.equal(result.quarterRows.length,3);
- assert.deepEqual(result.quarterRows.map(r=>r.Klxr),[16,17,16]);
- assert.deepEqual(result.quarterRows.map(r=>r.Fzona),[1,1,2]);
+ assert.deepEqual([...result.quarterRows.map(r=>r.Klxr)],[16,17,16]);
+ assert.deepEqual([...result.quarterRows.map(r=>r.Fzona)],[1,1,2]);
 });
 check('Duplicate six-part quarter record is rejected',()=>{
  assert.throws(()=>preview(payload({'Квартал':[q(base),q(base)],'Выдел':[stand(base,'1')]})),/Дублируется квартал/);
@@ -68,6 +68,6 @@ check('Orphan child rows fail rather than attaching to a different VD',()=>{
 check('Multiple rows per maket are preserved in input order',()=>{
  const a=stand(base,'001');
  const r=preview(payload({'Выдел':[a],'Макет10':[child(a,{IAR:1}),child(a,{IAR:2})]}))[0].quarters['11'].compartments[0];
- assert.deepEqual(r._children.Макет10.map(x=>x.IAR),[1,2]);
+ assert.deepEqual([...r._children.Макет10.map(x=>x.IAR)],[1,2]);
 });
 console.log('PASS '+passed+' Transfer address regression scenarios');
