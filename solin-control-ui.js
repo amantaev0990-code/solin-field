@@ -12,7 +12,7 @@ function navigate(issue){const records=all().filter(r=>KEYS.every(k=>r[k]!=null&
  if(records.length!==1)return toast('Адрес карточки отсутствует или неоднозначен. Проверьте лесничество и категорию ГЛФ.');
  current=records[0];closeModal();renderComp();show('card');SolinCardEditor.open(current,{focus:issue});
 }
-function mount(host,options={}){const key=forestKey(),config=settings(),groups=E.groups(),catalog=window.SOLIN_CONTROL_DATA.catalog,route=new Set(groups.flatMap(g=>g.codes));let latest=null,busy=false;
+function mount(host,options={}){const key=forestKey(),config=settings(),groups=E.groups(),catalog=window.SOLIN_CONTROL_DATA.catalog,route=new Set(groups.flatMap(g=>g.codes));let latest=null,busy=false,revision=0;
  const records=options.records||all();
  host.classList.add('solin-control');host.innerHTML='<p class="control-intro">Предварительная проверка текущих данных. Доступно <b>'+catalog.filter(c=>c.supported&&route.has(c.code)).length+' из '+route.size+'</b> проверок шести групп. Полная сверка с настольным SOLI-N ещё не завершена.</p>'+
  '<div class="control-scope"><span>'+h(options.caption||'Выделов: '+records.length)+(options.draft?' · несохранённый черновик':'')+'</span><label>Группа<select data-control-group><option value="">Все шесть групп</option>'+groups.map(g=>'<option value="'+g.id+'">'+h(g.name)+'</option>').join('')+'</select></label></div>'+
@@ -23,7 +23,8 @@ function mount(host,options={}){const key=forestKey(),config=settings(),groups=E
  function update(){const codes=visible(),q=find('[data-control-search]').value.trim().toLocaleLowerCase('ru-RU');let enabled=0;
  for(const c of catalog){const article=host.querySelector('[data-control-code="'+c.code+'"]');article.hidden=!codes.has(c.code)||!!q&&!(c.code+' '+c.Tosh+' '+c.Prim).toLocaleLowerCase('ru-RU').includes(q);if(codes.has(c.code)&&config[c.code].enabled)enabled++;}
  find('[data-control-enabled]').textContent='· включено '+enabled;}
- function persist(){try{saveSettings(config);if(latest){status.textContent='Настройки изменены. Повторите проверку.';find('[data-control-export]').disabled=true;}}catch(e){status.textContent='Не удалось сохранить настройки: '+e.message;}}
+ function invalidate(message){revision++;latest=null;find('[data-control-summary]').replaceChildren();find('[data-control-results]').replaceChildren();find('[data-control-export]').disabled=true;status.textContent=message;}
+ function persist(){try{saveSettings(config);invalidate('Настройки изменены. Повторите проверку.');}catch(e){invalidate('Настройки изменены, но их не удалось сохранить: '+e.message);}}
  function draw(){if(!latest)return;const s=latest.summary;
  find('[data-control-summary]').innerHTML='<div class="control-totals"><span><b>'+s.records+'</b> выделов</span><span class="'+(s.controlFindings+s.fieldErrors?'control-error':'')+'"><b>'+(s.controlFindings+s.fieldErrors)+'</b> замечаний</span><span><b>'+(s.unverified+s.partial+s.unverifiedFields)+'</b> неполных проверок</span></div><p class="control-coverage">Выполнено контролей: '+s.executed+'; частично: '+s.partial+'; не выполнено: '+s.unverified+'; выключено: '+s.disabled+'.</p>';
  const filter=find('[data-control-filter]').value,results=find('[data-control-results]');results.innerHTML='';
@@ -40,11 +41,11 @@ function mount(host,options={}){const key=forestKey(),config=settings(),groups=E
  host.querySelectorAll('[data-control-enable]').forEach(b=>b.onclick=()=>{const codes=visible();for(const c of catalog)if(codes.has(c.code)){config[c.code].enabled=b.dataset.controlEnable==='all'||b.dataset.controlEnable==='available'&&c.supported;host.querySelector('[data-control-check="'+c.code+'"]').checked=config[c.code].enabled;}persist();update();});
  host.querySelectorAll('[data-control-check]').forEach(input=>input.onchange=()=>{config[input.dataset.controlCheck].enabled=input.checked;persist();update();});
  host.querySelectorAll('[data-control-param]').forEach(input=>input.onchange=()=>{const [code,field]=input.dataset.controlParam.split(':'),raw=input.value.trim().replace(',','.');if(raw!==''&&!Number.isFinite(Number(raw))){input.setAttribute('aria-invalid','true');status.textContent='Проверьте числовой параметр '+code;return;}input.removeAttribute('aria-invalid');config[code][field]=raw===''?null:Number(raw);persist();});
- find('[data-control-search]').oninput=update;find('[data-control-group]').onchange=()=>{update();if(latest)status.textContent='Группа изменена. Повторите проверку.';};find('[data-control-filter]').onchange=draw;
+ find('[data-control-search]').oninput=update;find('[data-control-group]').onchange=()=>{update();invalidate('Группа изменена. Повторите проверку.');};find('[data-control-filter]').onchange=draw;
  find('[data-control-export]').onclick=()=>latest&&download(latest);
  find('[data-control-run]').onclick=async()=>{if(busy||forestKey()!==key)return;if(host.querySelector('[aria-invalid="true"]')){status.textContent='Исправьте параметры проверок.';return;}
- busy=true;find('[data-control-run]').disabled=true;find('[data-control-export]').disabled=true;status.textContent='Проверяю текущие данные…';
- try{await new Promise(r=>setTimeout(r,0));latest=await E.run({database:options.database||D,records,codes:[...visible()],settings:config});if(!host.isConnected||forestKey()!==key)return;status.textContent='Проверка завершена. '+new Date(latest.createdAt).toLocaleTimeString('ru-RU')+(options.draft?' · черновик не сохранён.':'.');draw();find('[data-control-export]').disabled=false;}catch(e){if(host.isConnected)status.textContent='Проверка не выполнена: '+e.message;}finally{busy=false;if(host.isConnected)find('[data-control-run]').disabled=false;}
+ const runRevision=revision;busy=true;find('[data-control-run]').disabled=true;find('[data-control-export]').disabled=true;status.textContent='Проверяю текущие данные…';
+ try{await new Promise(r=>setTimeout(r,0));const report=await E.run({database:options.database||D,records,codes:[...visible()],settings:config});if(!host.isConnected||forestKey()!==key)return;if(revision!==runRevision){status.textContent='Настройки изменились во время проверки. Повторите запуск.';return;}latest=report;status.textContent='Проверка завершена. '+new Date(latest.createdAt).toLocaleTimeString('ru-RU')+(options.draft?' · черновик не сохранён.':'.');draw();find('[data-control-export]').disabled=false;}catch(e){if(host.isConnected&&revision===runRevision)status.textContent='Проверка не выполнена: '+e.message;}finally{busy=false;if(host.isConnected)find('[data-control-run]').disabled=false;}
  };
  update();return {run:()=>find('[data-control-run]').click(),get report(){return latest}};
 }
