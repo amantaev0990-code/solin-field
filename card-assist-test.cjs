@@ -8,18 +8,18 @@ const server=http.createServer((req,res)=>{const rel=decodeURIComponent(req.url.
 (async()=>{let browser;
  try{
   await new Promise(r=>server.listen(8129,'127.0.0.1',r));
-  browser=await chromium.launch({headless:true});
+  browser=await chromium.launch({channel:process.env.BROWSER_CHANNEL||(process.platform==='win32'?'msedge':undefined),headless:true});
   const page=await browser.newPage({viewport:{width:390,height:844},acceptDownloads:true,hasTouch:true,isMobile:true});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
-  await page.goto('http://127.0.0.1:8129/');
+  await page.goto(process.env.TARGET_URL||'http://127.0.0.1:8129/');
   await page.waitForFunction(()=>window.SolinWorkspace&&window.SOLIN_REFS&&window.SolinCardAssist);
   await page.evaluate(()=>SolinWorkspace.ready);
   await page.evaluate(async()=>{const f=(await SolinWorkspace.list())[0];await SolinWorkspace.activate(f.id);current=Object.values(D.quarters).flatMap(q=>q.compartments).find(r=>r._children?.Макет10?.length)||Object.values(D.quarters).flatMap(q=>q.compartments)[0];renderComp();show('card');});
   await page.locator('#wfEditBase').click();
   await page.locator('#ce-form').waitFor();
-  assert.equal(await page.locator('.dt-board').evaluate(el=>el.offsetWidth),1200);
-  assert.equal(await page.locator('.dt-board').evaluate(el=>el.offsetHeight),704);
-  assert.equal(await page.locator('#ce-section-10').evaluate(el=>el.offsetTop),406);
+  assert(await page.locator('.dt-board').evaluate(el=>el.offsetWidth<=innerWidth));
+  assert(await page.locator('.dt-board').evaluate(el=>el.offsetHeight>704));
+  assert.equal(await page.locator('[data-ce-jump]').count(),9);
   assert(await page.locator('[data-ce-assist-find]').isVisible());
   assert(await page.locator('[data-ce-assist-row]').isVisible());
   const original=await page.locator('[data-ce-scope="base"][data-ce-field="PLV"]').inputValue();
@@ -37,11 +37,12 @@ const server=http.createServer((req,res)=>{const rel=decodeURIComponent(req.url.
   assert(await page.locator('[data-ce-assist-option]').count()>0);
   await page.locator('[data-ce-assist-option]').first().click();
   assert(await page.locator('[data-ce-field="KU"]').inputValue());
-  // A real touch on a tiny original-form field must open the fixed, readable editor.
-  await page.locator('[data-ce-zoom="actual"]').click();
-  await page.locator('[data-ce-scope="base"][data-ce-field="PRH"]').tap();
-  assert(await page.locator('#ce-assist-value').isVisible(),'touch did not open large editor');
-  await page.locator('[data-ce-assist-close]').click();
+  // Numeric fields accept direct touch input; Enter advances without saving.
+  await page.locator('[data-ce-jump="31"]').click();
+  const direct=page.locator('[data-ce-scope="base"][data-ce-field="PRH"]');
+  await direct.tap();await direct.fill('2,5');await direct.press('Enter');
+  assert(await page.locator('[data-ce-field="PRA"]').evaluate(el=>el===document.activeElement));
+  assert(await page.locator('#ce-form').isVisible());
   await page.locator('[data-ce-assist-row]').click();
   assert(await page.locator('.ce-assist-row-field').count()>=10);
   await page.locator('[data-ce-assist-row-field="3"]').click();
@@ -50,19 +51,43 @@ const server=http.createServer((req,res)=>{const rel=decodeURIComponent(req.url.
   await page.locator('[data-ce-assist-apply]').click();
   assert(await page.locator('.ce-assist-row-field').count()>=10);
   await page.locator('[data-ce-assist-done]').click();
-  for(const width of [390,320]){
+  for(const width of [320,360,390,430,700]){
     await page.setViewportSize({width,height:844});
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'page overflow at '+width);
     await page.locator('[data-ce-assist-find]').click();
     assert(await page.locator('.ce-assist-panel').evaluate(el=>{const r=el.getBoundingClientRect();return r.left>=-1&&r.right<=innerWidth+1&&r.top>=-1&&r.bottom<=innerHeight+1;}),'overlay escaped screen');
     await page.locator('[data-ce-assist-close]').click();
-    await page.locator('[data-ce-zoom="fit"]').click();
+    for(const section of [1,2,3,4,5,10,31,32]){
+      await page.locator('[data-ce-jump="'+section+'"]').click();
+      const bounds=await page.locator('#ce-section-'+section).evaluate(el=>{const r=el.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth;});assert(bounds,'section overflow '+section+' at '+width);
+    }
+    await page.locator('[data-ce-jump="main"]').click();
+    if(process.env.TEST_OUTPUT){fs.mkdirSync(process.env.TEST_OUTPUT,{recursive:true});await page.screenshot({path:require('path').join(process.env.TEST_OUTPUT,'mobile-'+width+'.png')});}
+
     assert(await page.locator('.dt-board').evaluate(el=>el.getBoundingClientRect().width<=innerWidth+1));
   }
+  await page.setViewportSize({width:390,height:500});
+  await page.locator('[data-ce-jump="10"]').click();
+  assert(await page.locator('.ce-table-wrap').first().evaluate(el=>el.scrollWidth>el.clientWidth));
   await page.locator('#ce-cancel').click();
   assert(await page.locator('#ce-form').isHidden());
   assert(Math.abs(Number(await page.evaluate(()=>current.PLV))-Number(original.replace(',','.')))<0.00001,'Cancel must discard edited values (float32 precision)');
+  await page.setViewportSize({width:320,height:700});
+  await page.locator('#wfEditBase').click();
+  await page.locator('[data-ce-jump="1"]').click();
+  if(process.env.TEST_OUTPUT)await page.screenshot({path:require('path').join(process.env.TEST_OUTPUT,'maket-1.png')});
+  await page.locator('[data-ce-extra="Макет11"]').first().click();
+  assert(await page.locator('#ce-extra').evaluate(el=>{const r=el.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight;}));
+  await page.locator('#ce-extra [data-ce-main]').click();
+  await page.locator('[data-ce-jump="10"]').click();
+  if(process.env.TEST_OUTPUT)await page.screenshot({path:require('path').join(process.env.TEST_OUTPUT,'maket-10.png')});
+  await page.locator('[data-ce-scope="base"][data-ce-field="PLV"]').fill('24,25');
+  await page.locator('#ce-save').click();
+  await page.waitForFunction(()=>!document.querySelector('#ce-form'));
+  assert.equal(await page.evaluate(()=>current.PLV),24.25);
+  await page.reload();await page.waitForFunction(()=>window.SolinWorkspace&&window.SOLIN_REFS);await page.evaluate(()=>SolinWorkspace.ready);
+  assert(await page.evaluate(()=>Object.values(D.quarters).flatMap(q=>q.compartments).some(r=>r.PLV===24.25)));
   assert.deepEqual(errors,[]);
-  console.log('PASS desktop geometry, fixed narrow viewports, code lookup, text entry, stand row editing, cancellation, no page exceptions');
+  console.log('PASS compact mobile layout, five narrow viewports, code lookup, text entry, stand row editing, cancellation, no page exceptions');
  }catch(e){console.error(e.stack||e);process.exitCode=1;}finally{await browser?.close();server.close();}
 })();

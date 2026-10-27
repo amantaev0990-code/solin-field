@@ -131,6 +131,7 @@ function close(){cleanup();closeModal();}
 function cancel(){if(session?.dirty&&!confirm('Закрыть карточку без сохранения изменений?'))return;close();}
 function onUnload(e){if(session?.dirty){e.preventDefault();e.returnValue='';}}
 function onKey(e){if(!session)return;if(e.key==='Escape'){e.preventDefault();cancel();return;}
+ if(e.key==='Enter'&&e.target.matches('[data-ce-field]')&&e.target.tagName!=='SELECT'){e.preventDefault();const fields=[...document.querySelectorAll('#ce-form [data-ce-field]')].filter(el=>el.getClientRects().length&&!el.disabled&&!el.readOnly);const next=fields[fields.indexOf(e.target)+1];next?.focus();next?.select?.();return;}
  if(e.key==='Tab'){const visible=[...document.querySelectorAll('.ce-modal button,.ce-modal input,.ce-modal select,.ce-modal summary,[role="dialog"] [tabindex="0"]')].filter(el=>el.getClientRects().length&&!el.disabled),first=visible[0],last=visible.at(-1);if(e.shiftKey&&document.activeElement===first){last?.focus();e.preventDefault();}else if(!e.shiftKey&&document.activeElement===last){first?.focus();e.preventDefault();}}
 }
 function save(e){e?.preventDefault();if(!session)return false;const s=session;
