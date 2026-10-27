@@ -3,6 +3,10 @@ on:
   push:
     paths:
       - "card-assist-test.cjs"
+      - "references-ui-test.cjs"
+      - "solin-readable.js"
+      - "solin-readable.css"
+      - "solin-workflow.js"
       - "solin-card-assist.js"
       - "solin-card-assist.css"
       - "solin-card-editor.js"
@@ -35,3 +39,6 @@ jobs:
           node --check card-assist-test.cjs
       - name: Test card on a phone-sized browser
         run: node card-assist-test.cjs
+
+      - name: Test readable references and mobile menu
+        run: node references-ui-test.cjs

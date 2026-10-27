@@ -156,25 +156,8 @@ openModal('Квартал '+k+' · контроль','<div class="wf-form-note">
 bar.querySelector('#wfQuarterSummary').onclick=()=>{const area=q.compartments.reduce((s,r)=>s+(Number(r.PLV)||0),0);openModal('Таксационное описание · квартал '+k,'<h3>Квартал '+h(k)+'</h3><p>Выделов: '+q.compartments.length+'</p><p>Площадь: '+area.toLocaleString('ru-RU')+' га</p><div class="wf-form-note">Это сводка из мобильных данных, а не официальный выходной документ SOLI-N.</div><button class="primary" onclick="closeModal()">Закрыть</button>');};
 bar.querySelector('#wfQuarterExport').onclick=()=>download('solin-quarter-'+k+'.json',{format:'SOLIN-Field-Quarter-v1',quarter:k,records:q.compartments});}
 function download(name,payload){const a=document.createElement('a');const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);}
-function enhancedMenu(){
-const menu=document.querySelector('#menuScreen .workspace');if(!menu||menu.querySelector('#wfMenu'))return;
-const el=document.createElement('div');el.id='wfMenu';el.className='wf-menu';
-el.innerHTML='<h3>Функции оригинальной SOLI-N</h3>'+
-'<button class="menuRow" data-route="quarters"><span><b>▦ Карточки таксации</b><small>Квартал → выдел → 15 макетов → контроль и печать</small></span><span>›</span></button>'+
-'<button class="menuRow" data-route="reports"><span><b>▤ Выходные документы</b><small>Предварительная сводка и печатная карточка</small></span><span>›</span></button>'+
-'<button class="menuRow" data-route="references"><span><b>◉ Справочники</b><small>Категории угодий, породы, мероприятия и другое</small></span><span>›</span></button>'+
-'<button class="menuRow" data-route="map"><span><b>◈ Картографические данные</b><small>CMF2/КМФ2 · контуры, подписи и атрибуты</small></span><span>›</span></button>'+
-'<button class="menuRow" data-route="audit"><span><b>≡ Статус переноса функций</b><small>Что работает и что ещё зависит от исходного VBA</small></span><span>›</span></button>';
-menu.prepend(el);
-el.querySelectorAll('[data-route]').forEach(b=>b.onclick=()=>{const route=b.dataset.route;
-if(route==='quarters')show('quartersScreen');
-if(route==='references')show('refsScreen');
-if(route==='map')openMapScreen();
-if(route==='reports'){openModal('Выходные документы','<p>Пока реализованы локальная сводка квартала и печать карточки отдельного выдела.</p><p>837 отчётов Access остаются предметом переноса и проверки.</p><button class="primary" onclick="closeModal();show(\'quartersScreen\')">Перейти к кварталам</button>');}
-if(route==='audit'){openModal('Статус точного переноса','<p><b>Реализовано для проверки:</b> карточки кварталов и выделов, 15 макетов со всеми полями из 29 таблиц, создание и изменение строк, локальное сохранение, базовый контроль, печать, карты CMF2, GPS, фото.</p><p><b>Пока не переносилось:</b> 554 настоящих экранов в пиксельном виде, 1 420 исполняемых оригинальных обработчиков, 142 специальных контроля, 837 отчётов и сложная формульная математика VBA.</p><p>Критичные операции импорта/удаления исходного MDB не вызываются.</p><button class="primary" onclick="closeModal()">Понятно</button>');}
-});}
 function setup(){
- enhancedMenu();
+
  const prev=window.renderComp;
  if(typeof prev==='function')window.renderComp=function(){if(record())localPatch(record());prev();currentMaket='Макет10';cardToolbar();openMaket(currentMaket);};
  const oldQuarter=window.openQuarter;
