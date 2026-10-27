@@ -15,6 +15,22 @@ const server=http.createServer((req,res)=>{const file=path.resolve(root,'.'+deco
  await page.locator('#solinControlMenu').click();await page.locator('.control-settings>summary').click();await page.locator('[data-control-enable="none"]').click();await page.locator('[data-control-check="К04"]').check();await page.locator('[data-control-check="К114"]').check();await page.locator('.control-settings>summary').click();
  await page.locator('[data-control-run]').click();await page.locator('[data-control-status]').filter({hasText:'Проверка завершена'}).waitFor();assert.equal(await page.locator('[data-control-issue="К04"]').count(),1);assert.equal(await page.locator('[data-control-issue="К114"]').count(),1);assert((await page.locator('[data-control-issue="К04"]').innerText()).includes('ГЛФ 27'));assert.equal(await page.evaluate(()=>JSON.stringify(D.quarters)),snapshot);
  const pending=page.waitForEvent('download');await page.locator('[data-control-export]').click();const file=await pending;const protocol=JSON.parse(fs.readFileSync(await file.path(),'utf8'));assert.equal(protocol.scope.records,2);assert.equal(protocol.summary.controlFindings,1);assert.equal(protocol.nativeButtonParity,false);assert.equal(protocol.preparationApplied,false);
+ // A different group or modified flags must never leave stale findings/export on screen.
+ await page.locator('[data-control-group]').selectOption('1');
+ assert.equal(await page.locator('[data-control-export]').isDisabled(),true,'group change invalidates export');
+ assert.equal(await page.locator('[data-control-issue]').count(),0,'group change clears stale findings');
+ assert.equal(await page.locator('[data-control-summary]').innerText(),'','group change clears old totals');
+ await page.locator('[data-control-group]').selectOption('');
+ await page.locator('[data-control-run]').click();await page.locator('[data-control-status]').filter({hasText:'Проверка завершена'}).waitFor();
+ assert.equal(await page.locator('[data-control-issue="К04"]').count(),1);
+ await page.locator('.control-settings>summary').click();
+ await page.locator('[data-control-check="К04"]').uncheck();
+ assert.equal(await page.locator('[data-control-export]').isDisabled(),true,'flag change invalidates export');
+ assert.equal(await page.locator('[data-control-issue]').count(),0,'flag change clears old findings');
+ await page.locator('[data-control-check="К04"]').check();
+ await page.locator('.control-settings>summary').click();
+ await page.locator('[data-control-run]').click();await page.locator('[data-control-status]').filter({hasText:'Проверка завершена'}).waitFor();
+ assert.equal(await page.locator('[data-control-issue="К04"]').count(),1);
  for(const width of [320,390,1365]){await page.setViewportSize({width,height:844});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'page overflow '+width);assert(await page.locator('.solin-control').evaluate(el=>{const r=el.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth;}));if(width===320&&process.env.TEST_OUTPUT){fs.mkdirSync(process.env.TEST_OUTPUT,{recursive:true});await page.screenshot({path:path.join(process.env.TEST_OUTPUT,'control-320.png')});}}
  await page.setViewportSize({width:390,height:844});await page.locator('[data-control-issue="К04"] [data-control-open]').click();await page.locator('#ce-form').waitFor();assert.equal(await page.evaluate(()=>current.KGLF),27);assert.equal(await page.evaluate(()=>document.activeElement.dataset.ceScope),'Макет19');
  await page.locator('[data-ce-scope="Макет19"][data-ce-field="TB"]').selectOption('1');await page.locator('[data-ce-controls=""]').click();assert((await page.locator('#ce-control-report').innerText()).includes('несохранённый черновик'));
