@@ -4,6 +4,8 @@ on:
     paths:
       - "card-assist-test.cjs"
       - "references-ui-test.cjs"
+      - "named-controls-test.cjs"
+      - "solin-named-controls.js"
       - "solin-readable.js"
       - "solin-readable.css"
       - "solin-workflow.js"
@@ -42,3 +44,6 @@ jobs:
 
       - name: Test readable references and mobile menu
         run: node references-ui-test.cjs
+
+      - name: Test named control quarter context
+        run: node named-controls-test.cjs
