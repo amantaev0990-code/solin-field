@@ -10,6 +10,8 @@ on:
       - "solin-access-expression.js"
       - "solin-control*"
       - "solin-field-core.js"
+      - "solin-workspace.js"
+      - "transfer-address-test.cjs"
       - "scripts/build-control-data.py"
       - "solin-named-controls.js"
       - "solin-readable.js"
@@ -59,3 +61,9 @@ jobs:
 
       - name: Test mobile control flow and offline execution
         run: node control-ui-test.cjs
+
+      - name: Verify Transfer address identity without Access
+        run: |
+          node --check solin-workspace.js
+          node --check transfer-address-test.cjs
+          node transfer-address-test.cjs
