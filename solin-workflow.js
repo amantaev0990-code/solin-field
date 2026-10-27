@@ -79,7 +79,7 @@ if(content&&!content.querySelector('#wfCardActions')){
 const bar=document.createElement('div');bar.id='wfCardActions';bar.className='wf-toolbar';
 bar.innerHTML='<button class="wf-primary" id="wfEditBase">✎ Редактировать выдел</button><button id="wfCardCheck">✓ Контроль</button><button id="wfCardPrint">⎙ Печать КТ</button><button id="wfCardExit">↩ Выход</button>';
 content.prepend(bar);
-bar.querySelector('#wfEditBase').onclick=editBase;bar.querySelector('#wfCardCheck').onclick=()=>checkData(record(),true);
+bar.querySelector('#wfEditBase').onclick=editBase;bar.querySelector('#wfCardCheck').onclick=()=>SolinControlUI.open({records:[record()],caption:'Карточка · квартал '+record().KV+' · выдел '+record().VD});
 bar.querySelector('#wfCardPrint').onclick=printCard;bar.querySelector('#wfCardExit').onclick=exitCard;
 }}
 function showWholeCard(){const r=record();if(!r)return;document.querySelector('#childContent').innerHTML='<div class="wf-maket-view"><h3>Краткая карточка таксации · КТ</h3><p class="wf-muted">Аналог сводного просмотра ВыделКрат. Данные отображаются без расчёта исходных Access-отчётов.</p>'+CORE.map(m=>'<div class="wf-summary-row"><b>'+m.replace('Макет','')+' · '+h(window.SolinHuman?.formName(m)||NAMES[m])+'</b><span>'+h(maketSummary(r,m))+'</span><button data-cardmak="'+m+'">Открыть →</button></div>').join('')+'</div>';
@@ -151,7 +151,7 @@ win.document.close();}
 function quarterToolbar(k){const box=document.querySelector('#quarters');if(!box||!db()?.quarters?.[k])return;const old=box.querySelector('#wfQuarterToolbar');old?.remove();const q=db().quarters[k],bar=document.createElement('div');bar.id='wfQuarterToolbar';bar.className='wf-toolbar';
 bar.innerHTML='<button id="wfQuarterControl">✓ Контроль квартала</button><button id="wfQuarterSummary">▤ Такс. описание</button><button id="wfQuarterExport">⇩ Сохранить JSON квартала</button>';
 box.querySelector('.screenHead')?.after(bar);
-bar.querySelector('#wfQuarterControl').onclick=()=>{let issues=0;const entries=[];for(const r of q.compartments||[]){const list=checkData(r,false);issues+=list.length;if(list.length)entries.push(r.VD+': '+list.length+' замечаний');}
+bar.querySelector('#wfQuarterControl').onclick=()=>{if(window.SolinControlUI)return SolinControlUI.open({records:q.compartments||[],caption:'Квартал '+k});let issues=0;const entries=[];for(const r of q.compartments||[]){const list=checkData(r,false);issues+=list.length;if(list.length)entries.push(r.VD+': '+list.length+' замечаний');}
 openModal('Квартал '+k+' · контроль','<div class="wf-form-note">Предварительная проверка без выполнения контролей Access.</div><p>Выделов: '+q.compartments.length+'</p><p>Замечаний: <b>'+issues+'</b></p>'+entries.map(x=>'<p>'+h(x)+'</p>').join('')+'<button class="primary" onclick="closeModal()">Закрыть</button>');};
 bar.querySelector('#wfQuarterSummary').onclick=()=>{const area=q.compartments.reduce((s,r)=>s+(Number(r.PLV)||0),0);openModal('Таксационное описание · квартал '+k,'<h3>Квартал '+h(k)+'</h3><p>Выделов: '+q.compartments.length+'</p><p>Площадь: '+area.toLocaleString('ru-RU')+' га</p><div class="wf-form-note">Это сводка из мобильных данных, а не официальный выходной документ SOLI-N.</div><button class="primary" onclick="closeModal()">Закрыть</button>');};
 bar.querySelector('#wfQuarterExport').onclick=()=>download('solin-quarter-'+k+'.json',{format:'SOLIN-Field-Quarter-v1',quarter:k,records:q.compartments});}

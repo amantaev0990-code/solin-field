@@ -5,6 +5,12 @@ on:
       - "card-assist-test.cjs"
       - "references-ui-test.cjs"
       - "named-controls-test.cjs"
+      - "control-engine-test.cjs"
+      - "control-ui-test.cjs"
+      - "solin-access-expression.js"
+      - "solin-control*"
+      - "solin-field-core.js"
+      - "scripts/build-control-data.py"
       - "solin-named-controls.js"
       - "solin-readable.js"
       - "solin-readable.css"
@@ -47,3 +53,9 @@ jobs:
 
       - name: Test named control quarter context
         run: node named-controls-test.cjs
+
+      - name: Test direct control predicates and Access expressions
+        run: node control-engine-test.cjs
+
+      - name: Test mobile control flow and offline execution
+        run: node control-ui-test.cjs
