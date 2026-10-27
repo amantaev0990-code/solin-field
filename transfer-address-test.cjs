@@ -7,7 +7,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const w = {addEventListener(){}};
-const sandbox = {window:w,D:{transfSchema:{'Макет10':['POS','LESN','KV','KGLF','VD','IAR','POR'], 'Макет23':['POS','LESN','KV','KGLF','VD','K1']}}};
+const sandbox = {window:w,document:{readyState:'loading',addEventListener(){}},D:{transfSchema:{'Макет10':['POS','LESN','KV','KGLF','VD','IAR','POR'], 'Макет23':['POS','LESN','KV','KGLF','VD','K1']}}};
 vm.runInNewContext(fs.readFileSync(path.join(__dirname,'solin-workspace.js'),'utf8'),sandbox);
 vm.runInNewContext(fs.readFileSync(path.join(__dirname,'solin-field-core.js'),'utf8'),sandbox);
 const preview=w.SolinWorkspace.previewTransfer;
