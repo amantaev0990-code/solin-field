@@ -9,6 +9,7 @@ const vm = require('node:vm');
 const w = {addEventListener(){}};
 const sandbox = {window:w,D:{transfSchema:{'Макет10':['POS','LESN','KV','KGLF','VD','IAR','POR'], 'Макет23':['POS','LESN','KV','KGLF','VD','K1']}}};
 vm.runInNewContext(fs.readFileSync(path.join(__dirname,'solin-workspace.js'),'utf8'),sandbox);
+vm.runInNewContext(fs.readFileSync(path.join(__dirname,'solin-field-core.js'),'utf8'),sandbox);
 const preview=w.SolinWorkspace.previewTransfer;
 
 const org=(POS,LESN,NOS)=>({POS,LESN,NOS,NLX:'Тестовое учреждение',GodT:2026});
@@ -69,5 +70,16 @@ check('Multiple rows per maket are preserved in input order',()=>{
  const a=stand(base,'001');
  const r=preview(payload({'Выдел':[a],'Макет10':[child(a,{IAR:1}),child(a,{IAR:2})]}))[0].quarters['11'].compartments[0];
  assert.deepEqual([...r._children.Макет10.map(x=>x.IAR)],[1,2]);
+});
+check('Backup validation preserves opaque Access TEXT VD',()=>{
+ const a=stand(base,'001'),b=stand(base,'12a');
+ const backup={format:'SOLIN-Field-Backup-v2',quarters:{'11':{compartments:[a,b]}},lesnichestvo:[base]};
+ assert.equal(w.solinCore.validateBackup(backup),2);
+ assert.equal(backup.quarters['11'].compartments[0].VD,'001');
+ assert.equal(backup.quarters['11'].compartments[1].VD,'12a');
+});
+check('Backup rejects repeated identical full text address',()=>{
+ const backup={format:'SOLIN-Field-Backup-v2',quarters:{'11':{compartments:[stand(base,'001'),stand(base,'001')]}},lesnichestvo:[base]};
+ assert.throws(()=>w.solinCore.validateBackup(backup),/Дублирующийся адрес/);
 });
 console.log('PASS '+passed+' Transfer address regression scenarios');
