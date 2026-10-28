@@ -31,9 +31,20 @@
         request.onsuccess=()=>{
           const forests=request.result||[];
           const active=localStorage.getItem(ACTIVE);
-          const selected=forests.find(f=>f.id===active)||forests[0];
+          // Never silently export the first stored forestry if the active ID
+          // is absent or stale: the MDB filename must represent the exact
+          // user-selected owner/district, not an arbitrary IndexedDB record.
+          const selected=active && forests.find(f=>f.id===active);
           db.close();
-          selected?resolve(selected):reject(Error('Нет лесничеств. Сначала откройте SOLI-N Field.'));
+          if(!active) {
+            reject(Error('Не выбрано активное лесничество. Вернитесь в SOLI-N Field и откройте нужное.'));
+          } else if(!selected) {
+            reject(Error('Выбранное лесничество не найдено. Откройте его заново в SOLI-N Field.'));
+          } else if(!selected.org || selected.id!==String(selected.org.POS)+'::'+String(selected.org.LESN)) {
+            reject(Error('Адрес сохранённого лесничества повреждён. Экспорт остановлен.'));
+          } else {
+            resolve(selected);
+          }
         };
         request.onerror=()=>{db.close();reject(Error('Не удалось прочитать карточки из памяти телефона.'));};
       };
