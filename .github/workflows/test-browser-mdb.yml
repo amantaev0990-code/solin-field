@@ -33,6 +33,8 @@ jobs:
           mkdir -p /tmp/solin-smoke/vendor
           cp mdb-service/target/mdb-export-service-0.1.0.jar /tmp/solin-smoke/vendor/solin-browser-mdb.jar
           cp mdb-service/browser-smoke.html /tmp/solin-smoke/browser-smoke.html
+          cp solin-transfer-reader.js /tmp/solin-smoke/solin-transfer-reader.js
+          cp vendor/mdb-reader.bundle.js /tmp/solin-smoke/vendor/mdb-reader.bundle.js
 
       - name: Install browser automation
         run: npm install --no-save --ignore-scripts playwright-core@1.56.1 http-server@14.1.1
