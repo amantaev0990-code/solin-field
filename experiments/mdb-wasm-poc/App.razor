@@ -40,6 +40,10 @@
     {
       status = "Экспорт остановлен: " + error.Message +
         ". Рабочие карточки не изменены.";
+      // The writer may run inside an off-screen same-origin frame. Report
+      // failures to the visible SOLI-N Field page instead of hiding them.
+      try { await JS.InvokeVoidAsync("solinReportMdbError", error.Message); }
+      catch { /* The standalone diagnostic page can still show status. */ }
     }
     finally
     {
