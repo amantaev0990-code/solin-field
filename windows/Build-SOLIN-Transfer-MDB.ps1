@@ -38,7 +38,7 @@ foreach ($progId in @("DAO.DBEngine.120","DAO.DBEngine.36")) {
   try { $engine = New-Object -ComObject $progId; break } catch {}
 }
 if (-not $engine) { Stop-Bridge "Не найден Microsoft Access DAO. Установите Access или Access Database Engine совместимой разрядности." }
-$out = Join-Path $PSScriptRoot ("Transf_{0}_{1}_{2}_Field.mdb" -f $pos,$lesn,$year)
+$out = Join-Path $PSScriptRoot ("Transf_{0}_{1}_{2}.mdb" -f $pos,$lesn,$year)
 if (Test-Path -LiteralPath $out) { Stop-Bridge "Выходной MDB уже существует: $out. Сначала переименуйте/перенесите предыдущий результат." }
 # The original template is NEVER opened for writing.
 Copy-Item -LiteralPath $TemplateMDB -Destination $out -ErrorAction Stop
