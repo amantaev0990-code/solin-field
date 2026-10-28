@@ -124,6 +124,8 @@
           }
           if (result.type !== 'solin-mdb-ready') return;
           try {
+            if (window.SolinWorkspace?.activeId !== expectedForest)
+              throw Error('За время экспорта изменилось лесничество. Повторите выгрузку.');
             if (result.name !== filename || !safeName(result.name) ||
                 !(result.bytes instanceof ArrayBuffer)) {
               throw Error('Получен неверный MDB или файл другого лесничества.');
@@ -165,7 +167,7 @@
     };
     window.addEventListener('solin-saved', clearReady);
     window.addEventListener('solin-forest-changed', clearReady);
-    window.addEventListener('pagehide', clearReady);
+    // Do not revoke the Blob on pagehide: Safari may fire it during a download.
     render();
   }
   if (document.readyState === 'loading')
