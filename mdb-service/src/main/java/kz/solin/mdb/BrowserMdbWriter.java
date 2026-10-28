@@ -43,8 +43,13 @@ public final class BrowserMdbWriter {
         throw new IOException("MDB не был создан.");
       }
       System.out.println("SOLIN_MDB_OK:" + result.getFileName() + ":" + Files.size(result));
-    } catch (Exception error) {
-      System.err.println("SOLIN_MDB_ERROR:" + error.getMessage());
+    } catch (Throwable error) {
+      try {
+        java.io.StringWriter text = new java.io.StringWriter();
+        error.printStackTrace(new java.io.PrintWriter(text));
+        Files.writeString(Path.of("/files/solin-browser-debug.txt"), text.toString());
+      } catch (Exception ignored) {}
+      System.err.println("SOLIN_MDB_ERROR:" + error);
       System.exit(1);
     }
   }
