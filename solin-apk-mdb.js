@@ -101,7 +101,7 @@
       });
       modal('Экспорт завершён',
         '<p>Файл <b>Transf_'+esc(transfer.identity.POS)+'_'+esc(transfer.identity.LESN)+'_'+
-        esc(transfer.identity.GodT)+'_Field.mdb</b> сохранён в выбранной папке.</p>'+
+        esc(transfer.identity.GodT)+'.mdb</b> сохранён в выбранной папке.</p>'+
         '<p>Перед использованием в работе откройте его на настольном SOLI-N в тестовой базе.</p>'+
         '<button type="button" onclick="closeModal()">Готово</button>');
     }catch(e){
