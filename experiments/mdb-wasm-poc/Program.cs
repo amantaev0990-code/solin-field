@@ -2,6 +2,6 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net.Http;
 var builder=WebAssemblyHostBuilder.CreateDefault(args);
-builder.RootComponents.Add<App>("#app");
+builder.RootComponents.Add<MdbWasmPoc.App>("#app");
 builder.Services.AddScoped(_ => new HttpClient { BaseAddress=new Uri(builder.HostEnvironment.BaseAddress) });
 await builder.Build().RunAsync();
