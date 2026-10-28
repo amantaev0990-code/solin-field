@@ -21,6 +21,11 @@ public final class BrowserSmokeVerifier {
         System.out.println("SOLIN_MDB_READBACK_OK:PLV=5.75");
       }
     }catch(Throwable e) {
+      try{
+        java.io.StringWriter details=new java.io.StringWriter();
+        e.printStackTrace(new java.io.PrintWriter(details));
+        java.nio.file.Files.writeString(java.nio.file.Path.of("/files/solin-verify-debug.txt"),details.toString());
+      }catch(Exception ignored){}
       e.printStackTrace();
       System.exit(1);
     }
