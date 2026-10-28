@@ -1,0 +1,36 @@
+name: Experimental MDB writer — Blazor WASM
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'experiments/mdb-wasm-poc/**'
+      - '.github/workflows/mdb-wasm-poc.yml'
+jobs:
+  build-poc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Add ONLY the data-free MDB template
+        run: |
+          cp vendor/solin-empty-transfer-v20261028-27.mdb experiments/mdb-wasm-poc/wwwroot/blank-transfer.mdb
+      - name: Publish WebAssembly proof separately
+        run: |
+          dotnet publish experiments/mdb-wasm-poc/MdbWasmPoc.csproj -c Release -o /tmp/mdwpublish
+          test -f /tmp/mdwpublish/wwwroot/index.html
+      - name: Publish isolated proof without modifying Field
+        run: |
+          mkdir -p mdb-wasm-poc
+          cp -a /tmp/mdwpublish/wwwroot/. mdb-wasm-poc/
+          git add -f mdb-wasm-poc
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if ! git diff --cached --quiet; then
+            git commit -m 'experiment: publish isolated .NET MDB writer WASM proof'
+            git push
+          fi
