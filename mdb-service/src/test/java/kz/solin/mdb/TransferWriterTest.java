@@ -84,6 +84,50 @@ class TransferWriterTest {
       """);
   }
 
+  @Test void acceptsIntegralDecimalStringsFromMobileForms() throws Exception {
+    assertEquals(12, TransferWriter.convert(json.readTree("\"12,0\""), DataType.LONG));
+    assertEquals(12, TransferWriter.convert(json.readTree("\"12.000\""), DataType.LONG));
+    assertEquals(12, TransferWriter.convert(json.readTree("12"), DataType.LONG));
+    assertEquals(0, TransferWriter.convert(json.readTree("\"0,0\""), DataType.LONG));
+    assertThrows(IllegalArgumentException.class,
+      () -> TransferWriter.convert(json.readTree("\"12,5\""), DataType.LONG));
+    assertThrows(IllegalArgumentException.class,
+      () -> TransferWriter.convert(json.readTree("\"2147483648\""), DataType.LONG));
+    assertThrows(IllegalArgumentException.class,
+      () -> TransferWriter.convert(json.readTree("\"-0,5\""), DataType.LONG));
+  }
+
+  @Test void namesWrongLongFieldAndRowWithoutTouchingSource() throws Exception {
+    Path template = template();
+    byte[] original = Files.readAllBytes(template);
+    var payload = (com.fasterxml.jackson.databind.node.ObjectNode) transfer();
+    var tables = (com.fasterxml.jackson.databind.node.ObjectNode) payload.get("tables");
+    ((com.fasterxml.jackson.databind.node.ObjectNode)tables.get("Макет10").get(0))
+      .put("POR", "12,5");
+    Path output = temp.resolve("bad-number.mdb");
+    IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+      () -> writer.writeInMemory(payload, template, output));
+    assertTrue(ex.getMessage().contains("Макет10"), ex.getMessage());
+    assertTrue(ex.getMessage().contains("POR"), ex.getMessage());
+    assertTrue(ex.getMessage().contains("строка 1"), ex.getMessage());
+    assertTrue(ex.getMessage().contains("12,5"), ex.getMessage());
+    assertArrayEquals(original, Files.readAllBytes(template));
+  }
+
+  @Test void exportsIntegralDecimalStringWithoutRounding() throws Exception {
+    Path template = template();
+    var payload = (com.fasterxml.jackson.databind.node.ObjectNode) transfer();
+    var tables = (com.fasterxml.jackson.databind.node.ObjectNode) payload.get("tables");
+    ((com.fasterxml.jackson.databind.node.ObjectNode)tables.get("Макет10").get(0))
+      .put("POR", "12,0");
+    Path output = temp.resolve("integral-decimal.mdb");
+    writer.writeInMemory(payload, template, output);
+    try (Database db=DatabaseBuilder.open(output.toFile())) {
+      assertEquals(12, ((Number) db.getTable("Макет10")
+        .iterator().next().get("POR")).intValue());
+    }
+  }
+
   @Test void createsRealMDBAndLeavesSourceUntouched() throws Exception {
     Path source = template();
     byte[] before = Files.readAllBytes(source);
