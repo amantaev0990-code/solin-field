@@ -141,9 +141,12 @@ public final class TransferWriter {
     if (inMemory) {
       // Never rely on random-access file writes in Safari's virtual file system:
       // Jackcess mutates pages in MemFileChannel; only then stream bytes to /files/.
+      // In the Safari VM, ignore the MSysObjects index: an invalid rowId must
+      // not make Jackcess trust a stale/corrupt system catalog index.
       try (com.healthmarketscience.jackcess.util.MemFileChannel channel =
               com.healthmarketscience.jackcess.util.MemFileChannel.newChannel(template)) {
-        try (Database db = new DatabaseBuilder(destination.toFile()).setChannel(channel).open()) {
+        try (Database db = new DatabaseBuilder(destination.toFile()).setChannel(channel)
+            .setIgnoreBrokenSystemCatalogIndex(true).open()) {
           writeTables(db, payload, data, id);
           // Database.close() may close an externally supplied FileChannel.
           // Copy the flushed Jet pages *before* leaving the Database scope.
@@ -164,7 +167,8 @@ public final class TransferWriter {
     if (inMemory) {
       try (com.healthmarketscience.jackcess.util.MemFileChannel verifiedBytes =
               com.healthmarketscience.jackcess.util.MemFileChannel.newChannel(destination);
-           Database verify = new DatabaseBuilder(destination.toFile()).setChannel(verifiedBytes).open()) {
+           Database verify = new DatabaseBuilder(destination.toFile()).setChannel(verifiedBytes)
+                .setIgnoreBrokenSystemCatalogIndex(true).open()) {
         verifyCounts(verify, data);
       }
     } else {
@@ -213,7 +217,7 @@ public final class TransferWriter {
       try (com.healthmarketscience.jackcess.util.MemFileChannel channel =
               com.healthmarketscience.jackcess.util.MemFileChannel.newChannel(empty)) {
         try (Database db = new DatabaseBuilder(destination.toFile())
-              .setChannel(channel).open()) {
+              .setChannel(channel).setIgnoreBrokenSystemCatalogIndex(true).open()) {
         for (var entry : data.entrySet()) {
           String name = entry.getKey();
           JsonNode fields = payload.path("schema").path(name);
@@ -256,7 +260,7 @@ public final class TransferWriter {
     try (com.healthmarketscience.jackcess.util.MemFileChannel check =
            com.healthmarketscience.jackcess.util.MemFileChannel.newChannel(destination);
          Database verified = new DatabaseBuilder(destination.toFile())
-           .setChannel(check).open()) {
+           .setChannel(check).setIgnoreBrokenSystemCatalogIndex(true).open()) {
       verifyCounts(verified, data);
     }
   }
