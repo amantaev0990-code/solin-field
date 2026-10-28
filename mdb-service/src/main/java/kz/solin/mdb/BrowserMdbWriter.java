@@ -65,7 +65,7 @@ public final class BrowserMdbWriter {
         throw new IllegalArgumentException("Имя файла не совпадает с данными лесничества.");
       }
       Files.createDirectories(result.getParent());
-      writer.write(payload, template, result);
+      writer.writeInMemory(payload, template, result);
       if (!Files.isRegularFile(result) || Files.size(result) < 1024) {
         throw new IOException("MDB не был создан.");
       }
