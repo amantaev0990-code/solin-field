@@ -1,4 +1,4 @@
-/* SOLI-N Field | Local Safari MDB writer experiment
+/* SOLI-N Field | Direct Safari MDB export experiment
    Runs Java/Jackcess inside the browser using CheerpJ. No server receives forest data.
    This is evaluation software and is NOT an offline/commercial-use guarantee.
    Android APK continues using the local native SolinMdb Capacitor plugin. */
@@ -125,18 +125,11 @@
     if (b) b.disabled = true;
     try {
       const transfer = await snapshot();
-      const local = await window.SolinOfflineMDB?.readStored?.(
-        [transfer.identity.POS, transfer.identity.LESN, transfer.identity.GodT].join('::')
-      );
-      if (!local) { chooseOriginal(transfer); return; }
-      if (!local.bytes || !jetHeader(local.bytes)) {
-        chooseOriginal(transfer, 'Старый шаблон повреждён. Выберите исходный MDB заново.');
-        return;
-      }
-      message('Создание MDB', '<p>Формирую файл Access на телефоне и проверяю таблицы. Исходный MDB не изменяется.</p>');
+      // Direct export: the browser writer creates a fresh Jet MDB from the
+      // saved forestry workspace. No source file needs to be uploaded.
+      message('Создание MDB', '<p>Создаю файл Access с актуальными карточками таксации. Загрузка исходного файла не нужна.</p>');
       await ensureRuntime();
       const output = '/files/' + nameOf(transfer.identity);
-      window.cheerpOSAddStringFile('/str/solin-original.mdb', new Uint8Array(local.bytes));
       // CheerpJ's UTF-8 decoder may pad Cyrillic Java strings with NUL chars.
       // Deliver ASCII JSON using \uXXXX escapes so Russian Access table names survive.
       const ascii = JSON.stringify(transfer).replace(/[^\x00-\x7F]/g, c =>
@@ -145,7 +138,6 @@
       const exit = await window.cheerpjRunMain(
         'kz.solin.mdb.BrowserMdbWriter',
         CHEERPJ_JAR,
-        '/str/solin-original.mdb',
         '/str/solin-transfer.json',
         output
       );
@@ -170,7 +162,7 @@
       downloadUrl = URL.createObjectURL(file);
       message('MDB готов к сохранению',
         '<p><b>' + esc(file.name) + '</b></p>' +
-        '<p>Файл создан и повторно прочитан как Access MDB. Сохраните его в «Файлы», ' +
+        '<p>Создан новый файл Access из данных SOLI-N Field; его таблицы проверены. Сохраните его в «Файлы», ' +
         'на флешку или отправьте на компьютер.</p>' +
         '<div id="solin-direct-mdb-save"></div>' +
         '<button type="button" onclick="closeModal()">Закрыть</button>');
@@ -197,47 +189,11 @@
       if (b) b.disabled = false;
     }
   }
-  function chooseOriginal(transfer, error = '') {
-    const originalName = 'Transf_' + transfer.identity.POS + '_' + transfer.identity.LESN + '_' + transfer.identity.GodT + '.mdb';
-    message('Первое сохранение MDB',
-      '<p>Один раз выберите исходный <b>' + esc(originalName) + '</b> из «Файлов» iPhone. ' +
-      'В дальнейшем достаточно будет нажать «Экспорт». Файл останется в памяти телефона.</p>' +
-      (error ? '<p role="alert">' + esc(error) + '</p>' : '') +
-      '<input type="file" id="solin-browser-template" accept=".mdb,application/vnd.ms-access" style="width:100%">' +
-      '<p id="solin-browser-template-error" role="alert"></p>' +
-      '<button type="button" onclick="closeModal()">Отмена</button>');
-    const chooser = document.getElementById('solin-browser-template');
-    if (!chooser) return;
-    chooser.onchange = async () => {
-      try {
-        const file = chooser.files?.[0];
-        if (!file) return;
-        if (file.size < 1024 || file.size > 12 * 1024 * 1024) throw Error('Неверный размер шаблона.');
-        const buf = await file.arrayBuffer();
-        if (!jetHeader(buf)) throw Error('Выбранный файл не настоящий MDB.');
-        // Ensure matching forest and year before making the original the active template.
-        const parsed = await window.SolinTransferReader.read(file);
-        const first = parsed.tables?.['Лесничество']?.[0];
-        if (!first || Number(first.POS) !== transfer.identity.POS ||
-            Number(first.LESN) !== transfer.identity.LESN ||
-            Number(first.GodT) !== transfer.identity.GodT) {
-          throw Error('MDB относится к другому лесничеству или году.');
-        }
-        const key = [transfer.identity.POS, transfer.identity.LESN, transfer.identity.GodT].join('::');
-        await window.SolinOfflineMDB.saveStored(key, { name: file.name, bytes: buf });
-        await exportBrowser();
-      } catch (err) {
-        const node = document.getElementById('solin-browser-template-error');
-        if (node) node.textContent = err.message;
-        else message('MDB не выбран','<p>' + esc(err.message) + '</p>');
-      }
-    };
-  }
   function install() {
     const b = button();
     if (!b) return;
     b.type = 'button';
-    b.innerHTML = '<span><b>Экспорт</b><small>Сохранить настоящий MDB на телефоне</small></span><span>⇩</span>';
+    b.innerHTML = '<span><b>Экспорт</b><small>Выгрузить файл MDB</small></span><span>⇩</span>';
     b.onclick = exportBrowser;
   }
   window.SolinBrowserMDB = { exportBrowser, ensureRuntime };
