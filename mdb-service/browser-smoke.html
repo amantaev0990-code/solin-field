@@ -1,0 +1,30 @@
+<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8">
+<title>Jet MDB in-browser test</title>
+<script src="https://cjrtnc.leaningtech.com/4.3/loader.js"></script>
+</head><body><p id="status">starting</p><script>
+(async () => {
+  const output = '/files/Transf_213_2_2026_Field.mdb';
+  const source = new Uint8Array(await (await fetch('/fixture/template.mdb')).arrayBuffer());
+  const transfer = await (await fetch('/fixture/transfer.json')).text();
+  if (source.length < 1024) throw Error('missing synthetic template');
+  await cheerpjInit({version:17});
+  cheerpOSAddStringFile('/str/smoke-template.mdb', source);
+  cheerpOSAddStringFile('/str/smoke-transfer.json', transfer);
+  const status = await cheerpjRunMain('kz.solin.mdb.BrowserMdbWriter',
+    '/app/vendor/solin-browser-mdb.jar', '/str/smoke-template.mdb',
+    '/str/smoke-transfer.json', output);
+  if (status !== 0) throw Error('Java Jet MDB writer exited with code '+status);
+  const file = await cjFileBlob(output);
+  if (!file || file.size < 1024) throw Error('Empty MDB output');
+  const header = new Uint8Array(await file.slice(0,32).arrayBuffer());
+  const signature = String.fromCharCode(...header.slice(4,19));
+  if (signature !== 'Standard Jet DB') throw Error('Incorrect binary Jet signature: '+signature);
+  document.body.dataset.result = 'passed';
+  document.getElementById('status').textContent='PASS: '+file.size+' byte Jet MDB';
+})().catch(e => {
+  document.body.dataset.result = 'failed';
+  document.body.dataset.error = String(e.message||e);
+  document.getElementById('status').textContent='FAILED: '+String(e.message||e);
+  console.error(e);
+});
+</script></body></html>
