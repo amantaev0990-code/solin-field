@@ -8,6 +8,7 @@ const state = {active:'213::2', saved:false, download:[], navigation:0, error:nu
 class Element {
   constructor(tag){this.tagName=tag.toUpperCase();this.children=[];this.disabled=false;this.style={};this.listeners={};}
   append(...children){this.children.push(...children);}
+  appendChild(child){this.children.push(child);return child;}
   replaceChildren(...children){this.children=[...children];}
   remove(){this.removed=true;}
   setAttribute(key,value){this[key]=value;}
