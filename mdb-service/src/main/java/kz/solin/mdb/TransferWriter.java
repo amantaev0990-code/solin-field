@@ -185,13 +185,31 @@ public final class TransferWriter {
 
   private static void verifyCounts(Database verify, Map<String, JsonNode> data) throws IOException {
     for (var entry : data.entrySet()) {
-      if (verify.getTable(entry.getKey()) == null ||
-          verify.getTable(entry.getKey()).getRowCount() != entry.getValue().size()) {
+      Table table = verify.getTable(entry.getKey());
+      if (table == null || table.getRowCount() != entry.getValue().size()) {
         throw new IOException("MDB не прошёл повторную проверку таблиц: " + entry.getKey());
       }
     }
+    // Do not trust the system catalog's rowCount alone. Safari's reader once
+    // reported that an otherwise valid-looking MDB had ZERO forestry rows.
+    // Iterate the actual data page and verify identity against the source.
+    JsonNode expected = data.get("Лесничество").get(0);
+    Table forest = verify.getTable("Лесничество");
+    var iter = forest.iterator();
+    if (!iter.hasNext())
+      throw new IOException("В MDB отсутствует физическая запись лесничества.");
+    Row row = iter.next();
+    for (String key : List.of("POS", "LESN", "GodT")) {
+      Object actual = row.get(key);
+      if (actual == null ||
+          !new java.math.BigDecimal(String.valueOf(actual)).equals(
+            new java.math.BigDecimal(expected.path(key).asText()))) {
+        throw new IOException("В MDB неверный шифр лесничества: " + key);
+      }
+    }
+    if (iter.hasNext())
+      throw new IOException("В MDB неожиданно несколько записей лесничества.");
   }
-
 
   /**
    * Template-free export for iPhone: create a NEW, real Jet 4 MDB in RAM using
