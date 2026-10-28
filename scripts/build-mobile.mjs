@@ -25,7 +25,12 @@ copy(root,out);
 const htmlPath=path.join(out,'index.html');
 let html=fs.readFileSync(htmlPath,'utf8');
 if(!html.includes('<head>'))throw Error('Capacitor needs an HTML head');
-html=html.replace('</body>','<script src="solin-apk-mdb.js"></script></body>');
+if(!html.includes('solin-apk-mdb.js')) html=html.replace('</body>','<script src="solin-apk-mdb.js"></script></body>');
 fs.writeFileSync(htmlPath,html);
+const apkApp=path.join(out,'app.js');
+let appSrc=fs.readFileSync(apkApp,'utf8');
+appSrc=appSrc.replace("if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});",
+  "if(!window.Capacitor?.isNativePlatform?.() && 'serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});");
+fs.writeFileSync(apkApp,appSrc);
 if(!fs.existsSync(path.join(out,'data-meta.json'))||!fs.existsSync(path.join(out,'quarters/q1.json'))||!fs.existsSync(path.join(out,'vendor/mdb-reader.bundle.js')))throw Error('Missing essential offline databases/maps');
 console.log('SOLI-N Field APK assets: '+count+' files, copied to www; original MDB files excluded.');
