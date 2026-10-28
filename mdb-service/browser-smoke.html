@@ -9,7 +9,9 @@
   if (source.length < 1024) throw Error('missing synthetic template');
   await cheerpjInit({version:17});
   cheerpOSAddStringFile('/str/smoke-template.mdb', source);
-  cheerpOSAddStringFile('/str/smoke-transfer.json', new TextEncoder().encode(transfer));
+  const ascii = transfer.replace(/[^\x00-\x7F]/g, c =>
+    '\\u' + c.charCodeAt(0).toString(16).padStart(4,'0'));
+  cheerpOSAddStringFile('/str/smoke-transfer.json', new TextEncoder().encode(ascii));
   const status = await cheerpjRunMain('kz.solin.mdb.BrowserMdbWriter',
     '/app/vendor/solin-browser-mdb.jar', '/str/smoke-template.mdb',
     '/str/smoke-transfer.json', output);
