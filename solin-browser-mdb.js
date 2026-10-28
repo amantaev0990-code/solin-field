@@ -62,6 +62,58 @@
     if (!transfer || transfer.format !== 'SOLIN-MDB-Bridge-v1') throw Error('Данные Transfer пока не готовы.');
     return transfer;
   };
+  // Use the original Transfer as a byte-for-byte schema template instead of
+  // constructing Access system tables (MSysObjects) in the Safari JVM.
+  // The source MDB is cached locally when the user imports Transfer.
+  function sourceKey(id) { return [id.POS, id.LESN, id.GodT].join('::'); }
+  async function getSource(transfer) {
+    const stored = await window.SolinOfflineMDB?.readStored?.(sourceKey(transfer.identity));
+    if (!stored?.bytes) return null;
+    const bytes = new Uint8Array(stored.bytes);
+    if (bytes.byteLength < 1024 || bytes.byteLength > 12 * 1024 * 1024 ||
+        !jetHeader(bytes.slice(0, 32).buffer)) {
+      throw Error('Сохранённый исходный Transfer повреждён. Выберите оригинальный MDB повторно.');
+    }
+    return bytes;
+  }
+  function requestOriginal(transfer) {
+    const id = transfer.identity;
+    message('Настройка формата MDB (один раз)',
+      '<p>Чтобы настольный SOLI-N принял выгрузку, нужен оригинальный формат базы. ' +
+      'Выберите <b>' + esc(nameOf(id)) + '</b> один раз. Файл остаётся на iPhone, ' +
+      'карточки не перезаписываются, ничего не отправляется на сервер.</p>' +
+      '<p>При следующем экспорте выбирать файл больше не потребуется.</p>' +
+      '<input id="solin-browser-original" type="file" accept=".mdb,application/vnd.ms-access" style="width:100%">' +
+      '<p id="solin-browser-source-error" role="alert"></p>' +
+      '<button type="button" onclick="closeModal()">Отмена</button>');
+    const picker = document.getElementById('solin-browser-original');
+    picker.onchange = async () => {
+      const file = picker.files?.[0];
+      if (!file) return;
+      picker.disabled = true;
+      try {
+        if (file.size < 1024 || file.size > 12 * 1024 * 1024) throw Error('Допустим оригинальный MDB размером до 12 МБ.');
+        const bytes = await file.arrayBuffer();
+        if (!jetHeader(bytes)) throw Error('Выбранный файл не является базой Jet MDB.');
+        const read = await window.SolinTransferReader?.read?.(file);
+        if (read?.sourceFormat !== 'MDB') throw Error('Не удалось проверить оригинальный MDB.');
+        const forest = read.tables?.['Лесничество'];
+        if (!Array.isArray(forest) || forest.length !== 1 ||
+            Number(forest[0].POS) !== Number(id.POS) ||
+            Number(forest[0].LESN) !== Number(id.LESN) ||
+            Number(forest[0].GodT) !== Number(id.GodT)) {
+          throw Error('Этот MDB принадлежит другому лесовладельцу, лесничеству или году.');
+        }
+        await window.SolinOfflineMDB.saveStored(sourceKey(id), { name:file.name, bytes });
+        closeModal();
+        await exportBrowser();
+      } catch (e) {
+        const error = document.getElementById('solin-browser-source-error');
+        if (error) { error.textContent = e.message; picker.disabled = false; }
+        else message('Не удалось подготовить шаблон', '<p role="alert">' + esc(e.message) + '</p>');
+      }
+    };
+  }
   function matchesCell(wanted, found) {
     if (wanted == null || wanted === '') return found == null || found === '';
     if (typeof wanted === 'boolean') return String(wanted) === String(found) ||
@@ -125,11 +177,16 @@
     if (b) b.disabled = true;
     try {
       const transfer = await snapshot();
-      // Direct export: the browser writer creates a fresh Jet MDB from the
-      // saved forestry workspace. No source file needs to be uploaded.
-      message('Создание MDB', '<p>Создаю файл Access с актуальными карточками таксации. Загрузка исходного файла не нужна.</p>');
+      const original = await getSource(transfer);
+      if (!original) {
+        requestOriginal(transfer);
+        return;
+      }
+      message('Создание MDB', '<p>Создаю отдельную копию исходного Transfer с актуальными карточками. ' +
+        'Оригинал остаётся без изменений; данные не передаются на сервер.</p>');
       await ensureRuntime();
       const output = '/files/' + nameOf(transfer.identity);
+      window.cheerpOSAddStringFile('/str/solin-original-transfer.mdb', original);
       // CheerpJ's UTF-8 decoder may pad Cyrillic Java strings with NUL chars.
       // Deliver ASCII JSON using \uXXXX escapes so Russian Access table names survive.
       const ascii = JSON.stringify(transfer).replace(/[^\x00-\x7F]/g, c =>
@@ -138,6 +195,7 @@
       const exit = await window.cheerpjRunMain(
         'kz.solin.mdb.BrowserMdbWriter',
         CHEERPJ_JAR,
+        '/str/solin-original-transfer.mdb',
         '/str/solin-transfer.json',
         output
       );
@@ -162,7 +220,7 @@
       downloadUrl = URL.createObjectURL(file);
       message('MDB готов к сохранению',
         '<p><b>' + esc(file.name) + '</b></p>' +
-        '<p>Создан новый файл Access из данных SOLI-N Field; его таблицы проверены. Сохраните его в «Файлы», ' +
+        '<p>Создана отдельная MDB-копия исходного Transfer; записанные таблицы проверены. Сохраните её в «Файлы», ' +
         'на флешку или отправьте на компьютер.</p>' +
         '<div id="solin-direct-mdb-save"></div>' +
         '<button type="button" onclick="closeModal()">Закрыть</button>');
