@@ -66,6 +66,9 @@ public final class BrowserMdbWriter {
         throw new IllegalArgumentException("Имя файла не совпадает с данными лесничества.");
       }
       Files.createDirectories(result.getParent());
+      // A second export of the same forestry workspace must replace the previous
+      // temporary result, not fail because it exists in CheerpJ's virtual FS.
+      if (fresh) Files.deleteIfExists(result);
       if (fresh) writer.writeNewInMemory(payload, result);
       else writer.writeInMemory(payload, template, result);
       if (!Files.isRegularFile(result) || Files.size(result) < 1024) {
