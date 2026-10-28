@@ -52,6 +52,9 @@
   }
   window.solinGetTransferJson=async function(){
     const selected=await currentWorkspace();
+    const expectedForest=new URL(location.href).searchParams.get('forest');
+    if(expectedForest && expectedForest!==selected.id)
+      throw Error('Выбрано другое лесничество. Вернитесь в SOLI-N Field и повторите экспорт.');
     const response=await fetch('../data-meta.json',{cache:'force-cache'});
     if(!response.ok)throw Error('Описание полей SOLI-N недоступно.');
     const meta=await response.json();
