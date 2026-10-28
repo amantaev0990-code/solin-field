@@ -114,6 +114,15 @@ public final class TransferWriter {
   }
 
   public void write(JsonNode payload, Path template, Path destination) throws IOException {
+    writeChecked(payload, template, destination, false);
+  }
+
+  /** In-browser local mode: edit the original Jet bytes entirely in RAM first. */
+  public void writeInMemory(JsonNode payload, Path template, Path destination) throws IOException {
+    writeChecked(payload, template, destination, true);
+  }
+
+  private void writeChecked(JsonNode payload, Path template, Path destination, boolean inMemory) throws IOException {
     Identity id = identity(payload);
     Map<String, JsonNode> data = validatePayload(payload, id);
     if (!Files.isRegularFile(template) || !Files.isReadable(template)) {
@@ -127,8 +136,38 @@ public final class TransferWriter {
     if (Files.exists(destination) && Files.isSameFile(template, destination)) {
       throw new IllegalArgumentException("Нельзя заменять исходную базу.");
     }
-    Files.copy(template, destination, StandardCopyOption.REPLACE_EXISTING);
-    try (Database db = DatabaseBuilder.open(destination.toFile())) {
+    if (inMemory) {
+      // Never rely on random-access file writes in Safari's virtual file system:
+      // Jackcess mutates pages in MemFileChannel; only then stream bytes to /files/.
+      try (com.healthmarketscience.jackcess.util.MemFileChannel channel =
+              com.healthmarketscience.jackcess.util.MemFileChannel.newChannel(template)) {
+        try (Database db = new DatabaseBuilder(destination.toFile()).setChannel(channel).open()) {
+          writeTables(db, payload, data, id);
+        }
+        try (java.io.OutputStream output = Files.newOutputStream(destination)) {
+          long written = channel.transferTo(output);
+          if (written != channel.size()) throw new IOException("MDB записан не полностью.");
+        }
+      }
+    } else {
+      Files.copy(template, destination, StandardCopyOption.REPLACE_EXISTING);
+      try (Database db = DatabaseBuilder.open(destination.toFile())) {
+        writeTables(db, payload, data, id);
+      }
+    }
+    // Reopen to confirm the output is a readable MDB, not merely a renamed blob.
+    try (Database verify = DatabaseBuilder.open(destination.toFile())) {
+      for (var entry : data.entrySet()) {
+        if (verify.getTable(entry.getKey()) == null ||
+            verify.getTable(entry.getKey()).getRowCount() != entry.getValue().size()) {
+          throw new IOException("MDB не прошёл повторную проверку таблиц.");
+        }
+      }
+    }
+  }
+
+
+  private void writeTables(Database db, JsonNode payload, Map<String, JsonNode> data, Identity id) throws IOException {
       // Validate all data and relationships before writing.
       for (var entry : data.entrySet()) {
         Table t = db.getTable(entry.getKey());
@@ -235,18 +274,8 @@ public final class TransferWriter {
           throw new IOException("Не совпало количество записей в " + entry.getKey() + ".");
         }
       }
-    }
-    // Reopen to confirm the output is a readable MDB, not merely a renamed blob.
-    try (Database verify = DatabaseBuilder.open(destination.toFile())) {
-      for (var entry : data.entrySet()) {
-        if (verify.getTable(entry.getKey()) == null ||
-            verify.getTable(entry.getKey()).getRowCount() != entry.getValue().size()) {
-          throw new IOException("MDB не прошёл повторную проверку таблиц.");
-        }
-      }
-    }
-  }
 
+  }
 
   private static String address(Object... fields) {
     StringBuilder result = new StringBuilder();
