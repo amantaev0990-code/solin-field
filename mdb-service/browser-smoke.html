@@ -1,6 +1,7 @@
 <!DOCTYPE html><html lang="ru"><head><meta charset="utf-8">
 <title>Jet MDB in-browser test</title>
 <script src="https://cjrtnc.leaningtech.com/4.3/loader.js"></script>
+<script src="/solin-transfer-reader.js"></script>
 </head><body><p id="status">starting</p><script>
 (async () => {
   const output = '/files/Transf_213_2_2026_Field.mdb';
@@ -26,6 +27,15 @@
   const header = new Uint8Array(await file.slice(0,32).arrayBuffer());
   const signature = String.fromCharCode(...header.slice(4,19));
   if (signature !== 'Standard Jet DB') throw Error('Incorrect binary Jet signature: '+signature);
+  let browserValue='';
+  try {
+    const parsed=await SolinTransferReader.read(
+      new File([file],'Transf_213_2_2026_Field.mdb',{type:'application/vnd.ms-access'}));
+    browserValue=String(parsed.tables?.['Выдел']?.[0]?.PLV);
+  }catch(error){browserValue='reader failed: '+error.message;}
+  if(browserValue!=='5.75'){
+    throw Error('Browser JS MDB parser read area PLV='+browserValue+', wanted 5.75');
+  }
   const checked = await cheerpjRunMain('kz.solin.mdb.BrowserSmokeVerifier',
     '/app/vendor/solin-browser-mdb.jar', output);
   if (checked !== 0) {
