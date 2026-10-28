@@ -8,6 +8,8 @@ on:
       - "mdb-service/src/test/java/**"
       - ".github/workflows/build-browser-mdb.yml"
       - "scripts/prepare-blank-mdb.mjs"
+      - "scripts/check-browser-mdb.mjs"
+      - "vendor/mdb-reader.bundle.js"
       - "solin-mdb-bridge.js"
       - "data-meta.json"
       - "data-transfer-types.json"
@@ -38,7 +40,9 @@ jobs:
       - name: Build NEW, user-data-free 18-table MDB template in the CI Java VM
         run: |
           node scripts/prepare-blank-mdb.mjs /tmp/solin-typing-input.json
-          java -cp mdb-service/target/mdb-export-service-0.1.0.jar kz.solin.mdb.BlankTransferTemplate /tmp/solin-typing-input.json data-transfer-types.json vendor/solin-empty-transfer-v20261028-27.mdb
+          java -cp mdb-service/target/mdb-export-service-0.1.0.jar kz.solin.mdb.BlankTransferTemplate /tmp/solin-typing-input.json data-transfer-types.json vendor/solin-empty-transfer-v20261028-27.mdb /tmp/solin-private-populated-for-js-check.mdb
+          node scripts/check-browser-mdb.mjs /tmp/solin-private-populated-for-js-check.mdb /tmp/solin-typing-input.json
+          rm -f /tmp/solin-private-populated-for-js-check.mdb
           rm -f /tmp/solin-typing-input.json
           test -s vendor/solin-empty-transfer-v20261028-27.mdb
       - name: Stage browser executable (never stage original MDB)
