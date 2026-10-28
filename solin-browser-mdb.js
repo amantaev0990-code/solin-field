@@ -91,7 +91,7 @@
       await ensureRuntime();
       const output = '/files/' + nameOf(transfer.identity);
       window.cheerpOSAddStringFile('/str/solin-original.mdb', new Uint8Array(local.bytes));
-      window.cheerpOSAddStringFile('/str/solin-transfer.json', JSON.stringify(transfer));
+      window.cheerpOSAddStringFile('/str/solin-transfer.json', new TextEncoder().encode(JSON.stringify(transfer)));
       const exit = await window.cheerpjRunMain(
         'kz.solin.mdb.BrowserMdbWriter',
         '/app/vendor/solin-browser-mdb.jar',
