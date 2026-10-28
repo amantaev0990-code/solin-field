@@ -60,7 +60,7 @@ function incomplete(database,records,reference){
 }
 async function runLocal(options){
  const database=options.database,records=all(database),indices=options.indices||records.map((_,i)=>i),scoped=indices.map(i=>records[i]),settings=options.settings||E.defaults(),requested=new Set(options.codes||E.groups().flatMap(g=>g.codes));
- const report={format:'SOLIN-Control-Protocol-v2',createdAt:new Date().toISOString(),source:N.source,scope:{records:scoped.length,addresses:scoped.map(addr)},settings,groups:options.routeGroups||E.groups(),nativeButtonParity:false,preparationApplied:false,controls:[],fields:E.fieldRules(scoped,database),findings:[],executions:[],preparation:{copyOnly:true,complete:false,steps:[],updates:[],deleted:[]}};
+ const report={format:'SOLIN-Control-Protocol-v2',createdAt:new Date().toISOString(),source:N.source,scope:{records:scoped.length,addresses:scoped.map(addr)},settings,groups:options.routeGroups||E.groups(),nativeButtonParity:false,fieldRuleScope:{kind:'Source validation expressions only',originalFormActivityAndEventsVerified:false},preparationApplied:false,controls:[],fields:E.fieldRules(scoped,database),findings:[],executions:[],preparation:{copyOnly:true,complete:false,steps:[],updates:[],deleted:[]}};
  let runtime;
  try{
   const reference=options.norms||await norms(),{tables,links}=sourceTables(database,records,settings,reference),owner=database.lesnichestvo?.length===1?database.lesnichestvo[0]:{};

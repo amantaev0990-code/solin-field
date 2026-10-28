@@ -46,7 +46,6 @@
     "inputUnchanged": true,
     "applyAndUndoPassed": true
   },
-  "originalFilesUnchanged": true,
   "positiveCases": [
     "К100 duplicate rows including NULL and opaque text VD",
     "К114 stateful numbering and priority inversion",
@@ -59,5 +58,18 @@
     "Missing original fields, territory parameters, ambiguous context and runtime failures remain unverified.",
     "The old built-in demo and older saved data may omit original fields; import a complete Transfer for full checking.",
     "Preparation applies to the whole selected forest, requires an explicit UI action and can be undone only before later edits."
-  ]
+  ],
+  "originalBinaryHashesUnchangedDuringReferenceRun": true,
+  "finalOriginalObservation": {
+    "workingTablesCompared": 17,
+    "allWorkingTablesIdentical": true,
+    "controlConfigurationIdentical": true,
+    "definitionsCompared": 466,
+    "definitionsMatched": 466,
+    "sourceObjectsCompared": 6,
+    "allSourceObjectsByteIdentical": true,
+    "backendDifferenceBytes": 1,
+    "backendDifferencePage": 0,
+    "wholeMdbBinaryStabilityAsserted": false
+  }
 }
