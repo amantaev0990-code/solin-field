@@ -40,41 +40,43 @@ public final class BrowserMdbWriter {
   }
 
   public static void main(String[] args) {
-    if (args.length != 3) {
-      System.err.println("Usage: BrowserMdbWriter /str/template.mdb /str/transfer.json /files/result.mdb");
+    // 2 arguments: new template-free direct MDB export (preferred on iPhone).
+    // 3 arguments: legacy original-template export for controlled comparisons.
+    if (args.length != 2 && args.length != 3) {
+      System.err.println("Usage: BrowserMdbWriter [/str/template.mdb] /str/transfer.json /files/result.mdb");
       System.exit(2);
       return;
     }
     try {
-      Path template = Path.of(args[0]).normalize();
-      Path transferFile = Path.of(args[1]).normalize();
-      Path result = Path.of(args[2]).normalize();
-      if (!template.startsWith(Path.of("/str/")) ||
+      boolean fresh = args.length == 2;
+      Path template = fresh ? null : Path.of(args[0]).normalize();
+      Path transferFile = Path.of(args[fresh ? 0 : 1]).normalize();
+      Path result = Path.of(args[fresh ? 1 : 2]).normalize();
+      if ((!fresh && !template.startsWith(Path.of("/str/"))) ||
           !transferFile.startsWith(Path.of("/str/")) ||
           !result.startsWith(Path.of("/files/")) ||
           !result.getFileName().toString().matches("Transf_\\d+_\\d+_\\d+_Field\\.mdb")) {
         throw new IllegalArgumentException("Недопустимые пути для обмена.");
       }
-      // CheerpJ 4.3 Java17 sometimes pads decoded non-ASCII strings with U+0000.
-      // Normalize JSON *only at the browser boundary*, never modify an MDB template.
       JsonNode payload = cleanJson(new ObjectMapper().readTree(Files.readString(transferFile)));
       TransferWriter writer = new TransferWriter();
       TransferWriter.Identity id = writer.identity(payload);
-      String desired = id.filename().replace(".mdb", "_Field.mdb");
-      if (!desired.equals(result.getFileName().toString())) {
+      if (!id.filename().replace(".mdb", "_Field.mdb")
+              .equals(result.getFileName().toString())) {
         throw new IllegalArgumentException("Имя файла не совпадает с данными лесничества.");
       }
       Files.createDirectories(result.getParent());
-      writer.writeInMemory(payload, template, result);
+      if (fresh) writer.writeNewInMemory(payload, result);
+      else writer.writeInMemory(payload, template, result);
       if (!Files.isRegularFile(result) || Files.size(result) < 1024) {
         throw new IOException("MDB не был создан.");
       }
       System.out.println("SOLIN_MDB_OK:" + result.getFileName() + ":" + Files.size(result));
     } catch (Throwable error) {
       try {
-        java.io.StringWriter text = new java.io.StringWriter();
-        error.printStackTrace(new java.io.PrintWriter(text));
-        Files.writeString(Path.of("/files/solin-browser-debug.txt"), text.toString());
+        java.io.StringWriter details = new java.io.StringWriter();
+        error.printStackTrace(new java.io.PrintWriter(details));
+        Files.writeString(Path.of("/files/solin-browser-debug.txt"), details.toString());
       } catch (Exception ignored) {}
       System.err.println("SOLIN_MDB_ERROR:" + error);
       System.exit(1);
