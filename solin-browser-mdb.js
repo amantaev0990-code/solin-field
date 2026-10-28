@@ -91,7 +91,11 @@
       await ensureRuntime();
       const output = '/files/' + nameOf(transfer.identity);
       window.cheerpOSAddStringFile('/str/solin-original.mdb', new Uint8Array(local.bytes));
-      window.cheerpOSAddStringFile('/str/solin-transfer.json', new TextEncoder().encode(JSON.stringify(transfer)));
+      // CheerpJ's UTF-8 decoder may pad Cyrillic Java strings with NUL chars.
+      // Deliver ASCII JSON using \uXXXX escapes so Russian Access table names survive.
+      const ascii = JSON.stringify(transfer).replace(/[^\x00-\x7F]/g, c =>
+        '\\u' + c.charCodeAt(0).toString(16).padStart(4,'0'));
+      window.cheerpOSAddStringFile('/str/solin-transfer.json', new TextEncoder().encode(ascii));
       const exit = await window.cheerpjRunMain(
         'kz.solin.mdb.BrowserMdbWriter',
         '/app/vendor/solin-browser-mdb.jar',
