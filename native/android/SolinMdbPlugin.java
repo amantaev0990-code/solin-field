@@ -284,7 +284,8 @@ public class SolinMdbPlugin extends Plugin {
           if(!(value.equals("0")||value.equals("1")||value.equalsIgnoreCase("true")||value.equalsIgnoreCase("false")))
             throw new IllegalArgumentException("Неверный логический тип.");
           return value.equals("1")||value.equalsIgnoreCase("true");
-        case "BYTE": case "INT":return Short.parseShort(value);
+        case "BYTE":return Integer.parseInt(value);
+        case "INT":return Short.parseShort(value);
         case "LONG":return Integer.parseInt(value);
         case "BIG_INT":return Long.parseLong(value);
         case "FLOAT":return Float.parseFloat(value);
