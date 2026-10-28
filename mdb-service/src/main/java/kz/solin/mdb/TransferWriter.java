@@ -143,10 +143,12 @@ public final class TransferWriter {
               com.healthmarketscience.jackcess.util.MemFileChannel.newChannel(template)) {
         try (Database db = new DatabaseBuilder(destination.toFile()).setChannel(channel).open()) {
           writeTables(db, payload, data, id);
-        }
-        try (java.io.OutputStream output = Files.newOutputStream(destination)) {
-          long written = channel.transferTo(output);
-          if (written != channel.size()) throw new IOException("MDB записан не полностью.");
+          // Database.close() may close an externally supplied FileChannel.
+          // Copy the flushed Jet pages *before* leaving the Database scope.
+          try (java.io.OutputStream output = Files.newOutputStream(destination)) {
+            long written = channel.transferTo(output);
+            if (written != channel.size()) throw new IOException("MDB записан не полностью.");
+          }
         }
       }
     } else {
@@ -155,17 +157,30 @@ public final class TransferWriter {
         writeTables(db, payload, data, id);
       }
     }
-    // Reopen to confirm the output is a readable MDB, not merely a renamed blob.
-    try (Database verify = DatabaseBuilder.open(destination.toFile())) {
-      for (var entry : data.entrySet()) {
-        if (verify.getTable(entry.getKey()) == null ||
-            verify.getTable(entry.getKey()).getRowCount() != entry.getValue().size()) {
-          throw new IOException("MDB не прошёл повторную проверку таблиц.");
-        }
+    // Reopen to confirm that the output is a readable Jet MDB. In Safari
+    // RandomAccessFile/FileChannel is not guaranteed to work; verify via RAM.
+    if (inMemory) {
+      try (com.healthmarketscience.jackcess.util.MemFileChannel verifiedBytes =
+              com.healthmarketscience.jackcess.util.MemFileChannel.newChannel(destination);
+           Database verify = new DatabaseBuilder(destination.toFile()).setChannel(verifiedBytes).open()) {
+        verifyCounts(verify, data);
+      }
+    } else {
+      try (Database verify = DatabaseBuilder.open(destination.toFile())) {
+        verifyCounts(verify, data);
       }
     }
   }
 
+
+  private static void verifyCounts(Database verify, Map<String, JsonNode> data) throws IOException {
+    for (var entry : data.entrySet()) {
+      if (verify.getTable(entry.getKey()) == null ||
+          verify.getTable(entry.getKey()).getRowCount() != entry.getValue().size()) {
+        throw new IOException("MDB не прошёл повторную проверку таблиц: " + entry.getKey());
+      }
+    }
+  }
 
   private void writeTables(Database db, JsonNode payload, Map<String, JsonNode> data, Identity id) throws IOException {
       // Validate all data and relationships before writing.
