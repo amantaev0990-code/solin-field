@@ -70,6 +70,38 @@
         throw Error('Проверка MDB: число записей таблицы «' + name + '» не совпало.');
       }
     }
+    // Row counts alone cannot prove that edits were written: a copied original MDB
+    // can have exactly the same number of rows. Compare the complete stand address
+    // and every non-empty exported stand field before enabling the download.
+    const idFields = ['POS','LESN','KV','KGLF','VD'];
+    const address = row => idFields.map(k => {
+      const value = row?.[k];
+      return value == null ? '' : Number.isFinite(Number(value)) ? String(Number(value)) : String(value);
+    }).join('::');
+    const expectedStands = original['Выдел'] || [];
+    const actualStands = received.tables['Выдел'] || [];
+    const byAddress = new Map(actualStands.map(row => [address(row),row]));
+    if (byAddress.size !== actualStands.length) {
+      throw Error('В полученном MDB повторяются адреса выделов.');
+    }
+    for (const row of expectedStands) {
+      const actual = byAddress.get(address(row));
+      if (!actual) throw Error('В полученном MDB отсутствует выдел ' + address(row));
+      for (const [field, value] of Object.entries(row)) {
+        if (value == null || value === '' || field === '_children') continue;
+        const found = actual[field];
+        if (found == null || found === '') throw Error('В MDB потеряно поле «' + field + '» выдела ' + address(row));
+        if (typeof value === 'number' || typeof found === 'number') {
+          const a=Number(value),b=Number(found);
+          if (!Number.isFinite(a) || !Number.isFinite(b) ||
+              Math.abs(a-b) > Math.max(0.000001,Math.abs(a)*0.000001)) {
+            throw Error('Изменённые данные не сохранились: «' + field + '», выдел ' + address(row));
+          }
+        } else if (String(value).trim() !== String(found).trim()) {
+          throw Error('В MDB не совпало поле «' + field + '», выдел ' + address(row));
+        }
+      }
+    }
     return file;
   }
   async function exportBrowser() {
