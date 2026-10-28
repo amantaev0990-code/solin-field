@@ -16,7 +16,11 @@ function copy(from,to,level=0){
   const p=path.join(from,ent.name),dest=path.join(to,ent.name);
   if(ent.isSymbolicLink())continue;
   if(ent.isDirectory()){copy(p,dest,level+1);continue;}
-  if(!ent.isFile()||forbidden.test(ent.name)||!extensions.has(path.extname(ent.name).toLowerCase()))continue;
+  // Only the CI-verified BLANK 18-table template may enter an APK. All
+  // original forest MDBs remain excluded, including matching filenames.
+  const relative=path.relative(root,p).split(path.sep).join('/');
+  const safeBlank=relative==='vendor/solin-empty-transfer-v20261028-23.mdb';
+  if(!ent.isFile()||(!safeBlank&&(forbidden.test(ent.name)||!extensions.has(path.extname(ent.name).toLowerCase()))))continue;
   fs.mkdirSync(path.dirname(dest),{recursive:true});
   fs.copyFileSync(p,dest);count++;
  }
@@ -32,5 +36,5 @@ let appSrc=fs.readFileSync(apkApp,'utf8');
 appSrc=appSrc.replace("if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});",
   "if(!window.Capacitor?.isNativePlatform?.() && 'serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});");
 fs.writeFileSync(apkApp,appSrc);
-if(!fs.existsSync(path.join(out,'data-meta.json'))||!fs.existsSync(path.join(out,'quarters/q1.json'))||!fs.existsSync(path.join(out,'vendor/mdb-reader.bundle.js')))throw Error('Missing essential offline databases/maps');
+if(!fs.existsSync(path.join(out,'data-meta.json'))||!fs.existsSync(path.join(out,'quarters/q1.json'))||!fs.existsSync(path.join(out,'vendor/mdb-reader.bundle.js'))||!fs.existsSync(path.join(out,'vendor/solin-empty-transfer-v20261028-23.mdb')))throw Error('Missing essential offline databases/maps');
 console.log('SOLI-N Field APK assets: '+count+' files, copied to www; original MDB files excluded.');
