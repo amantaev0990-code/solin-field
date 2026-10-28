@@ -28,7 +28,12 @@
   if (signature !== 'Standard Jet DB') throw Error('Incorrect binary Jet signature: '+signature);
   const checked = await cheerpjRunMain('kz.solin.mdb.BrowserSmokeVerifier',
     '/app/vendor/solin-browser-mdb.jar', output);
-  if (checked !== 0) throw Error('Field-level MDB readback failed (PLV must be 5.75)');
+  if (checked !== 0) {
+    let reason='';
+    try { reason=await (await cjFileBlob('/files/solin-verify-debug.txt')).text(); }
+    catch(e){ reason='No verifier log: '+e.message; }
+    throw Error('Field-level MDB readback failed (PLV must be 5.75): '+reason.slice(0,1800));
+  }
   document.body.dataset.result = 'passed';
   document.getElementById('status').textContent='PASS: '+file.size+' byte Jet MDB';
 })().catch(e => {
