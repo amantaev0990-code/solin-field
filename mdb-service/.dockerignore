@@ -1,0 +1,7 @@
+target/
+*.mdb
+*.accdb
+.env
+.env.*
+*.json
+*.zip
