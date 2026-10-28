@@ -82,7 +82,7 @@ try {
   $children = @($names | Where-Object { $_ -notin @("Лесничество","Квартал","Выдел") })
   $deletionOrder = @($children) + @("Выдел","Квартал","Лесничество")
   foreach ($name in $deletionOrder) {
-    $safeName = ([string]$name).Replace("]"," ]] ")
+    $safeName = ([string]$name).Replace("]", "]]")
     $db.Execute("DELETE FROM [" + $safeName + "]", 128) # dbFailOnError
   }
   $insertOrder = @("Лесничество","Квартал","Выдел") + $children
