@@ -90,7 +90,7 @@ class TransferWriterTest {
     Path output = temp.resolve("Field.mdb");
     writer.write(transfer(), source, output);
     assertArrayEquals(before, Files.readAllBytes(source));
-    assertNotEquals(new String(before), new String(Files.readAllBytes(output)));
+    assertFalse(java.util.Arrays.equals(before, Files.readAllBytes(output)));
     assertTrue(new String(Files.readAllBytes(output), 0, 32,
       java.nio.charset.StandardCharsets.ISO_8859_1).contains("Standard Jet DB"));
     try (Database db = DatabaseBuilder.open(output.toFile())) {
