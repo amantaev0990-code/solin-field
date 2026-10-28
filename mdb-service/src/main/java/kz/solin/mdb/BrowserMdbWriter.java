@@ -5,6 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 
 /**
  * Executes the existing checked Jet writer inside a browser JVM (CheerpJ).
@@ -81,6 +85,29 @@ public final class BrowserMdbWriter {
       if (!Files.isRegularFile(result) || Files.size(result) < 1024) {
         throw new IOException("MDB не был создан.");
       }
+      // A sidecar receipt written only AFTER Jackcess readback has verified all
+      // exported table rowcounts. JS compares its downloaded Blob SHA-256 with
+      // the independently reopened Java file, preventing stale VFS files from
+      // being mistaken for a valid export.
+      Map<String, Object> receipt = new LinkedHashMap<>();
+      receipt.put("format", "SOLIN-JET-RECEIPT-v1");
+      receipt.put("filename", result.getFileName().toString());
+      receipt.put("size", Files.size(result));
+      receipt.put("pos", id.pos);
+      receipt.put("lesn", id.lesn);
+      receipt.put("year", id.year);
+      Map<String,Integer> counts = new LinkedHashMap<>();
+      payload.path("tables").fields().forEachRemaining(e -> counts.put(e.getKey(),e.getValue().size()));
+      receipt.put("counts", counts);
+      MessageDigest hash = MessageDigest.getInstance("SHA-256");
+      try (var input = Files.newInputStream(result)) {
+        byte[] buffer = new byte[65536];
+        int read;
+        while ((read=input.read(buffer))!=-1) hash.update(buffer,0,read);
+      }
+      receipt.put("sha256", HexFormat.of().formatHex(hash.digest()));
+      Files.writeString(result.resolveSibling(result.getFileName()+".verified.json"),
+        new ObjectMapper().writeValueAsString(receipt));
       System.out.println("SOLIN_MDB_OK:" + result.getFileName() + ":" + Files.size(result));
     } catch (Throwable error) {
       try {
