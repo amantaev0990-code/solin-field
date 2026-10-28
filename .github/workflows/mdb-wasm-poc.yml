@@ -8,7 +8,7 @@ on:
 jobs:
   build-poc:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     permissions:
       contents: write
     steps:
@@ -34,8 +34,10 @@ jobs:
         run: |
           mkdir -p /tmp/mdw-www/solin-field/mdb-wasm-poc
           cp -a /tmp/mdwpublish/wwwroot/. /tmp/mdw-www/solin-field/mdb-wasm-poc/
+          cp data-meta.json solin-mdb-bridge.js /tmp/mdw-www/solin-field/
           python3 -m http.server 8765 --bind 127.0.0.1 --directory /tmp/mdw-www &
           node experiments/mdb-wasm-poc/test-webkit.mjs
+          node experiments/mdb-wasm-poc/test-webkit-full.mjs
       - name: Publish isolated proof without modifying Field
         run: |
           mkdir -p mdb-wasm-poc
