@@ -24,8 +24,8 @@ public final class BlankTransferTemplate {
   );
 
   public static void main(String[] args) throws Exception {
-    if (args.length != 3)
-      throw new IllegalArgumentException("Usage: BlankTransferTemplate transfer.json data-transfer-types.json blank.mdb");
+    if (args.length != 3 && args.length != 4)
+      throw new IllegalArgumentException("Usage: BlankTransferTemplate transfer.json data-transfer-types.json blank.mdb [temporary-populated-for-js-test.mdb]");
     Path snapshot = Path.of(args[0]);
     Path typeFile = Path.of(args[1]);
     Path output = Path.of(args[2]);
@@ -135,6 +135,8 @@ public final class BlankTransferTemplate {
         }
         if(seen!=226)throw new IllegalStateException("Stand 226 missing.");
       }
+      // Only a CI-local temporary file. Never git-add or publish the populated copy.
+      if (args.length == 4) Files.copy(roundtrip, Path.of(args[3]), StandardCopyOption.REPLACE_EXISTING);
       System.out.println("PUBLISH_OK: 18 empty Jet4 tables, 279 original field types, "
         +"1243 source rows and PRkol=0.6 fractional roundtrip validated.");
     } finally {
