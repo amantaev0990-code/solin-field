@@ -1,0 +1,17 @@
+// Build a missing-field patch using an audited source snapshot and the exact
+// previously published quarter files. Never synthesize defaults or replace data.
+const fs=require('fs'),vm=require('vm'),crypto=require('crypto'),zlib=require('zlib');
+const path=require('path'),root=path.resolve(__dirname,'..'),sourcePath=process.argv[2];if(!sourcePath)throw Error('Pass the audited before-native-run.json path');const read=p=>JSON.parse(fs.readFileSync(p,'utf8').replace(/^\uFEFF/,''));
+const source=read(sourcePath),manifest=read(root+'/data-manifest.json'),meta=read(root+'/data-meta.json'),quarters=Object.assign({},...manifest.quarterChunks.map(p=>read(root+'/'+p))),sandbox={window:{}};
+vm.runInNewContext(fs.readFileSync(root+'/solin-native-control-data.js','utf8'),sandbox);const schemas=sandbox.window.SOLIN_NATIVE_CONTROL_DATA.schemas;
+const keys=['POS','LESN','KV','KGLF','VD'],qkeys=['POS','LESN','KV','KGLF','Klxr','Fzona'],key=r=>JSON.stringify(keys.map(k=>String(r[k]??''))),own=(o,k)=>Object.hasOwn(o,k),addr=r=>Object.fromEntries(keys.map(k=>[k,r[k]]));
+function same(a,b,table,f){if(a==null||b==null)return a===b;if(typeof a==='number'&&typeof b==='number')return schemas[table]?.[f]?.type===6?Math.fround(a)===Math.fround(b):a===b;return String(a)===String(b);}
+function missing(old,candidates){const out={};for(const [f,v]of Object.entries(candidates[0]))if(!own(old,f)&&candidates.every(c=>JSON.stringify(c[f])===JSON.stringify(v)))out[f]=v;return out;}
+const native=new Map(source.Выдел.map(r=>[key(r),r])),patch={format:'SOLIN-Verified-Source-Recovery-v1',sourceSha256:crypto.createHash('sha256').update(fs.readFileSync(sourcePath)).digest('hex'),origin:{POS:meta.lesnichestvo[0].POS,LESN:meta.lesnichestvo[0].LESN,year:meta.source.year,operational:meta.source.operational,notes:meta.source.notes},stands:[],quarters:[],children:[]};
+for(const q of Object.values(quarters)){
+ for(const old of q.quarterRows||[q.meta]){const matches=source.Квартал.filter(r=>qkeys.every(f=>!own(old,f)||same(old[f],r[f],'Квартал',f)));if(matches.length!==1)throw Error('Ambiguous source quarter');patch.quarters.push({identity:Object.fromEntries(qkeys.filter(f=>own(old,f)).map(f=>[f,old[f]])),values:missing(old,matches)});}
+ for(const old of q.compartments){const sourceRow=native.get(key(old));if(!sourceRow)throw Error('Source stand absent');patch.stands.push({address:addr(old),values:missing(old,[sourceRow])});
+  for(const [form,children]of Object.entries(old._children||{}))for(const child of children){const signature=Object.fromEntries(Object.entries(child).filter(([f])=>!keys.includes(f)&&!f.startsWith('_'))),matches=source[form].filter(r=>key(r)===key(old)&&Object.entries(signature).every(([f,v])=>same(v,r[f],form,f)));if(!matches.length)throw Error('Source child does not match '+form);patch.children.push({address:addr(old),form,signature,values:missing(child,matches)});}
+ }
+}
+const bytes=zlib.gzipSync(Buffer.from(JSON.stringify(patch)),{level:9});fs.writeFileSync(root+'/solin-control-source-recovery.json.gz',bytes);const proof={sourceSha256:patch.sourceSha256,assetSha256:crypto.createHash('sha256').update(bytes).digest('hex'),bytes:bytes.length,stands:patch.stands.length,quarters:patch.quarters.length,children:patch.children.length,fields:patch.stands.concat(patch.quarters,patch.children).reduce((n,r)=>n+Object.keys(r.values).length,0)};console.log(JSON.stringify(proof,null,2));
