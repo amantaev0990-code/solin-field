@@ -1,0 +1,22 @@
+name: MDB writer alternative — isolated .NET probe
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'experiments/mdb-dotnet/**'
+      - '.github/workflows/mdb-dotnet-probe.yml'
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Write and independently reopen test MDB
+        run: dotnet run --project experiments/mdb-dotnet/MdbProbe.csproj -c Release -- .
+      - name: Prove no existing user data or production code has changed
+        run: |
+          git diff --exit-code
+          test -f vendor/solin-empty-transfer-v20261028-27.mdb
