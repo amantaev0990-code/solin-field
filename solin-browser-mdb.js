@@ -91,7 +91,7 @@
       if (typeof v === 'number') return v;
       if (typeof v !== 'string') return Number.NaN;
       const t = v.trim();
-      if (!/^[+-]?(?:\\d+(?:[.,]\\d+)?|[.,]\\d+)$/.test(t)) return Number.NaN;
+      if (!/^[+-]?(?:\d+(?:[.,]\d+)?|[.,]\d+)$/.test(t)) return Number.NaN;
       return Number(t.replace(',', '.'));
     };
     const a = numeric(wanted), b = numeric(found);
