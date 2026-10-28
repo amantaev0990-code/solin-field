@@ -17,6 +17,7 @@ public final class BlankTransferTemplate {
     if (!"SOLIN-MDB-Bridge-v1".equals(transfer.path("format").asText()) ||
         transfer.path("schema").size()!=18) throw new IllegalArgumentException("Unsupported Transfer schema");
     Path intermediate=Files.createTempFile("solin-build-only-", ".mdb");
+    Path roundtrip=Files.createTempFile("solin-write-roundtrip-", ".mdb");
     // TransferWriter requires a not-yet-existing destination.
     Files.delete(intermediate);
     try {
@@ -55,7 +56,22 @@ public final class BlankTransferTemplate {
           }
         }
       }
-      System.out.println("PUBLISH_OK blank MDB "+Files.size(output)+" bytes; 18 empty tables, zero forest rows.");
-    } finally { Files.deleteIfExists(intermediate); }
+      // Verify actual export against the immutable, BLANK distributable MDB.
+      // This is a JVM roundtrip; iPhone/Virtual-FS validation remains separate.
+      new TransferWriter().writeInMemory(transfer, output, roundtrip);
+      try (Database populated=DatabaseBuilder.open(roundtrip.toFile());
+           Database stillBlank=DatabaseBuilder.open(output.toFile())) {
+        if (populated.getTableNames().size()!=18)
+          throw new IllegalStateException("Roundtrip lost a table.");
+        for (String name:populated.getTableNames()) {
+          int wanted=transfer.path("tables").path(name).size();
+          if(populated.getTable(name).getRowCount()!=wanted ||
+             stillBlank.getTable(name).getRowCount()!=0)
+            throw new IllegalStateException("Blank-template export failed: "+name);
+        }
+      }
+      System.out.println("PUBLISH_OK blank MDB "+Files.size(output)+
+        " bytes; 18 empty tables; full data export/reopen verified.");
+    } finally { Files.deleteIfExists(intermediate); Files.deleteIfExists(roundtrip); }
   }
 }
