@@ -35,6 +35,7 @@ button:disabled{opacity:.5}button.secondary{margin-top:12px;background:#235b83}#
   back.onclick=()=>location.assign('../');
   box.append(title,message,note,retry,back);
   app.replaceChildren(box);
+  window.solinReportMdbError?.(reason);
  }
  window.addEventListener('error',event=>{
   const target=event.target;
@@ -51,12 +52,32 @@ button:disabled{opacity:.5}button.secondary{margin-top:12px;background:#235b83}#
 </script>
 <script>
 let lastMdbUrl;
-window.solinShouldAutoExport=()=>new URL(location.href).searchParams.get('export')==='1';
+const solinParams=new URL(location.href).searchParams;
+const solinEmbed=window.parent!==window && solinParams.get('embed')==='1' && !!solinParams.get('token');
+let solinErrorSent=false;
+window.solinShouldAutoExport=()=>solinParams.get('export')==='1';
+window.solinReportMdbError=reason=>{
+ if(!solinEmbed || solinErrorSent)return;
+ solinErrorSent=true;
+ window.parent.postMessage({
+   type:'solin-mdb-error',token:solinParams.get('token'),
+   error:String(reason||'Не удалось создать MDB.').slice(0,400)
+ },location.origin);
+};
 window.saveMdb=(name,bytes)=>{
  if(!/^Transf_[0-9]+_[0-9]+_[0-9]+\.mdb$/.test(name))throw Error('Некорректное имя MDB.');
  const view=new Uint8Array(bytes);
  if(view.byteLength<2048 || String.fromCharCode(...view.slice(4,19))!=='Standard Jet DB')
    throw Error('Созданный файл не является базой Access MDB.');
+ if(solinEmbed){
+   // The parent SOLI-N Field page owns the download and remains visible.
+   const transferBytes=view.slice().buffer;
+   window.parent.postMessage({
+     type:'solin-mdb-ready',token:solinParams.get('token'),
+     name,bytes:transferBytes
+   },location.origin,[transferBytes]);
+   return;
+ }
  const blob=new Blob([bytes],{type:'application/vnd.ms-access'});
  const url=URL.createObjectURL(blob);
  const a=document.createElement('a');
@@ -72,6 +93,16 @@ window.saveMdb=(name,bytes)=>{
 // Transitional alias only for a stale cached test binary. The latest build
 // invokes saveMdb directly and uses the canonical filename.
 window.saveMdbTest=(name,bytes)=>window.saveMdb(name.replace(/^TEST_/,''),bytes);
+// Also handle errors emitted by an older cached .NET binary that cannot
+// directly invoke solinReportMdbError. The frame itself remains invisible.
+if(solinEmbed){
+ const failureObserver=new MutationObserver(()=>{
+   const status=document.querySelector('#app [role="status"]')?.textContent||'';
+   if(/^(?:Экспорт остановлен|Ошибка WebAssembly)/.test(status.trim()))
+     window.solinReportMdbError(status.trim());
+ });
+ failureObserver.observe(document.getElementById('app'),{subtree:true,childList:true,characterData:true});
+}
 </script>
 <script>
 /* For a previously cached, already running two-button WASM binary: present
