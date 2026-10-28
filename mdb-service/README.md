@@ -33,7 +33,11 @@ Use a TLS reverse proxy or trusted HTTPS ingress; do not expose the raw HTTP por
 
 ### Safety and limitations
 
-- Fail closed on incorrect forest identity, missing original fields/tables, invalid types and **non-represented district-specific tables**. Never silently replace those missing data structures. JSON sent to the converter is not published or committed.
+- Fail closed on incorrect forest identity, missing original fields/tables and invalid types. Non-represented original MDB tables are **preserved**, but any row referring to a quarter or stand absent from the new export aborts conversion. The preserved fields are not recalculated; a desktop SOLI-N round-trip remains mandatory. JSON sent to the converter is not published or committed.
 - A binary MDB is different from an Access `ACCDB`; this converter supports Jet templates identified by `Standard Jet DB`.
 - Jackcess cannot guarantee that original Access forms, macros, VBA, proprietary SOLI-N receiving rules, locks, and Access validation expressions are reproduced. Desktop round-trip testing with the user's original template is required before field deployment.
 - **No live server, private template or secret has been provisioned by this repository alone.** Until those are connected, the app honestly reports that MDB generation isn't configured.
+
+## Blueprint
+
+The repository root contains `render.yaml` for an opt-in deployment with a persistent (paid) disk, HTTPS and a user-supplied secret key. The service does **not** include or publish the source MDB. The original template still must be securely transferred into the mounted private `/data/templates` directory after deployment. A deployed HTTP `/health` endpoint only confirms that Java is running, not that templates or real MDB conversion are working.
