@@ -1,0 +1,24 @@
+# Private SOLI-N Field MDB converter. Requires a paid Render disk-capable plan.
+# NEVER commit original MDB files or API keys to this public repository.
+services:
+  - type: web
+    name: solin-mdb-export
+    runtime: docker
+    dockerfilePath: ./mdb-service/Dockerfile
+    dockerContext: ./mdb-service
+    region: frankfurt
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: SOLIN_ALLOWED_ORIGIN
+        value: https://amantaev0990-code.github.io
+      - key: SOLIN_TEMPLATE_DIR
+        value: /data/templates
+      - key: SOLIN_EXPORT_TOKEN
+        sync: false
+    disk:
+      name: solin-private-mdb-templates
+      mountPath: /data
+      sizeGB: 1
