@@ -86,7 +86,7 @@
       '   powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\\' + FILENAME + '"',
       '4. При отсутствии автоматически найденного файла укажите шаблон вручную:',
       '   powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\\' + FILENAME + '" -TemplateMDB "D:\\Path\\Transf.mdb"',
-      '5. Появится Transf_' + POS + '_' + LESN + '_' + GodT + '_Field.mdb.',
+      '5. Появится Transf_' + POS + '_' + LESN + '_' + GodT + '.mdb.',
       '6. Откройте готовый файл в Microsoft Access, проверьте таблицы и данные.',
       '   Затем используйте штатный прием Transfer в SOLI-N, сперва на резервной копии.',
       '',
