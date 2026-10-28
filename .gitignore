@@ -1,0 +1,15 @@
+# Sensitive original operational databases and secrets: never commit.
+*.mdb
+*.accdb
+*.ldb
+*.laccdb
+.env
+.env.*
+**/templates/
+**/secrets/
+# Java build artifacts
+mdb-service/target/
+*.jar
+# Local-only previews
+node_modules/
+.DS_Store
