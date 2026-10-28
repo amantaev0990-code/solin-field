@@ -1,4 +1,3 @@
-# Sensitive original operational databases and secrets: never commit.
 *.mdb
 *.accdb
 *.ldb
@@ -7,9 +6,14 @@
 .env.*
 **/templates/
 **/secrets/
-# Java build artifacts
 mdb-service/target/
 *.jar
-# Local-only previews
 node_modules/
+www/
+android/.gradle/
+android/local.properties
+android/.idea/
+android/app/build/
+*.keystore
+*.jks
 .DS_Store
