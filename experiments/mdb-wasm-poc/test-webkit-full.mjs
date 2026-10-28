@@ -67,7 +67,16 @@ try {
     throw Error('Edited stand #226 PRkol=0,6 not preserved: '+actual);
   const status=await page.getByRole('status').innerText();
   if(!status.includes('Успешно'))throw Error('No successful status: '+status);
-  console.log('WEBKIT_FULL_TRANSFER_OK: 18 tables, 1243 rows, edited PRkol=0.6 preserved, Jet MDB bytes='+bytes.length);
+  // Regression: a stale active forestry ID must fail instead of silently
+  // exporting an unrelated first forest from IndexedDB.
+  const wrongForestError=await page.evaluate(async()=>{
+    localStorage.setItem('solin_active_forest_v1','999::99');
+    try { await window.solinGetTransferJson(); return ''; }
+    catch(error) { return String(error.message||error); }
+  });
+  if(!wrongForestError.includes('Выбранное лесничество не найдено'))
+    throw Error('Stale active forestry was accepted: '+wrongForestError);
+  console.log('WEBKIT_FULL_TRANSFER_OK: 18 tables, 1243 rows, edited PRkol=0.6 preserved, invalid forest blocked, Jet MDB bytes='+bytes.length);
 } catch(e) {
   console.error('WEBKIT_FULL_TRANSFER_FAILED: '+e.stack);
   if(page)console.error('STATUS: '+await page.getByRole('status').innerText().catch(()=>'')); 
