@@ -51,7 +51,8 @@ try {
   # Check schema before modifying a single record.
   foreach ($name in $names) {
     try { $tableDef = $db.TableDefs.Item([string]$name) } catch { Stop-Bridge "В оригинальном MDB отсутствует таблица: $name" }
-    $columns = @($tableDef.Fields | ForEach-Object { [string]$_.Name })
+    $columns = @()
+    for ($columnIndex = 0; $columnIndex -lt $tableDef.Fields.Count; $columnIndex++) { $columns += [string]$tableDef.Fields.Item($columnIndex).Name }
     foreach ($key in @($data.schema.$name)) {
       if ($columns -notcontains [string]$key) { Stop-Bridge "В $name отсутствует исходное поле: $key" }
     }
@@ -101,8 +102,8 @@ try {
           if ($value -is [string] -and $value.Length -eq 0 -and $fieldType -notin @(10,12)) { continue }
           switch ($fieldType) {
             1 { $cast = [bool]([int]$value); break }
-            { $_ -in @(2,3,4,16,17) } { $cast = [int64]::Parse([string]$value,$culture); break }
-            { $_ -in @(5,6,7,20,21,23) } { $cast = [decimal]::Parse([string]$value,$culture); break }
+            { $_ -in @(2,3,4,16,17) } { $cast = [int64]::Parse([Convert]::ToString($value,$culture),$culture); break }
+            { $_ -in @(5,6,7,20,21,23) } { $cast = [decimal]::Parse([Convert]::ToString($value,$culture),$culture); break }
             8 { $cast = [datetime]::Parse([string]$value,$culture); break }
             default { $cast = [string]$value }
           }
