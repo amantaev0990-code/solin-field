@@ -144,4 +144,32 @@ class TransferWriterTest {
       assertEquals("Сохранять без изменений", db.getTable("НеизменённаяТаблица").iterator().next().get("Note"));
     }
   }
+  @Test void createsDirectJetWithoutInputTemplate() throws Exception {
+    Path output = temp.resolve("Direct_Field.mdb");
+    writer.writeNewInMemory(transfer(), output);
+    byte[] bytes = Files.readAllBytes(output);
+    assertTrue(bytes.length > 1024);
+    assertTrue(new String(bytes, 0, 32, java.nio.charset.StandardCharsets.ISO_8859_1)
+      .contains("Standard Jet DB"));
+    try (Database db = DatabaseBuilder.open(output.toFile())) {
+      assertEquals(4, db.getTableNames().size());
+      assertEquals(1, db.getTable("Лесничество").getRowCount());
+      assertEquals(1, db.getTable("Квартал").getRowCount());
+      assertEquals(1, db.getTable("Выдел").getRowCount());
+      assertEquals(17.25d, ((Number)db.getTable("Выдел").iterator().next()
+          .get("PLV")).doubleValue(), 0.00001d);
+      assertEquals(12, ((Number)db.getTable("Макет10").iterator().next()
+          .get("POR")).intValue());
+    }
+  }
+
+  @Test void rejectsBadDirectSchemaWithoutProducingFakeMDB() throws Exception {
+    var data = (com.fasterxml.jackson.databind.node.ObjectNode)transfer();
+    ((com.fasterxml.jackson.databind.node.ObjectNode)data.get("tables")).remove("Выдел");
+    Path output = temp.resolve("should-not-be-exported.mdb");
+    assertThrows(IllegalArgumentException.class,
+      () -> writer.writeNewInMemory(data, output));
+    assertFalse(Files.exists(output));
+  }
+
 }
