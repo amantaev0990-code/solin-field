@@ -50,3 +50,34 @@ Do **not** assume that CheerpJ's community license permits bundling/self-hosting
 - https://jackcess.sourceforge.io/
 - https://jackcess.sourceforge.io/faq.html
 - https://cheerpj.com/new-cheerpj-licensing/
+
+
+## Реализовано в ветке main (первый рабочий каркас APK)
+
+- `package.json`, `capacitor.config.json`: Capacitor Android из **того же HTML/CSS/JS**, что и GitHub Pages, без переписывания на Flutter.
+- `scripts/build-mobile.mjs`: собирает статические файлы, справочники, данные кварталов, библиотеки CMF2 и карты в `www/`. Не включает личные MDB или ключи. Отключает регистрацию service worker внутри APK.
+- `scripts/install-android-mdb.mjs`: регистрирует локальный плагин `SolinMdb` и добавляет Jackcess 4.0.12 в Android Gradle.
+- `native/android/SolinMdbPlugin.java`: создаёт **копию** Jet MDB, проверяет лесничество и схему таблиц, заменяет данные, проверяет сохранённые количества строк и вызывает системное окно Android «Создать документ» для `.mdb`. Временные копии удаляются.
+- `solin-apk-mdb.js`: общий клиентский слой для снимка Transfer и Android-плагина; первый раз просит оригинальный `.mdb`, сохраняет его в IndexedDB приложения; дальнейшие экспорты одной кнопкой. На iPhone Safari показывает честное сообщение, что локальный writer пока недоступен, а не поддельный MDB.
+- `.github/workflows/solin-android-apk.yml`: CI пытается собрать debug APK и выдать артефакт сборки. **Создание файла APK в CI не является тестом содержимого MDB.**
+
+### Как собрать отладочную сборку (Android SDK + Java 21 + Node 22)
+
+```sh
+npm install
+npm run android:init
+cd android
+./gradlew assembleDebug
+```
+
+Результат при успешной сборке: `android/app/build/outputs/apk/debug/app-debug.apk`.
+Публичный GitHub Actions workflow также может собрать APK, если у репозитория включены Actions. Не выдавайте сборку как полноценный SOLI-N до испытания настоящей MDB.
+
+### Что обязательно проверить
+
+- Компиляция и запуск APK на устройстве: в текущем окружении нет Android SDK и нельзя подтвердить запуск. Jackcess для Android может требовать дополнительные ресурсы JAR в `res/raw` (см. FAQ Jackcess); это нужно проверить на устройстве, прежде чем считать экспорт готовым.
+- Реальный round-trip `Transf_213_2_2026.mdb`: особенно неизвестные поля оригинала, дочерние макеты, индексные связи, русские сортировки, сохранение пустых значений. Если несовместимо — остановить экспорт, а не портить существующий Transfer.
+- Отдельный бесплатный **iPhone Safari writer** ещё не реализован. Android-плагин не может работать в iPhone Safari. Не привязывать архитектуру к платному CheerpJ или серверу.
+- Safari IndexedDB и Android WebView IndexedDB независимы — для переноса с iPhone на Android потребуется экспорт/импорт рабочей базы (отдельный этап).
+
+Старые `solin-online-mdb.js`, `render.yaml` и `mdb-service/` не используются новой кнопкой экспорта. Никакие платные сервисы не создаются.
