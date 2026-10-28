@@ -191,7 +191,7 @@ public static class TransferConverter
                 }
             }
             byte[] output=System.IO.File.ReadAllBytes(path);
-            return new Result($"TEST_Transf_{pos}_{lesn}_{year}.mdb",output,18,count);
+            return new Result($"Transf_{pos}_{lesn}_{year}.mdb",output,18,count);
         }finally{try{System.IO.File.Delete(path);}catch{}}
     }
 }
