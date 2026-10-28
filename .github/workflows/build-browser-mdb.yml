@@ -42,8 +42,8 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             cp /tmp/solin-mdb-writer.jar vendor/solin-browser-mdb.jar
-            cp /tmp/solin-mdb-writer.jar vendor/solin-browser-mdb-v20261028-19.jar
-            git add -f vendor/solin-browser-mdb.jar vendor/solin-browser-mdb-v20261028-19.jar
+            cp /tmp/solin-mdb-writer.jar vendor/solin-browser-mdb-v20261028-21.jar
+            git add -f vendor/solin-browser-mdb.jar vendor/solin-browser-mdb-v20261028-21.jar
             if git diff --cached --quiet; then
               echo "MDB writer bundle unchanged"
               exit 0
