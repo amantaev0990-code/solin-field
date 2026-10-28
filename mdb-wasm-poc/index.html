@@ -54,14 +54,14 @@ let lastMdbUrl;
 window.solinShouldAutoExport=()=>new URL(location.href).searchParams.get('export')==='1';
 window.saveMdb=(name,bytes)=>{
  if(!/^Transf_[0-9]+_[0-9]+_[0-9]+\.mdb$/.test(name))throw Error('Некорректное имя MDB.');
- const view=new Uint8Array(bytes.buffer||bytes);
+ const view=new Uint8Array(bytes);
  if(view.byteLength<2048 || String.fromCharCode(...view.slice(4,19))!=='Standard Jet DB')
    throw Error('Созданный файл не является базой Access MDB.');
  const blob=new Blob([bytes],{type:'application/vnd.ms-access'});
  const url=URL.createObjectURL(blob);
  const a=document.createElement('a');
  a.href=url;a.download=name;a.textContent='Сохранить MDB';
- a.setAttribute('aria-label','Сохранить '+name);
+ a.setAttribute('aria-label','Сохранить MDB: '+name);
  document.getElementById('download-area').replaceChildren(a);
  if(lastMdbUrl)URL.revokeObjectURL(lastMdbUrl);
  lastMdbUrl=url;
