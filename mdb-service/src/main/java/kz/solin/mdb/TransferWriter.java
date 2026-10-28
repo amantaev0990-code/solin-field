@@ -2,6 +2,8 @@ package kz.solin.mdb;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.healthmarketscience.jackcess.Column;
+import com.healthmarketscience.jackcess.ColumnBuilder;
+import com.healthmarketscience.jackcess.TableBuilder;
 import com.healthmarketscience.jackcess.Cursor;
 import com.healthmarketscience.jackcess.DataType;
 import com.healthmarketscience.jackcess.Database;
@@ -180,6 +182,103 @@ public final class TransferWriter {
         throw new IOException("MDB не прошёл повторную проверку таблиц: " + entry.getKey());
       }
     }
+  }
+
+
+  /**
+   * Template-free export for iPhone: create a NEW, real Jet 4 MDB in RAM using
+   * the exported tables. This avoids asking the user to import a source file.
+   *
+   * IMPORTANT: the original Access-only indexes, properties and unrepresented
+   * tables cannot be reconstructed from the mobile snapshot. This is a binary
+   * Access export, but desktop SOLI-N import compatibility is NOT asserted.
+   */
+  public void writeNewInMemory(JsonNode payload, Path destination) throws IOException {
+    Identity id = identity(payload);
+    Map<String, JsonNode> data = validatePayload(payload, id);
+    if (Files.exists(destination)) {
+      throw new IllegalArgumentException("Выходной MDB уже существует.");
+    }
+    try (com.healthmarketscience.jackcess.util.MemFileChannel channel =
+          com.healthmarketscience.jackcess.util.MemFileChannel.newChannel(
+            new java.io.ByteArrayInputStream(new byte[0]))) {
+      try (Database db = new DatabaseBuilder(destination.toFile())
+          .setChannel(channel).setFileFormat(Database.FileFormat.V2000).create()) {
+        for (var entry : data.entrySet()) {
+          String name = entry.getKey();
+          JsonNode fields = payload.path("schema").path(name);
+          TableBuilder builder = new TableBuilder(name);
+          for (JsonNode field : fields) {
+            String fieldName = field.asText();
+            DataType type = inferredType(fieldName, entry.getValue());
+            ColumnBuilder column = new ColumnBuilder(fieldName, type);
+            if (type == DataType.TEXT) column.setLengthInUnits(255);
+            builder.addColumn(column);
+          }
+          builder.toTable(db);
+        }
+        for (var entry : data.entrySet()) {
+          Table table = db.getTable(entry.getKey());
+          for (JsonNode row : entry.getValue()) {
+            Map<String,Object> values = new LinkedHashMap<>();
+            for (var it = row.fields(); it.hasNext();) {
+              var field = it.next();
+              values.put(field.getKey(),
+                convert(field.getValue(), table.getColumn(field.getKey()).getType()));
+            }
+            table.addRowFromMap(values);
+          }
+        }
+        db.flush();
+        verifyCounts(db, data);
+        // The virtual filesystem can be write-once; copy the random-access
+        // channel to its target while it is still open.
+        try (java.io.OutputStream output = Files.newOutputStream(destination)) {
+          long bytes = channel.transferTo(output);
+          if (bytes != channel.size() || bytes < 1024) {
+            throw new IOException("MDB записан не полностью.");
+          }
+        }
+      }
+    }
+    // Re-read from a separate in-memory channel, as in iPhone CheerpJ runtime.
+    try (com.healthmarketscience.jackcess.util.MemFileChannel check =
+           com.healthmarketscience.jackcess.util.MemFileChannel.newChannel(destination);
+         Database verified = new DatabaseBuilder(destination.toFile())
+           .setChannel(check).open()) {
+      verifyCounts(verified, data);
+    }
+  }
+
+  private static DataType inferredType(String field, JsonNode rows) {
+    // The forest address is always numeric even when a JavaScript form
+    // stored its values as text. This preserves unique stand/quarter identity.
+    if (Set.of("POS","LESN","KV","KGLF","VD","GodT").contains(field)) {
+      return DataType.LONG;
+    }
+    boolean sawText = false, sawDecimal = false, sawBool = false;
+    boolean sawNumber = false, bigText = false;
+    for (JsonNode row : rows) {
+      JsonNode value = row.path(field);
+      if (value.isMissingNode() || value.isNull() ||
+          (value.isTextual() && value.asText().isBlank())) continue;
+      if (value.isBoolean()) { sawBool = true; continue; }
+      if (value.isNumber()) {
+        sawNumber = true;
+        if (!value.isIntegralNumber() || !value.canConvertToInt()) sawDecimal = true;
+        continue;
+      }
+      if (value.isTextual()) {
+        String v = value.asText();
+        if (v.length() > 255) bigText = true;
+        sawText = true;
+      }
+    }
+    if (sawText || bigText) return bigText ? DataType.MEMO : DataType.TEXT;
+    if (sawBool && !sawNumber) return DataType.BOOLEAN;
+    if (sawNumber) return sawDecimal ? DataType.DOUBLE : DataType.LONG;
+    // Empty table/column: conservative text default, NULL values preserved.
+    return DataType.TEXT;
   }
 
   private void writeTables(Database db, JsonNode payload, Map<String, JsonNode> data, Identity id) throws IOException {
