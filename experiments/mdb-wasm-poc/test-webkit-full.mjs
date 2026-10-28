@@ -6,6 +6,11 @@ const meta=JSON.parse(fs.readFileSync('data-meta.json','utf8'));
 const manifest=JSON.parse(fs.readFileSync('data-manifest.json','utf8'));
 const quarters=Object.assign({},...manifest.quarterChunks.map(p=>JSON.parse(fs.readFileSync(p,'utf8'))));
 const org=meta.lesnichestvo[0];
+const stands=Object.values(quarters).flatMap(q=>q.compartments||[]);
+if(stands.length!==471)throw Error('Sample should have exactly 471 stands');
+// Regression from the user's original v27 failure: local field entry with
+// a comma decimal must survive as Access FLOAT, with no rounding to LONG.
+stands[225].PRkol='0,6';
 const forest={id:org.POS+'::'+org.LESN,org,quarters,source:meta.source,extraTables:{},updatedAt:new Date().toISOString(),history:[]};
 
 const browser=await webkit.launch({headless:true});
@@ -55,10 +60,14 @@ try {
   }
   if(rows!==1243)throw Error('Expected 1243 records, got '+rows);
   if(r.getTable('Лесничество').getData().length!==1)throw Error('No forestry row');
-  if(r.getTable('Выдел').getData().length!==471)throw Error('Missing stands');
+  const standRows=r.getTable('Выдел').getData();
+  if(standRows.length!==471)throw Error('Missing stands');
+  const actual=Number(standRows[225].PRkol);
+  if(!Number.isFinite(actual)||Math.abs(actual-0.6)>0.000001)
+    throw Error('Edited stand #226 PRkol=0,6 not preserved: '+actual);
   const status=await page.getByRole('status').innerText();
   if(!status.includes('Успешно'))throw Error('No successful status: '+status);
-  console.log('WEBKIT_FULL_TRANSFER_OK: 18 tables, 1243 rows, Jet MDB bytes='+bytes.length);
+  console.log('WEBKIT_FULL_TRANSFER_OK: 18 tables, 1243 rows, edited PRkol=0.6 preserved, Jet MDB bytes='+bytes.length);
 } catch(e) {
   console.error('WEBKIT_FULL_TRANSFER_FAILED: '+e.stack);
   if(page)console.error('STATUS: '+await page.getByRole('status').innerText().catch(()=>'')); 
