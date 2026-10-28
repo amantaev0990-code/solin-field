@@ -11,6 +11,45 @@ button:disabled{opacity:.5}button.secondary{margin-top:12px;background:#235b83}#
 <body><div id="app">Загружаю отдельный тестовый конвертер…</div>
 <div id="download-area"></div>
 <script>
+/* Diagnostic fallback for a missing or stalled Blazor runtime. Never touches
+   SOLI-N workspace records. The live Blazor UI replaces this on success. */
+(function solinBootWatchdog(){
+ 'use strict';
+ const app=document.getElementById('app');
+ let failureReason='';
+ const ready=()=>!!app.querySelector('button');
+ const record=message=>{if(!failureReason)failureReason=String(message||'Неизвестная ошибка').slice(0,240);};
+ function failure(reason) {
+  if(ready())return;
+  const box=document.createElement('section');box.className='shell';
+  const title=document.createElement('h1');title.textContent='Конвертер не загрузился';
+  const message=document.createElement('p');
+  message.textContent=reason||'Не удалось запустить WebAssembly. Проверьте сеть и откройте страницу повторно.';
+  const note=document.createElement('p');note.className='note';
+  note.textContent='Карточки SOLI-N Field не изменены. Файл MDB не создавался.';
+  const retry=document.createElement('button');
+  retry.type='button';retry.textContent='Повторить загрузку';
+  retry.onclick=()=>{const url=new URL(location.href);url.searchParams.set('retry',Date.now());location.replace(url.href);};
+  const back=document.createElement('button');
+  back.className='secondary';back.type='button';back.textContent='Вернуться в SOLI-N Field';
+  back.onclick=()=>location.assign('../');
+  box.append(title,message,note,retry,back);
+  app.replaceChildren(box);
+ }
+ window.addEventListener('error',event=>{
+  const target=event.target;
+  if(target?.tagName==='SCRIPT'&&target.src?.includes('blazor.webassembly.js')) {
+   failure('Не загрузился файл _framework/blazor.webassembly.js. Это ошибка публикации GitHub Pages или сети.');
+  }else if(event.message)record(event.message);
+ },true);
+ window.addEventListener('unhandledrejection',event=>record(event.reason?.message||event.reason));
+ setTimeout(()=>{if(!ready())failure(failureReason
+   ? 'Ошибка запуска: '+failureReason
+   : 'WebAssembly не запустился. Возможна недоступность файлов _framework или ошибка загрузки в Safari.');
+ },30000);
+})();
+</script>
+<script>
 let lastMdbUrl;
 window.saveMdbTest=(name,bytes)=>{
  const blob=new Blob([bytes],{type:'application/vnd.ms-access'});
