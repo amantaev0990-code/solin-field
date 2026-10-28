@@ -10,6 +10,7 @@ on:
       - "scripts/prepare-blank-mdb.mjs"
       - "solin-mdb-bridge.js"
       - "data-meta.json"
+      - "data-transfer-types.json"
       - "data-manifest.json"
       - "quarters/**"
   workflow_dispatch:
@@ -37,9 +38,9 @@ jobs:
       - name: Build NEW, user-data-free 18-table MDB template in the CI Java VM
         run: |
           node scripts/prepare-blank-mdb.mjs /tmp/solin-typing-input.json
-          java -cp mdb-service/target/mdb-export-service-0.1.0.jar kz.solin.mdb.BlankTransferTemplate /tmp/solin-typing-input.json vendor/solin-empty-transfer-v20261028-23.mdb
+          java -cp mdb-service/target/mdb-export-service-0.1.0.jar kz.solin.mdb.BlankTransferTemplate /tmp/solin-typing-input.json data-transfer-types.json vendor/solin-empty-transfer-v20261028-27.mdb
           rm -f /tmp/solin-typing-input.json
-          test -s vendor/solin-empty-transfer-v20261028-23.mdb
+          test -s vendor/solin-empty-transfer-v20261028-27.mdb
       - name: Stage browser executable (never stage original MDB)
         run: |
           test -f mdb-service/target/mdb-export-service-0.1.0.jar
@@ -52,14 +53,14 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           cp vendor/solin-browser-mdb.jar /tmp/solin-mdb-writer.jar
-          cp vendor/solin-empty-transfer-v20261028-23.mdb /tmp/solin-blank-transfer-template.mdb
+          cp vendor/solin-empty-transfer-v20261028-27.mdb /tmp/solin-blank-transfer-template.mdb
           for attempt in 1 2 3 4 5; do
             git fetch origin main
             git reset --hard origin/main
             cp /tmp/solin-mdb-writer.jar vendor/solin-browser-mdb.jar
-            cp /tmp/solin-mdb-writer.jar vendor/solin-browser-mdb-v20261028-25.jar
-            cp /tmp/solin-blank-transfer-template.mdb vendor/solin-empty-transfer-v20261028-23.mdb
-            git add -f vendor/solin-browser-mdb.jar vendor/solin-browser-mdb-v20261028-25.jar vendor/solin-empty-transfer-v20261028-23.mdb
+            cp /tmp/solin-mdb-writer.jar vendor/solin-browser-mdb-v20261028-27.jar
+            cp /tmp/solin-blank-transfer-template.mdb vendor/solin-empty-transfer-v20261028-27.mdb
+            git add -f vendor/solin-browser-mdb.jar vendor/solin-browser-mdb-v20261028-27.jar vendor/solin-empty-transfer-v20261028-27.mdb
             if git diff --cached --quiet; then
               echo "MDB writer bundle unchanged"
               exit 0
