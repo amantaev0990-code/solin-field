@@ -80,7 +80,7 @@ public class SolinMdbPlugin extends Plugin {
         replaceTables(transfer, pos, lesn, output);
         if (!isJet(readFirst32(output))) throw new IllegalStateException("Полученный файл не MDB.");
         File safe = output; output = null;
-        String filename = "Transf_" + pos + "_" + lesn + "_" + year + "_Field.mdb";
+        String filename = "Transf_" + pos + "_" + lesn + "_" + year + ".mdb";
         getActivity().runOnUiThread(() -> {
           pendingFile = safe;
           Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
