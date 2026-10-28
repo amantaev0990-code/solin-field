@@ -2,7 +2,11 @@ function exportTransfer(){
  if(!window.D)return toast('Данные ещё загружаются');
  const local=JSON.parse(localStorage.getItem('solin_user_data_v1')||'{"quarters":{}}');
  const tables={"Квартал":[],"Выдел":[],"Макет10":[],"Макет11":[],"Макет12":[],"Макет13":[],"Макет14":[],"Макет15":[],"Макет17":[],"Макет19":[],"Макет20":[],"Макет21":[],"Макет23":[],"Макет25":[],"Макет27":[],"Макет28":[]};
- const POS=213,LESN=2,GodT=2026;
+ const owner=D.lesnichestvo?.[0];
+ if(!owner)return toast('Сначала выберите лесничество');
+ const POS=Number(owner.POS),LESN=Number(owner.LESN),GodT=Number(owner.GodT);
+ if(![POS,LESN,GodT].every(Number.isSafeInteger)||POS<=0||LESN<=0||GodT<1900||GodT>2200)
+   return toast('Проверьте шифры лесовладельца, лесничества и год таксации');
  for(const [kv,q] of Object.entries(local.quarters||{})){
    if(q._local){const m=q.meta||{};tables['Квартал'].push({POS,LESN,KV:+kv||kv,KGLF:m.KGLF||null,Fzona:m.Fzona||null,GodT,Kpz:m.Kpz||null,Klxr:m.Klxr||null});}
    for(const r of q.compartments||[]){
