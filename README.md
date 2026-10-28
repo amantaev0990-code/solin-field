@@ -24,7 +24,7 @@
 
 **Почему нужен шаблон?** Первоначальное создание нового пустого Jet MDB внутри Safari вызывало `Given rowId is invalid ... Table=MSysObjects`. Теперь применяется локально сохранённый исходный Transfer и его настоящий системный каталог. В Java-чтении разрешён обход индекса `MSysObjects`, если он несовместим с виртуальным файловым каналом. Эта схема ещё должна пройти испытание на самом iPhone.
 
-Java-ядро: `mdb-service/src/main/java/kz/solin/mdb/BrowserMdbWriter.java` и `TransferWriter.java`. Проверки: `mdb-service/src/test/java/kz/solin/mdb/TransferWriterTest.java`. Публикуемый браузерный пакет: `vendor/solin-browser-mdb-v20261028-21.jar`; собирается и тестируется GitHub Actions в `.github/workflows/build-browser-mdb.yml`.
+Java-ядро: `mdb-service/src/main/java/kz/solin/mdb/BrowserMdbWriter.java` и `TransferWriter.java`. Проверки: `mdb-service/src/test/java/kz/solin/mdb/TransferWriterTest.java`. Публикуемый браузерный пакет: `vendor/solin-browser-mdb-v20261028-22.jar`; собирается и тестируется GitHub Actions в `.github/workflows/build-browser-mdb.yml`.
 
 ## Android APK и резервный вариант для Windows
 
