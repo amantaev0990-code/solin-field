@@ -99,11 +99,27 @@
       ''
     ].join('\r\n');
   }
-  function saveBlob(blob, filename) {
+  // Mobile Safari needs a real tap on an anchor after asynchronous ZIP generation.
+  // Do not report that a file was saved before the user actually taps the link.
+  function offerDownload(blob, filename) {
     const url = URL.createObjectURL(blob);
+    const host = document.getElementById('solin-download-area');
     const a = document.createElement('a');
-    a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 15000);
+    a.href = url; a.download = filename;
+    a.textContent = 'Сохранить ZIP для MDB';
+    a.className = 'primary';
+    a.style.cssText = 'display:flex;align-items:center;justify-content:center;text-align:center;min-height:48px;border-radius:12px;padding:10px 16px;text-decoration:none;box-sizing:border-box;background:#218546;color:white;font-weight:700;';
+    if (!host) {
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } else {
+      host.replaceChildren(a);
+      const note = document.createElement('p');
+      note.textContent = 'На iPhone после открытия файла выберите «Поделиться» → «Сохранить в Файлы», если браузер не скачает его автоматически.';
+      host.append(note);
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 10 * 60 * 1000);
   }
   async function exportForWindows() {
     const button = document.getElementById('solin-mdb-export');
@@ -123,15 +139,17 @@
       zip.file('README.txt', instructions(payload));
       const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
       const { POS, LESN, GodT } = payload.identity;
-      saveBlob(blob, 'SOLIN-MDB-' + POS + '-' + LESN + '-' + GodT + '.zip');
+      const filename = 'SOLIN-MDB-' + POS + '-' + LESN + '-' + GodT + '.zip';
       const detail = Object.values(payload.counts).reduce((n, c) => n + c, 0);
       if (typeof openModal === 'function') {
-        openModal('Экспорт для MDB подготовлен',
-          '<p>Сохранён ZIP-пакет: <b>солин Transfer для Windows</b>.</p>' +
-          '<p>В пакете ' + Object.keys(payload.tables).length + ' таблиц, ' + detail + ' строк и инструмент создания настоящего MDB.</p>' +
-          '<p><b>Важно:</b> это пока не готовый MDB. На компьютере нужно распаковать ZIP и выполнить инструкцию README.txt. Исходная база не изменится.</p>' +
-          '<button class="primary" onclick="closeModal()">Понятно</button>');
-      } else if (typeof toast === 'function') toast('ZIP для создания MDB скачан');
+        openModal('Пакет для MDB готов',
+          '<p><b>' + filename + '</b></p>' +
+          '<p>Подготовлено ' + Object.keys(payload.tables).length + ' таблиц и ' + detail + ' строк.</p>' +
+          '<p><b>Это ZIP, а не готовый MDB.</b> На Windows распакуйте архив и следуйте README.txt; для создания MDB потребуется исходная база Transfer.</p>' +
+          '<div id="solin-download-area"></div>' +
+          '<button type="button" onclick="closeModal()">Закрыть</button>');
+      }
+      offerDownload(blob, filename);
     } catch (err) {
       if (typeof toast === 'function') toast('MDB-пакет: ' + err.message);
       else alert(err.message);
