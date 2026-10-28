@@ -145,7 +145,7 @@ public final class ExportServer {
       var headers = exchange.getResponseHeaders();
       headers.set("Content-Type", "application/vnd.ms-access");
       headers.set("Content-Disposition", "attachment; filename=\"" +
-          "Transf_" + id.pos + "_" + id.lesn + "_" + id.year + "_Field.mdb\"");
+          "Transf_" + id.pos + "_" + id.lesn + "_" + id.year + ".mdb\"");
       exchange.sendResponseHeaders(200, result.length);
       try (var response = exchange.getResponseBody()) { response.write(result); }
     } catch (IllegalArgumentException badRequest) {
