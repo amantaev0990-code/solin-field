@@ -237,14 +237,16 @@ public final class TransferWriter {
         }
         for (var entry : data.entrySet()) {
           Table table = db.getTable(entry.getKey());
+          int rowIndex = 0;
           for (JsonNode row : entry.getValue()) {
             Map<String,Object> values = new LinkedHashMap<>();
             for (var it = row.fields(); it.hasNext();) {
               var field = it.next();
               values.put(field.getKey(),
-                convert(field.getValue(), table.getColumn(field.getKey()).getType()));
+                convertCell(field.getValue(), table.getColumn(field.getKey()), entry.getKey(), rowIndex));
             }
             table.addRowFromMap(values);
+            rowIndex++;
           }
         }
         db.flush();
@@ -311,13 +313,15 @@ public final class TransferWriter {
           if (!columns.contains(field.asText())) throw new IllegalArgumentException(
             "В оригинальном MDB нет поля «" + entry.getKey() + "." + field.asText() + "».");
         }
+        int rowIndex = 0;
         for (JsonNode row : entry.getValue()) {
           for (var it = row.fields(); it.hasNext();) {
             var cell = it.next();
             Column column = t.getColumn(cell.getKey());
             if (column == null) throw new IllegalArgumentException("Отсутствует поле " + entry.getKey() + "." + cell.getKey());
-            convert(cell.getValue(), column.getType());
+            convertCell(cell.getValue(), column, entry.getKey(), rowIndex);
           }
+          rowIndex++;
         }
       }
       Table forest = db.getTable("Лесничество");
@@ -391,13 +395,15 @@ public final class TransferWriter {
       insertOrder.addAll(children);
       for (String name : insertOrder) {
         Table t = db.getTable(name);
+        int rowIndex = 0;
         for (JsonNode record : data.get(name)) {
           Map<String,Object> values = new LinkedHashMap<>();
           for (var it = record.fields(); it.hasNext();) {
             var field = it.next();
-            values.put(field.getKey(), convert(field.getValue(), t.getColumn(field.getKey()).getType()));
+            values.put(field.getKey(), convertCell(field.getValue(), t.getColumn(field.getKey()), name, rowIndex));
           }
           t.addRowFromMap(values);
+          rowIndex++;
         }
       }
       db.flush();
@@ -428,11 +434,56 @@ public final class TransferWriter {
     return value instanceof Number ? ((Number)value).intValue() : Integer.parseInt(String.valueOf(value));
   }
 
+  // Convert a mathematically integral number without truncating fractional
+  // data. Mobile forms can store "1", "1.0" or "1,0" for the same integer.
+  private static BigDecimal exactDecimal(String raw) {
+    String value = raw.trim();
+    // A comma is accepted as a decimal separator only when there is no dot.
+    // Group separators and ambiguous mixed punctuation are deliberately rejected.
+    if (value.indexOf(',') >= 0) {
+      if (value.indexOf('.') >= 0 || value.indexOf(',', value.indexOf(',')+1) >= 0)
+        throw new NumberFormatException("Неоднозначный формат числа");
+      value = value.replace(',', '.');
+    }
+    return new BigDecimal(value);
+  }
+
+  private static Object requireInt(String value, DataType type) {
+    try {
+      switch (type) {
+        case BYTE: {
+          int n = exactDecimal(value).intValueExact();
+          if (n < 0 || n > 255) throw new ArithmeticException("Out of BYTE range");
+          return n;
+        }
+        case INT: return exactDecimal(value).shortValueExact();
+        case LONG: return exactDecimal(value).intValueExact();
+        case BIG_INT: return exactDecimal(value).longValueExact();
+        default: throw new IllegalArgumentException("Expected integral type");
+      }
+    } catch (NumberFormatException | ArithmeticException e) {
+      throw new IllegalArgumentException("Недопустимое целое число для " + type + ": «" +
+        (value.length() <= 70 ? value : value.substring(0, 70) + "…") + "».", e);
+    }
+  }
+
+  private static Object convertCell(JsonNode value, Column column, String table, int row) {
+    try {
+      return convert(value, column.getType());
+    } catch (IllegalArgumentException e) {
+      String sample = value == null || value.isNull() ? "null" : value.asText();
+      if (sample.length() > 80) sample = sample.substring(0, 80) + "…";
+      throw new IllegalArgumentException("Таблица «" + table + "», строка " + (row + 1) +
+        ", поле «" + column.getName() + "», значение «" + sample +
+        "», тип MDB " + column.getType() + ": " + e.getMessage(), e);
+    }
+  }
+
   static Object convert(JsonNode node, DataType type) {
     if (node == null || node.isNull()) return null;
     if (node.isContainerNode()) throw new IllegalArgumentException("Сложные значения не поддерживаются.");
     String v = node.asText();
-    if (v.isEmpty() && type != DataType.TEXT && type != DataType.MEMO) return null;
+    if (v.trim().isEmpty() && type != DataType.TEXT && type != DataType.MEMO) return null;
     try {
       return switch (type) {
         case BOOLEAN -> {
@@ -442,10 +493,7 @@ public final class TransferWriter {
           }
           yield node.isBoolean() ? node.asBoolean() : (v.equals("1") || v.equalsIgnoreCase("true"));
         }
-        case BYTE -> Integer.parseInt(v);
-        case INT -> Short.parseShort(v);
-        case LONG -> Integer.parseInt(v);
-        case BIG_INT -> Long.parseLong(v);
+        case BYTE, INT, LONG, BIG_INT -> requireInt(v, type);
         case FLOAT -> Float.parseFloat(v);
         case DOUBLE -> Double.parseDouble(v);
         case MONEY, NUMERIC -> new BigDecimal(v);
