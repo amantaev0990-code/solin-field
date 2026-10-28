@@ -44,6 +44,14 @@ class TransferWriterTest {
         .addColumn(new ColumnBuilder("VD", DataType.LONG))
         .addColumn(new ColumnBuilder("PLV", DataType.DOUBLE))
         .toTable(db).addRow(213, 2, 1, 3, 1, 1.0d);
+      new TableBuilder("НеизменённаяТаблица")
+        .addColumn(new ColumnBuilder("POS", DataType.LONG))
+        .addColumn(new ColumnBuilder("LESN", DataType.LONG))
+        .addColumn(new ColumnBuilder("KV", DataType.LONG))
+        .addColumn(new ColumnBuilder("KGLF", DataType.LONG))
+        .addColumn(new ColumnBuilder("VD", DataType.LONG))
+        .addColumn(new ColumnBuilder("Note", DataType.TEXT))
+        .toTable(db).addRow(213, 2, 1, 3, 1, "Сохранять без изменений");
       new TableBuilder("Макет10")
         .addColumn(new ColumnBuilder("POS", DataType.LONG))
         .addColumn(new ColumnBuilder("LESN", DataType.LONG))
@@ -88,6 +96,7 @@ class TransferWriterTest {
     try (Database db = DatabaseBuilder.open(output.toFile())) {
       assertEquals(1, db.getTable("Лесничество").getRowCount());
       assertEquals(1, db.getTable("Выдел").getRowCount());
+      assertEquals("Сохранять без изменений", db.getTable("НеизменённаяТаблица").iterator().next().get("Note"));
       var row = db.getTable("Выдел").iterator().next();
       assertEquals(17.25d, ((Number) row.get("PLV")).doubleValue(), 0.0001);
       assertEquals(12, ((Number) db.getTable("Макет10").iterator().next().get("POR")).intValue());
@@ -110,5 +119,15 @@ class TransferWriterTest {
     ((com.fasterxml.jackson.databind.node.ArrayNode)transfer.path("schema").path("Выдел")).add("NotARealColumn");
     assertThrows(IllegalArgumentException.class,
       () -> writer.write(transfer, source, temp.resolve("wrong2.mdb")));
+  }
+
+  @Test void rejectsOrphanReferenceInUnrepresentedTable() throws Exception {
+    Path source = template();
+    byte[] original = Files.readAllBytes(source);
+    var transfer = (com.fasterxml.jackson.databind.node.ObjectNode)transfer();
+    ((com.fasterxml.jackson.databind.node.ArrayNode)transfer.path("tables").path("Выдел")).removeAll();
+    assertThrows(IllegalArgumentException.class,
+        () -> writer.write(transfer, source, temp.resolve("orphan.mdb")));
+    assertArrayEquals(original, Files.readAllBytes(source));
   }
 }
