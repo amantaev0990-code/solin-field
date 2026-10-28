@@ -199,11 +199,21 @@ public final class TransferWriter {
     if (Files.exists(destination)) {
       throw new IllegalArgumentException("Выходной MDB уже существует.");
     }
-    try (com.healthmarketscience.jackcess.util.MemFileChannel channel =
-          com.healthmarketscience.jackcess.util.MemFileChannel.newChannel(
-            new java.io.ByteArrayInputStream(new byte[0]))) {
-      try (Database db = new DatabaseBuilder(destination.toFile())
-          .setChannel(channel).setFileFormat(Database.FileFormat.V2000).create()) {
+    // Safari/CheerpJ: DatabaseBuilder.create() copies the bundled "empty.mdb"
+    // to a blank FileChannel. In CheerpJ that initialization path can leave
+    // MSysObjects with invalid rowIds (e.g. "14:18"). Instead seed the
+    // MemFileChannel directly from Jackcess's already-valid blank Jet4 MDB,
+    // then OPEN it. The system catalog is never rebuilt from an empty channel.
+    final String resource = "com/healthmarketscience/jackcess/empty.mdb";
+    try (java.io.InputStream empty = TransferWriter.class.getClassLoader()
+            .getResourceAsStream(resource)) {
+      if (empty == null) {
+        throw new IOException("Не найден стандартный пустой MDB в библиотеке Jackcess.");
+      }
+      try (com.healthmarketscience.jackcess.util.MemFileChannel channel =
+              com.healthmarketscience.jackcess.util.MemFileChannel.newChannel(empty)) {
+        try (Database db = new DatabaseBuilder(destination.toFile())
+              .setChannel(channel).open()) {
         for (var entry : data.entrySet()) {
           String name = entry.getKey();
           JsonNode fields = payload.path("schema").path(name);
@@ -238,6 +248,7 @@ public final class TransferWriter {
           if (bytes != channel.size() || bytes < 1024) {
             throw new IOException("MDB записан не полностью.");
           }
+        }
         }
       }
     }
