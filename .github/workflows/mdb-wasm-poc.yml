@@ -23,6 +23,19 @@ jobs:
         run: |
           dotnet publish experiments/mdb-wasm-poc/MdbWasmPoc.csproj -c Release -o /tmp/mdwpublish
           test -f /tmp/mdwpublish/wwwroot/index.html
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install WebKit browser test
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.0
+          npx playwright install --with-deps webkit
+      - name: Verify actual MDB write and download in mobile-sized WebKit
+        run: |
+          mkdir -p /tmp/mdw-www/solin-field/mdb-wasm-poc
+          cp -a /tmp/mdwpublish/wwwroot/. /tmp/mdw-www/solin-field/mdb-wasm-poc/
+          python3 -m http.server 8765 --bind 127.0.0.1 --directory /tmp/mdw-www &
+          node experiments/mdb-wasm-poc/test-webkit.mjs
       - name: Publish isolated proof without modifying Field
         run: |
           mkdir -p mdb-wasm-poc
