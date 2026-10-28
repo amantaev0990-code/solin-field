@@ -13,7 +13,12 @@
   const status = await cheerpjRunMain('kz.solin.mdb.BrowserMdbWriter',
     '/app/vendor/solin-browser-mdb.jar', '/str/smoke-template.mdb',
     '/str/smoke-transfer.json', output);
-  if (status !== 0) throw Error('Java Jet MDB writer exited with code '+status);
+  if (status !== 0) {
+    let details = '';
+    try { details = await (await cjFileBlob('/files/solin-browser-debug.txt')).text(); }
+    catch (err) { details = 'No Java log: '+err.message; }
+    throw Error('Java Jet MDB writer exited with code '+status+'; '+details.slice(0,2200));
+  }
   const file = await cjFileBlob(output);
   if (!file || file.size < 1024) throw Error('Empty MDB output');
   const header = new Uint8Array(await file.slice(0,32).arrayBuffer());
