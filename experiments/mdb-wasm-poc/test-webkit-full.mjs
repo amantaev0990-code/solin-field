@@ -67,7 +67,7 @@ try {
   const actual=Number(standRows[225].PRkol);
   if(!Number.isFinite(actual)||Math.abs(actual-0.6)>0.000001)
     throw Error('Edited stand #226 PRkol=0,6 not preserved: '+actual);
-  await page.getByRole('status').getByText(/готов/i).waitFor({timeout:30000});
+  await page.getByRole('status').filter({hasText:/готов/i}).waitFor({timeout:30000});
   const status=await page.getByRole('status').innerText();
   if(!status.includes('готов'))throw Error('No successful status: '+status);
   await page.getByRole('link',{name:'Сохранить MDB'}).waitFor({timeout:30000});
