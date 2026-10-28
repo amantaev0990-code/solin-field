@@ -155,15 +155,53 @@ public final class TransferWriter {
           throw new IllegalArgumentException("MDB-шаблон принадлежит другому лесничеству.");
         }
       }
-      // Do not silently preserve stale foreign or district-specific rows which
-      // are absent from the mobile package.
+      // The original transfer may have more tables than the mobile editor knows.
+      // Preserve all such tables byte-for-byte in the copied database. Before
+      // writing, ensure each surviving related row still points at a quarter/
+      // compartment in the new export. Never silently preserve orphan records.
+      Set<String> exportedQuarterKeys = new HashSet<>();
+      Set<String> exportedStandKeys = new HashSet<>();
+      Set<String> exportedStandFullKeys = new HashSet<>();
+      for (JsonNode row : data.get("Квартал")) {
+        exportedQuarterKeys.add(address(row.path("POS"), row.path("LESN"), row.path("KV")));
+      }
+      for (JsonNode row : data.get("Выдел")) {
+        exportedStandKeys.add(address(row.path("POS"), row.path("LESN"), row.path("KV"), row.path("VD")));
+        exportedStandFullKeys.add(address(row.path("POS"), row.path("LESN"), row.path("KV"),
+            row.path("KGLF"), row.path("VD")));
+      }
       for (String name : db.getTableNames()) {
         if (data.containsKey(name)) continue;
         Table other = db.getTable(name);
-        if (other != null && other.getRowCount() > 0 &&
-            other.getColumn("POS") != null && other.getColumn("LESN") != null) {
-          throw new IllegalArgumentException("В шаблоне есть дополнительные данные «" + name +
-            "». Нужно расширить экспорт, чтобы не потерять связи между таблицами.");
+        if (other == null || other.getRowCount() == 0) continue;
+        Set<String> columns = new HashSet<>();
+        for (Column c : other.getColumns()) columns.add(c.getName());
+        if (!columns.contains("POS") || !columns.contains("LESN")) continue;
+        for (Row original : other) {
+          if (asInt(original.get("POS")) != id.pos || asInt(original.get("LESN")) != id.lesn) {
+            throw new IllegalArgumentException("Дополнительная таблица «" + name +
+                "» содержит строки другого лесничества. Автоматическая замена запрещена.");
+          }
+          if (columns.contains("KV") && original.get("KV") != null) {
+            String q = address(original.get("POS"), original.get("LESN"), original.get("KV"));
+            if (!exportedQuarterKeys.contains(q)) {
+              throw new IllegalArgumentException("Дополнительная таблица «" + name +
+                  "» содержит ссылку на отсутствующий квартал. Проверьте удалённые кварталы.");
+            }
+            if (columns.contains("VD") && original.get("VD") != null) {
+              String k = address(original.get("POS"), original.get("LESN"), original.get("KV"), original.get("VD"));
+              if (!exportedStandKeys.contains(k)) {
+                throw new IllegalArgumentException("Дополнительная таблица «" + name +
+                    "» содержит ссылку на удалённый выдел. Нужно сначала обновить исходный Transfer.");
+              }
+              if (columns.contains("KGLF") && original.get("KGLF") != null &&
+                  !exportedStandFullKeys.contains(address(original.get("POS"), original.get("LESN"),
+                      original.get("KV"), original.get("KGLF"), original.get("VD")))) {
+                throw new IllegalArgumentException("Дополнительная таблица «" + name +
+                    "» ссылается на выдел с другой категорией лесного фонда.");
+              }
+            }
+          }
         }
       }
       List<String> children = new ArrayList<>(data.keySet());
@@ -207,6 +245,21 @@ public final class TransferWriter {
         }
       }
     }
+  }
+
+
+  private static String address(Object... fields) {
+    StringBuilder result = new StringBuilder();
+    for (Object field : fields) {
+      Object value = field instanceof JsonNode ? ((JsonNode)field).asText() : field;
+      if (result.length() > 0) result.append("::");
+      if (value instanceof Number) {
+        result.append(new BigDecimal(value.toString()).stripTrailingZeros().toPlainString());
+      } else if (value != null) {
+        result.append(String.valueOf(value));
+      }
+    }
+    return result.toString();
   }
 
   private static int asInt(Object value) {
