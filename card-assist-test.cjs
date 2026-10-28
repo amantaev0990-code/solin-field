@@ -2,16 +2,16 @@
 'use strict';
 const {chromium}=require(process.env.PLAYWRIGHT_PATH||'playwright');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
-const root=__dirname;
+const root=__dirname,port=Number(process.env.TEST_PORT||8129);
 const mime={'.html':'text/html; charset=utf-8','.js':'application/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.wasm':'application/wasm'};
 const server=http.createServer((req,res)=>{const rel=decodeURIComponent(req.url.split('?')[0]||'/');const file=path.resolve(root,'.'+rel);if(!file.startsWith(root+path.sep)&&file!==root){res.writeHead(403);return res.end('forbidden');}try{const target=fs.statSync(file).isDirectory()?path.join(file,'index.html'):file;res.setHeader('Content-Type',mime[path.extname(target)]||'application/octet-stream');res.end(fs.readFileSync(target));}catch{res.writeHead(404);res.end('not found');}});
 (async()=>{let browser;
  try{
-  await new Promise(r=>server.listen(8129,'127.0.0.1',r));
+  await new Promise(r=>server.listen(port,'127.0.0.1',r));
   browser=await chromium.launch({channel:process.env.BROWSER_CHANNEL||(process.platform==='win32'?'msedge':undefined),headless:true});
   const page=await browser.newPage({viewport:{width:390,height:844},acceptDownloads:true,hasTouch:true,isMobile:true});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
-  await page.goto(process.env.TARGET_URL||'http://127.0.0.1:8129/');
+  await page.goto(process.env.TARGET_URL||'http://127.0.0.1:'+port+'/');
   await page.waitForFunction(()=>window.SolinWorkspace&&window.SOLIN_REFS&&window.SolinCardAssist);
   await page.evaluate(()=>SolinWorkspace.ready);
   await page.evaluate(async()=>{const f=(await SolinWorkspace.list())[0];await SolinWorkspace.activate(f.id);current=Object.values(D.quarters).flatMap(q=>q.compartments).find(r=>r._children?.Макет10?.length)||Object.values(D.quarters).flatMap(q=>q.compartments)[0];renderComp();show('card');});

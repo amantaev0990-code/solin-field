@@ -1,0 +1,63 @@
+{
+  "date": "2026-10-28",
+  "scope": "Reference dataset and synthetic positive cases; not exhaustive UI equivalence",
+  "sourceDefinitionsCompared": 466,
+  "sourceDefinitionsMatched": 466,
+  "preparation": {
+    "common": 28,
+    "groupCalls": 24,
+    "allCountsMatch": true
+  },
+  "nativeSequence": {
+    "planned": 142,
+    "executed": 141,
+    "uniqueExecuted": 140,
+    "macroSkipped": [
+      "К126"
+    ],
+    "executionFailures": 0,
+    "errorRowMultisetDifferences": 0
+  },
+  "sourceTablesCompared": 16,
+  "allPreparedTablesMatch": true,
+  "adapter": {
+    "summary": {
+      "records": 471,
+      "fieldErrors": 0,
+      "controlFindings": 140,
+      "executed": 139,
+      "partial": 0,
+      "unverified": 0,
+      "disabled": 2,
+      "unverifiedFields": 0
+    },
+    "preparation": {
+      "complete": true,
+      "steps": 52,
+      "updates": 333,
+      "deleted": 8
+    },
+    "findings": {
+      "К105": 30,
+      "К87": 48,
+      "К130": 14,
+      "К52": 48
+    },
+    "inputUnchanged": true,
+    "applyAndUndoPassed": true
+  },
+  "originalFilesUnchanged": true,
+  "positiveCases": [
+    "К100 duplicate rows including NULL and opaque text VD",
+    "К114 stateful numbering and priority inversion",
+    "К108 Single rounding boundary",
+    "Native NDR binding with intentionally conflicting source values"
+  ],
+  "limits": [
+    "Source SQL execution is verified on one forest dataset and synthetic fixtures; all positive branches of all controls are not covered.",
+    "Original form events, prompts and arbitrary menu orders are not reproduced.",
+    "Missing original fields, territory parameters, ambiguous context and runtime failures remain unverified.",
+    "The old built-in demo and older saved data may omit original fields; import a complete Transfer for full checking.",
+    "Preparation applies to the whole selected forest, requires an explicit UI action and can be undone only before later edits."
+  ]
+}

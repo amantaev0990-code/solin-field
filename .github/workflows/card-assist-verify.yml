@@ -8,6 +8,11 @@ on:
       - "control-engine-test.cjs"
       - "control-ui-test.cjs"
       - "solin-access-expression.js"
+      - "solin-access-sql.js"
+      - "solin-native-control*"
+      - "native-control-test.cjs"
+      - "tests/native-control-positive.json"
+      - "scripts/build-native-control-data.cjs"
       - "solin-control*"
       - "solin-field-core.js"
       - "solin-workspace.js"
@@ -59,6 +64,9 @@ jobs:
       - name: Test direct control predicates and Access expressions
         run: node control-engine-test.cjs
 
+      - name: Test native query preparation, numbering, rounding and transactions
+        run: node native-control-test.cjs
+
       - name: Test mobile control flow and offline execution
         run: node control-ui-test.cjs
 
@@ -67,3 +75,4 @@ jobs:
           node --check solin-workspace.js
           node --check transfer-address-test.cjs
           node transfer-address-test.cjs
+

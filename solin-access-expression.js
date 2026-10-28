@@ -10,10 +10,10 @@ function number(v){if(nil(v))return null;if(typeof v==='boolean')return v?-1:0;
 const truth=v=>nil(v)?null:typeof v==='boolean'?v:number(v)!==0;
 const bool=v=>v===null?null:v?-1:0;
 function compare(op,a,b){if(nil(a)||nil(b))return null;
- if(typeof a==='number'||typeof b==='number'||typeof a==='boolean'||typeof b==='boolean'){a=number(a);b=number(b);}
- else{a=String(a).toLocaleUpperCase('ru-RU');b=String(b).toLocaleUpperCase('ru-RU');}
+ if(typeof a==='number'||typeof b==='number'||typeof a==='boolean'||typeof b==='boolean'){a=number(a===''?0:a);b=number(b===''?0:b);}
+ else{a=String(a).replace(/ +$/,'').toLocaleUpperCase('ru-RU');b=String(b).replace(/ +$/,'').toLocaleUpperCase('ru-RU');}
  return bool({'=':a===b,'<>':a!==b,'<':a<b,'>':a>b,'<=':a<=b,'>=':a>=b}[op]);}
-function arithmetic(op,a,b){if(nil(a)||nil(b))return null;a=number(a);b=number(b);
+function arithmetic(op,a,b){if(nil(a)||nil(b))return null;a=number(a===''?0:a);b=number(b===''?0:b);
  if(op==='/'&&b===0)throw Error('Деление на ноль');
  return {'+':()=>a+b,'-':()=>a-b,'*':()=>a*b,'/':()=>a/b}[op]();}
 function round(v,p=0){if(nil(v)||nil(p))return null;v=number(v);p=number(p);
@@ -27,7 +27,7 @@ function tokenize(source){const out=[];let i=0;source=source.replace(/\\+"/g,'"'
  if(c==='['){const end=source.indexOf(']',i+1);if(end<0)throw Error('Незакрытое имя поля');out.push({type:'name',value:source.slice(i+1,end)});i=end+1;continue;}
  const n=source.slice(i).match(/^(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/);if(n){out.push({type:'literal',value:Number(n[0])});i+=n[0].length;continue;}
  const name=source.slice(i).match(/^[\p{L}_][\p{L}\p{N}_]*/u);if(name){out.push({type:'name',value:name[0]});i+=name[0].length;continue;}
- const op=source.slice(i).match(/^(?:<=|>=|<>|[=<>+*/(),.!-])/);if(op){out.push({type:'op',value:op[0]});i+=op[0].length;continue;}
+ const op=source.slice(i).match(/^(?:<=|>=|<>|[=<>+*/(),.!&-])/);if(op){out.push({type:'op',value:op[0]});i+=op[0].length;continue;}
  throw Error('Неподдерживаемый символ: '+c);
  }return out;
 }
@@ -39,7 +39,7 @@ function parse(source,validation=false){const tokens=tokenize(source);let i=0;
  const expect=w=>{if(!eat(w))throw Error('Ожидалось '+w);};
  const binary=(op,left,right)=>({kind:'binary',op,left,right});
  function atom(implicit){if(eat('(')){const n=or(implicit);expect(')');return n;}
- const t=tokens[i++];if(!t)throw Error('Ожидалось выражение');if(t.type==='literal')return literal(t.value);
+ const t=tokens[i++];if(!t)throw Error('Ожидалось выражение');if(t.type==='literal')return literal(t.value);if(t.value==='*')return {kind:'star'};
  if(t.type!=='name')throw Error('Ожидалось значение');
  const w=t.value.toLowerCase();if(w==='null')return literal(null);if(w==='yes'||w==='true')return literal(-1);if(w==='no'||w==='false')return literal(0);
  if(eat('(')){const args=[];if(!eat(')')){do{args.push(or(false));}while(eat(','));expect(')');}return {kind:'call',name:w,args};}
@@ -48,9 +48,10 @@ function parse(source,validation=false){const tokens=tokenize(source);let i=0;
  function unary(implicit){if(eat('-'))return {kind:'unary',op:'-',arg:unary(implicit)};if(eat('+'))return unary(implicit);return atom(implicit);}
  function mul(implicit){let n=unary(implicit);while(['*','/'].includes(peek())){const op=tokens[i++].value;n=binary(op,n,unary(implicit));}return n;}
  function add(implicit){let n=mul(implicit);while(['+','-'].includes(peek())){const op=tokens[i++].value;n=binary(op,n,mul(implicit));}return n;}
+ function concat(implicit){let n=add(implicit);while(eat('&'))n=binary('&',n,add(implicit));return n;}
  function cmp(implicit){let n;
- if(implicit&&(['=','<>','<','>','<=','>='].includes(peek())||word('is')))n=valueRef();else n=add(implicit);
- if(['=','<>','<','>','<=','>='].includes(peek())){const op=tokens[i++].value;return binary(op,n,add(false));}
+ if(implicit&&(['=','<>','<','>','<=','>='].includes(peek())||word('is')))n=valueRef();else n=concat(implicit);
+ if(['=','<>','<','>','<=','>='].includes(peek())){const op=tokens[i++].value;return binary(op,n,concat(false));}
  if(eat('is')){const not=eat('not');expect('null');return {kind:'isnull',not,arg:n};}
  if(implicit&&n.kind==='literal')return binary('=',valueRef(),n);return n;
  }
@@ -62,22 +63,26 @@ function parse(source,validation=false){const tokens=tokenize(source);let i=0;
 function field(row,name){const key=Object.keys(row||{}).find(k=>k.toLowerCase()===name.toLowerCase());if(key===undefined)throw Error('Нет контекста '+name);return row[key];}
 function call(name,args){switch(name){
  case 'nz':if(args.length<1||args.length>2)break;return nil(args[0])?(args.length===2?args[1]:0):args[0];
- case 'iif':if(args.length!==3)break;return truth(args[0])?args[1]:args[2];
+ case 'iif':if(args.length<2||args.length>3)break;return truth(args[0])?args[1]:(args[2]??null);
  case 'int':if(args.length!==1)break;return nil(args[0])?null:Math.floor(number(args[0]));
  case 'abs':if(args.length!==1)break;return nil(args[0])?null:Math.abs(number(args[0]));
  case 'round':if(args.length<1||args.length>2)break;return round(args[0],args[1]??0);
  case 'val':if(args.length!==1)break;return val(args[0]);
  case 'left':if(args.length!==2)break;if(nil(args[0])||nil(args[1]))return null;if(number(args[1])<0)throw Error('Отрицательная длина Left');return String(args[0]).slice(0,Math.trunc(number(args[1])));
- default:throw Error('Функция не перенесена: '+name);
+ case 'trim':case 'ltrim':case 'rtrim':if(args.length!==1)break;return nil(args[0])?null:String(args[0]).replace(name==='trim'?/^ +| +$/g:name==='ltrim'?/^ +/g:/ +$/g,'');
+ case 'str':if(args.length!==1)break;if(nil(args[0]))return null;{const n=number(args[0]);let s=String(n);if(s.startsWith('0.'))s=s.slice(1);else if(s.startsWith('-0.'))s='-'+s.slice(2);return n>=0?' '+s:s;}
+ case 'instr':if(args.length!==3)break;if(nil(args[1])||nil(args[2]))return null;{const start=number(args[0]);if(start<1)throw Error('Invalid InStr start');return String(args[1]).toLocaleUpperCase('ru-RU').indexOf(String(args[2]).toLocaleUpperCase('ru-RU'),start-1)+1;}
+ case 'year':if(args.length!==1)break;if(nil(args[0]))return null;{const y=new Date(args[0]).getFullYear();if(!Number.isFinite(y))throw Error('Invalid date');return y;}
+ default:{const operators={eqsingle:'=',nesingle:'<>',ltsingle:'<',gtsingle:'>',lesingle:'<=',gesingle:'>='};if(operators[name])return compare(operators[name],nil(args[0])?null:Math.fround(number(args[0])),nil(args[1])?null:Math.fround(number(args[1])));if(name==='roundsingle')return nil(args[0])||nil(args[1])?null:Math.fround(round(args[0],args[1]));if(name==='strsingle')return nil(args[0])?null:call('str',[Number(number(args[0]).toPrecision(7))]);throw Error('Функция не перенесена: '+name);}
  }throw Error('Число аргументов '+name);
 }
-function evaluate(ast,resolve){switch(ast.kind){
+function evaluate(ast,resolve,shortCircuit=false){switch(ast.kind){
  case 'literal':return ast.value;
  case 'ref':return resolve(ast.path);
- case 'call':return call(ast.name,ast.args.map(a=>evaluate(a,resolve)));
- case 'isnull':return bool(ast.not?!nil(evaluate(ast.arg,resolve)):nil(evaluate(ast.arg,resolve)));
- case 'unary':{const a=evaluate(ast.arg,resolve);return ast.op==='not'?bool(nil(a)?null:!truth(a)):nil(a)?null:-number(a);}
- case 'binary':{const a=evaluate(ast.left,resolve),b=evaluate(ast.right,resolve);if(ast.op==='and'){const x=truth(a),y=truth(b);return bool(x===false||y===false?false:x===null||y===null?null:true);}if(ast.op==='or'){const x=truth(a),y=truth(b);return bool(x===true||y===true?true:x===null||y===null?null:false);}if(['+','-','*','/'].includes(ast.op))return arithmetic(ast.op,a,b);return compare(ast.op,a,b);}
+ case 'call':return call(ast.name,ast.args.map(a=>evaluate(a,resolve,shortCircuit)));
+ case 'isnull':return bool(ast.not?!nil(evaluate(ast.arg,resolve,shortCircuit)):nil(evaluate(ast.arg,resolve,shortCircuit)));
+ case 'unary':{const a=evaluate(ast.arg,resolve,shortCircuit);return ast.op==='not'?bool(nil(a)?null:!truth(a)):nil(a)?null:-number(a);}
+ case 'binary':{const a=evaluate(ast.left,resolve,shortCircuit);if(shortCircuit&&ast.op==='and'&&truth(a)===false)return 0;if(shortCircuit&&ast.op==='or'&&truth(a)===true)return -1;const b=evaluate(ast.right,resolve,shortCircuit);if(ast.op==='&')return nil(a)&&nil(b)?null:String(a??'')+String(b??'');if(ast.op==='and'){const x=truth(a),y=truth(b);return bool(x===false||y===false?false:x===null||y===null?null:true);}if(ast.op==='or'){const x=truth(a),y=truth(b);return bool(x===true||y===true?true:x===null||y===null?null:false);}if(['+','-','*','/'].includes(ast.op))return arithmetic(ast.op,a,b);return compare(ast.op,a,b);}
  default:throw Error('Неизвестный узел');
 }}
 const cache=new Map();
@@ -94,15 +99,23 @@ function sql(ast,resolve){switch(ast.kind){
  case 'ref':return resolve(ast.path);
  case 'isnull':return '('+sql(ast.arg,resolve)+(ast.not?' IS NOT NULL':' IS NULL')+')';
  case 'unary':return ast.op==='not'?'(NOT '+sql(ast.arg,resolve)+')':'ac_neg('+sql(ast.arg,resolve)+')';
- case 'call':{const arity={nz:[1,2],iif:[3],int:[1],abs:[1],round:[1,2],val:[1],left:[2]}[ast.name];if(!arity?.includes(ast.args.length))throw Error('Функция не перенесена: '+ast.name);const args=[...ast.args];if(['nz','round'].includes(ast.name)&&args.length===1)args.push(literal(0));return 'ac_'+ast.name+'('+args.map(a=>sql(a,resolve)).join(',')+')';}
- case 'binary':{const a=sql(ast.left,resolve),b=sql(ast.right,resolve);if(['and','or'].includes(ast.op))return '('+a+' '+ast.op.toUpperCase()+' '+b+')';const fn={'+':'add','-':'sub','*':'mul','/':'div','=':'eq','<>':'ne','<':'lt','>':'gt','<=':'le','>=':'ge'}[ast.op];if(!fn)throw Error('Оператор не перенесён');return 'ac_'+fn+'('+a+','+b+')';}
+ case 'star':return '*';
+ case 'call':{if(['sum','count','max','min','first'].includes(ast.name)){if(ast.args.length!==1)throw Error('Invalid aggregate');return (ast.name==='first'?'ac_first':ast.name)+'('+sql(ast.args[0],resolve)+')';}if(ast.name==='date'&&ast.args.length===0)return 'ac_date()';const arity={nz:[1,2],iif:[2,3],int:[1],abs:[1],round:[1,2],val:[1],left:[2],trim:[1],ltrim:[1],rtrim:[1],str:[1],instr:[3],year:[1],roundsingle:[2],strsingle:[1],eqsingle:[2],nesingle:[2],ltsingle:[2],gtsingle:[2],lesingle:[2],gesingle:[2]}[ast.name];if(!arity?.includes(ast.args.length))throw Error('Функция не перенесена: '+ast.name);const args=[...ast.args];if(['nz','round'].includes(ast.name)&&args.length===1)args.push(literal(0));if(ast.name==='iif'&&args.length===2)args.push(literal(null));return 'ac_'+ast.name+'('+args.map(a=>sql(a,resolve)).join(',')+')';}
+ case 'binary':{const a=sql(ast.left,resolve),b=sql(ast.right,resolve);if(['and','or'].includes(ast.op))return '('+a+' '+ast.op.toUpperCase()+' '+b+')';const fn={'&':'concat','+':'add','-':'sub','*':'mul','/':'div','=':'eq','<>':'ne','<':'lt','>':'gt','<=':'le','>=':'ge'}[ast.op];if(!fn)throw Error('Оператор не перенесён');return 'ac_'+fn+'('+a+','+b+')';}
  default:throw Error('Неизвестный узел');
 }}
-function register(db){for(const [name,op]of Object.entries({eq:'=',ne:'<>',lt:'<',gt:'>',le:'<=',ge:'>='}))db.create_function('ac_'+name,(a,b)=>compare(op,a,b));
+function register(db,options={}){for(const [name,op]of Object.entries({eq:'=',ne:'<>',lt:'<',gt:'>',le:'<=',ge:'>='}))db.create_function('ac_'+name,(a,b)=>compare(op,a,b));
  for(const [name,op]of Object.entries({add:'+',sub:'-',mul:'*',div:'/'}))db.create_function('ac_'+name,(a,b)=>arithmetic(op,a,b));
  db.create_function('ac_neg',a=>nil(a)?null:-number(a));db.create_function('ac_nz',(a,b)=>call('nz',[a,b]));db.create_function('ac_iif',(a,b,c)=>call('iif',[a,b,c]));db.create_function('ac_round',(a,b)=>round(a,b));
  db.create_function('ac_left',(a,b)=>call('left',[a,b]));
- for(const name of ['int','abs','val'])db.create_function('ac_'+name,a=>call(name,[a]));
+ for(const name of ['int','abs','val','trim','ltrim','rtrim','str','year'])db.create_function('ac_'+name,a=>call(name,[a]));
+ db.create_function('ac_instr',(a,b,c)=>call('instr',[a,b,c]));
+ db.create_function('ac_concat',(a,b)=>nil(a)&&nil(b)?null:String(a??'')+String(b??''));
+ db.create_function('ac_date',()=>options.date||new Date().toISOString().slice(0,10));
+ for(const name of ['roundsingle','eqsingle','nesingle','ltsingle','gtsingle','lesingle','gesingle'])db.create_function('ac_'+name,(a,b)=>call(name,[a,b]));
+ db.create_function('ac_strsingle',a=>call('strsingle',[a]));
+ db.create_aggregate('ac_first',{init:()=>({seen:false,value:null}),step:(state,value)=>state.seen?state:{seen:true,value},finalize:state=>state.value});
 }
 window.SolinAccessExpression={parse,evaluate,sql,rule,register,quote,number,compare,round,val};
 })();
+

@@ -1,0 +1,532 @@
+{
+  "source": "Synthetic prepared rows executed by the original native queries in an isolated front-end copy on 2026-10-28. No working stand records.",
+  "rows": [
+    {
+      "B": true,
+      "KTO": 150000000,
+      "KlxrVD": 8,
+      "POS": 213,
+      "LESN": 2,
+      "KV": 9001,
+      "KGLF": 27,
+      "VD": "001",
+      "VDCH": 1,
+      "Klxr": 8,
+      "KU10": 1,
+      "PLV10": 1,
+      "M3Pr10": "Б",
+      "IAR": 1,
+      "POL": 0.4,
+      "KOEF": 5,
+      "POR": "ГР",
+      "LET": 50,
+      "PH": 10,
+      "PD2": 20,
+      "KT": 4,
+      "PROI": 9,
+      "SPS": null,
+      "ZAP": 100
+    },
+    {
+      "B": true,
+      "KTO": 150000000,
+      "KlxrVD": 8,
+      "POS": 213,
+      "LESN": 2,
+      "KV": 9001,
+      "KGLF": 27,
+      "VD": "001",
+      "VDCH": 1,
+      "Klxr": 8,
+      "KU10": 1,
+      "PLV10": 1,
+      "M3Pr10": "Б",
+      "IAR": 1,
+      "POL": 0.4,
+      "KOEF": 5,
+      "POR": "Б",
+      "LET": 50,
+      "PH": 10,
+      "PD2": 20,
+      "KT": 4,
+      "PROI": 9,
+      "SPS": null,
+      "ZAP": 90
+    },
+    {
+      "B": true,
+      "KTO": 150000000,
+      "KlxrVD": 8,
+      "POS": 213,
+      "LESN": 2,
+      "KV": 9002,
+      "KGLF": 27,
+      "VD": "001",
+      "VDCH": 1,
+      "Klxr": 8,
+      "KU10": 1,
+      "PLV10": 1,
+      "M3Pr10": "Б",
+      "IAR": 1,
+      "POL": 0.4,
+      "KOEF": 5,
+      "POR": "Б",
+      "LET": 50,
+      "PH": 10,
+      "PD2": 20,
+      "KT": 4,
+      "PROI": 9,
+      "SPS": null,
+      "ZAP": 100
+    },
+    {
+      "B": true,
+      "KTO": 150000000,
+      "KlxrVD": 8,
+      "POS": 213,
+      "LESN": 2,
+      "KV": 9002,
+      "KGLF": 27,
+      "VD": "001",
+      "VDCH": 1,
+      "Klxr": 8,
+      "KU10": 1,
+      "PLV10": 1,
+      "M3Pr10": "Б",
+      "IAR": 1,
+      "POL": 0.4,
+      "KOEF": 5,
+      "POR": "ГР",
+      "LET": 50,
+      "PH": 10,
+      "PD2": 20,
+      "KT": 4,
+      "PROI": 9,
+      "SPS": null,
+      "ZAP": 90
+    },
+    {
+      "B": true,
+      "KTO": 150000000,
+      "KlxrVD": 8,
+      "POS": 213,
+      "LESN": 2,
+      "KV": 9003,
+      "KGLF": 27,
+      "VD": "001",
+      "VDCH": 1,
+      "Klxr": 8,
+      "KU10": 1,
+      "PLV10": 1,
+      "M3Pr10": "Б",
+      "IAR": 1,
+      "POL": 0.4,
+      "KOEF": 5,
+      "POR": "Б",
+      "LET": 50,
+      "PH": 10,
+      "PD2": 20,
+      "KT": 4,
+      "PROI": 9,
+      "SPS": null,
+      "ZAP": 100
+    },
+    {
+      "B": true,
+      "KTO": 150000000,
+      "KlxrVD": 8,
+      "POS": 213,
+      "LESN": 2,
+      "KV": 9003,
+      "KGLF": 27,
+      "VD": "001",
+      "VDCH": 1,
+      "Klxr": 8,
+      "KU10": 1,
+      "PLV10": 1,
+      "M3Pr10": "Б",
+      "IAR": 1,
+      "POL": 0.4,
+      "KOEF": 4,
+      "POR": "Б",
+      "LET": 50,
+      "PH": 10,
+      "PD2": 20,
+      "KT": 4,
+      "PROI": 9,
+      "SPS": null,
+      "ZAP": 90
+    },
+    {
+      "B": true,
+      "KTO": 150000000,
+      "KlxrVD": 8,
+      "POS": 213,
+      "LESN": 2,
+      "KV": 9004,
+      "KGLF": 27,
+      "VD": "001",
+      "VDCH": 1,
+      "Klxr": 8,
+      "KU10": 1,
+      "PLV10": 1,
+      "M3Pr10": "Б",
+      "IAR": 1,
+      "POL": 0.4,
+      "KOEF": 5,
+      "POR": null,
+      "LET": 50,
+      "PH": 10,
+      "PD2": 20,
+      "KT": 4,
+      "PROI": 9,
+      "SPS": null,
+      "ZAP": 100
+    },
+    {
+      "B": true,
+      "KTO": 150000000,
+      "KlxrVD": 8,
+      "POS": 213,
+      "LESN": 2,
+      "KV": 9004,
+      "KGLF": 27,
+      "VD": "001",
+      "VDCH": 1,
+      "Klxr": 8,
+      "KU10": 1,
+      "PLV10": 1,
+      "M3Pr10": "Б",
+      "IAR": 1,
+      "POL": 0.4,
+      "KOEF": 5,
+      "POR": null,
+      "LET": 50,
+      "PH": 10,
+      "PD2": 20,
+      "KT": 4,
+      "PROI": 9,
+      "SPS": null,
+      "ZAP": 90
+    },
+    {
+      "B": true,
+      "KTO": 150000000,
+      "KlxrVD": 8,
+      "POS": 213,
+      "LESN": 2,
+      "KV": 9005,
+      "KGLF": 27,
+      "VD": "001",
+      "VDCH": 1,
+      "Klxr": 8,
+      "KU10": 1,
+      "PLV10": 1,
+      "M3Pr10": "Б",
+      "IAR": 1,
+      "POL": 0.4,
+      "KOEF": 5,
+      "POR": "Б",
+      "LET": 50,
+      "PH": 10,
+      "PD2": 20,
+      "KT": 4,
+      "PROI": 9,
+      "SPS": null,
+      "ZAP": 100
+    },
+    {
+      "B": true,
+      "KTO": 150000000,
+      "KlxrVD": 8,
+      "POS": 213,
+      "LESN": 2,
+      "KV": 9005,
+      "KGLF": 27,
+      "VD": "1",
+      "VDCH": 1,
+      "Klxr": 8,
+      "KU10": 1,
+      "PLV10": 1,
+      "M3Pr10": "Б",
+      "IAR": 1,
+      "POL": 0.4,
+      "KOEF": 5,
+      "POR": "Б",
+      "LET": 50,
+      "PH": 10,
+      "PD2": 20,
+      "KT": 4,
+      "PROI": 9,
+      "SPS": null,
+      "ZAP": 90
+    },
+    {
+      "B": true,
+      "KTO": 150000000,
+      "KlxrVD": 8,
+      "POS": 213,
+      "LESN": 2,
+      "KV": 9006,
+      "KGLF": 27,
+      "VD": "001",
+      "VDCH": 1,
+      "Klxr": 8,
+      "KU10": 1,
+      "PLV10": 1,
+      "M3Pr10": "Б",
+      "IAR": 1,
+      "POL": 0.45,
+      "KOEF": 5,
+      "POR": "Б",
+      "LET": 50,
+      "PH": 10,
+      "PD2": 20,
+      "KT": 4,
+      "PROI": 9,
+      "SPS": null,
+      "ZAP": 100
+    },
+    {
+      "B": true,
+      "KTO": 150000000,
+      "KlxrVD": 8,
+      "POS": 213,
+      "LESN": 2,
+      "KV": 9007,
+      "KGLF": 27,
+      "VD": "001",
+      "VDCH": 1,
+      "Klxr": 8,
+      "KU10": 1,
+      "PLV10": 1,
+      "M3Pr10": "Б",
+      "IAR": 1,
+      "POL": 0.4,
+      "KOEF": 5,
+      "POR": "Б",
+      "LET": 50,
+      "PH": 10,
+      "PD2": 20,
+      "KT": 4,
+      "PROI": 9,
+      "SPS": null,
+      "ZAP": 100
+    }
+  ],
+  "expected": {
+    "К100": [
+      9003
+    ],
+    "К114": [
+      9001
+    ],
+    "К108": [
+      9006
+    ]
+  },
+  "nativeNumbering": [
+    {
+      "KV": 9001,
+      "VD": "001",
+      "POR": "ГР",
+      "KOEF": 5,
+      "Lev_1": 1,
+      "Lev_2": 1,
+      "Lev_3": 1
+    },
+    {
+      "KV": 9001,
+      "VD": "001",
+      "POR": "Б",
+      "KOEF": 5,
+      "Lev_1": 1,
+      "Lev_2": 1,
+      "Lev_3": 2
+    },
+    {
+      "KV": 9002,
+      "VD": "001",
+      "POR": "Б",
+      "KOEF": 5,
+      "Lev_1": 2,
+      "Lev_2": 1,
+      "Lev_3": 1
+    },
+    {
+      "KV": 9002,
+      "VD": "001",
+      "POR": "ГР",
+      "KOEF": 5,
+      "Lev_1": 2,
+      "Lev_2": 1,
+      "Lev_3": 2
+    },
+    {
+      "KV": 9003,
+      "VD": "001",
+      "POR": "Б",
+      "KOEF": 5,
+      "Lev_1": 3,
+      "Lev_2": 1,
+      "Lev_3": 1
+    },
+    {
+      "KV": 9003,
+      "VD": "001",
+      "POR": "Б",
+      "KOEF": 4,
+      "Lev_1": 3,
+      "Lev_2": 1,
+      "Lev_3": 2
+    },
+    {
+      "KV": 9004,
+      "VD": "001",
+      "POR": null,
+      "KOEF": 5,
+      "Lev_1": 4,
+      "Lev_2": 1,
+      "Lev_3": 1
+    },
+    {
+      "KV": 9004,
+      "VD": "001",
+      "POR": null,
+      "KOEF": 5,
+      "Lev_1": 4,
+      "Lev_2": 1,
+      "Lev_3": 1
+    },
+    {
+      "KV": 9005,
+      "VD": "001",
+      "POR": "Б",
+      "KOEF": 5,
+      "Lev_1": 5,
+      "Lev_2": 1,
+      "Lev_3": 1
+    },
+    {
+      "KV": 9005,
+      "VD": "1",
+      "POR": "Б",
+      "KOEF": 5,
+      "Lev_1": 5,
+      "Lev_2": 2,
+      "Lev_3": 1
+    },
+    {
+      "KV": 9006,
+      "VD": "001",
+      "POR": "Б",
+      "KOEF": 5,
+      "Lev_1": 6,
+      "Lev_2": 1,
+      "Lev_3": 1
+    },
+    {
+      "KV": 9007,
+      "VD": "001",
+      "POR": "Б",
+      "KOEF": 5,
+      "Lev_1": 7,
+      "Lev_2": 1,
+      "Lev_3": 1
+    }
+  ],
+  "binding": {
+    "status": "executed",
+    "speciesNDR": 3,
+    "KGLF2427": 24,
+    "preparedNDR": 2
+  },
+  "numericTypes": [
+    {
+      "sql": "SELECT TOP 1 POL,Round(POL,1) AS R,Round(POL,1)=POL AS E,VarType(POL) AS T,VarType(Round(POL,1)) AS RT FROM Макет10Выб WHERE POL=0.4",
+      "E": -1,
+      "T": 4,
+      "RT": 4,
+      "R": 0.4000000059604645,
+      "POL": 0.4
+    },
+    {
+      "T": 4,
+      "RT": 4,
+      "sql": "SELECT TOP 1 PLV,Round(PLV,1) AS R,VarType(PLV) AS T,VarType(Round(PLV,1)) AS RT FROM ВыделВыб WHERE PLV>0",
+      "PLV": 0.8,
+      "R": 0.800000011920929
+    },
+    {
+      "T": 5,
+      "E": -1,
+      "sql": "SELECT TOP 1 CSng(0.4)=CDbl(0.4) AS E,VarType(CSng(0.4)/10) AS T,CSng(0.4)/10 AS N FROM Контроли",
+      "N": 0.04000000059604645
+    }
+  ],
+  "scalars": [
+    {
+      "status": "executed",
+      "rows": [
+        {
+          "Probe": null
+        }
+      ],
+      "expression": "IIf(0,3)"
+    },
+    {
+      "status": "executed",
+      "rows": [
+        {
+          "Probe": null
+        }
+      ],
+      "expression": "Null & Null"
+    },
+    {
+      "status": "executed",
+      "rows": [
+        {
+          "Probe": "A"
+        }
+      ],
+      "expression": "Null & \"A\""
+    },
+    {
+      "status": "executed",
+      "rows": [
+        {
+          "Probe": " .5"
+        }
+      ],
+      "expression": "Str(0.5)"
+    },
+    {
+      "status": "executed",
+      "rows": [
+        {
+          "Probe": "-.5"
+        }
+      ],
+      "expression": "Str(-0.5)"
+    },
+    {
+      "status": "executed",
+      "rows": [
+        {
+          "Probe": null
+        }
+      ],
+      "expression": "InStr(1,Null,\" \")"
+    },
+    {
+      "status": "executed",
+      "rows": [
+        {
+          "Probe": 10.2
+        }
+      ],
+      "expression": "Round(10.15,1)"
+    }
+  ]
+}
