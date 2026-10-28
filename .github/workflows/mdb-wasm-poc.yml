@@ -4,6 +4,8 @@ on:
   push:
     paths:
       - 'experiments/mdb-wasm-poc/**'
+      - 'solin-mdb-wasm-entry.js'
+      - 'scripts/test-single-mdb-export.mjs'
       - '.github/workflows/mdb-wasm-poc.yml'
 # Only the latest tested writer should publish compiled WASM assets.
 concurrency:
@@ -30,6 +32,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Verify the single SOLI-N Field Export action
+        run: node scripts/test-single-mdb-export.mjs
       - name: Install WebKit browser test
         run: |
           npm install --no-save --no-package-lock playwright@1.56.0
