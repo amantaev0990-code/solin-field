@@ -55,7 +55,7 @@ assert.equal(state.saved,true);
 assert.equal(state.navigation,0,'Export must never navigate away from Field');
 const frame=body.children.find(e=>e.tagName==='IFRAME'&&!e.removed);
 assert.ok(frame,'WASM exporter must run in off-screen iframe');
-assert.match(frame.style.cssText,/left:-10000px/);
+assert.match(frame.style.cssText,/opacity:0/);
 const target=new TestURL(frame.src);
 assert.equal(target.searchParams.get('forest'),'213::2');
 assert.equal(target.searchParams.get('embed'),'1');
