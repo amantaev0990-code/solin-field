@@ -84,7 +84,17 @@
     if (wanted == null || wanted === '') return found == null || found === '';
     if (typeof wanted === 'boolean') return String(wanted) === String(found) ||
       Number(wanted) === Number(found);
-    const a = Number(wanted), b = Number(found);
+    // The mobile card editor may serialize numeric Access values as "1,0"
+    // or "1.0". Jackcess writes the exact numeric value, so readback must
+    // compare it as a number, not as a literal formatting string.
+    const numeric = v => {
+      if (typeof v === 'number') return v;
+      if (typeof v !== 'string') return Number.NaN;
+      const t = v.trim();
+      if (!/^[+-]?(?:\\d+(?:[.,]\\d+)?|[.,]\\d+)$/.test(t)) return Number.NaN;
+      return Number(t.replace(',', '.'));
+    };
+    const a = numeric(wanted), b = numeric(found);
     // Access floating point values may round at database field precision.
     if (typeof wanted === 'number' || typeof found === 'number') {
       return Number.isFinite(a) && Number.isFinite(b) &&
