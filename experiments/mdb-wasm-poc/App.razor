@@ -1,0 +1,67 @@
+@inject HttpClient Http
+@inject IJSRuntime JS
+<div class="shell">
+  <h1>MDB Writer — тест WebAssembly</h1>
+  <p>Отдельный эксперимент SOLI-N Field. Не использует и не изменяет рабочие карточки.</p>
+  <button disabled="@busy" @onclick="MakeTest">@((busy) ? "Проверяю MDB…" : "Создать тестовый MDB без сервера")</button>
+  <p role="status" class="status">@status</p>
+  <p class="note">Это тестовая база только с двумя записями, не файл для импорта в SOLI-N. Формат настоящего Transfer и работу на Safari ещё проверяем.</p>
+</div>
+@code {
+    bool busy;
+    string status = "Нажмите кнопку для создания тестового Jet MDB на устройстве.";
+    private static object?[] Build(Table table, bool stand) {
+        var cells=new object?[table.Columns.Count];
+        for(int i=0;i<cells.Length;i++) {
+          cells[i] = table.Columns[i].Name switch {
+            "POS" => (short)213, "LESN" => (short)2,
+            "GodT" when !stand => (short)2026,
+            "KV" when stand => (short)1,
+            "KGLF" when stand => (short)1,
+            "VD" when stand => "1",
+            "PLV" when stand => 1.25f,
+            "PRkol" when stand => 0.6f,
+            _ => null
+          };
+        }
+        return cells;
+    }
+    async Task MakeTest() {
+      if(busy)return;
+      busy=true;
+      string? path=null;
+      try {
+        status="Загружаю пустой шаблон Access (без лесных данных)…";
+        byte[] template=await Http.GetByteArrayAsync("blank-transfer.mdb");
+        if(template.Length<2048 ||
+            System.Text.Encoding.ASCII.GetString(template,4,15)!="Standard Jet DB")
+          throw new Exception("Неправильный формат пустого шаблона.");
+        path=Path.Combine(Path.GetTempPath(),"solin-wasm-"+Guid.NewGuid().ToString("N")+".mdb");
+        await System.IO.File.WriteAllBytesAsync(path,template);
+        status="Записываю тестовые записи в Access…";
+        using(var db=Database.Open(path,readOnly:false)) {
+          var f=db.GetTable("Лесничество")??throw new Exception("Нет таблицы лесничества.");
+          var t=db.GetTable("Выдел")??throw new Exception("Нет таблицы выделов.");
+          if(f.RowCount!=0||t.RowCount!=0)throw new Exception("Шаблон не пуст.");
+          f.AddRow(Build(f,false));
+          t.AddRow(Build(t,true));
+        }
+        status="Повторно открываю и проверяю дробное поле PRkol…";
+        using(var db=Database.Open(path,readOnly:true)) {
+          var f=db.GetTable("Лесничество")??throw new Exception("Потеряна таблица лесничества.");
+          var t=db.GetTable("Выдел")??throw new Exception("Потеряна таблица выделов.");
+          if(f.Rows().Count()!=1||t.Rows().Count()!=1)throw new Exception("Записи не сохранились.");
+          double value=Convert.ToDouble(t.Rows().Single()["PRkol"]);
+          if(Math.Abs(value-0.6)>0.000001)throw new Exception("PRkol записан неправильно: "+value);
+        }
+        var output=await System.IO.File.ReadAllBytesAsync(path);
+        status="Успешно: создан тестовый Jet MDB, PRkol=0.6. Сохраните файл для независимой проверки.";
+        await JS.InvokeVoidAsync("saveMdbTest","TEST_Transf_213_2_2026.mdb",output);
+      } catch(Exception e){
+        status="Ошибка WebAssembly: "+e.GetType().Name+": "+e.Message;
+      } finally {
+        if(path!=null)try{System.IO.File.Delete(path);}catch{}
+        busy=false;
+      }
+    }
+}
