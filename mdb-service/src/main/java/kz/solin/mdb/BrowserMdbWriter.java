@@ -60,17 +60,19 @@ public final class BrowserMdbWriter {
       if ((!fresh && !template.startsWith(Path.of("/str/"))) ||
           !transferFile.startsWith(Path.of("/str/")) ||
           !result.startsWith(Path.of("/files/")) ||
-          !result.getFileName().toString().matches("Transf_\\d+_\\d+_\\d+_Field\\.mdb")) {
+          !result.getFileName().toString().matches("Transf_\\d+_\\d+_\\d+\\.mdb")) {
         throw new IllegalArgumentException("Недопустимые пути для обмена.");
       }
       JsonNode payload = cleanJson(new ObjectMapper().readTree(Files.readString(transferFile)));
       TransferWriter writer = new TransferWriter();
       TransferWriter.Identity id = writer.identity(payload);
-      if (!id.filename().replace(".mdb", "_Field.mdb")
+      if (!id.filename()
               .equals(result.getFileName().toString())) {
         throw new IllegalArgumentException("Имя файла не совпадает с данными лесничества.");
       }
       Files.createDirectories(result.getParent());
+      // Do not surface a previous attempt\u0027s MSysObjects stacktrace as a new error.
+      Files.deleteIfExists(Path.of("/files/solin-browser-debug.txt"));
       // A second export of the same forestry workspace must replace the previous
       // temporary result, not fail because it exists in CheerpJ's virtual FS.
       if (fresh) Files.deleteIfExists(result);
