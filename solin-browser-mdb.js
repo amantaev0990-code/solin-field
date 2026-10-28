@@ -6,6 +6,9 @@
   'use strict';
   if (window.Capacitor?.isNativePlatform?.() && window.Capacitor?.getPlatform?.() === 'android') return;
   const URL_JAR = './vendor/solin-browser-mdb.jar';
+  // CheerpJ /app mounts the *domain root*, not GitHub Pages project path.
+  // The PWA lives under /solin-field/, so use the page-relative absolute URL.
+  const CHEERPJ_JAR = '/app' + new URL(URL_JAR, document.baseURI).pathname;
   const URL_JAVA = 'https://cjrtnc.leaningtech.com/4.3/loader.js';
   let runtimePromise = null;
   let running = false;
@@ -130,7 +133,7 @@
       window.cheerpOSAddStringFile('/str/solin-transfer.json', new TextEncoder().encode(ascii));
       const exit = await window.cheerpjRunMain(
         'kz.solin.mdb.BrowserMdbWriter',
-        '/app/vendor/solin-browser-mdb.jar',
+        CHEERPJ_JAR,
         '/str/solin-original.mdb',
         '/str/solin-transfer.json',
         output
