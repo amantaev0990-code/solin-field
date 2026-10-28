@@ -19,7 +19,7 @@
     if (typeof openModal !== 'function') throw Error('Недоступно окно экспорта');
     openModal(title, html);
   };
-  const nameOf = id => 'Transf_' + id.POS + '_' + id.LESN + '_' + id.GodT + '_Field.mdb';
+  const nameOf = id => 'Transf_' + id.POS + '_' + id.LESN + '_' + id.GodT + '.mdb';
   const jetHeader = buffer => {
     const arr = new Uint8Array(buffer, 0, Math.min(buffer.byteLength, 32));
     return arr.length >= 32 && String.fromCharCode(...arr.slice(4,19)) === 'Standard Jet DB';
