@@ -73,5 +73,31 @@ window.saveMdb=(name,bytes)=>{
 // invokes saveMdb directly and uses the canonical filename.
 window.saveMdbTest=(name,bytes)=>window.saveMdb(name.replace(/^TEST_/,''),bytes);
 </script>
+<script>
+/* For a previously cached, already running two-button WASM binary: present
+   exactly the same single Export action and run it once after Field navigation.
+   Automatically becomes inactive when the new one-button binary is published. */
+(function(){
+ const app=document.getElementById('app');
+ let automaticallyStarted=false;
+ const simplify=()=>{
+   const shell=app.querySelector('.shell');
+   if(!shell)return;
+   const buttons=[...shell.querySelectorAll(':scope > button')];
+   if(buttons.length!==2)return;
+   shell.querySelectorAll('h1,.note').forEach(node=>{if(!node.hidden)node.hidden=true;});
+   if(!buttons[0].hidden)buttons[0].hidden=true;
+   const exportButton=buttons[1];
+   if(!exportButton.disabled && exportButton.textContent!=='Экспорт')
+     exportButton.textContent='Экспорт';
+   if(!automaticallyStarted && window.solinShouldAutoExport?.() && !exportButton.disabled){
+     automaticallyStarted=true;
+     exportButton.click();
+   }
+ };
+ new MutationObserver(simplify).observe(app,{childList:true,subtree:true});
+ simplify();
+})();
+</script>
 <script src="workspace-reader.js"></script>
 <script src="_framework/blazor.webassembly.js"></script></body></html>
