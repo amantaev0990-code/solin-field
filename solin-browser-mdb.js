@@ -62,49 +62,60 @@
     if (!transfer || transfer.format !== 'SOLIN-MDB-Bridge-v1') throw Error('Данные Transfer пока не готовы.');
     return transfer;
   };
+  function matchesCell(wanted, found) {
+    if (wanted == null || wanted === '') return found == null || found === '';
+    if (typeof wanted === 'boolean') return String(wanted) === String(found) ||
+      Number(wanted) === Number(found);
+    const a = Number(wanted), b = Number(found);
+    // Access floating point values may round at database field precision.
+    if (typeof wanted === 'number' || typeof found === 'number') {
+      return Number.isFinite(a) && Number.isFinite(b) &&
+        Math.abs(a - b) <= Math.max(0.000001,Math.abs(a)*0.000001);
+    }
+    if (wanted instanceof Date || found instanceof Date) {
+      const t1 = new Date(wanted).getTime(), t2 = new Date(found).getTime();
+      return Number.isFinite(t1) && t1 === t2;
+    }
+    return String(wanted).trim() === String(found).trim();
+  }
   async function confirmOutput(blob, transfer) {
     const file = new File([blob], nameOf(transfer.identity), {type: 'application/vnd.ms-access'});
     if (!window.SolinTransferReader?.read) throw Error('Модуль проверки Access MDB не загружен.');
     const received = await window.SolinTransferReader.read(file);
-    const original = transfer.tables;
-    for (const name of Object.keys(original)) {
-      const rows = received.tables?.[name];
-      if (!Array.isArray(rows) || rows.length !== original[name].length) {
+    const expected = transfer.tables;
+    const actual = received?.tables;
+    if (!actual || typeof actual !== 'object') throw Error('MDB не содержит таблиц Transfer.');
+    let checked = 0;
+    for (const [name, rows] of Object.entries(expected)) {
+      const candidate = actual[name];
+      if (!Array.isArray(candidate) || candidate.length !== rows.length) {
         throw Error('Проверка MDB: число записей таблицы «' + name + '» не совпало.');
       }
-    }
-    // Row counts alone cannot prove that edits were written: a copied original MDB
-    // can have exactly the same number of rows. Compare the complete stand address
-    // and every non-empty exported stand field before enabling the download.
-    const idFields = ['POS','LESN','KV','KGLF','VD'];
-    const address = row => idFields.map(k => {
-      const value = row?.[k];
-      return value == null ? '' : Number.isFinite(Number(value)) ? String(Number(value)) : String(value);
-    }).join('::');
-    const expectedStands = original['Выдел'] || [];
-    const actualStands = received.tables['Выдел'] || [];
-    const byAddress = new Map(actualStands.map(row => [address(row),row]));
-    if (byAddress.size !== actualStands.length) {
-      throw Error('В полученном MDB повторяются адреса выделов.');
-    }
-    for (const row of expectedStands) {
-      const actual = byAddress.get(address(row));
-      if (!actual) throw Error('В полученном MDB отсутствует выдел ' + address(row));
-      for (const [field, value] of Object.entries(row)) {
-        if (value == null || value === '' || field === '_children') continue;
-        const found = actual[field];
-        if (found == null || found === '') throw Error('В MDB потеряно поле «' + field + '» выдела ' + address(row));
-        if (typeof value === 'number' || typeof found === 'number') {
-          const a=Number(value),b=Number(found);
-          if (!Number.isFinite(a) || !Number.isFinite(b) ||
-              Math.abs(a-b) > Math.max(0.000001,Math.abs(a)*0.000001)) {
-            throw Error('Изменённые данные не сохранились: «' + field + '», выдел ' + address(row));
+      // Match all rows, including repeatable child makets, independent of row ordering.
+      // Match every present source value, not just quarter/stand identifiers.
+      const used = new Set();
+      for (const originalRow of rows) {
+        let match = -1;
+        for (let i = 0; i < candidate.length; i++) {
+          if (used.has(i)) continue;
+          const actualRow = candidate[i];
+          if (Object.entries(originalRow).every(([field, value]) =>
+            field === '_children' || matchesCell(value, actualRow[field]))) {
+            match = i;
+            break;
           }
-        } else if (String(value).trim() !== String(found).trim()) {
-          throw Error('В MDB не совпало поле «' + field + '», выдел ' + address(row));
         }
+        if (match < 0) {
+          const location = ['POS','LESN','KV','KGLF','VD'].filter(k=>originalRow[k]!=null)
+            .map(k=>k+'='+originalRow[k]).join(', ');
+          throw Error('Проверка MDB: данные строки не совпадают в «' + name +
+            '» (' + (location||'нет адреса') + ').');
+        }
+        used.add(match);
+        checked++;
       }
     }
+    if (checked < 1) throw Error('В готовом MDB нет записей для проверки.');
     return file;
   }
   async function exportBrowser() {
