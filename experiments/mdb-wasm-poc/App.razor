@@ -4,8 +4,9 @@
   <h1>MDB Writer — тест WebAssembly</h1>
   <p>Отдельный эксперимент SOLI-N Field. Не использует и не изменяет рабочие карточки.</p>
   <button disabled="@busy" @onclick="MakeTest">@((busy) ? "Проверяю MDB…" : "Создать тестовый MDB без сервера")</button>
+  <button disabled="@busy" class="secondary" @onclick="MakeForestTest">Экспортировать сохранённое лесничество (тест)</button>
   <p role="status" class="status">@status</p>
-  <p class="note">Это тестовая база только с двумя записями, не файл для импорта в SOLI-N. Формат настоящего Transfer и работу на Safari ещё проверяем.</p>
+  <p class="note">Первая кнопка создаёт две тестовые записи. Вторая читает выбранное лесничество из локальной памяти SOLI-N Field и экспортирует 18 таблиц без отправки данных на сервер. Файлы имеют префикс TEST_, потому что приём старым SOLI-N ещё не подтверждён. Не заменяйте рабочую базу.</p>
 </div>
 @code {
     bool busy;
@@ -25,6 +26,26 @@
           };
         }
         return cells;
+    }
+    async Task MakeForestTest() {
+      if(busy)return;
+      busy=true;
+      try {
+        status="Читаю сохранённые карточки SOLI-N Field только на этом устройстве…";
+        await InvokeAsync(StateHasChanged);
+        string snapshot=await JS.InvokeAsync<string>("solinGetTransferJson");
+        status="Записываю 18 таблиц в настоящий MDB через WebAssembly…";
+        await InvokeAsync(StateHasChanged);
+        byte[] blank=await Http.GetByteArrayAsync("blank-transfer.mdb");
+        TransferConverter.Result result=TransferConverter.ConvertFromSnapshot(snapshot,blank);
+        status=$"Успешно: {result.Tables} таблиц, {result.Rows} записей. Файл проверен повторным чтением. Это тестовая выгрузка.";
+        await InvokeAsync(StateHasChanged);
+        await JS.InvokeVoidAsync("saveMdbTest",result.FileName,result.Bytes);
+      }catch(Exception error) {
+        status="Экспорт остановлен: "+error.Message;
+      }finally {
+        busy=false;
+      }
     }
     async Task MakeTest() {
       if(busy)return;
