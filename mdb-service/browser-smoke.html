@@ -32,7 +32,11 @@
     let reason='';
     try { reason=await (await cjFileBlob('/files/solin-verify-debug.txt')).text(); }
     catch(e){ reason='No verifier log: '+e.message; }
-    throw Error('Field-level MDB readback failed (PLV must be 5.75): '+reason.slice(0,1800));
+    const outputBytes = new Uint8Array(await file.arrayBuffer());
+    let differences = Math.abs(outputBytes.length - source.length);
+    for(let i=0;i<Math.min(outputBytes.length,source.length);i++)if(outputBytes[i]!==source[i])differences++;
+    throw Error('Field-level MDB readback failed; modified bytes=' + differences +
+      ', source=' + source.length + ', output=' + outputBytes.length + ': ' + reason.slice(0,1800));
   }
   document.body.dataset.result = 'passed';
   document.getElementById('status').textContent='PASS: '+file.size+' byte Jet MDB';
