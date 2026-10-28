@@ -127,15 +127,19 @@ public final class TransferWriter {
   private void writeChecked(JsonNode payload, Path template, Path destination, boolean inMemory) throws IOException {
     Identity id = identity(payload);
     Map<String, JsonNode> data = validatePayload(payload, id);
-    if (!Files.isRegularFile(template) || !Files.isReadable(template)) {
-      throw new IllegalArgumentException("Оригинальный MDB-шаблон для лесничества ещё не установлен на сервере.");
+    // /str/ files in CheerpJ are virtual regular files, and some browsers
+    // do not implement isRegularFile()/isSameFile() across virtual mounts.
+    // The browser entry point separately restricts template to /str/.
+    if (!inMemory && (!Files.isRegularFile(template) || !Files.isReadable(template))) {
+      throw new IllegalArgumentException("Не найден оригинальный MDB-шаблон.");
     }
     byte[] header;
     try (var input = Files.newInputStream(template)) { header = input.readNBytes(32); }
     if (!new String(header, StandardCharsets.ISO_8859_1).contains("Standard Jet DB")) {
       throw new IllegalArgumentException("Шаблон не является базой Access Jet MDB.");
     }
-    if (Files.exists(destination) && Files.isSameFile(template, destination)) {
+    if (template.toAbsolutePath().normalize().equals(destination.toAbsolutePath().normalize()) ||
+        (!inMemory && Files.exists(destination) && Files.isSameFile(template, destination))) {
       throw new IllegalArgumentException("Нельзя заменять исходную базу.");
     }
     if (inMemory) {
