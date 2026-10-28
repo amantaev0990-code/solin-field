@@ -33,9 +33,14 @@ jobs:
           mkdir -p /tmp/solin-smoke/vendor
           cp mdb-service/target/mdb-export-service-0.1.0.jar /tmp/solin-smoke/vendor/solin-browser-mdb.jar
           cp mdb-service/browser-smoke.html /tmp/solin-smoke/browser-smoke.html
-          python3 -m http.server 8765 --directory /tmp/solin-smoke >/tmp/solin-browser-http.log 2>&1 &
+
       - name: Install browser automation
-        run: npm install --no-save --ignore-scripts playwright-core@1.56.1
+        run: npm install --no-save --ignore-scripts playwright-core@1.56.1 http-server@14.1.1
+      - name: Start CheerpJ-compatible server supporting HTTP Range
+        run: |
+          npx http-server /tmp/solin-smoke -a 127.0.0.1 -p 8765 -s >/tmp/solin-browser-http.log 2>&1 &
+          sleep 2
+          curl -fsSI -H 'Range: bytes=0-100' http://127.0.0.1:8765/vendor/solin-browser-mdb.jar | grep -q '206 Partial Content'
       - name: Run Jet MDB writer INSIDE a Chromium browser
         run: |
           node --input-type=module <<'NODE'
