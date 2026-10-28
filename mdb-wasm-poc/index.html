@@ -6,16 +6,24 @@
 body{background:#eff5f0;color:#143622;font:16px system-ui,-apple-system,sans-serif;margin:0;padding:20px}
 .shell{max-width:600px;margin:30px auto;background:white;border-radius:18px;padding:26px;box-shadow:0 2px 12px #15372616}
 h1{font-size:24px}button{background:#18784b;color:white;font-weight:700;padding:15px;border:0;border-radius:12px;font-size:16px;width:100%}
-button:disabled{opacity:.5}button.secondary{margin-top:12px;background:#235b83}.status{white-space:pre-wrap;line-height:1.6}.note{color:#60786d;font-size:14px}
+button:disabled{opacity:.5}button.secondary{margin-top:12px;background:#235b83}#download-area a{display:block;background:#0b6741;color:#fff;text-align:center;padding:14px;border-radius:12px;font-weight:bold;text-decoration:none;margin:20px auto}#download-area:empty{display:none}.status{white-space:pre-wrap;line-height:1.6}.note{color:#60786d;font-size:14px}
 </style></head>
 <body><div id="app">Загружаю отдельный тестовый конвертер…</div>
+<div id="download-area"></div>
 <script>
+let lastMdbUrl;
 window.saveMdbTest=(name,bytes)=>{
  const blob=new Blob([bytes],{type:'application/vnd.ms-access'});
  const url=URL.createObjectURL(blob);
- const a=document.createElement('a');a.href=url;a.download=name;a.textContent='Сохранить тестовый MDB';
- document.body.appendChild(a);a.click();
- setTimeout(()=>URL.revokeObjectURL(url),60000);
+ const a=document.createElement('a');
+ a.href=url;a.download=name;a.textContent='Сохранить тестовый MDB в Файлы';
+ a.setAttribute('aria-label','Сохранить '+name);
+ document.getElementById('download-area').replaceChildren(a);
+ if(lastMdbUrl)URL.revokeObjectURL(lastMdbUrl);
+ lastMdbUrl=url;
+ // Safari sometimes blocks downloads after an asynchronous WebAssembly call.
+ // The link remains available for a manual, trusted tap.
+ try {a.click();}catch(e){}
 };
 </script>
 <script src="workspace-reader.js"></script>
