@@ -37,13 +37,25 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f vendor/solin-browser-mdb.jar
-          if git diff --cached --quiet; then
-            echo "MDB writer bundle unchanged"
-            exit 0
-          fi
-          git commit -m "Publish browser-only Jet MDB writer bytecode [skip ci]"
-          git push origin HEAD:main
+          cp vendor/solin-browser-mdb.jar /tmp/solin-mdb-writer.jar
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/solin-mdb-writer.jar vendor/solin-browser-mdb.jar
+            git add -f vendor/solin-browser-mdb.jar
+            if git diff --cached --quiet; then
+              echo "MDB writer bundle unchanged"
+              exit 0
+            fi
+            git commit -m "Publish browser-only Jet MDB writer bytecode [skip ci]"
+            if git push origin HEAD:main; then
+              echo "Published verified JAR"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Could not fast-forward origin/main after retries"
+          exit 1
       - uses: actions/upload-artifact@v4
         with:
           name: solin-browser-mdb-java-archive
