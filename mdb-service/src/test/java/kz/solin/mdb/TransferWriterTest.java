@@ -191,8 +191,15 @@ class TransferWriterTest {
           .addColumn(new ColumnBuilder("POR", DataType.LONG))
           .toTable(sourceDb);
         table.addRow(213, 2, 1, 3, 1, 50);
-        schema.set(name, json.readTree("[\\"POS\\",\\"LESN\\",\\"KV\\",\\"KGLF\\",\\"VD\\",\\"POR\\"]"));
-        tables.set(name, json.readTree("[{\\"POS\\":213,\\"LESN\\":2,\\"KV\\":1,\\"KGLF\\":3,\\"VD\\":1,\\"POR\\":12}]"));
+        var fields = json.createArrayNode();
+        for (String field : new String[]{"POS","LESN","KV","KGLF","VD","POR"}) fields.add(field);
+        schema.set(name, fields);
+        var rows = json.createArrayNode();
+        var record = json.createObjectNode();
+        record.put("POS",213); record.put("LESN",2); record.put("KV",1);
+        record.put("KGLF",3); record.put("VD",1); record.put("POR",12);
+        rows.add(record);
+        tables.set(name, rows);
       }
     }
     assertEquals(18, tables.size());
