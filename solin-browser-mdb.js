@@ -149,7 +149,18 @@
         '/str/solin-transfer.json',
         output
       );
-      if (exit !== 0) throw Error('Движок MDB не смог записать базу. Подробности в журнале браузера.');
+      if (exit !== 0) {
+        let reason = 'Не удалось записать MDB. Исходный файл и карточки не изменены.';
+        try {
+          // On iPhone there is no developer console: show the first Java error
+          // from the local virtual filesystem instead of a useless generic text.
+          const log = await (await window.cjFileBlob('/files/solin-browser-debug.txt')).text();
+          const cause = log.split(/\\r?\\n/).find(line =>
+            /(?:IllegalArgumentException|IOException|IllegalStateException|AccessException):/.test(line));
+          if (cause) reason = 'Ошибка MDB: ' + cause.replace(/^\\s*at\\s+/, '').slice(0,500);
+        } catch (_) { /* No diagnostic file available */ }
+        throw Error(reason);
+      }
       const blob = await window.cjFileBlob(output);
       if (!blob || blob.size < 1024 || !jetHeader(await blob.slice(0,32).arrayBuffer())) {
         throw Error('Файл не является настоящей базой Jet MDB.');
