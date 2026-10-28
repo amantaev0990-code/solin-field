@@ -5,7 +5,7 @@
 (() => {
   'use strict';
   if (window.Capacitor?.isNativePlatform?.() && window.Capacitor?.getPlatform?.() === 'android') return;
-  const URL_JAR = './vendor/solin-browser-mdb.jar';
+  const URL_JAR = './vendor/solin-browser-mdb-v20261028-19.jar';
   // CheerpJ /app mounts the *domain root*, not GitHub Pages project path.
   // The PWA lives under /solin-field/, so use the page-relative absolute URL.
   const CHEERPJ_JAR = '/app' + new URL(URL_JAR, document.baseURI).pathname;
@@ -38,7 +38,7 @@
     if (!runtimePromise) {
       runtimePromise = (async () => {
         const response = await fetch(URL_JAR, { cache: 'no-store' });
-        if (!response.ok) throw Error('Компонент записи MDB ещё не опубликован. Проверьте сборку приложения.');
+        if (!response.ok) throw Error('Новая версия движка MDB ещё не загружена на сайт. Попробуйте обновить страницу.');
         const jar = await response.arrayBuffer();
         if (jar.byteLength < 100000 || new Uint8Array(jar)[0] !== 80 || new Uint8Array(jar)[1] !== 75) {
           throw Error('Модуль записи MDB повреждён или не является Java-архивом.');
