@@ -15,6 +15,12 @@
    button.type='button';
    const idle='<span><b>Экспорт</b><small>Сохранить базу в формате MDB</small></span><span>⇩</span>';
    button.innerHTML=idle;
+   // Safari may restore the prior page from its back/forward cache.
+   // Make Export clickable again after returning from the download view.
+   window.addEventListener('pageshow',()=>{
+     button.disabled=false;
+     button.innerHTML=idle;
+   });
    button.onclick=async()=>{
      if(button.disabled)return;
      button.disabled=true;
