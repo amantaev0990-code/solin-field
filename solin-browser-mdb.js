@@ -5,7 +5,7 @@
 (() => {
   'use strict';
   if (window.Capacitor?.isNativePlatform?.() && window.Capacitor?.getPlatform?.() === 'android') return;
-  const URL_JAR = './vendor/solin-browser-mdb-v20261028-27.jar';
+  const URL_JAR = './vendor/solin-browser-mdb-v20261028-28.jar';
   const URL_TEMPLATE = './vendor/solin-empty-transfer-v20261028-27.mdb';
   // CheerpJ /app mounts the *domain root*, not GitHub Pages project path.
   // The PWA lives under /solin-field/, so use the page-relative absolute URL.
