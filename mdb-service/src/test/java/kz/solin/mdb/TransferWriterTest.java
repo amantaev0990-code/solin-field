@@ -172,6 +172,49 @@ class TransferWriterTest {
     assertFalse(Files.exists(output));
   }
 
+  @Test void templateModePreservesRealCatalogAcrossEighteenTables() throws Exception {
+    // Safari regression: the Jet catalog MSysObjects must be inherited from an
+    // existing source MDB instead of being rebuilt in its virtual filesystem.
+    Path source = template();
+    var payload = (com.fasterxml.jackson.databind.node.ObjectNode) transfer();
+    var schema = (com.fasterxml.jackson.databind.node.ObjectNode) payload.get("schema");
+    var tables = (com.fasterxml.jackson.databind.node.ObjectNode) payload.get("tables");
+    try (Database sourceDb = DatabaseBuilder.open(source.toFile())) {
+      for (int number = 11; number <= 24; number++) {
+        String name = "Макет" + number;
+        var table = new TableBuilder(name)
+          .addColumn(new ColumnBuilder("POS", DataType.LONG))
+          .addColumn(new ColumnBuilder("LESN", DataType.LONG))
+          .addColumn(new ColumnBuilder("KV", DataType.LONG))
+          .addColumn(new ColumnBuilder("KGLF", DataType.LONG))
+          .addColumn(new ColumnBuilder("VD", DataType.LONG))
+          .addColumn(new ColumnBuilder("POR", DataType.LONG))
+          .toTable(sourceDb);
+        table.addRow(213, 2, 1, 3, 1, 50);
+        schema.set(name, json.readTree("[\\"POS\\",\\"LESN\\",\\"KV\\",\\"KGLF\\",\\"VD\\",\\"POR\\"]"));
+        tables.set(name, json.readTree("[{\\"POS\\":213,\\"LESN\\":2,\\"KV\\":1,\\"KGLF\\":3,\\"VD\\":1,\\"POR\\":12}]"));
+      }
+    }
+    assertEquals(18, tables.size());
+    byte[] unchangedTemplate = Files.readAllBytes(source);
+    for (int pass = 0; pass < 2; pass++) {
+      Path output = temp.resolve("real-schema-" + pass + ".mdb");
+      writer.writeInMemory(payload, source, output);
+      assertArrayEquals(unchangedTemplate, Files.readAllBytes(source));
+      try (Database exported = DatabaseBuilder.open(output.toFile())) {
+        assertEquals(19, exported.getTableNames().size());
+        assertEquals(17.25d, ((Number)exported.getTable("Выдел")
+          .iterator().next().get("PLV")).doubleValue(), 0.0001);
+        assertEquals("Сохранять без изменений", exported.getTable("НеизменённаяТаблица")
+          .iterator().next().get("Note"));
+        for (int number = 11; number <= 24; number++) {
+          assertEquals(12, ((Number)exported.getTable("Макет" + number)
+            .iterator().next().get("POR")).intValue());
+        }
+      }
+    }
+  }
+
   @Test void directExportSupportsEighteenTablesAndRepeatedExport() throws Exception {
     // Regression for Safari's MSysObjects rowId=14:18 when adding many tables.
     var source = (com.fasterxml.jackson.databind.node.ObjectNode) transfer();
