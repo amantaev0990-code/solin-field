@@ -5,6 +5,10 @@ on:
     paths:
       - 'experiments/mdb-wasm-poc/**'
       - '.github/workflows/mdb-wasm-poc.yml'
+# Only the latest tested writer should publish compiled WASM assets.
+concurrency:
+  group: solin-mdb-wasm-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   build-poc:
     runs-on: ubuntu-latest
