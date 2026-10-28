@@ -26,6 +26,9 @@
   const header = new Uint8Array(await file.slice(0,32).arrayBuffer());
   const signature = String.fromCharCode(...header.slice(4,19));
   if (signature !== 'Standard Jet DB') throw Error('Incorrect binary Jet signature: '+signature);
+  const checked = await cheerpjRunMain('kz.solin.mdb.BrowserSmokeVerifier',
+    '/app/vendor/solin-browser-mdb.jar', output);
+  if (checked !== 0) throw Error('Field-level MDB readback failed (PLV must be 5.75)');
   document.body.dataset.result = 'passed';
   document.getElementById('status').textContent='PASS: '+file.size+' byte Jet MDB';
 })().catch(e => {
