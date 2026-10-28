@@ -124,7 +124,7 @@ public final class TransferWriter {
     if (!new String(header, StandardCharsets.ISO_8859_1).contains("Standard Jet DB")) {
       throw new IllegalArgumentException("Шаблон не является базой Access Jet MDB.");
     }
-    if (Files.isSameFile(template, destination)) {
+    if (Files.exists(destination) && Files.isSameFile(template, destination)) {
       throw new IllegalArgumentException("Нельзя заменять исходную базу.");
     }
     Files.copy(template, destination, StandardCopyOption.REPLACE_EXISTING);
@@ -220,7 +220,13 @@ public final class TransferWriter {
     if (v.isEmpty() && type != DataType.TEXT && type != DataType.MEMO) return null;
     try {
       return switch (type) {
-        case BOOLEAN -> (node.isBoolean() ? node.asBoolean() : (v.equals("1") || v.equalsIgnoreCase("true")));
+        case BOOLEAN -> {
+          if (!node.isBoolean() && !v.equals("1") && !v.equals("0") &&
+              !v.equalsIgnoreCase("true") && !v.equalsIgnoreCase("false")) {
+            throw new IllegalArgumentException("Недопустимое логическое значение.");
+          }
+          yield node.isBoolean() ? node.asBoolean() : (v.equals("1") || v.equalsIgnoreCase("true"));
+        }
         case BYTE -> Integer.parseInt(v);
         case INT -> Short.parseShort(v);
         case LONG -> Integer.parseInt(v);
@@ -229,6 +235,7 @@ public final class TransferWriter {
         case DOUBLE -> Double.parseDouble(v);
         case MONEY, NUMERIC -> new BigDecimal(v);
         case SHORT_DATE_TIME -> {
+          if (v.matches("\\d{4}-\\d{2}-\\d{2}")) yield java.time.LocalDate.parse(v).atStartOfDay();
           if (v.endsWith("Z")) yield java.util.Date.from(Instant.parse(v));
           if (v.contains("+") && v.contains("T")) yield java.util.Date.from(OffsetDateTime.parse(v).toInstant());
           yield LocalDateTime.parse(v);
