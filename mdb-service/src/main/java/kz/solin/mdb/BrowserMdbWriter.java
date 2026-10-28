@@ -40,6 +40,11 @@ public final class BrowserMdbWriter {
   }
 
   public static void main(String[] args) {
+    // CheerpJ's virtual NIO differs from desktop JVM. Jackcess documents this
+    // fallback for runtimes with incomplete ByteBuffer/FileChannel behavior.
+    // Must be set BEFORE loading any of Jackcess's implementation classes.
+    System.setProperty("com.healthmarketscience.jackcess.brokenNio", "true");
+    Thread.currentThread().setContextClassLoader(BrowserMdbWriter.class.getClassLoader());
     // 2 arguments: new template-free direct MDB export (preferred on iPhone).
     // 3 arguments: legacy original-template export for controlled comparisons.
     if (args.length != 2 && args.length != 3) {
