@@ -11,7 +11,7 @@ self.addEventListener('fetch', e => {
   if(r.headers.has('range')||/\.jar$/i.test(u.pathname))return;
   e.respondWith((async()=>{
     const c=await caches.open(CACHE);
-    const dynamic=r.mode==='navigate'||/\/solin-mdb-wasm-entry\\.js$/.test(u.pathname)||/(?:index|export-v29)\.html$|\/solin-(?:browser-mdb(?:-v29)?|transfer-reader|mdb-bridge|apk-mdb)\.js$/.test(u.pathname);
+    const dynamic=r.mode==='navigate'||u.pathname.endsWith('/solin-mdb-wasm-entry.js')||/(?:index|export-v29)\.html$|\/solin-(?:browser-mdb(?:-v29)?|transfer-reader|mdb-bridge|apk-mdb)\.js$/.test(u.pathname);
     if(dynamic) {
       try {
         const network=await fetch(r,{cache:'no-store'});
