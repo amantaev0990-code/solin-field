@@ -17,6 +17,8 @@ public final class BlankTransferTemplate {
     if (!"SOLIN-MDB-Bridge-v1".equals(transfer.path("format").asText()) ||
         transfer.path("schema").size()!=18) throw new IllegalArgumentException("Unsupported Transfer schema");
     Path intermediate=Files.createTempFile("solin-build-only-", ".mdb");
+    // TransferWriter requires a not-yet-existing destination.
+    Files.delete(intermediate);
     try {
       // Infer numeric/text Jet types from the already-public field dataset.
       new TransferWriter().writeNewInMemory(transfer,intermediate);
