@@ -5,7 +5,8 @@
 (() => {
   'use strict';
   if (window.Capacitor?.isNativePlatform?.() && window.Capacitor?.getPlatform?.() === 'android') return;
-  const URL_JAR = './vendor/solin-browser-mdb-v20261028-28.jar';
+  const RELEASE = 'v29';
+  const URL_JAR = './vendor/solin-browser-mdb-v20261028-29.jar';
   const URL_TEMPLATE = './vendor/solin-empty-transfer-v20261028-27.mdb';
   // CheerpJ /app mounts the *domain root*, not GitHub Pages project path.
   // The PWA lives under /solin-field/, so use the page-relative absolute URL.
@@ -175,13 +176,16 @@
     if (running) return;
     running = true;
     const b = button();
+    let stage = 'подготовка карточек';
     if (b) b.disabled = true;
     try {
       const transfer = await snapshot();
       message('Создание MDB',
         '<p>Формирую файл Access из текущих карточек выбранного лесничества. ' +
         'Загружать исходный MDB не нужно.</p>');
+      stage = 'получение пустого MDB';
       const template = await getAutomaticTemplate();
+      stage = 'запуск Java';
       await ensureRuntime();
       // Every run gets a new path inside CheerpJ's persistent filesystem.
       // Reusing the same MDB path can expose stale file metadata to Safari.
@@ -194,6 +198,7 @@
       const ascii = JSON.stringify(transfer).replace(/[^\x00-\x7F]/g, c =>
         '\\u' + c.charCodeAt(0).toString(16).padStart(4,'0'));
       window.cheerpOSAddStringFile('/str/solin-transfer.json', new TextEncoder().encode(ascii));
+      stage = 'запись таблиц Access';
       const exit = await window.cheerpjRunMain(
         'kz.solin.mdb.BrowserMdbWriter',
         CHEERPJ_JAR,
@@ -213,6 +218,7 @@
         } catch (_) { /* No diagnostic file available */ }
         throw Error(reason);
       }
+      stage = 'чтение готового MDB из памяти телефона';
       const blob = await window.cjFileBlob(output);
       if (!blob || blob.size < 1024 || !jetHeader(await blob.slice(0,32).arrayBuffer())) {
         throw Error('Файл не является настоящей базой Jet MDB.');
@@ -220,9 +226,11 @@
       // Cross-check actual downloaded bytes against Java's second readback.
       // This is independent from the Javascript MDB viewer, which in Safari
       // sometimes reports "no forestry" for a Java-verified Jet file.
+      stage = 'проверка контрольной суммы';
       await verifyJavaReceipt(blob, output, transfer);
       let file;
       let browserReadWarning = false;
+      stage = 'независимая проверка браузером';
       try {
         file = await confirmOutput(blob, transfer);
       } catch(error) {
@@ -230,6 +238,7 @@
         browserReadWarning = true;
         file = new File([blob], nameOf(transfer.identity), {type:'application/vnd.ms-access'});
       }
+      stage = 'подготовка сохранения';
       if (downloadUrl) URL.revokeObjectURL(downloadUrl);
       downloadUrl = URL.createObjectURL(file);
       message('MDB готов к сохранению',
@@ -258,6 +267,7 @@
       console.error('SOLIN local Safari MDB error:', e);
       message('Не удалось создать MDB',
         '<p role="alert">' + esc(e.message || 'Ошибка создания MDB') + '</p>' +
+        '<p style="font-size:12px;opacity:.75">Диагностика: экспортёр ' + RELEASE + ', этап «' + esc(stage) + '».</p>' +
         '<p>Вместо MDB не будет выдан JSON или ZIP. Исходная база и карточки сохранены.</p>' +
         '<button type="button" onclick="closeModal()">Закрыть</button>');
     } finally {
@@ -269,10 +279,10 @@
     const b = button();
     if (!b) return;
     b.type = 'button';
-    b.innerHTML = '<span><b>Экспорт</b><small>Выгрузить файл MDB</small></span><span>⇩</span>';
+    b.innerHTML = '<span><b>Экспорт</b><small>Выгрузить файл MDB · ' + RELEASE + '</small></span><span>⇩</span>';
     b.onclick = exportBrowser;
   }
-  window.SolinBrowserMDB = { exportBrowser, ensureRuntime };
+  window.SolinBrowserMDB = { exportBrowser, ensureRuntime, version: RELEASE };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, {once:true});
   else install();
 })();
