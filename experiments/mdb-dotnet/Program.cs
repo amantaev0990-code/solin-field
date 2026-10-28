@@ -20,7 +20,7 @@ try {
         row[i] = forest.Columns[i].Name switch {
           "POS" => (short)213,
           "LESN" => (short)2,
-          "GodT" => (int)2026,
+          "GodT" => (short)2026,
           _ => null
         };
       }
