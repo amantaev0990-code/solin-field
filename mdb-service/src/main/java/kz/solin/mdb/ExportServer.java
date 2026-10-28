@@ -8,6 +8,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -16,7 +17,7 @@ import java.util.concurrent.Semaphore;
 
 /**
  * Self-hosted HTTPS-behind-proxy MDB conversion API.
- * Configure SOLIN_EXPORT_TOKEN, SOLIN_ALLOWED_ORIGIN, SOLIN_TEMPLATE_DIR, PORT.
+ * Configure SOLIN_EXPORT_TOKEN, SOLIN_ALLOWED_ORIGIN, PORT.
  * Never commit/upload personal forest MDB files or the bearer token into GitHub.
  */
 public final class ExportServer {
@@ -26,13 +27,11 @@ public final class ExportServer {
 
   private final String token;
   private final String allowedOrigin;
-  private final Path templates;
   private final TransferWriter writer = new TransferWriter();
 
-  private ExportServer(String token, String allowedOrigin, Path templates) {
+  private ExportServer(String token, String allowedOrigin) {
     this.token = token;
     this.allowedOrigin = allowedOrigin;
-    this.templates = templates;
   }
 
   public static void main(String[] args) throws IOException {
@@ -41,15 +40,14 @@ public final class ExportServer {
       throw new IllegalStateException("SOLIN_EXPORT_TOKEN must have at least 32 characters.");
     }
     String origin = System.getenv().getOrDefault("SOLIN_ALLOWED_ORIGIN", "https://amantaev0990-code.github.io");
-    Path templates = Path.of(System.getenv().getOrDefault("SOLIN_TEMPLATE_DIR", "/data/templates")).toAbsolutePath().normalize();
     int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080"));
     HttpServer server = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 8);
-    ExportServer app = new ExportServer(token, origin, templates);
+    ExportServer app = new ExportServer(token, origin);
     server.createContext("/health", app::health);
     server.createContext("/api/export", app::export);
     server.setExecutor(Executors.newFixedThreadPool(4));
     server.start();
-    System.out.println("SOLI-N MDB service listening, port=" + port + ", templates configured=" + Files.isDirectory(templates));
+    System.out.println("SOLI-N MDB temporary-conversion service listening, port=" + port + ". No original MDB files stored.");
   }
 
   private void commonHeaders(HttpExchange exchange) {
@@ -109,17 +107,37 @@ public final class ExportServer {
     }
     if (!SLOTS.tryAcquire()) { sendJson(exchange, 429, "Converter is busy. Try again."); return; }
     Path copy = null;
+    Path temporaryTemplate = null;
     try {
       byte[] body = exchange.getRequestBody().readNBytes(MAX_BODY + 1);
       if (body.length == 0 || body.length > MAX_BODY) {
         sendJson(exchange, 413, "Transfer too large (limit 25 MB)"); return;
       }
-      JsonNode payload = JSON.readTree(body);
+      // Never persist a user's original template. The phone sends it with each request.
+      JsonNode request = JSON.readTree(body);
+      if (request == null || !"SOLIN-MDB-OnDemand-v1".equals(request.path("format").asText())) {
+        throw new IllegalArgumentException("Требуется формат SOLIN-MDB-OnDemand-v1.");
+      }
+      JsonNode payload = request.path("transfer");
       TransferWriter.Identity id = writer.identity(payload);
-      Path template = templates.resolve(id.filename()).normalize();
-      if (!template.getParent().equals(templates)) throw new IllegalArgumentException("Invalid template path.");
+      JsonNode encoded = request.path("templateBase64");
+      if (!encoded.isTextual() || encoded.asText().length() > 18 * 1024 * 1024) {
+        throw new IllegalArgumentException("Не приложен корректный исходный MDB-шаблон.");
+      }
+      byte[] mdb;
+      try { mdb = Base64.getDecoder().decode(encoded.asText()); }
+      catch (IllegalArgumentException invalid) {
+        throw new IllegalArgumentException("MDB-шаблон повреждён: неверный base64.");
+      }
+      if (mdb.length < 1024 || mdb.length > 12 * 1024 * 1024 ||
+          !new String(mdb, 0, Math.min(32, mdb.length), StandardCharsets.ISO_8859_1)
+            .contains("Standard Jet DB")) {
+        throw new IllegalArgumentException("Требуется настоящий исходный Access MDB размером до 12 МБ.");
+      }
+      temporaryTemplate = Files.createTempFile("solin-private-source-", ".mdb");
+      Files.write(temporaryTemplate, mdb);
       copy = Files.createTempFile("solin-transfer-", ".mdb");
-      writer.write(payload, template, copy);
+      writer.write(payload, temporaryTemplate, copy);
       byte[] result = Files.readAllBytes(copy);
       // Gate download on true binary Jet signature, rather than trusting the suffix.
       if (!new String(result, 0, Math.min(result.length, 32), StandardCharsets.ISO_8859_1)
@@ -138,6 +156,7 @@ public final class ExportServer {
       sendJson(exchange, 500, "Не удалось создать MDB. Проверьте формат исходного шаблона и таблиц.");
     } finally {
       if (copy != null) Files.deleteIfExists(copy);
+      if (temporaryTemplate != null) Files.deleteIfExists(temporaryTemplate);
       SLOTS.release();
       exchange.close();
     }
