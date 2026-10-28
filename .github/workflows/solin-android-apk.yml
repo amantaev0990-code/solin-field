@@ -1,0 +1,48 @@
+name: Android APK check (offline MDB prototype)
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - package.json
+      - capacitor.config.json
+      - scripts/**
+      - native/android/**
+      - solin-apk-mdb.js
+      - .github/workflows/solin-android-apk.yml
+permissions:
+  contents: read
+jobs:
+  debug-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - name: Install Capacitor dependencies
+        run: npm install --no-audit --no-fund
+      - name: Stage existing SOLI-N Field web assets
+        run: npm run build
+      - name: Create native Android project
+        run: npx cap add android
+      - name: Register offline MDB writer
+        run: node scripts/install-android-mdb.mjs
+      - name: Sync complete web app
+        run: npx cap sync android
+      - name: Compile Android debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: solin-field-offline-mdb-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 7
