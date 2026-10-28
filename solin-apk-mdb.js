@@ -53,7 +53,7 @@
   async function packagedTemplate() {
     // Shipped as a validated, data-free 18-table Jet MDB app asset.
     // Never ask field staff to upload or select a source database.
-    const response = await fetch('./vendor/solin-empty-transfer-v20261028-23.mdb');
+    const response = await fetch('./vendor/solin-empty-transfer-v20261028-27.mdb');
     if (!response.ok) throw Error('В сборке APK отсутствует пустой MDB-шаблон.');
     const bytes = await response.arrayBuffer();
     if (bytes.byteLength<1024 || bytes.byteLength>12000000 || !isJet(bytes))
