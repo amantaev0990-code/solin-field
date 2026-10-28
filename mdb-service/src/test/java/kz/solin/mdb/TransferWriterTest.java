@@ -172,4 +172,42 @@ class TransferWriterTest {
     assertFalse(Files.exists(output));
   }
 
+  @Test void directExportSupportsEighteenTablesAndRepeatedExport() throws Exception {
+    // Regression for Safari's MSysObjects rowId=14:18 when adding many tables.
+    var source = (com.fasterxml.jackson.databind.node.ObjectNode) transfer();
+    var schema = (com.fasterxml.jackson.databind.node.ObjectNode) source.get("schema");
+    var tables = (com.fasterxml.jackson.databind.node.ObjectNode) source.get("tables");
+    for (int n = 11; n <= 24; n++) {
+      String name = "Макет" + n;
+      if (schema.has(name)) continue;
+      var fields = json.createArrayNode();
+      for (String field : new String[]{"POS","LESN","KV","KGLF","VD","TEXT"}) fields.add(field);
+      schema.set(name, fields);
+      var rows = json.createArrayNode();
+      var record = json.createObjectNode();
+      record.put("POS", 213);
+      record.put("LESN", 2);
+      record.put("KV", 1);
+      record.put("KGLF", 3);
+      record.put("VD", 1);
+      record.put("TEXT", "Тестовые данные " + n);
+      rows.add(record);
+      tables.set(name, rows);
+    }
+    assertEquals(18, tables.size());
+    for (int pass = 0; pass < 2; pass++) {
+      Path output = temp.resolve("eighteen-pass-" + pass + ".mdb");
+      writer.writeNewInMemory(source, output);
+      try (Database db = DatabaseBuilder.open(output.toFile())) {
+        assertEquals(18, db.getTableNames().size());
+        for (var it = tables.fieldNames(); it.hasNext();) {
+          String name = it.next();
+          assertEquals(tables.get(name).size(), db.getTable(name).getRowCount(), name);
+        }
+        assertEquals("Тестовые данные 24", db.getTable("Макет24")
+          .iterator().next().get("TEXT"));
+      }
+    }
+  }
+
 }
