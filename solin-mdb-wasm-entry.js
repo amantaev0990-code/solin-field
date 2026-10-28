@@ -108,9 +108,9 @@
         frame.title = 'Внутренний модуль экспорта MDB';
         frame.setAttribute('aria-hidden', 'true');
         frame.tabIndex = -1;
-        // Do not use display:none: Safari can defer WebAssembly in hidden frames.
+        // Keep a 1px transparent frame IN the viewport; Safari may defer off-screen frames.
         frame.style.cssText = 'position:fixed!important;width:1px!important;height:1px!important;' +
-          'left:-10000px!important;top:0!important;opacity:0!important;pointer-events:none!important;border:0!important;';
+          'left:0!important;top:0!important;opacity:0!important;pointer-events:none!important;border:0!important;';
 
         onMessage = event => {
           if (!frame || event.source !== frame.contentWindow ||
