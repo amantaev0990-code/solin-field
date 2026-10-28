@@ -1,88 +1,50 @@
 @inject HttpClient Http
 @inject IJSRuntime JS
+
 <div class="shell">
-  <h1>MDB Writer — тест WebAssembly</h1>
-  <p>Отдельный эксперимент SOLI-N Field. Не использует и не изменяет рабочие карточки.</p>
-  <button disabled="@busy" @onclick="MakeTest">@((busy) ? "Проверяю MDB…" : "Создать тестовый MDB без сервера")</button>
-  <button disabled="@busy" class="secondary" @onclick="MakeForestTest">Экспортировать сохранённое лесничество (тест)</button>
-  <p role="status" class="status">@status</p>
-  <p class="note">Первая кнопка создаёт две тестовые записи. Вторая читает выбранное лесничество из локальной памяти SOLI-N Field и экспортирует 18 таблиц без отправки данных на сервер. Файлы имеют префикс TEST_, потому что приём старым SOLI-N ещё не подтверждён. Не заменяйте рабочую базу.</p>
+  <button disabled="@busy" @onclick="Export">@(busy ? "Создаю MDB…" : "Экспорт")</button>
+  @if (!string.IsNullOrEmpty(status))
+  {
+    <p role="status" class="status">@status</p>
+  }
 </div>
+
 @code {
-    bool busy;
-    string status = "Нажмите кнопку для создания тестового Jet MDB на устройстве.";
-    private static object?[] Build(Table table, bool stand) {
-        var cells=new object?[table.Columns.Count];
-        for(int i=0;i<cells.Length;i++) {
-          cells[i] = table.Columns[i].Name switch {
-            "POS" => (short)213, "LESN" => (short)2,
-            "GodT" when !stand => (short)2026,
-            "KV" when stand => (short)1,
-            "KGLF" when stand => (short)1,
-            "VD" when stand => "1",
-            "PLV" when stand => 1.25f,
-            "PRkol" when stand => 0.6f,
-            _ => null
-          };
-        }
-        return cells;
+  private bool busy;
+  private string status = "";
+
+  protected override async Task OnAfterRenderAsync(bool firstRender)
+  {
+    if (firstRender && await JS.InvokeAsync<bool>("solinShouldAutoExport"))
+      await Export();
+  }
+
+  private async Task Export()
+  {
+    if (busy) return;
+    busy = true;
+    try
+    {
+      status = "Готовлю карточки выбранного лесничества…";
+      await InvokeAsync(StateHasChanged);
+      string snapshot = await JS.InvokeAsync<string>("solinGetTransferJson");
+      status = "Создаю файл MDB…";
+      await InvokeAsync(StateHasChanged);
+      byte[] template = await Http.GetByteArrayAsync("blank-transfer.mdb");
+      TransferConverter.Result result = TransferConverter.ConvertFromSnapshot(snapshot, template);
+      await JS.InvokeVoidAsync("saveMdb", result.FileName, result.Bytes);
+      status = "Файл " + result.FileName +
+        " готов. Если он не скачался автоматически, нажмите «Сохранить MDB».";
     }
-    async Task MakeForestTest() {
-      if(busy)return;
-      busy=true;
-      try {
-        status="Читаю сохранённые карточки SOLI-N Field только на этом устройстве…";
-        await InvokeAsync(StateHasChanged);
-        string snapshot=await JS.InvokeAsync<string>("solinGetTransferJson");
-        status="Записываю 18 таблиц в настоящий MDB через WebAssembly…";
-        await InvokeAsync(StateHasChanged);
-        byte[] blank=await Http.GetByteArrayAsync("blank-transfer.mdb");
-        TransferConverter.Result result=TransferConverter.ConvertFromSnapshot(snapshot,blank);
-        status=$"Успешно: {result.Tables} таблиц, {result.Rows} записей. Файл проверен повторным чтением. Это тестовая выгрузка.";
-        await InvokeAsync(StateHasChanged);
-        await JS.InvokeVoidAsync("saveMdbTest",result.FileName,result.Bytes);
-      }catch(Exception error) {
-        status="Экспорт остановлен: "+error.Message;
-      }finally {
-        busy=false;
-      }
+    catch (Exception error)
+    {
+      status = "Экспорт остановлен: " + error.Message +
+        ". Рабочие карточки не изменены.";
     }
-    async Task MakeTest() {
-      if(busy)return;
-      busy=true;
-      string? path=null;
-      try {
-        status="Загружаю пустой шаблон Access (без лесных данных)…";
-        byte[] template=await Http.GetByteArrayAsync("blank-transfer.mdb");
-        if(template.Length<2048 ||
-            System.Text.Encoding.ASCII.GetString(template,4,15)!="Standard Jet DB")
-          throw new Exception("Неправильный формат пустого шаблона.");
-        path=Path.Combine(Path.GetTempPath(),"solin-wasm-"+Guid.NewGuid().ToString("N")+".mdb");
-        await System.IO.File.WriteAllBytesAsync(path,template);
-        status="Записываю тестовые записи в Access…";
-        using(var db=Database.Open(path,readOnly:false)) {
-          var f=db.GetTable("Лесничество")??throw new Exception("Нет таблицы лесничества.");
-          var t=db.GetTable("Выдел")??throw new Exception("Нет таблицы выделов.");
-          if(f.RowCount!=0||t.RowCount!=0)throw new Exception("Шаблон не пуст.");
-          f.AddRow(Build(f,false));
-          t.AddRow(Build(t,true));
-        }
-        status="Повторно открываю и проверяю дробное поле PRkol…";
-        using(var db=Database.Open(path,readOnly:true)) {
-          var f=db.GetTable("Лесничество")??throw new Exception("Потеряна таблица лесничества.");
-          var t=db.GetTable("Выдел")??throw new Exception("Потеряна таблица выделов.");
-          if(f.Rows().Count()!=1||t.Rows().Count()!=1)throw new Exception("Записи не сохранились.");
-          double value=Convert.ToDouble(t.Rows().Single()["PRkol"]);
-          if(Math.Abs(value-0.6)>0.000001)throw new Exception("PRkol записан неправильно: "+value);
-        }
-        var output=await System.IO.File.ReadAllBytesAsync(path);
-        status="Успешно: создан тестовый Jet MDB, PRkol=0.6. Сохраните файл для независимой проверки.";
-        await JS.InvokeVoidAsync("saveMdbTest","TEST_Transf_213_2_2026.mdb",output);
-      } catch(Exception e){
-        status="Ошибка WebAssembly: "+e.GetType().Name+": "+e.Message;
-      } finally {
-        if(path!=null)try{System.IO.File.Delete(path);}catch{}
-        busy=false;
-      }
+    finally
+    {
+      busy = false;
+      await InvokeAsync(StateHasChanged);
     }
+  }
 }
