@@ -155,9 +155,9 @@
           // On iPhone there is no developer console: show the first Java error
           // from the local virtual filesystem instead of a useless generic text.
           const log = await (await window.cjFileBlob('/files/solin-browser-debug.txt')).text();
-          const cause = log.split(/\\r?\\n/).find(line =>
+          const cause = log.split(/\r?\n/).find(line =>
             /(?:IllegalArgumentException|IOException|IllegalStateException|AccessException):/.test(line));
-          if (cause) reason = 'Ошибка MDB: ' + cause.replace(/^\\s*at\\s+/, '').slice(0,500);
+          if (cause) reason = 'Ошибка MDB: ' + cause.replace(/^\s*at\s+/, '').slice(0,500);
         } catch (_) { /* No diagnostic file available */ }
         throw Error(reason);
       }
