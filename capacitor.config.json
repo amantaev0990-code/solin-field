@@ -1,0 +1,8 @@
+{
+  "appId": "kz.solin.field",
+  "appName": "SOLI-N Field",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  }
+}
