@@ -130,4 +130,18 @@ class TransferWriterTest {
         () -> writer.write(transfer, source, temp.resolve("orphan.mdb")));
     assertArrayEquals(original, Files.readAllBytes(source));
   }
+
+  @Test void createsRealMDBInMemoryWithEditedValues() throws Exception {
+    Path source = template();
+    byte[] before = Files.readAllBytes(source);
+    Path output = temp.resolve("MemoryField.mdb");
+    writer.writeInMemory(transfer(), source, output);
+    assertArrayEquals(before, Files.readAllBytes(source));
+    try (Database db = DatabaseBuilder.open(output.toFile())) {
+      assertEquals(1, db.getTable("Выдел").getRowCount());
+      var stand = db.getTable("Выдел").iterator().next();
+      assertEquals(17.25d, ((Number)stand.get("PLV")).doubleValue(), 0.0001);
+      assertEquals("Сохранять без изменений", db.getTable("НеизменённаяТаблица").iterator().next().get("Note"));
+    }
+  }
 }
