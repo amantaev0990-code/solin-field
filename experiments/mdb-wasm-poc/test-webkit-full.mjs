@@ -36,11 +36,13 @@ try {
       };
     });
   },forest);
-  await page.getByRole('button',{name:/Экспортировать сохранённое лесничество/}).waitFor({timeout:90000});
+  // The only menu Export action navigates here with export=1.
+  // Exercise the automatic browser export, not a second confirmation tap.
   const waiting=page.waitForEvent('download',{timeout:180000});
-  await page.getByRole('button',{name:/Экспортировать сохранённое лесничество/}).click();
+  await page.goto('http://127.0.0.1:8765/solin-field/mdb-wasm-poc/?export=1&forest=213%3A%3A2',
+    {waitUntil:'domcontentloaded',timeout:60000});
   const download=await waiting;
-  if(download.suggestedFilename()!=='TEST_Transf_213_2_2026.mdb')
+  if(download.suggestedFilename()!=='Transf_213_2_2026.mdb')
     throw Error('Export name is wrong: '+download.suggestedFilename());
   const bytes=fs.readFileSync(await download.path());
   if(bytes.toString('latin1',4,19)!=='Standard Jet DB')throw Error('Not an Access Jet file');
@@ -65,8 +67,10 @@ try {
   const actual=Number(standRows[225].PRkol);
   if(!Number.isFinite(actual)||Math.abs(actual-0.6)>0.000001)
     throw Error('Edited stand #226 PRkol=0,6 not preserved: '+actual);
+  await page.getByRole('status').getByText(/готов/i).waitFor({timeout:30000});
   const status=await page.getByRole('status').innerText();
-  if(!status.includes('Успешно'))throw Error('No successful status: '+status);
+  if(!status.includes('готов'))throw Error('No successful status: '+status);
+  await page.getByRole('link',{name:'Сохранить MDB'}).waitFor({timeout:30000});
   // Regression: a stale active forestry ID must fail instead of silently
   // exporting an unrelated first forest from IndexedDB.
   const wrongForestError=await page.evaluate(async()=>{
