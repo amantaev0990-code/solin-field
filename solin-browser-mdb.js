@@ -80,6 +80,31 @@
     })().catch(error=>{templatePromise=null;throw error;});
     return templatePromise;
   }
+  async function verifyJavaReceipt(blob, output, transfer) {
+    let receipt;
+    try {
+      receipt = JSON.parse(await (await window.cjFileBlob(output + '.verified.json')).text());
+    } catch (_) { throw Error('Не получена Java-проверка созданного MDB. Выгрузка остановлена.'); }
+    const id=transfer.identity;
+    if (receipt?.format!=='SOLIN-JET-RECEIPT-v1' ||
+        receipt.filename!==nameOf(id) || receipt.size!==blob.size ||
+        Number(receipt.pos)!==Number(id.POS) ||
+        Number(receipt.lesn)!==Number(id.LESN) ||
+        Number(receipt.year)!==Number(id.GodT)) {
+      throw Error('Новый MDB не совпадает с проверкой Java. Возможно, браузер открыл старый файл.');
+    }
+    for(const [name, rows] of Object.entries(transfer.tables)) {
+      if(receipt.counts?.[name]!==rows.length)
+        throw Error('Java-проверка MDB: неверное количество записей «' + name + '».');
+    }
+    if(!window.crypto?.subtle?.digest)
+      throw Error('Браузер не поддерживает SHA-256 для проверки файла MDB.');
+    const digest = new Uint8Array(await window.crypto.subtle.digest('SHA-256',await blob.arrayBuffer()));
+    const hex = [...digest].map(b=>b.toString(16).padStart(2,'0')).join('');
+    if(hex!==receipt.sha256)
+      throw Error('Данные MDB отличаются от проверенной Java-копии. Скачивание остановлено.');
+    return receipt;
+  }
   function matchesCell(wanted, found) {
     if (wanted == null || wanted === '') return found == null || found === '';
     if (typeof wanted === 'boolean') return String(wanted) === String(found) ||
@@ -158,7 +183,11 @@
         'Загружать исходный MDB не нужно.</p>');
       const template = await getAutomaticTemplate();
       await ensureRuntime();
-      const output = '/files/' + nameOf(transfer.identity);
+      // Every run gets a new path inside CheerpJ's persistent filesystem.
+      // Reusing the same MDB path can expose stale file metadata to Safari.
+      const directory = '/files/export-' + Date.now().toString(36) + '-' +
+        Math.random().toString(36).slice(2,10);
+      const output = directory + '/' + nameOf(transfer.identity);
       window.cheerpOSAddStringFile('/str/solin-original-transfer.mdb', template);
       // CheerpJ's UTF-8 decoder may pad Cyrillic Java strings with NUL chars.
       // Deliver ASCII JSON using \uXXXX escapes so Russian Access table names survive.
@@ -188,13 +217,29 @@
       if (!blob || blob.size < 1024 || !jetHeader(await blob.slice(0,32).arrayBuffer())) {
         throw Error('Файл не является настоящей базой Jet MDB.');
       }
-      const file = await confirmOutput(blob, transfer);
+      // Cross-check actual downloaded bytes against Java's second readback.
+      // This is independent from the Javascript MDB viewer, which in Safari
+      // sometimes reports "no forestry" for a Java-verified Jet file.
+      await verifyJavaReceipt(blob, output, transfer);
+      let file;
+      let browserReadWarning = false;
+      try {
+        file = await confirmOutput(blob, transfer);
+      } catch(error) {
+        if (!/В файле не указано ни одного лесничества/.test(String(error?.message))) throw error;
+        browserReadWarning = true;
+        file = new File([blob], nameOf(transfer.identity), {type:'application/vnd.ms-access'});
+      }
       if (downloadUrl) URL.revokeObjectURL(downloadUrl);
       downloadUrl = URL.createObjectURL(file);
       message('MDB готов к сохранению',
         '<p><b>' + esc(file.name) + '</b></p>' +
-        '<p>Создан MDB из встроенной пустой структуры Transfer; записанные таблицы проверены. Сохраните её в «Файлы», ' +
-        'на флешку или отправьте на компьютер.</p>' +
+        (browserReadWarning
+          ? '<p role="alert"><b>Тестовый MDB:</b> Java проверила таблицы и файл, ' +
+            'а просмотрщик Safari не распознал строку лесничества. Файл можно сохранить ' +
+            'для проверки в настольном SOLI-N только на резервной базе. Совместимость пока не подтверждена.</p>'
+          : '<p>Создан настоящий Access MDB; данные повторно прочитаны. ' +
+            'Сохраните файл в «Файлы» или передайте на компьютер.</p>') +
         '<div id="solin-direct-mdb-save"></div>' +
         '<button type="button" onclick="closeModal()">Закрыть</button>');
       const host = document.getElementById('solin-direct-mdb-save');
