@@ -50,27 +50,15 @@
     }
     return btoa(text);
   }
-  function selectTemplate(snapshot) {
-    const id=snapshot.identity,key=keyOf(id);
-    modal('Исходный MDB для экспорта',
-      '<p>Один раз выберите оригинальный <b>Transf_'+esc(id.POS)+'_'+esc(id.LESN)+'_'+esc(id.GodT)+'.mdb</b> на телефоне. '+
-      'Приложение сохранит этот файл <b>локально</b> для дальнейшего экспорта. Исходный файл не изменится.</p>'+
-      '<input id="solin-source-mdb" type="file" accept=".mdb,application/vnd.ms-access" style="width:100%">'+
-      '<p role="alert" id="solin-template-error"></p>'+
-      '<button type="button" onclick="closeModal()">Отмена</button>');
-    const chooser=document.getElementById('solin-source-mdb');
-    chooser.onchange=async()=>{
-      const file=chooser.files?.[0];if(!file)return;
-      try{
-        if(file.size>12_000_000)throw Error('Файл больше 12 МБ. Нужно расширить лимит конвертера.');
-        const bytes=await file.arrayBuffer();
-        if(!isJet(bytes))throw Error('Это не файл Microsoft Access Jet MDB.');
-        await saveStored(key,{name:file.name,bytes});
-        await exportMDB();
-      }catch(e){const error=document.getElementById('solin-template-error');
-        if(error)error.textContent=e.message;
-        else alert(e.message);}
-    };
+  async function packagedTemplate() {
+    // Shipped as a validated, data-free 18-table Jet MDB app asset.
+    // Never ask field staff to upload or select a source database.
+    const response = await fetch('./vendor/solin-empty-transfer-v20261028-23.mdb');
+    if (!response.ok) throw Error('В сборке APK отсутствует пустой MDB-шаблон.');
+    const bytes = await response.arrayBuffer();
+    if (bytes.byteLength<1024 || bytes.byteLength>12000000 || !isJet(bytes))
+      throw Error('Встроенный MDB-шаблон повреждён.');
+    return bytes;
   }
   async function exportMDB(){
     const b=button();
@@ -91,12 +79,10 @@
       await window.SolinWorkspace?.persist?.();
       const transfer=window.SolinMDBBridge?.snapshot?.();
       if(!transfer||transfer.format!=='SOLIN-MDB-Bridge-v1')throw Error('Не удалось собрать карточки Transfer.');
-      const stored=await readStored(keyOf(transfer.identity));
-      if(!stored){selectTemplate(transfer);return;}
-      if(!isJet(stored.bytes)){throw Error('Локальный MDB-шаблон повреждён. Удалите и выберите его заново.');}
+      const blank = await packagedTemplate();
       modal('Экспорт MDB','<p>Создаю MDB на телефоне. После проверки откроется выбор папки для сохранения.</p>');
       await plugin().export({
-        templateBase64:base64(stored.bytes),
+        templateBase64:base64(blank),
         transferJson:JSON.stringify(transfer)
       });
       modal('Экспорт завершён',
