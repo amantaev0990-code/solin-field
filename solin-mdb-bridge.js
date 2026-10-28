@@ -140,15 +140,37 @@
       if (button) button.disabled = false;
     }
   }
+  // Keep the «Ещё» page uncluttered: exactly one top-level export button.
   function addButton() {
     const host = document.querySelector('#menuScreen .workspace');
-    if (!host || document.getElementById('solin-mdb-export')) return;
-    const button = document.createElement('button');
-    button.id = 'solin-mdb-export'; button.className = 'menuRow'; button.type = 'button';
-    button.innerHTML = '<span><b>Экспорт для MDB (Windows)</b><small>ZIP для создания настоящего MDB на компьютере</small></span><span>⇩</span>';
-    button.addEventListener('click', exportForWindows);
-    const oldButton = [...host.querySelectorAll('button')].find(x => /Экспорт Transfer/.test(x.textContent));
-    if (oldButton) oldButton.insertAdjacentElement('afterend', button); else host.append(button);
+    if (!host) return;
+    let button = document.getElementById('solin-mdb-export');
+    if (!button) {
+      button = document.createElement('button');
+      button.id = 'solin-mdb-export'; button.className = 'menuRow'; button.type = 'button';
+      host.querySelector('h2')?.after(button);
+    }
+    button.innerHTML = '<span><b>Экспорт</b><small>Передача данных в настольный SOLI-N</small></span><span>⇩</span>';
+    // Remove stale menu entries from older cached versions without deleting their underlying data.
+    for (const other of host.querySelectorAll(':scope > .menuRow')) {
+      if (other === button) continue;
+      if (/экспорт|скачать локальные данные JSON/i.test(other.textContent)) other.remove();
+    }
+    button.onclick = () => {
+      let payload;
+      try { payload = snapshot(); }
+      catch (error) { if (typeof toast === 'function') toast(error.message); else alert(error.message); return; }
+      const n = Object.values(payload.counts).reduce((sum, count) => sum + count, 0);
+      if (typeof openModal !== 'function') { exportForWindows(); return; }
+      openModal('Экспорт данных',
+        '<p><b>' + String(payload.forest).replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</b></p>' +
+        '<p>Подготовлено ' + Object.keys(payload.tables).length + ' таблиц и ' + n + ' записей.</p>' +
+        '<p><b>Важно:</b> в веб-версии пока невозможно создать настоящий MDB непосредственно на телефоне. ' +
+        'Сейчас доступен ZIP-пакет для последующего преобразования в MDB на Windows с оригинальным Transfer.</p>' +
+        '<div class="formActions"><button type="button" onclick="closeModal()">Отмена</button>' +
+        '<button type="button" id="solin-export-confirm" class="primary">Скачать пакет для MDB</button></div>');
+      document.querySelector('#solin-export-confirm')?.addEventListener('click', exportForWindows);
+    };
   }
   window.SolinMDBBridge = { snapshot, exportForWindows, instructions };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', addButton);
