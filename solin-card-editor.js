@@ -45,7 +45,15 @@ function input(form,field,value,scope,index){
  el.id=id;el.dataset.ceField=field;el.dataset.ceScope=scope;el.dataset.ceForm=form;
  el.setAttribute('aria-label',caption);el.removeAttribute('data-wffield');
  if(index!=null)el.dataset.ceRow=index;
- if(el.tagName==='SELECT')for(const option of el.options){option.title=option.textContent;option.textContent=option.value;}
+ if(el.tagName==='SELECT')for(const option of el.options){
+   const description=option.textContent.trim();
+   option.title=description;
+   // In original Access the expanded list shows a code *and* its meaning.
+   // Leave the actual option.value unchanged for Transfer/MDB compatibility.
+   option.textContent=option.value
+      ? option.value+(description&&description!==option.value?' — '+description:'')
+      : '—';
+ }
  else{el.placeholder=numeric.has(field)?'0':'';if(numeric.has(field))el.inputMode='decimal';}
  return label.outerHTML;
 }
