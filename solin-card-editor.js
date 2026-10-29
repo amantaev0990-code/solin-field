@@ -65,7 +65,7 @@ function cell(field,value,scope='base',form='ВыделВ',opts={}){const name=o
 function fixed(label,value,width,opts={}){return '<div class="dt-fixed'+(opts.inline?' dt-inline':'')+'"'+(width?' style="width:'+width+'px"':'')+'>'+(label?'<span>'+h(label)+'</span>':'')+'<input readonly aria-label="'+h(label||opts.aria||'')+'" value="'+h(value??'')+'"'+(opts.unavailable?' title="Поле пока недоступно для редактирования"':'')+'></div>';}
 function maket(n,body){return '<section class="dt-section" id="ce-section-'+n+'" aria-label="Макет '+n+'"><b class="dt-maket">'+(n==='31'?'Подрост<br>':n==='32'?'Подлесок<br>':'')+'Макет '+n+'</b><div class="dt-fields">'+body+'</div></section>';}
 function block(number,name,body){return '<section class="dt-section" id="ce-section-'+number+'" aria-label="Макет '+number+'">'+body+'</section>';}
-function newTableRow(form){return Object.fromEntries((D.transfSchema[form]||[]).map(f=>[f,keys.includes(f)?session.draft[f]??null:numeric.has(f)?0:form==='Макет10'&&f==='IAR'?1:form==='Макет10'&&f==='PROI'?0:null]));}
+function newTableRow(form){return Object.fromEntries((D.transfSchema[form]||[]).map(f=>[f,keys.includes(f)?session.draft[f]??null:numeric.has(f)?0:form==='Макет10'&&f==='IAR'?(window.SolinDependentRules?.allowedLayers(session.draft,window.SOLIN_REFS?.tables)?.items?.[0]?.value??null):form==='Макет10'&&f==='PROI'?0:null]));}
 function table(form){const rs=session.draft._children[form]||[],schema=(D.transfSchema[form]||[]).filter(f=>!keys.includes(f)),shown=rs.length?rs:[newTableRow(form)];
  const m10=form==='Макет10';
  return '<div class="ce-table-wrap" tabindex="0" aria-label="Таблица '+h(form)+'"><table class="ce-table"><caption class="ce-sr-only">'+h(form)+' — '+h(SolinHuman.formName(form))+'</caption><colgroup><col style="width:24px">'+schema.map(f=>'<col'+(m10?' style="width:'+({IAR:145,KOEF:85,POR:190,LET:55,PH:55,PD2:55,KT:70,PROI:160,POL:80,SPS:75,ZAP:110}[f]||90)+'px"':'')+'>').join('')+'</colgroup><thead><tr><th scope="col"></th>'+schema.map(f=>'<th scope="col">'+h(m10?desktopLabels[f]:SolinHuman.label(form,f))+'</th>').join('')+'</tr></thead><tbody>'+shown.map((row,i)=>'<tr'+(!rs.length?' data-ce-placeholder="true"':'')+'><th scope="row" tabindex="0" data-ce-select="'+i+'" data-ce-select-form="'+h(form)+'" aria-label="Запись '+(i+1)+'">'+(i===0?'►':'')+'</th>'+schema.map(f=>'<td>'+input(form,f,row[f],form,i)+'</td>').join('')+'</tr>').join('')+'</tbody></table></div><div class="dt-record-nav"><span>Запись: </span><button type="button" data-ce-record="first" data-ce-table="'+form+'" aria-label="Первая запись">|◀</button><button type="button" data-ce-record="previous" data-ce-table="'+form+'" aria-label="Предыдущая запись">◀</button><span data-ce-count="'+form+'">'+(rs.length?'1 из '+rs.length:'Новая')+'</span><button type="button" data-ce-record="next" data-ce-table="'+form+'" aria-label="Следующая запись">▶</button><button type="button" data-ce-record="last" data-ce-table="'+form+'" aria-label="Последняя запись">▶|</button><button type="button" data-ce-add="'+form+'" aria-label="Добавить запись">▶*</button><button type="button" data-ce-delete="'+form+'" data-ce-index="0" aria-label="Удалить выбранную запись">×</button></div>';
@@ -77,6 +77,7 @@ function markup(){const s=session,r=s.draft,o=D.lesnichestvo?.find(x=>same(x.POS
  return '<form id="ce-form" novalidate><div class="dt-toolbar"><div class="dt-zoom-controls"><span>Масштаб</span><button type="button" data-ce-zoom="out" aria-label="Уменьшить">−</button><output id="ce-zoom">100%</output><button type="button" data-ce-zoom="in" aria-label="Увеличить">+</button><button type="button" data-ce-zoom="fit">По ширине</button><button type="button" data-ce-zoom="actual">100%</button></div><span class="dt-toolbar-spacer"></span><div class="dt-tools"><button type="button" data-ce-support>Поля…</button><button type="button" data-ce-makets>Макеты</button><button type="button" data-ce-controls="">Контроль</button><button type="submit" id="ce-save">Сохранить</button><button type="button" id="ce-cancel">Отмена</button><span id="ce-status" role="status">'+(s.isNew?'Новая':'')+'</span></div></div>'+
  '<div class="dt-viewport" aria-label="Настольная карточка. Прокрутка по горизонтали и вертикали" tabindex="0"><div class="dt-stage"><div class="dt-board" data-desktop-width="1200"><div id="ce-main"><header class="dt-header"><div class="ce-summary"><h2>Карточка таксации</h2></div><div class="dt-counters"><span>Выделов всего;</span>'+fixed('',stands.length,42,{aria:'Выделов всего'})+'<span>последний</span>'+fixed('',stands.length?Math.max(...stands.map(x=>Number(x.VD)||0)):'',48,{aria:'Последний выдел'})+'</div><div class="dt-owner"><span>Лесовладелец</span>'+fixed('',r.POS,42,{aria:'Код лесовладельца'})+fixed('',o.NLX,520,{aria:'Лесовладелец'})+'<span>Лесничество</span>'+fixed('',r.LESN,40,{aria:'Номер лесничества'})+fixed('',o.NOS,304,{aria:'Лесничество'})+'</div><div class="dt-category"><span>Категория ГЛФ</span>'+fixed('',r.KGLF,42,{aria:'Категория ГЛФ, код'})+fixed('',description('ВыделВ','KGLF',r.KGLF),745,{aria:'Категория ГЛФ'})+cell('Fzona',r.Fzona,'base','ВыделВ',{label:'Функ. зона',inline:true,split:true})+'</div><div class="dt-quarter"><span>Квартал</span>'+fixed('',r.KV,38,{aria:'Квартал'})+cell('GodT',s.quarter.GodT,'quarter','Квартал',{label:'Год таксации',inline:true})+cell('Rel',s.quarter.Rel,'quarter','Квартал',{label:'Рельеф',inline:true,split:true})+cell('Dost',s.quarter.Dost,'quarter','Квартал',{label:'Доступность',inline:true,split:true})+cell('KlxrVD',r.KlxrVD,'base','ВыделВ',{label:false,split:true})+'</div></header>'+
  '<section class="dt-base" aria-label="Выдел и категория угодий">'+(s.isNew?cell('VD',r.VD,'base','ВыделВ',{label:'Выдел',weight:.45}):fixed('Выдел',r.VD,42))+cell('PLV',r.PLV,'base','ВыделВ',{label:'Площадь',weight:.65})+cell('KU',r.KU,'base','ВыделВ',{label:'Категория угодий',weight:3.2,split:true})+cell('CR',r.CR,'base','ВыделВ',{label:'Способ рубки',weight:1.9,split:true})+fixed('Памятник, заказник','',235,{unavailable:true})+fixed('Арендатор','',220,{unavailable:true})+'</section>'+
+ '<div id="ce-category-guidance" class="ce-category-guidance" role="status" aria-live="polite">Допустимые ярусы будут показаны после выбора категории угодий.</div>'+ 
  maket('1',cell('OZU',r.OZU,'base','ВыделВ',{label:'Особозащитный участок',weight:3.2,split:true})+cell('CkEk',r.CkEk,'base','ВыделВ',{label:'Склон - экспозиция',weight:1.7,split:true})+cell('CkKr',r.CkKr,'base','ВыделВ',{label:'крутизна',weight:.65})+cell('VNUM',r.VNUM,'base','ВыделВ',{label:'ВНУМ',weight:.65})+cell('ErV',r.ErV,'base','ВыделВ',{label:'Эрозия - вид',weight:1.6,split:true})+cell('ErCt',r.ErCt,'base','ВыделВ',{label:'степень',weight:1.5,split:true}))+
  maket('2',cell('M2PM1',r.M2PM1,'base','ВыделВ',{label:'Первое мероприятие',weight:3.1,split:true})+cell('M2Pr',r.M2Pr,'base','ВыделВ',{label:'Процент',weight:.55})+cell('M22',r.M22,'base','ВыделВ',{label:'Второе мероприятие',weight:2.6,split:true})+cell('M23',r.M23,'base','ВыделВ',{label:'Третье мероприятие',weight:2.6,split:true})+cell('M2Cp',r.M2Cp,'base','ВыделВ',{label:'Целевая порода',weight:2.2,split:true}))+
  maket('3',cell('M3Pr',r.M3Pr,'base','ВыделВ',{label:'Главная порода',weight:3,split:true})+cell('M3B',r.M3B,'base','ВыделВ',{label:'Бонитет',weight:.6})+cell('M3TLU',r.M3TLU,'base','ВыделВ',{label:'Характеристика типа леса',weight:3.3,split:true})+cell('M3G',r.M3G,'base','ВыделВ',{label:'Год выруб.',weight:.75})+cell('M3KP',r.M3KP,'base','ВыделВ',{label:'Пней всего, шт.',weight:.9})+cell('M3KPC',r.M3KPC,'base','ВыделВ',{label:'в т.ч. хвойных',weight:.9}))+
@@ -108,6 +109,17 @@ function linkedOptions(el){
 }
 function refreshLinked(){
  if(!session||!window.SolinDependentRules)return;
+ const guide=document.getElementById('ce-category-guidance');
+ if(guide){
+  const info=window.SolinDependentRules.allowedLayers(session.draft,window.SOLIN_REFS?.tables);
+  guide.textContent=info.status==='complete'?
+   'Категория «'+(info.categoryName||session.draft.KU)+'»: '+(info.items.length?
+    'допустимые ярусы — '+info.items.map(x=>x.value+' '+x.label).join('; '):
+    'для этой категории ярусы древостоя не предусмотрены'):
+   (info.reason||'Не удалось определить допустимые ярусы');
+  guide.dataset.ceCategoryStatus=info.status;
+ }
+
  for(const el of document.querySelectorAll('#ce-form select[data-ce-field]')){
   const result=linkedOptions(el);
   if(!result)continue;
@@ -182,6 +194,21 @@ function linkedIssues(){
   const result=engine.options('Квартал','Klxr',session.quarter,base,linkedOrg());
   if(engine.currentIsAllowed(session.quarter.Klxr,result)===false)
    return {message:'Лесохозяйственная зона квартала не соответствует выбранной природной зоне.',form:'Квартал',scope:'quarter',field:'Klxr'};
+ }
+ // Category KU determines permitted Maket 10 strata via SKU.P10 → SIAR.Ia.
+ // Validate only when KU was changed or the Maket 10 itself was edited,
+ // so unrelated edits to historical imported cards stay untouched.
+ if(session.isNew||changed(base,before,['KU'])||session.changedMakets.has('Макет10')){
+  const forestLayers=engine.allowedLayers(base,window.SOLIN_REFS?.tables);
+  if(forestLayers.status==='complete'){
+   const layers=base._children?.Макет10||[];
+   for(let i=0;i<layers.length;i++){
+    const layer=layers[i]?.IAR;
+    if(layer==null||String(layer)==='0'||String(layer)==='')continue;
+    if(engine.currentIsAllowed(layer,forestLayers)===false)
+     return {message:'Ярус '+layer+' не допускается для категории угодий «'+(forestLayers.categoryName||base.KU)+'». Выберите допустимый ярус в макете 10.',form:'Макет10',scope:'Макет10',field:'IAR',index:i};
+   }
+  }
  }
  // Original maket 12 SBR RowSource excludes repeated first/second damage code.
  if(session.changedMakets.has('Макет12')){
