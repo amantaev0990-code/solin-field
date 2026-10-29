@@ -41,6 +41,29 @@ function forestTypes(card,org,refs=ref()){
   'В данном сочетании STL имеет одну группу; NE2A в карточке не заполнено';
  return {status,reason,items,group,zone,area,groups};
 }
+// Original ВыделВ.KU rowsource contains SKU.P10 (position 5) and
+// Макет10.IAR RowSource uses SIAR.Ia = Forms!ВыделВ!NM1.
+// P10 is the category-level IAR group; zero means no tree layers.
+function landCategory(card,refs=ref()){
+ if(!filled(card?.KU))return {status:'waiting',reason:'Сначала укажите категорию угодий'};
+ if(!refs?.SKU)return {status:'unavailable',reason:'Справочник категорий SKU недоступен'};
+ const found=refs.SKU.find(r=>same(r.KU,card.KU));
+ if(!found)return {status:'unknown',reason:'Категория угодий отсутствует в SKU'};
+ const group=num(found.P10);
+ if(group===null)return {status:'unknown',reason:'Для категории не определена группа ярусов P10'};
+ return {status:'complete',category:String(found.KU),name:String(found.NKU??''),group,maketGroup:num(found.GrMak),forestGroup:num(found.KLF)};
+}
+function allowedLayers(card,refs=ref()){
+ const c=landCategory(card,refs);
+ if(c.status!=='complete')return {...c,items:[]};
+ if(!refs?.SIAR?.length||!refs?.PIAP?.length)
+  return {status:'unavailable',reason:'Не загружены исходные таблицы SIAR / PIAP',items:[]};
+ const joined=new Set(refs.PIAP.filter(r=>filled(r.KIAR)).map(r=>code(r.KIAR)));
+ const items=refs.SIAR.filter(r=>same(r.Ia,c.group)&&joined.has(code(r.KIAR))&&filled(r.NIAR))
+  .map(r=>({value:String(r.KIAR),label:String(r.NIAR)}));
+ return {status:'complete',reason:'Группа P10='+c.group+' категории «'+c.name+'» → SIAR.Ia → PIAP.KIAR',
+  items,category:c.category,categoryName:c.name,group:c.group,notApplicable:c.group===0};
+}
 function suggestedOrigin(species,refs=ref()){
  const physical=(refs?.SDP||[]).find(r=>same(r.KPC,species));
  if(!physical||!filled(physical['ОбПор']))return null;
@@ -54,6 +77,7 @@ function distinctOptions(table,field,allowed,excluded=[]){
  return (table||[]).filter(r=>allowed(r)&&!excluded.some(v=>filled(v)&&same(r[field],v)));
 }
 function options(form,field,row,card,org,refs=ref()){
+ if(form==='Макет10'&&field==='IAR')return allowedLayers(card,refs);
  if(form==='ВыделВ'&&field==='M3TLU'){
   const r=forestTypes(card,org,refs);
   return {status:r.status,reason:r.reason,items:r.items};
@@ -126,5 +150,5 @@ function currentIsAllowed(value,result){
  if(code(value)==='0' && !result.items.some(r=>same(r.value,0)))return null;
  return result.items.some(r=>same(r.value,value));
 }
-window.SolinDependentRules={forestTypes,options,currentIsAllowed,region,speciesGroup,suggestedOrigin};
+window.SolinDependentRules={forestTypes,options,currentIsAllowed,region,speciesGroup,suggestedOrigin,landCategory,allowedLayers};
 })();
