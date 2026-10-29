@@ -18,13 +18,13 @@ try{
  await page.locator('#modalProbe').fill('работает');
  assert.equal(await page.locator('#modalProbe').inputValue(),'работает');
  await page.locator('#modal .modalHead .close').click();
- await page.locator('#modal.hidden').waitFor();
+ await page.locator('#modal').waitFor({state:'hidden'});
  await page.evaluate(()=>openModal('Escape','<input aria-label="escape-test">'));
  await page.keyboard.press('Escape');
- await page.locator('#modal.hidden').waitFor();
+ await page.locator('#modal').waitFor({state:'hidden'});
  await page.evaluate(()=>openModal('Backdrop','<input aria-label="backdrop-test">'));
  await page.locator('#modal').click({position:{x:2,y:2}});
- await page.locator('#modal.hidden').waitFor();
+ await page.locator('#modal').waitFor({state:'hidden'});
 
  // Simulate map/control sheet that used to cover dialogs with z-index 900.
  await page.evaluate(()=>{
@@ -53,7 +53,7 @@ try{
  const changed=await page.locator('#newCompKGLF option').count();
  assert.ok(changed>=1,'KGLF options must update for the selected quarter');
  await page.locator('#modal .modalHead .close').click();
- await page.locator('#modal.hidden').waitFor();
+ await page.locator('#modal').waitFor({state:'hidden'});
  assert.ok(!errors.length,'Browser errors: '+errors.join('; '));
  console.log('MODALS_WEBKIT_OK: native quarter selector, typing, header X, Escape, backdrop, and higher stacking');
  await context.close();
