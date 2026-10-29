@@ -63,6 +63,18 @@ function options(form,field,row,card,org,refs=ref()){
   if(!filled(row.Kpz))return {status:'waiting',reason:'Выберите природную зону квартала',items:[]};
   return {status:'complete',reason:'Секции Slxr зависят от природной зоны квартала',items:refs.Slxr.filter(r=>filled(r.Klxz)&&same(r.Kpz,row.Kpz)&&!same(r.Klxz,0)).map(r=>({value:String(r.Klxz),label:String(r.Nlxr||'')}))};
  }
+ if(form==='Макет16'&&field==='Por16'&&refs.SDP){
+  // Original RowSource reads Maket10Выд.POR for this same stand.
+  const stems=card?._children?.['Макет10']||[],used=new Set(stems.map(r=>code(r.POR)).filter(Boolean));
+  if(!used.size)return {status:'waiting',reason:'Сначала укажите состав древостоя в макете 10',items:[]};
+  return {status:'complete',reason:'Породы макета 16 берутся из древостоя этого выдела',items:[...used].map(k=>({value:k,label:refs.SDP.find(r=>same(r.KPC,k))?.NDP||k}))};
+ }
+ if(form==='Макет12'&&['SV','SB'].includes(field)&&refs.SSP){
+  const level=field==='SV'&&same(row.KTP,84)?1:0;
+  return {status:'complete',reason:field==='SV'?'Степень повреждения зависит от типа повреждения (84 / другое)':'Вторая степень по группе K84=0',
+   items:refs.SSP.filter(r=>filled(r.KSP)&&(field==='SV'?same(r.KSP,0)||num(r.K84)===level:num(r.K84)===0))
+    .map(r=>({value:String(r.KSP),label:String(r.NSP||'')}))};
+ }
  if(form==='Макет12'&&['VV','VB'].includes(field)&&refs.SBR){
   const exclude=field==='VV'?row.VB:row.VV;
   // Access also filters by computed Признак; its origin is not proven here.
