@@ -21,3 +21,15 @@
 /* Context from original SKU.P10 / SIAR.Ia / PIAP.KIAR (informative, not persisted). */
 .ce-category-guidance{display:block;box-sizing:border-box;width:100%;padding:6px 12px;background:#f2f5ee;color:#305138;border-top:1px solid #ced5c6;border-bottom:1px solid #ced5c6;font:12px/1.35 Arial,sans-serif;overflow-wrap:anywhere}
 .ce-category-guidance[data-ce-category-status="unavailable"],.ce-category-guidance[data-ce-category-status="unknown"]{color:#694d25;background:#faf5eb}
+
+/* SOLI-N K58 / Maket10ZAP: original vs corrected values; scrollable on iPhone. */
+.ce-calc-notice{display:block;box-sizing:border-box;max-width:100%;padding:10px 13px;border:1px solid #b9c8ba;background:#f8faf6;color:#223d2c;font:12px/1.45 Arial,sans-serif}
+.ce-calc-notice[hidden]{display:none!important}
+.ce-calc-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ce-calc-heading strong{font-size:13px}
+.ce-calc-heading button{min-width:32px;min-height:30px;border:1px solid #a2b6a4;border-radius:5px;background:white;cursor:pointer}
+.ce-calc-notice p{margin:6px 0 8px;line-height:1.5}
+.ce-calc-table-wrap{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.ce-calc-table-wrap table{width:100%;border-collapse:collapse;min-width:560px;text-align:left;font-size:12px}
+.ce-calc-table-wrap th,.ce-calc-table-wrap td{border:1px solid #c9d6ca;padding:6px 8px;vertical-align:top;white-space:normal}
+.ce-calc-table-wrap th{background:#e9f1e7;font-weight:700}
