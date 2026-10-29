@@ -57,7 +57,8 @@ async function importFile(file){if(!file)return;openModal('Чтение Transfer
 function bind(){document.querySelector('#newForestButton').onclick=newForest;// A real full-size file input sits over the visual Transfer button.
  // This avoids iOS/Safari rejecting a scripted click on a hidden input.
  const nativePicker=document.querySelector('#transferForestInput');
- document.querySelector('#importForestButton').onclick=()=>nativePicker.click(); // keyboard/legacy fallback
+ // The native input is inside the styled label. The physical tap goes to the input,
+ // so no synthetic click is needed (and no duplicate chooser can be opened).
  nativePicker.onchange=e=>{
    const file=e.currentTarget.files?.[0];
    e.currentTarget.value=''; // selecting the same MDB again must still fire change
