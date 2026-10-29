@@ -185,6 +185,25 @@ function linkedIssues(){
     return {message:'Макет 12: второй вредитель или болезнь не должен повторять первый код.',form:'Макет12',scope:'Макет12',field:'VB',index:i};
   }
  }
+ // Native dependencies also apply to the additional maket rows, and a
+ // changed Maket 10 species must not leave Maket 16 linked to another tree.
+ for(const form of ['Макет12','Макет16']){
+  const active=session.changedMakets.has(form)||(form==='Макет16'&&session.changedMakets.has('Макет10'));
+  if(!active)continue;
+  const rows=base._children?.[form]||[],oldRows=before._children?.[form]||[];
+  const dependencies=form==='Макет12'?{SV:['KTP','SV'],SB:['SB'],VV:['VV','VB'],VB:['VV','VB']}:{Por16:['Por16']};
+  for(let i=0;i<rows.length;i++){
+   for(const [field,upstream] of Object.entries(dependencies)){
+    const relevant=form==='Макет16'&&session.changedMakets.has('Макет10')||
+      session.isNew||changed(rows[i],oldRows[i],upstream);
+    if(!relevant||rows[i][field]==null||String(rows[i][field]).trim()==='')continue;
+    const result=engine.options(form,field,rows[i],base,linkedOrg());
+    if(form==='Макет16'&&result?.status==='waiting'||
+      engine.currentIsAllowed(rows[i][field],result)===false&&String(rows[i][field])!=='0')
+     return {message:form+': «'+title(form,field)+'» не согласовано с предыдущими данными карточки.',form,scope:form,field,index:i};
+   }
+  }
+ }
  // For maket 23 restrict repeated and out-of-order codes only after editing.
  for(const [form,rows] of Object.entries(base._children||{})){
   if(form!=='Макет23'||!session.changedMakets.has(form))continue;
