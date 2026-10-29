@@ -19,6 +19,27 @@ const result=calc.corrections(card,refs);
 assert.deepEqual(Array.from(result.issues,x=>x.field),['M3B','STUR1','STUR']);
 assert.deepEqual(Array.from(result.issues,x=>String(x.expected)),['4','40','80']);
 assert.equal(JSON.stringify(card),snapshot,'Calculations must never mutate saved or draft data');
+// K59 physical stage has 58 rows, including a V species row with
+// height 6, POL approx 0.6, table v6=59 => ZAP=35.
+const stockRefs={Szap:[{Obl:150000000,LXZ:8,KUL:'.',p1:'В',v6:59}],SzapCK:[]};
+const k59Card={POS:213,LESN:1,KV:6,KGLF:26,VD:'2',M3Pr:'В',KlxrVD:8,KU:2,PLV:2,STUR1:99,STUR:198,
+ _children:{Макет10:[{POS:213,LESN:1,KV:6,KGLF:26,VD:'2',IAR:1,POR:'В',POL:0.6000000238418579,KOEF:10,PH:6,ZAP:99}]}};
+const k59Snapshot=JSON.stringify(k59Card);
+const original=calc.stockPerHectare(k59Card,stockRefs,{KTO:150000000});
+assert.equal(original.status,'complete');
+assert.equal(original.expected,35);
+assert.equal(original.index,0);
+const cascaded=calc.corrections(k59Card,stockRefs,{KTO:150000000});
+assert.deepEqual(Array.from(cascaded.issues,x=>x.field),['ZAP','STUR1','STUR']);
+assert.deepEqual(Array.from(cascaded.issues,x=>x.expected),[35,35,70]);
+assert.equal(JSON.stringify(k59Card),k59Snapshot,'K59 corrections must not modify source data');
+assert.equal(calc.stockPerHectare(k59Card,stockRefs,null).status,'waiting');
+assert.equal(calc.stockPerHectare({...k59Card,KU:21},stockRefs,{KTO:150000000}).status,'not-applicable');
+assert.equal(calc.stockPerHectare(k59Card,{Szap:[stockRefs.Szap[0],stockRefs.Szap[0]]},{KTO:150000000}).status,'ambiguous');
+assert.equal(calc.stockPerHectare({...k59Card,_children:{Макет10:[...k59Card._children.Макет10,{...k59Card._children.Макет10[0],PH:8}]}},stockRefs,{KTO:150000000}).status,'ambiguous');
+const wrongForest={...k59Card,LESN:2};
+assert.equal(calc.stockPerHectare(wrongForest,stockRefs,{KTO:150000000}).status,'waiting');
+
 assert.equal(calc.bonitet({...card,KU:21},refs).status,'not-applicable');
 assert.equal(calc.standStock({...card,KU:21}).status,'not-applicable');
 assert.equal(calc.bonitet({...card,M3Pr:'Б'},refs).status,'waiting');
@@ -39,4 +60,4 @@ assert.match(editor,/recalculateEditedField\(e\.target\)/);
 assert.match(editor,/Введено впервые/);
 assert.match(editor,/Пересчитано · не сохранено/);
 assert.match(editor,/const changed=\(row,prior,names\)/);
-console.log('K58_AND_STOCK_OK: 43-row historical bonitet fixture, stock preview, typed correction banner, no data mutation');
+console.log('K58_AND_STOCK_OK: 43-row historical bonitet fixture, K59 table-backed ZAP and STUR previews, typed correction banner, no data mutation');
