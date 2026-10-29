@@ -8,7 +8,7 @@
  function host(){return document.querySelector('.ce-modal .modalCard');}
  function layer(){const parent=host();if(!parent)return null;let el=parent.querySelector('#ce-assist');if(!el){el=document.createElement('div');el.id='ce-assist';el.className='ce-assist-overlay';el.hidden=true;el.setAttribute('role','dialog');el.setAttribute('aria-modal','true');el.setAttribute('aria-label','Удобное редактирование карточки');parent.append(el);}return el;}
  function mount(title,body,back){const el=layer();if(!el)return;el.hidden=false;el.innerHTML='<div class="ce-assist-panel"><header class="ce-assist-head"><button type="button" data-ce-assist-back aria-label="Назад">‹</button><strong>'+h(title)+'</strong><button type="button" data-ce-assist-close aria-label="Закрыть">×</button></header><div class="ce-assist-content">'+body+'</div></div>';el.dataset.back=back?'1':'0';}
- function dismiss(){const el=layer();if(el){el.hidden=true;el.replaceChildren();}state=null;}
+ function dismiss(){const el=document.getElementById('ce-assist');if(el){el.hidden=true;el.replaceChildren();}state=null;}
  function fieldLabel(el){return el.getAttribute('aria-label')||el.dataset.ceField||'Поле';}
  function locationName(el){const group=el.closest('[id^="ce-section-"]');if(group)return 'Макет '+group.id.replace('ce-section-','');return el.dataset.ceScope==='quarter'?'Квартал':'Карточка таксации';}
  function findElements(){return [...(board()?.querySelectorAll('[data-ce-field]')||[])].filter(el=>!el.closest('.ce-other')&&!el.closest('#ce-extra'));}
