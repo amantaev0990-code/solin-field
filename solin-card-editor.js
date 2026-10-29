@@ -156,6 +156,7 @@ function linkedIssues(){
  const engine=window.SolinDependentRules;
  if(!engine||!session)return null;
  const base=session.draft,before=session.original;
+ const changed=(row,prior,names)=>names.some(k=>String(row?.[k]??'')!==String(prior?.[k]??''));
  if(changed(base,before,['M3Pr'])||session.isNew){
   const speciesChoice=engine.options('ВыделВ','M3Pr',base,base,linkedOrg());
   if(engine.currentIsAllowed(base.M3Pr,speciesChoice)===false)
@@ -167,7 +168,6 @@ function linkedIssues(){
   PRP2:['PRP1','PRP2'],PRP3:['PRP1','PRP2','PRP3'],
   PLP2:['PLP1','PLP2'],PLP3:['PLP1','PLP2','PLP3']
  };
- const changed=(row,prior,names)=>names.some(k=>String(row?.[k]??'')!==String(prior?.[k]??''));
  for(const [field,deps] of Object.entries(affected)){
   if(!changed(base,before,deps)&&!session.isNew)continue;
   const result=engine.options('ВыделВ',field,base,base,linkedOrg());
