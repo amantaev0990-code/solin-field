@@ -76,6 +76,7 @@ function footer(){const routes=SOLIN_AUDIT.routes['ВыделВ']||[],buttons=ro
 }
 function markup(){const s=session,r=s.draft,o=D.lesnichestvo?.find(x=>same(x.POS,r.POS)&&same(x.LESN,r.LESN))||{},stands=D.quarters[r.KV]?.compartments.filter(x=>same(x.POS,r.POS)&&same(x.LESN,r.LESN)&&same(x.KGLF,r.KGLF))||[],known=new Set([...keys,'Fzona','PLV','KU','CR','KlxrVD',...sections.flatMap(x=>x[2])]),rest=(D.transfSchema['Выдел']||[]).filter(f=>!known.has(f));
  return '<form id="ce-form" novalidate><div class="dt-toolbar"><div class="dt-zoom-controls"><span>Масштаб</span><button type="button" data-ce-zoom="out" aria-label="Уменьшить">−</button><output id="ce-zoom">100%</output><button type="button" data-ce-zoom="in" aria-label="Увеличить">+</button><button type="button" data-ce-zoom="fit">По ширине</button><button type="button" data-ce-zoom="actual">100%</button></div><span class="dt-toolbar-spacer"></span><div class="dt-tools"><button type="button" data-ce-support>Поля…</button><button type="button" data-ce-makets>Макеты</button><button type="button" data-ce-controls="">Контроль</button><button type="submit" id="ce-save">Сохранить</button><button type="button" id="ce-cancel">Отмена</button><span id="ce-status" role="status">'+(s.isNew?'Новая':'')+'</span></div></div>'+
+ '<div id="ce-calc-notice" class="ce-calc-notice" role="status" aria-live="polite" hidden></div>'+ 
  '<div class="dt-viewport" aria-label="Настольная карточка. Прокрутка по горизонтали и вертикали" tabindex="0"><div class="dt-stage"><div class="dt-board" data-desktop-width="1200"><div id="ce-main"><header class="dt-header"><div class="ce-summary"><h2>Карточка таксации</h2></div><div class="dt-counters"><span>Выделов всего;</span>'+fixed('',stands.length,42,{aria:'Выделов всего'})+'<span>последний</span>'+fixed('',stands.length?Math.max(...stands.map(x=>Number(x.VD)||0)):'',48,{aria:'Последний выдел'})+'</div><div class="dt-owner"><span>Лесовладелец</span>'+fixed('',r.POS,42,{aria:'Код лесовладельца'})+fixed('',o.NLX,520,{aria:'Лесовладелец'})+'<span>Лесничество</span>'+fixed('',r.LESN,40,{aria:'Номер лесничества'})+fixed('',o.NOS,304,{aria:'Лесничество'})+'</div><div class="dt-category"><span>Категория ГЛФ</span>'+fixed('',r.KGLF,42,{aria:'Категория ГЛФ, код'})+fixed('',description('ВыделВ','KGLF',r.KGLF),745,{aria:'Категория ГЛФ'})+cell('Fzona',r.Fzona,'base','ВыделВ',{label:'Функ. зона',inline:true,split:true})+'</div><div class="dt-quarter"><span>Квартал</span>'+fixed('',r.KV,38,{aria:'Квартал'})+cell('GodT',s.quarter.GodT,'quarter','Квартал',{label:'Год таксации',inline:true})+cell('Rel',s.quarter.Rel,'quarter','Квартал',{label:'Рельеф',inline:true,split:true})+cell('Dost',s.quarter.Dost,'quarter','Квартал',{label:'Доступность',inline:true,split:true})+cell('KlxrVD',r.KlxrVD,'base','ВыделВ',{label:false,split:true})+'</div></header>'+
  '<section class="dt-base" aria-label="Выдел и категория угодий">'+(s.isNew?cell('VD',r.VD,'base','ВыделВ',{label:'Выдел',weight:.45}):fixed('Выдел',r.VD,42))+cell('PLV',r.PLV,'base','ВыделВ',{label:'Площадь',weight:.65})+cell('KU',r.KU,'base','ВыделВ',{label:'Категория угодий',weight:3.2,split:true})+cell('CR',r.CR,'base','ВыделВ',{label:'Способ рубки',weight:1.9,split:true})+fixed('Памятник, заказник','',235,{unavailable:true})+fixed('Арендатор','',220,{unavailable:true})+'</section>'+
  '<div id="ce-category-guidance" class="ce-category-guidance" role="status" aria-live="polite">Допустимые ярусы будут показаны после выбора категории угодий.</div>'+ 
@@ -164,6 +165,58 @@ function refreshLinked(){
    el.title='Исходный код сохранён, проверьте его по справочнику';
   }
  }
+}
+// Local draft-only correction: do not persist a replacement without Save.
+function recalculateEditedField(el){
+ const calc=window.SolinCardCalculations;
+ if(!session||!calc||!el?.dataset?.ceField)return;
+ const {ceField:field,ceScope:scope}=el.dataset;
+ const baseFields=new Set(['M3B','STUR','STUR1','KU','PLV','M3Pr']);
+ const standFields=new Set(['ZAP','IAR','POR','LET','PH','POL','PROI','KOEF']);
+ if(!(scope==='base'&&baseFields.has(field)||scope==='Макет10'&&standFields.has(field)))return;
+ // Keep malformed numeric input and its error visible instead of overwriting it.
+ if(el.getAttribute('aria-invalid')==='true')return;
+ const check=calc.corrections(session.draft,window.SOLIN_REFS?.tables);
+ const changed=[];
+ for(const issue of check.issues){
+   if(!['M3B','STUR1','STUR'].includes(issue.field))continue;
+   const prior=session.draft[issue.field];
+   // A real change in an associated field triggers the original calculation.
+   const corrected=issue.field==='M3B'?String(issue.expected):Number(issue.expected);
+   if(String(prior??'')===String(corrected))continue;
+   session.draft[issue.field]=corrected;
+   changed.push({...issue,previous:prior==null?'Не указано':String(prior),expected:String(corrected)});
+   const fieldEl=document.querySelector('#ce-form [data-ce-field="'+issue.field+'"][data-ce-scope="base"]');
+   if(fieldEl){
+     if(fieldEl.tagName==='SELECT'&&!Array.from(fieldEl.options).some(o=>o.value===String(corrected)))
+       fieldEl.add(new Option(String(corrected),String(corrected)));
+     fieldEl.value=String(corrected);
+     const output=document.querySelector('[data-ce-display-for="'+fieldEl.id+'"]');
+     if(output)output.textContent=description('ВыделВ',issue.field,corrected);
+   }
+ }
+ if(!changed.length)return;
+ session.dirty=true;
+ const status=document.getElementById('ce-status');
+ if(status)status.textContent='Пересчитано · не сохранено';
+ session.calcNotices??=[];
+ session.calcShown??=new Set();
+ const fresh=changed.filter(item=>{
+   if(session.calcShown.has(item.field))return false;
+   session.calcShown.add(item.field);return true;
+ });
+ if(!fresh.length)return;
+ session.calcNotices.push(...fresh);
+ const notice=document.getElementById('ce-calc-notice');
+ if(!notice)return;
+ notice.hidden=false;
+ notice.innerHTML='<div class="ce-calc-heading"><strong>Проверка расчётов SOLI-N · исправлено в черновике</strong>'+
+   '<button type="button" data-ce-calc-close aria-label="Скрыть таблицу расчётов">×</button></div>'+
+   '<p>Первоначальное значение не совпало с расчётом. Правильное значение уже подставлено в карточку, но <b>запись ещё не сохранена</b>.</p>'+
+   '<div class="ce-calc-table-wrap"><table><thead><tr><th>Поле</th><th>Введено впервые</th><th>Расчётное</th><th>Основание</th></tr></thead><tbody>'+
+   session.calcNotices.map(item=>'<tr><td>'+h(item.label)+'</td><td>'+h(item.previous)+'</td><td><b>'+h(item.expected)+'</b></td><td>'+h(item.reason)+'</td></tr>').join('')+
+   '</tbody></table></div>';
+ notice.scrollIntoView({block:'nearest',behavior:'smooth'});
 }
 function linkedIssues(){
  const engine=window.SolinDependentRules;
@@ -416,8 +469,16 @@ function open(record,options={}){if(!record)return;
  openModal('Карточка таксации',markup());const modal=document.querySelector('#modal');modal.classList.add('ce-modal');modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');modal.setAttribute('aria-labelledby','modalTitle');document.body.style.overflow='hidden';session.supportGrid=document.querySelector('.ce-other .ce-grid');setZoom('actual');
  modal.querySelector('.close').onclick=cancel;
  const form=document.querySelector('#ce-form');form.addEventListener('input',e=>{capture(e.target);if(e.target.dataset.ceScope?.startsWith('Макет'))session.changedMakets.add(e.target.dataset.ceScope)});
- form.addEventListener('change',e=>{if(e.target.matches('.dt-maket-select')){const n=e.target.value;e.target.value='';if(n==='10'||n==='31'||n==='32')showMain(n);else if(n)showExtra('Макет'+n);return;}capture(e.target);if(e.target.dataset.ceScope?.startsWith('Макет'))session.changedMakets.add(e.target.dataset.ceScope)});
- form.addEventListener('click',e=>{const cell=e.target.closest('[data-ce-select]');if(cell)selectRecord(cell.dataset.ceSelectForm,Number(cell.dataset.ceSelect));});
+ form.addEventListener('change',e=>{
+  if(e.target.matches('.dt-maket-select')){const n=e.target.value;e.target.value='';if(n==='10'||n==='31'||n==='32')showMain(n);else if(n)showExtra('Макет'+n);return;}
+  capture(e.target);
+  if(e.target.dataset.ceScope?.startsWith('Макет'))session.changedMakets.add(e.target.dataset.ceScope);
+  recalculateEditedField(e.target);
+ });
+ form.addEventListener('click',e=>{
+  if(e.target.closest('[data-ce-calc-close]')){const notice=document.getElementById('ce-calc-notice');if(notice)notice.hidden=true;return;}
+  const cell=e.target.closest('[data-ce-select]');if(cell)selectRecord(cell.dataset.ceSelectForm,Number(cell.dataset.ceSelect));
+ });
  refreshLinked();
  form.addEventListener('click',click);form.addEventListener('submit',save);document.querySelector('#ce-cancel').onclick=cancel;
  document.addEventListener('keydown',onKey);window.addEventListener('beforeunload',onUnload);modal.querySelector('.modalCard').scrollTop=0;modal.querySelector('.close').focus();if(options.focus)focusControlIssue(options.focus);
