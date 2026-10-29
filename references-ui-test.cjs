@@ -15,7 +15,7 @@ const server=http.createServer((req,res)=>{const rel=decodeURIComponent(req.url.
  if(process.env.TEST_OUTPUT){fs.mkdirSync(process.env.TEST_OUTPUT,{recursive:true});await page.screenshot({path:path.join(process.env.TEST_OUTPUT,'more.png')});}
  await page.evaluate(()=>{show('refsScreen');renderFriendlyRefs('')});assert(await page.locator('.refCard').count()>30);
  await page.locator('[data-reference="SPV"]>summary').click();await page.locator('[data-reference="SPV"] .human-ref-row').first().waitFor();
- const analysis=await page.locator('[data-reference="SPV"]').innerText();assert(analysis.includes('Макет 15 — Выполненные мероприятия'));assert(analysis.includes('Шифр 1'));assert(!analysis.includes('Служебные параметры'));assert(!analysis.includes('Код '));
+ const analysis=await page.locator('[data-reference="SPV"]').innerText();assert(analysis.includes('Макет 15 — Выполненные хозяйственные мероприятия'));assert(analysis.includes('Шифр 1'));assert(!analysis.includes('Служебные параметры'));assert(!analysis.includes('Код '));
  await page.locator('#refsScreen input').fill('Макет 21');assert(await page.locator('[data-reference="SOE"]').count());
  await page.locator('#refsScreen input').fill('сосна');await page.locator('.refCard>summary').first().click();await page.locator('.human-ref-row').first().waitFor();assert(/Сосн/i.test(await page.locator('#friendlyRefs').innerText()));
  await page.locator('#refsScreen input').fill('');await page.evaluate(()=>{for(const d of document.querySelectorAll('.refCard'))d.open=true});await page.waitForFunction(()=>[...document.querySelectorAll('.refCard')].every(d=>d.querySelector('.human-ref-list')));
