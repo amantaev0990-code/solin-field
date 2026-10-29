@@ -6,6 +6,7 @@ on:
       - 'solin-card-editor.js'
       - 'solin-workflow.js'
       - 'scripts/test-dependent-field-rules.cjs'
+      - 'scripts/test-category-layer-dependencies.cjs'
       - '.github/workflows/solin-dependent-card.yml'
   workflow_dispatch:
 jobs:
@@ -25,4 +26,5 @@ jobs:
       - name: Regression — forest type, species, zone, region and Access combo rules
         run: |
           node scripts/test-dependent-field-rules.cjs
+          node scripts/test-category-layer-dependencies.cjs
           node scripts/card-editor-quarter-test.cjs
