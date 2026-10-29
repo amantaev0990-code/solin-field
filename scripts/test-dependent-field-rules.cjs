@@ -23,12 +23,17 @@ const ref={
 };
 const org={KTO:150000000};
 const type=rule.forestTypes({M3Pr:'В',KlxrVD:8},org,ref);
-assert.equal(type.status,'partial');
-assert.deepEqual(Array.from(type.items,x=>x.value),['  В','ВРТЗ','ВРТ1']);
-assert.ok(type.items.every(x=>x.area===15&&x.zone===8));
-assert.equal(rule.currentIsAllowed('ВРТЗ',type),true);
-assert.equal(rule.currentIsAllowed('ВЛД',type),false);
-assert.equal(rule.currentIsAllowed('  В',type),true);
+assert.equal(type.status,'ambiguous'); // Cannot assume NE2A when several groups exist.
+assert.equal(type.items.length,0);
+assert.equal(rule.currentIsAllowed('ВРТ1',type),false);
+const onlyZero={...ref,STL:ref.STL.filter(x=>x.GrTL===0)};
+const single=rule.forestTypes({M3Pr:'В',KlxrVD:8},org,onlyZero);
+assert.equal(single.status,'partial');
+assert.deepEqual(Array.from(single.items,x=>x.value),['  В','ВРТЗ']);
+assert.ok(single.items.every(x=>x.area===15&&x.zone===8));
+assert.equal(rule.currentIsAllowed('ВРТЗ',single),true);
+assert.equal(rule.currentIsAllowed('ВЛД',single),false);
+assert.equal(rule.currentIsAllowed('  В',single),true);
 const grouped=rule.forestTypes({M3Pr:'В',KlxrVD:8,NE2A:0},org,ref);
 assert.equal(grouped.status,'complete');
 assert.deepEqual(Array.from(grouped.items,x=>x.value),['  В','ВРТЗ']);
