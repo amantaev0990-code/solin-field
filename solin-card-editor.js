@@ -236,5 +236,5 @@ function open(record,options={}){if(!record)return;
  form.addEventListener('click',click);form.addEventListener('submit',save);document.querySelector('#ce-cancel').onclick=cancel;
  document.addEventListener('keydown',onKey);window.addEventListener('beforeunload',onUnload);modal.querySelector('.modalCard').scrollTop=0;modal.querySelector('.close').focus();if(options.focus)focusControlIssue(options.focus);
 }
-window.SolinCardEditor={open};
+window.SolinCardEditor={open,resolveQuarter:quarterForRecord};
 })();
