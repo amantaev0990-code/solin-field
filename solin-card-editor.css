@@ -17,3 +17,7 @@
 .dt-zoom-controls,.dt-tools{display:flex;align-items:center;gap:5px}
 @media(max-width:700px){.ce-modal{padding:0}.ce-modal .modalCard{width:100%;height:100dvh;max-height:100dvh;border:0;border-radius:0}.ce-modal .modalHead{padding-top:calc(3px + env(safe-area-inset-top,0px));min-height:30px}.dt-toolbar{height:auto;min-height:34px;flex-wrap:wrap;overflow:visible}.dt-toolbar button{height:25px}.dt-toolbar .dt-toolbar-spacer,.dt-toolbar #ce-status{display:none}.dt-viewport{padding-bottom:env(safe-area-inset-bottom,0px)}}
 @media print{@page{size:landscape;margin:8mm}.ce-print{position:static;background:#fff;padding:0}.ce-print .dt-board{position:relative;transform:none!important;border:0}.ce-print .dt-footer,.ce-print .dt-record-nav{display:none}.ce-print button{display:none}.ce-print .dt-board input{color:#000}.ce-print .dt-board{break-inside:avoid}}
+
+/* Context from original SKU.P10 / SIAR.Ia / PIAP.KIAR (informative, not persisted). */
+.ce-category-guidance{display:block;box-sizing:border-box;width:100%;padding:6px 12px;background:#f2f5ee;color:#305138;border-top:1px solid #ced5c6;border-bottom:1px solid #ced5c6;font:12px/1.35 Arial,sans-serif;overflow-wrap:anywhere}
+.ce-category-guidance[data-ce-category-status="unavailable"],.ce-category-guidance[data-ce-category-status="unknown"]{color:#694d25;background:#faf5eb}
