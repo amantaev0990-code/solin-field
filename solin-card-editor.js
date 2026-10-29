@@ -93,6 +93,91 @@ function readValue(el,old){const raw=el.value.trim(),field=el.dataset.ceField;
  if(old!=null&&same(raw,old))return old;
  return el.tagName==='SELECT'&&typeof old==='number'&&Number.isFinite(Number(raw))?Number(raw):raw;
 }
+function linkedRow(el){
+ const scope=el.dataset.ceScope;
+ return scope==='base'?session.draft:scope==='quarter'?session.quarter:
+  session.draft._children?.[scope]?.[Number(el.dataset.ceRow)]||{};
+}
+function linkedOrg(){return D.lesnichestvo?.find(x=>same(x.POS,session.draft.POS)&&same(x.LESN,session.draft.LESN))||null;}
+function linkedOptions(el){
+ const engine=window.SolinDependentRules;
+ if(!engine||el.tagName!=='SELECT')return null;
+ return engine.options(el.dataset.ceForm,el.dataset.ceField,linkedRow(el),session.draft,linkedOrg());
+}
+function refreshLinked(){
+ if(!session||!window.SolinDependentRules)return;
+ for(const el of document.querySelectorAll('#ce-form select[data-ce-field]')){
+  const result=linkedOptions(el);
+  if(!result)continue;
+  el.title=result.reason||'';
+  if(result.status==='unavailable')continue; // Keep original list when sources missing.
+  const raw=linkedRow(el)[el.dataset.ceField];
+  const current=raw==null?'':String(raw),list=result.items||[];
+  const old=el.value;
+  const options=[new Option('— Не указано —','')];
+  for(const opt of list){
+   if(!opt.value)continue;
+   options.push(new Option(opt.value+(opt.label?' — '+opt.label:''),opt.value));
+  }
+  // Imported Access TEXT codes can contain original leading/trailing spaces.
+  // Do not rewrite a value merely by rebuilding a dropdown.
+  if(current&&!options.some(o=>o.value===current)){
+   const match=list.find(x=>String(x.value).trim()===current.trim());
+   options.push(new Option('Сохранённый код: '+current+(match?.label?' — '+match.label:''),current));
+  }
+  const signature=options.map(o=>o.value+'|'+o.textContent).join('\u241e');
+  if(el.dataset.linkedSignature!==signature){
+   el.replaceChildren(...options);
+   el.dataset.linkedSignature=signature;
+  }
+  el.value=current;
+  const cell=el.closest('.dt-cell'),output=cell?.querySelector('output[data-ce-display-for]');
+  if(output&&el.dataset.ceField==='M3TLU'){
+   const selected=list.find(o=>String(o.value).trim()===current.trim());
+   output.textContent=current?(selected?.label||'Проверьте соответствие породе и зоне'):(result.status==='waiting'?'Сначала порода':list.length+' допустимых типа леса');
+   output.title=result.reason;
+  }
+  el.dataset.linkedStatus=result.status;
+  el.dataset.linkedCount=String(list.length);
+  if(result.status==='waiting')el.title='Сначала выберите главную породу';
+  if(old!==current && current && el.value!==current){
+   el.title='Исходный код сохранён, проверьте его по справочнику';
+  }
+ }
+}
+function linkedIssues(){
+ const engine=window.SolinDependentRules;
+ if(!engine||!session)return null;
+ const base=session.draft,before=session.original;
+ const affected={
+  M3TLU:['M3Pr','M3TLU','KlxrVD','NE2A'],
+  M22:['M2PM1','M22'],M23:['M2PM1','M22','M23'],
+  PRP2:['PRP1','PRP2'],PRP3:['PRP1','PRP2','PRP3'],
+  PLP2:['PLP1','PLP2'],PLP3:['PLP1','PLP2','PLP3']
+ };
+ const changed=(row,prior,names)=>names.some(k=>String(row?.[k]??'')!==String(prior?.[k]??''));
+ for(const [field,deps] of Object.entries(affected)){
+  if(!changed(base,before,deps)&&!session.isNew)continue;
+  const result=engine.options('ВыделВ',field,base,base,linkedOrg());
+  const valid=engine.currentIsAllowed(base[field],result);
+  if(valid===false && String(base[field]??'').trim()!=='0'){
+   return {message:'Значение «'+title('ВыделВ',field)+'» не соответствует выбранной породе или предыдущим полям. Выберите значение из подходящего списка.',form:'ВыделВ',scope:'base',field};
+  }
+ }
+ // For maket 23 restrict repeated and out-of-order codes only after editing.
+ for(const [form,rows] of Object.entries(base._children||{})){
+  if(form!=='Макет23'||!session.changedMakets.has(form))continue;
+  for(let i=0;i<rows.length;i++){
+   for(let n=1;n<=8;n++){
+    const field='K'+n,result=engine.options(form,field,rows[i],base,linkedOrg());
+    const value=rows[i][field],valid=engine.currentIsAllowed(value,result);
+    if(valid===false && String(value??'').trim()!=='0')
+     return {message:'Макет 23: код '+n+' повторяется или недопустим в последовательности.',form,scope:form,field,index:i};
+   }
+  }
+ }
+ return null;
+}
 function capture(el){if(!el.matches('[data-ce-field]'))return;
  const {ceScope:scope,ceField:field,ceRow:index}=el.dataset;
  if(scope.startsWith('Макет')&&!session.draft._children[scope]?.[Number(index)]){(session.draft._children[scope]??=[]).push(newTableRow(scope));el.closest('tr')?.removeAttribute('data-ce-placeholder');session.changedMakets.add(scope);}
@@ -101,6 +186,7 @@ function capture(el){if(!el.matches('[data-ce-field]'))return;
  catch(e){el.setAttribute('aria-invalid','true');el.setCustomValidity(e.message);}
  const output=document.querySelector('[data-ce-display-for="'+el.id+'"]');if(output)output.textContent=description(el.dataset.ceForm,field,target[field]);
  session.dirty=true;document.querySelector('#ce-status').textContent='Изменено';
+ refreshLinked();
 }
 function error(message,el,location){const box=document.querySelector('#ce-error');box.textContent=message;
  if(location?.form){if(location.form.startsWith('Макет')&&location.form!=='Макет10')showExtra(location.form);else showMain();el=document.querySelector('[data-ce-scope="'+location.scope+'"][data-ce-field="'+location.field+'"]'+(location.index==null?'':'[data-ce-row="'+location.index+'"]'));}
@@ -109,7 +195,7 @@ function error(message,el,location){const box=document.querySelector('#ce-error'
  if(el?.closest('.ce-other'))showSupport();
  const target=el?.isConnected?el:box;target.closest('details')?.setAttribute('open','');target.focus();target.scrollIntoView({block:'center',inline:'center'});
 }
-function rerenderTable(form){document.getElementById('ce-table-'+form).innerHTML=table(form);}
+function rerenderTable(form){document.getElementById('ce-table-'+form).innerHTML=table(form);refreshLinked();}
 function showMain(jump){document.querySelector('#ce-main').hidden=false;document.querySelector('#ce-extra').hidden=true;
  document.querySelector('#ce-action-panel').hidden=true;
  document.querySelectorAll('[data-ce-extra]').forEach(b=>b.removeAttribute('aria-current'));
@@ -120,7 +206,7 @@ function showExtra(form){const root=document.querySelector('#ce-extra');
  document.querySelector('#ce-main').hidden=false;document.querySelector('#ce-action-panel').hidden=true;root.hidden=false;
  if(root.dataset.form!==form){root.dataset.form=form;root.innerHTML='<div class="dt-subtitle"><span>Макет '+h(form.replace('Макет',''))+' — '+h(SolinHuman.formName(form))+'</span><button type="button" data-ce-main aria-label="Закрыть макет">×</button></div><div class="dt-subbody"><div id="ce-table-'+h(form)+'">'+table(form)+'</div></div>';}
  document.querySelectorAll('[data-ce-extra]').forEach(b=>{if(b.dataset.ceExtra===form)b.setAttribute('aria-current','true');else b.removeAttribute('aria-current')});
- root.scrollIntoView({block:'nearest',inline:'nearest'});
+ refreshLinked();root.scrollIntoView({block:'nearest',inline:'nearest'});
 }
 function setZoom(value){const viewport=document.querySelector('.dt-viewport'),fit=viewport.clientWidth/DESKTOP_WIDTH;
  let scale=value==='fit'?fit:value==='actual'?1:value==='in'?(session.zoom||1)+.15:value==='out'?(session.zoom||1)-.15:Number(value);
@@ -160,6 +246,7 @@ function preview(print){const popup=window.open('','_blank');if(!popup)return to
 function newCard(e){const previous=session.draft,kv=previous.KV;if(!save(e))return;const q=D.quarters[kv],org=D.lesnichestvo?.[0]||{},r=Object.fromEntries((D.transfSchema['Выдел']||[]).map(f=>[f,null]));for(const f of numeric)if(f in r)r[f]=0;for(const f of ['CR','OZU','ErV','ErCt','M2PM1','M22','M23','PLG'])r[f]=0;Object.assign(r,{POS:previous.POS??org.POS,LESN:previous.LESN??org.LESN,KV:kv,KGLF:previous.KGLF,VD:Math.max(0,...q.compartments.filter(x=>same(x.POS,previous.POS)&&same(x.LESN,previous.LESN)&&same(x.KGLF,previous.KGLF)).map(x=>Number(x.VD)||0))+1,PLV:null,KU:null,Fzona:previous.Fzona,KlxrVD:previous.KlxrVD,_children:{},_local:true});open(r,{isNew:true});}
 function updateBadges(form){const n=session.draft._children[form]?.length||0;document.querySelectorAll('[data-ce-badge="'+form+'"]').forEach(b=>b.textContent=n||'');}
 function validate(){
+ const linkIssue=linkedIssues();if(linkIssue)throw linkIssue;
  const invalid=document.querySelector('#ce-form [aria-invalid="true"]');if(invalid)throw {message:invalid.validationMessage,el:invalid};
  if(!(Number(session.draft.PLV)>0))throw {message:'Площадь выдела должна быть больше нуля.',el:document.querySelector('[data-ce-field="PLV"]')};
  if(session.isNew){if(!Number.isInteger(Number(session.draft.VD))||Number(session.draft.VD)<1)throw {message:'Номер выдела должен быть положительным целым.',el:document.querySelector('[data-ce-field="VD"]')};if(D.quarters[session.draft.KV].compartments.some(r=>keys.every(k=>same(r[k],session.draft[k]))))throw {message:'Выдел с таким номером и категорией ГЛФ уже есть.',el:document.querySelector('[data-ce-field="VD"]')};if(session.draft.KU==null||Number(session.draft.KU)===0)throw {message:'Выберите категорию угодий.',el:document.querySelector('[data-ce-field="KU"]')};}
@@ -243,8 +330,10 @@ function open(record,options={}){if(!record)return;
  const form=document.querySelector('#ce-form');form.addEventListener('input',e=>{capture(e.target);if(e.target.dataset.ceScope?.startsWith('Макет'))session.changedMakets.add(e.target.dataset.ceScope)});
  form.addEventListener('change',e=>{if(e.target.matches('.dt-maket-select')){const n=e.target.value;e.target.value='';if(n==='10'||n==='31'||n==='32')showMain(n);else if(n)showExtra('Макет'+n);return;}capture(e.target);if(e.target.dataset.ceScope?.startsWith('Макет'))session.changedMakets.add(e.target.dataset.ceScope)});
  form.addEventListener('click',e=>{const cell=e.target.closest('[data-ce-select]');if(cell)selectRecord(cell.dataset.ceSelectForm,Number(cell.dataset.ceSelect));});
+ refreshLinked();
  form.addEventListener('click',click);form.addEventListener('submit',save);document.querySelector('#ce-cancel').onclick=cancel;
  document.addEventListener('keydown',onKey);window.addEventListener('beforeunload',onUnload);modal.querySelector('.modalCard').scrollTop=0;modal.querySelector('.close').focus();if(options.focus)focusControlIssue(options.focus);
 }
-window.SolinCardEditor={open,resolveQuarter:quarterForRecord};
+window.addEventListener('solin-refs-ready',()=>{if(session)refreshLinked()});
+window.SolinCardEditor={open,resolveQuarter:quarterForRecord,refreshDependencies:refreshLinked};
 })();
