@@ -50,7 +50,7 @@ function fieldInput(name,value='',prefix='wf',form='ВыделВ'){
  const label=window.SolinHuman?.label(form,name)||LABELS[name]||FORM_LABELS[name]||db()?.fieldLabels?.[name]||name;
  const id=prefix+'_'+name,lookup=findLookups(name,form),str=String(value??'');
  if(lookup){
- const options=Object.entries(lookup).filter(([k,v])=>k!==''&&v!=null).map(([k,v])=>'<option value="'+h(k)+'"'+(String(k)===str?' selected':'')+'>'+h(v)+'</option>').join('');
+ const options=Object.entries(lookup).filter(([k,v])=>k!==''&&v!=null).map(([k,v])=>'<option value="'+h(k)+'"'+(String(k)===str?' selected':'')+'>'+h(String(k)+' — '+String(v))+'</option>').join('');
  return '<label class="wf-field"><span>'+h(label)+' <small>'+h('')+'</small></span><select id="'+h(id)+'" data-wffield="'+h(name)+'"><option value="">— не указано —</option>'+options+'</select></label>';
  }
  const numeric=DECIMAL.has(name)||['IAR','LET','VNUM','PRA','PRkol','KOEF','PH','PD2','ZAP','POL','MTC','G15','GZ'].includes(name);
