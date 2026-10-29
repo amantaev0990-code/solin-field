@@ -17,7 +17,9 @@ try{
  assert.equal(await picker.getAttribute('accept'),null);
  const layout=await picker.evaluate(el=>{const r=el.getBoundingClientRect();return {width:r.width,height:r.height,opacity:getComputedStyle(el).opacity};});
  assert.ok(layout.width>100&&layout.height>40,'Native input must physically cover the visual button');
- assert.ok(Number(layout.opacity)>0,'File input must participate in native tap processing');
+ assert.equal(Number(layout.opacity),0,'Native chooser must be invisible; only the green button is visible');
+ assert.equal(await picker.evaluate(el=>getComputedStyle(el).pointerEvents),'auto','The invisible native picker must remain tappable');
+ assert.equal(await page.locator('#importForestButton').textContent().then(t=>t.trim()),'↓ Загрузить Transfer','Keep the previous one-button design');
  const chosen=page.waitForEvent('filechooser',{timeout:15000});
  await page.locator('.transfer-file-picker').click({position:{x:32,y:20}});
  const chooser=await chosen;
