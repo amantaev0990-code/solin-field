@@ -16,7 +16,8 @@ function region(org){
 }
 function speciesGroup(primary,refs){
  if(!filled(primary))return null;
- const s=(refs?.SDP_Tip||refs?.SDP||[]).find(r=>same(r.KPC,primary));
+ const s=(refs?.SDP_Tip||[]).find(r=>same(r.KPC,primary)&&filled(r['ОбПор']))||
+   (refs?.SDP||[]).find(r=>same(r.KPC,primary));
  return s&&filled(s['ОбПор'])?String(s['ОбПор']):null;
 }
 function forestTypes(card,org,refs=ref()){
