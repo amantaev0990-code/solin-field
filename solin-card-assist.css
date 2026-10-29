@@ -7,6 +7,8 @@
 .ce-modal .dt-board .dt-fields,.ce-modal .dt-board .dt-fields>*{min-width:0}
 .ce-modal .dt-board #ce-extra,.ce-modal .dt-board #ce-action-panel{max-width:calc(100% - 20px);max-height:calc(100% - 145px);box-sizing:border-box}
 .ce-modal .dt-toolbar .ce-assist-shortcuts{display:none}
+/* The hidden attribute must defeat author display:flex (otherwise an empty dark overlay dims/blocks every subsequent modal). */
+.ce-assist-overlay[hidden]{display:none!important;pointer-events:none!important}
 .ce-assist-overlay{position:absolute;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:10px;background:rgba(15,23,24,.65);box-sizing:border-box;overscroll-behavior:contain}
 .ce-assist-panel{display:flex;flex-direction:column;width:min(520px,100%);height:auto;max-height:100%;min-width:0;overflow:hidden;background:#f3f3f1;color:#202520;border:1px solid #7b827c;border-radius:10px;box-shadow:0 12px 35px #0007;font:15px Arial,sans-serif}
 .ce-assist-head{display:flex;flex:none;align-items:center;gap:9px;background:#d9ded7;border-bottom:1px solid #a2aaa0;padding:8px;min-height:48px;box-sizing:border-box}
