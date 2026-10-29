@@ -35,6 +35,15 @@ function forestTypes(card,org,refs=ref()){
  const items=selected.map(r=>({value:String(r.KTL??''),label:name(r),group:r.GrTL,area:r.OblStl,zone:r.Lxz}));
  return {status:groupKnown?'complete':'partial',reason:groupKnown?'Точный фильтр SOLI-N: порода, зона, группа, область':'Группа типа леса NE2A отсутствует; показаны варианты породы, зоны и области',items,group,zone,area,groups};
 }
+function suggestedOrigin(species,refs=ref()){
+ const physical=(refs?.SDP||[]).find(r=>same(r.KPC,species));
+ if(!physical||!filled(physical['ОбПор']))return null;
+ // Original SOLI-N manual: auto-origin except birch, where it is manual.
+ if(code(physical['ОбПор']).toLocaleUpperCase('ru')==='Б')return null;
+ if(!filled(physical['Происхож']))return null;
+ const v=Number(physical['Происхож']);
+ return Number.isFinite(v)?v:null;
+}
 function distinctOptions(table,field,allowed,excluded=[]){
  return (table||[]).filter(r=>allowed(r)&&!excluded.some(v=>filled(v)&&same(r[field],v)));
 }
@@ -44,6 +53,15 @@ function options(form,field,row,card,org,refs=ref()){
   return {status:r.status,reason:r.reason,items:r.items};
  }
  if(!refs)return {status:'unavailable',reason:'Справочники ещё не загружены',items:[]};
+ if(form==='Квартал'&&field==='Klxr'&&refs.Slxr){
+  if(!filled(row.Kpz))return {status:'waiting',reason:'Выберите природную зону квартала',items:[]};
+  return {status:'complete',reason:'Секции Slxr зависят от природной зоны квартала',items:refs.Slxr.filter(r=>same(r.Kpz,row.Kpz)&&!same(r.Klxz,0)).map(r=>({value:String(r.Klxz),label:String(r.Nlxr||'')}))};
+ }
+ if(form==='Макет12'&&['VV','VB'].includes(field)&&refs.SBR){
+  const exclude=field==='VV'?row.VB:row.VV;
+  // Access also filters by computed Признак; its origin is not proven here.
+  return {status:'partial',reason:'Виды не должны повторяться. Признак вредителя требует проверки исходного Access.',items:refs.SBR.filter(r=>!filled(exclude)||!same(r.KB,exclude)).map(r=>({value:String(r.KB),label:String(r.NB||'')}))};
+ }
  if(form==='ВыделВ'&&['M2PM1','M22','M23'].includes(field)&&refs.SLM){
   const prev=field==='M22'?[row.M2PM1]:field==='M23'?[row.M2PM1,row.M22]:[];
   const previousReady=field==='M2PM1'||(field==='M22'?filled(row.M2PM1)&&code(row.M2PM1)!=='0':filled(row.M22)&&code(row.M22)!=='0');
@@ -84,5 +102,5 @@ function currentIsAllowed(value,result){
  if(code(value)==='0' && !result.items.some(r=>same(r.value,0)))return null;
  return result.items.some(r=>same(r.value,value));
 }
-window.SolinDependentRules={forestTypes,options,currentIsAllowed,region,speciesGroup};
+window.SolinDependentRules={forestTypes,options,currentIsAllowed,region,speciesGroup,suggestedOrigin};
 })();
