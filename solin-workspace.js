@@ -70,10 +70,14 @@ const SOLIN_OWNER_FORESTS={
  213:[{code:1,name:'Комсомольское'},{code:2,name:'Бугетсайское'},{code:3,name:'Карабутакское'}]
 };
 const matchCode=(a,b)=>String(a)===String(b);
+const REGION_BY_KTO={110000000:100,150000000:200,190000000:300,230000000:400,270000000:500,310000000:600,350000000:700,390000000:800,430000000:900,470000000:1000,510000000:1100,550000000:1200,590000000:1300,630000000:1400};
+const regionFromKTO=kto=>REGION_BY_KTO[Number(kto)]??null;
 function forestRegionCode(f){
  const known=f?.source?.regionCode??f?.org?.regionCode;
  if(known!=null&&SOLIN_REGIONS.some(x=>matchCode(x.code,known)))return Number(known);
  const owner=Number(f?.org?.POS);
+ const originalOwner=window.SOLIN_FOREST_CATALOG?.rows?.find(r=>r[0]===owner&&r[1]===0);
+ if(originalOwner)return regionFromKTO(originalOwner[4]);
  const fromStatic=SOLIN_REGIONS.find(r=>(SOLIN_REGION_OWNERS[r.code]||[]).some(o=>o.code===owner))?.code;
  if(fromStatic)return fromStatic;
  const legacyRegion=Math.floor(owner/100)*100;
@@ -84,8 +88,8 @@ function catalogOwners(regionCode,forests){
  // Rows with LESN=0 are the owner/enterprise headers in original KUch.
  // The original POS numbering assigns owners to 14 historical regions.
  for(const row of window.SOLIN_FOREST_CATALOG?.rows||[]){
-  const [pos,lesn,name]=row;
-  if(lesn!==0||Math.floor(pos/100)*100!==Number(regionCode)||!name)continue;
+  const [pos,lesn,name,,kto]=row;
+  if(lesn!==0||regionFromKTO(kto)!==Number(regionCode)||!name)continue;
   owners.set(String(pos),{code:pos,name});
  }
  for(const f of forests)if(matchCode(forestRegionCode(f),regionCode)&&f.org?.POS&&f.org?.NLX){
