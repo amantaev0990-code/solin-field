@@ -74,10 +74,20 @@ function forestRegionCode(f){
  const known=f?.source?.regionCode??f?.org?.regionCode;
  if(known!=null&&SOLIN_REGIONS.some(x=>matchCode(x.code,known)))return Number(known);
  const owner=Number(f?.org?.POS);
- return SOLIN_REGIONS.find(r=>(SOLIN_REGION_OWNERS[r.code]||[]).some(o=>o.code===owner))?.code??null;
+ const fromStatic=SOLIN_REGIONS.find(r=>(SOLIN_REGION_OWNERS[r.code]||[]).some(o=>o.code===owner))?.code;
+ if(fromStatic)return fromStatic;
+ const legacyRegion=Math.floor(owner/100)*100;
+ return SOLIN_REGIONS.some(r=>r.code===legacyRegion)?legacyRegion:null;
 }
 function catalogOwners(regionCode,forests){
  const owners=new Map((SOLIN_REGION_OWNERS[regionCode]||[]).map(o=>[String(o.code),o]));
+ // Rows with LESN=0 are the owner/enterprise headers in original KUch.
+ // The original POS numbering assigns owners to 14 historical regions.
+ for(const row of window.SOLIN_FOREST_CATALOG?.rows||[]){
+  const [pos,lesn,name]=row;
+  if(lesn!==0||Math.floor(pos/100)*100!==Number(regionCode)||!name)continue;
+  owners.set(String(pos),{code:pos,name});
+ }
  for(const f of forests)if(matchCode(forestRegionCode(f),regionCode)&&f.org?.POS&&f.org?.NLX){
   const key=String(f.org.POS);if(!owners.has(key))owners.set(key,{code:Number(f.org.POS),name:f.org.NLX});
  }
@@ -85,6 +95,12 @@ function catalogOwners(regionCode,forests){
 }
 function catalogForests(ownerCode,forests){
  const districts=new Map((SOLIN_OWNER_FORESTS[ownerCode]||[]).map(o=>[String(o.code),o]));
+ // A forest district is uniquely addressed by the pair (POS, LESN).
+ for(const row of window.SOLIN_FOREST_CATALOG?.rows||[]){
+  const [pos,lesn,name]=row;
+  if(lesn<=0||!matchCode(pos,ownerCode)||!name)continue;
+  districts.set(String(lesn),{code:lesn,name});
+ }
  for(const f of forests)if(matchCode(f.org?.POS,ownerCode)&&f.org?.LESN&&f.org?.NOS){
   const key=String(f.org.LESN);if(!districts.has(key))districts.set(key,{code:Number(f.org.LESN),name:f.org.NOS});
  }
