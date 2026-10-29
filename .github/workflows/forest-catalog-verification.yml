@@ -1,0 +1,26 @@
+name: SOLI-N Field — original forest catalogue verification
+on:
+  push:
+    paths:
+      - 'solin-forest-catalog.js'
+      - 'solin-workspace.js'
+      - 'index.html'
+      - 'sw.js'
+      - 'tests/forest-catalog-verification.cjs'
+      - '.github/workflows/forest-catalog-verification.yml'
+  workflow_dispatch:
+jobs:
+  forest-catalog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify browser scripts
+        run: |
+          node --check solin-forest-catalog.js
+          node --check solin-workspace.js
+      - name: Verify original KUch hierarchy
+        run: node tests/forest-catalog-verification.cjs
