@@ -3,3 +3,7 @@
 .quarterOpenedHead{margin-bottom:4px}
 .quickActions{grid-template-columns:1.4fr 1fr}
 @media(max-width:700px){.quickActions{grid-template-columns:1fr 1fr}.quickActions .secondary{grid-column:auto}.sectionTabs{scrollbar-width:none}.sectionTabs::-webkit-scrollbar{display:none}}
+/* Visually audited desktop quarter category (KGLF) navigation. */
+.quarterCategoryHint{margin:8px 0 11px;padding:0 3px;font-size:13px;line-height:1.45;opacity:.85}
+#qCategoryList .quarterCard{width:100%}
+#qCategoryList .quarterNo{font-size:16px;min-width:45px}
