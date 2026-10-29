@@ -166,6 +166,18 @@ function linkedIssues(){
    return {message:'Значение «'+title('ВыделВ',field)+'» не соответствует выбранной породе или предыдущим полям. Выберите значение из подходящего списка.',form:'ВыделВ',scope:'base',field};
   }
  }
+ if(changed(session.quarter,session.originalQuarter,['Kpz','Klxr'])){
+  const result=engine.options('Квартал','Klxr',session.quarter,base,linkedOrg());
+  if(engine.currentIsAllowed(session.quarter.Klxr,result)===false)
+   return {message:'Лесохозяйственная зона квартала не соответствует выбранной природной зоне.',form:'Квартал',scope:'quarter',field:'Klxr'};
+ }
+ // Original maket 12 SBR RowSource excludes repeated first/second damage code.
+ if(session.changedMakets.has('Макет12')){
+  for(const [i,row] of (base._children?.Макет12||[]).entries()){
+   if(row.VV!=null&&row.VB!=null&&String(row.VV)!=='0'&&String(row.VV)===String(row.VB))
+    return {message:'Макет 12: второй вредитель или болезнь не должен повторять первый код.',form:'Макет12',scope:'Макет12',field:'VB',index:i};
+  }
+ }
  // For maket 23 restrict repeated and out-of-order codes only after editing.
  for(const [form,rows] of Object.entries(base._children||{})){
   if(form!=='Макет23'||!session.changedMakets.has(form))continue;
