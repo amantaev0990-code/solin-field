@@ -127,7 +127,11 @@ function corrections(record,refs,org){
  else if(b.status==='complete'&&!defined(record.M3B))
   issues.push({field:'M3B',label:'Бонитет',previous:'Не указан',expected:String(b.expected),reason:b.reason});
  else if(b.status!=='complete')unknown.push({field:'M3B',...b});
- const k59=stockPerHectare(record,refs,org);
+ // If K58 gave an unambiguous new bonitet, subsequent SzapCK lookup
+ // must use that value, never the stale manually entered class.
+ const bonitetChecked=b.status==='complete'&&!same(record.M3B,b.expected)?
+   {...record,M3B:b.expected}:record;
+ const k59=stockPerHectare(bonitetChecked,refs,org);
  let computedRecord=record;
  if(k59.status==='complete'){
   const current=record._children.Макет10[k59.index].ZAP;
