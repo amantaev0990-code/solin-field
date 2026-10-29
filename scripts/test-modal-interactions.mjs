@@ -43,7 +43,6 @@ try{
  await page.evaluate(()=>openCompForm(Object.keys(D.quarters)[0]));
  await page.locator('#newVD').fill('987');
  await page.locator('#newPLV').fill('4.6');
- const before=await page.locator('#modalBody').evaluate(el=>el);
  const ids=await page.locator('#newCompKV option').evaluateAll(opts=>opts.map(x=>x.value));
  assert.ok(ids.length>1);
  await page.locator('#newCompKV').selectOption(ids[1]);
