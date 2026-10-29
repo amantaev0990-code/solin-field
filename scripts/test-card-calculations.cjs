@@ -53,7 +53,7 @@ const two={...card,_children:{Макет10:[{...card._children.Макет10[0],Z
 assert.equal(calc.standStock(two).status,'ambiguous');
 assert.equal(calc.standStock({...card,PLV:0.0125}).status,'ambiguous'); // 0.5 tie
 const diff={...card,LESN:1};
-assert.equal(calc.standStock(diff).expectedTotal,80,'Pure functions do not use global active forestry');
+assert.equal(calc.standStock(diff).status,'waiting','A child from a different forestry must never contribute to the stock');
 const editor=fs.readFileSync('solin-card-editor.js','utf8');
 assert.match(editor,/function recalculateEditedField\(el\)/);
 assert.match(editor,/recalculateEditedField\(e\.target\)/);
