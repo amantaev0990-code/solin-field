@@ -7,13 +7,20 @@ const vm=require('node:vm');
 const assert=require('node:assert/strict');
 const source=fs.readFileSync('app.js','utf8');
 const nodes={};
-const makeNode=()=>({
-  innerHTML:'',children:[],onclick:null,className:'',type:'',textContent:'',
-  appendChild(child){this.children.push(child);}
-});
+const makeNode=(key='')=>{
+  let html='';
+  const node={children:[],onclick:null,className:'',type:'',textContent:'',
+    appendChild(child){this.children.push(child);}};
+  Object.defineProperty(node,'innerHTML',{get(){return html;},set(value){
+    html=value;node.children=[];
+    // Replacing the parent DOM replaces all nested elements as in a browser.
+    if(key==='#quarters')for(const child of ['#qReturn','#qCategoryList','#qActions','#qComps'])delete nodes[child];
+  }});
+  return node;
+};
 const document={
-  querySelector(q){return nodes[q]||(nodes[q]=makeNode());},
-  createElement:makeNode
+  querySelector(q){return nodes[q]||(nodes[q]=makeNode(q));},
+  createElement:()=>makeNode()
 };
 const fixture={
   quarters:{'1':{
