@@ -31,9 +31,14 @@ function forestTypes(card,org,refs=ref()){
  const groups=[...new Set(matches.map(r=>code(r.GrTL)))];
  // NE2A is a real additional source field; if absent, do not invent it.
  const groupKnown=filled(card.NE2A);
- const selected=groupKnown?matches.filter(r=>same(r.GrTL,card.NE2A)):matches;
+ const ambiguous=!groupKnown&&groups.length>1;
+ const selected=ambiguous?[]:groupKnown?matches.filter(r=>same(r.GrTL,card.NE2A)):matches;
  const items=selected.map(r=>({value:String(r.KTL??''),label:name(r),group:r.GrTL,area:r.OblStl,zone:r.Lxz}));
- return {status:groupKnown?'complete':'partial',reason:groupKnown?'Точный фильтр SOLI-N: порода, зона, группа, область':'Группа типа леса NE2A отсутствует; показаны варианты породы, зоны и области',items,group,zone,area,groups};
+ const status=ambiguous?'ambiguous':groupKnown?'complete':'partial';
+ const reason=ambiguous?'Уточните группу типа леса NE2A: в этой зоне существуют разные группы':groupKnown?
+  'Точный фильтр SOLI-N: порода, зона, группа, область':
+  'В данном сочетании STL имеет одну группу; NE2A в карточке не заполнено';
+ return {status,reason,items,group,zone,area,groups};
 }
 function suggestedOrigin(species,refs=ref()){
  const physical=(refs?.SDP||[]).find(r=>same(r.KPC,species));
