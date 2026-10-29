@@ -13,6 +13,18 @@ const sections=[
  ['32','Подлесок',['PLG','PLP1','PLP2','PLP3']]
 ];
 const extras=[11,12,13,14,15,16,17,19,20,21,23,25,27,28];
+// Desktop SOLI-N uses the complete forestry + quarter/category address.
+// Repeated quarter rows may differ in хозяйственная секция and functional zone.
+function quarterForRecord(record){
+ const q=D.quarters?.[String(record.KV)];
+ if(!q)return null;
+ const rows=q.quarterRows?.length?q.quarterRows:[q.meta||{}];
+ const candidates=rows.filter(row=>['POS','LESN','KV','KGLF'].every(k=>
+   row[k]==null ? rows.length===1 : same(row[k],record[k])));
+ const detailed=candidates.filter(row=>
+   same(row.Klxr,record.KlxrVD)&&same(row.Fzona,record.Fzona));
+ return detailed.length===1?detailed[0]:candidates.length===1?candidates[0]:null;
+}
 const numeric=new Set(['PLV','GodT','CkKr','VNUM','M2Pr','M3G','M3KP','M3KPC','M4ZO','M4ZL','M4SS','AKL','AGR','AGR1','STUR','STUR1','PRkol','PRH','PRA','PRK1','PRK2','PRK3','KOEF','LET','PH','PD2','KT','POL','SPS','ZAP','RAS','Koef16','Voz16','H16','Ur16','Sbor','VZ','SHR','PRT','SHT','KLD','PR','PL','PL15','PTR1','PTR2','PTR3','PTR4','ZPR','STUR1','KOL','AV','ZO','LIK','DEL','PLP','MTC','G15','GZ']);
 numeric.add('VD');
 const aliases={PRkol:'Количество, тыс. шт.',PRH:'Средняя высота, м',PRA:'Средний возраст, лет',PRK1:'Коэффициент 1',PRK2:'Коэффициент 2',PRK3:'Коэффициент 3',PRP1:'Порода 1',PRP2:'Порода 2',PRP3:'Порода 3',PLP1:'Порода 1',PLP2:'Порода 2',PLP3:'Порода 3',PLG:'Густота',AGR1:'Группа возраста ТО',M2Pr:'Процент выборки, %'};
@@ -53,8 +65,8 @@ function table(form){const rs=session.draft._children[form]||[],schema=(D.transf
 function footer(){const routes=SOLIN_AUDIT.routes['ВыделВ']||[],buttons=routes.filter(x=>/^\d+$/.test(x.caption)).sort((a,b)=>Number(a.left)-Number(b.left));
  return '<footer class="dt-footer"><span class="dt-footer-label">Макет</span>'+buttons.map(b=>'<button type="button" data-ce-extra="Макет'+h(b.caption)+'" style="left:'+(Number(b.left)*.08)+'px;width:'+(Number(b.width)*.08)+'px" title="'+h(SolinHuman.formName('Макет'+b.caption))+'" aria-label="Макет '+b.caption+' — '+h(SolinHuman.formName('Макет'+b.caption))+'">'+b.caption+'</button>').join('')+'<select class="dt-maket-select" aria-label="Дополнительные макеты"><option value=""></option>'+[10,...extras,31,32].map(n=>'<option value="'+n+'">Макет '+n+'</option>').join('')+'</select><button type="button" class="dt-kt" data-ce-preview>КТ</button><button type="button" class="dt-print" data-ce-print>Печать</button><button type="button" class="dt-control" data-ce-controls="6">Конт. рубок</button><button type="button" class="dt-new" data-ce-new>Новая</button><button type="submit" class="dt-exit" id="ce-exit">Выход</button></footer>';
 }
-function markup(){const s=session,r=s.draft,o=D.lesnichestvo?.find(x=>same(x.POS,r.POS)&&same(x.LESN,r.LESN))||D.lesnichestvo?.[0]||{},stands=D.quarters[r.KV]?.compartments.filter(x=>same(x.KGLF,r.KGLF))||[],known=new Set([...keys,'Fzona','PLV','KU','CR','KlxrVD',...sections.flatMap(x=>x[2])]),rest=(D.transfSchema['Выдел']||[]).filter(f=>!known.has(f));
- return '<form id="ce-form" novalidate><div class="dt-toolbar"><div class="dt-zoom-controls"><span>Масштаб</span><button type="button" data-ce-zoom="out" aria-label="Уменьшить">−</button><output id="ce-zoom">100%</output><button type="button" data-ce-zoom="in" aria-label="Увеличить">+</button><button type="button" data-ce-zoom="fit">По ширине</button><button type="button" data-ce-zoom="actual">100%</button></div><span class="dt-toolbar-spacer"></span><div class="dt-tools"><button type="button" data-ce-support>Поля…</button><button type="button" data-ce-controls="">Контроль</button><button type="submit" id="ce-save">Сохранить</button><button type="button" id="ce-cancel">Отмена</button><span id="ce-status" role="status">'+(s.isNew?'Новая':'')+'</span></div></div>'+
+function markup(){const s=session,r=s.draft,o=D.lesnichestvo?.find(x=>same(x.POS,r.POS)&&same(x.LESN,r.LESN))||{},stands=D.quarters[r.KV]?.compartments.filter(x=>same(x.POS,r.POS)&&same(x.LESN,r.LESN)&&same(x.KGLF,r.KGLF))||[],known=new Set([...keys,'Fzona','PLV','KU','CR','KlxrVD',...sections.flatMap(x=>x[2])]),rest=(D.transfSchema['Выдел']||[]).filter(f=>!known.has(f));
+ return '<form id="ce-form" novalidate><div class="dt-toolbar"><div class="dt-zoom-controls"><span>Масштаб</span><button type="button" data-ce-zoom="out" aria-label="Уменьшить">−</button><output id="ce-zoom">100%</output><button type="button" data-ce-zoom="in" aria-label="Увеличить">+</button><button type="button" data-ce-zoom="fit">По ширине</button><button type="button" data-ce-zoom="actual">100%</button></div><span class="dt-toolbar-spacer"></span><div class="dt-tools"><button type="button" data-ce-support>Поля…</button><button type="button" data-ce-makets>Макеты</button><button type="button" data-ce-controls="">Контроль</button><button type="submit" id="ce-save">Сохранить</button><button type="button" id="ce-cancel">Отмена</button><span id="ce-status" role="status">'+(s.isNew?'Новая':'')+'</span></div></div>'+
  '<div class="dt-viewport" aria-label="Настольная карточка. Прокрутка по горизонтали и вертикали" tabindex="0"><div class="dt-stage"><div class="dt-board" data-desktop-width="1200"><div id="ce-main"><header class="dt-header"><div class="ce-summary"><h2>Карточка таксации</h2></div><div class="dt-counters"><span>Выделов всего;</span>'+fixed('',stands.length,42,{aria:'Выделов всего'})+'<span>последний</span>'+fixed('',stands.length?Math.max(...stands.map(x=>Number(x.VD)||0)):'',48,{aria:'Последний выдел'})+'</div><div class="dt-owner"><span>Лесовладелец</span>'+fixed('',r.POS,42,{aria:'Код лесовладельца'})+fixed('',o.NLX,520,{aria:'Лесовладелец'})+'<span>Лесничество</span>'+fixed('',r.LESN,40,{aria:'Номер лесничества'})+fixed('',o.NOS,304,{aria:'Лесничество'})+'</div><div class="dt-category"><span>Категория ГЛФ</span>'+fixed('',r.KGLF,42,{aria:'Категория ГЛФ, код'})+fixed('',description('ВыделВ','KGLF',r.KGLF),745,{aria:'Категория ГЛФ'})+cell('Fzona',r.Fzona,'base','ВыделВ',{label:'Функ. зона',inline:true,split:true})+'</div><div class="dt-quarter"><span>Квартал</span>'+fixed('',r.KV,38,{aria:'Квартал'})+cell('GodT',s.quarter.GodT,'quarter','Квартал',{label:'Год таксации',inline:true})+cell('Rel',s.quarter.Rel,'quarter','Квартал',{label:'Рельеф',inline:true,split:true})+cell('Dost',s.quarter.Dost,'quarter','Квартал',{label:'Доступность',inline:true,split:true})+cell('KlxrVD',r.KlxrVD,'base','ВыделВ',{label:false,split:true})+'</div></header>'+
  '<section class="dt-base" aria-label="Выдел и категория угодий">'+(s.isNew?cell('VD',r.VD,'base','ВыделВ',{label:'Выдел',weight:.45}):fixed('Выдел',r.VD,42))+cell('PLV',r.PLV,'base','ВыделВ',{label:'Площадь',weight:.65})+cell('KU',r.KU,'base','ВыделВ',{label:'Категория угодий',weight:3.2,split:true})+cell('CR',r.CR,'base','ВыделВ',{label:'Способ рубки',weight:1.9,split:true})+fixed('Памятник, заказник','',235,{unavailable:true})+fixed('Арендатор','',220,{unavailable:true})+'</section>'+
  maket('1',cell('OZU',r.OZU,'base','ВыделВ',{label:'Особозащитный участок',weight:3.2,split:true})+cell('CkEk',r.CkEk,'base','ВыделВ',{label:'Склон - экспозиция',weight:1.7,split:true})+cell('CkKr',r.CkKr,'base','ВыделВ',{label:'крутизна',weight:.65})+cell('VNUM',r.VNUM,'base','ВыделВ',{label:'ВНУМ',weight:.65})+cell('ErV',r.ErV,'base','ВыделВ',{label:'Эрозия - вид',weight:1.6,split:true})+cell('ErCt',r.ErCt,'base','ВыделВ',{label:'степень',weight:1.5,split:true}))+
@@ -108,6 +120,21 @@ function setZoom(value){const viewport=document.querySelector('.dt-viewport'),fi
 }
 function panel(caption,html){const root=document.querySelector('#ce-action-panel');document.querySelector('#ce-extra').hidden=true;root.hidden=false;root.innerHTML='<div class="dt-subtitle"><span>'+h(caption)+'</span><button type="button" data-ce-main aria-label="Закрыть окно">×</button></div><div class="dt-subbody">'+html+'</div>';root.scrollIntoView({block:'nearest',inline:'nearest'});return root;}
 function showSupport(){panel('Дополнительные поля карточки','').querySelector('.dt-subbody').append(session.supportGrid);}
+function showMaketNavigator(){
+ const standard=sections.map(([n,label])=>({n,label,kind:'standard'}));
+ const others=[{n:'10',label:'Таксационная характеристика древостоя',kind:'table'},
+   ...extras.map(n=>({n:String(n),label:SolinHuman.formName('Макет'+n),kind:'table'}))];
+ const items=[...standard,...others].sort((a,b)=>Number(a.n)-Number(b.n));
+ const html='<p class="ce-maket-guide">Макеты выбранного выдела. Число записей берётся из текущей карточки. Изменения сохраняются только кнопкой «Сохранить».</p>'+
+  '<div class="ce-maket-nav">'+items.map(item=>{
+   const form='Макет'+item.n;
+   const count=item.kind==='table'?(session.draft._children?.[form]?.length||0):null;
+   return '<button type="button" class="ce-maket-nav-item" data-ce-nav-maket="'+h(item.n)+'">'+
+    '<b>Макет '+h(item.n)+'</b><span>'+h(item.label)+'</span>'+
+    (count==null?'':'<small>'+count+' зап.</small>')+'</button>';
+  }).join('')+'</div>';
+ panel('Навигатор макетов',html);
+}
 function focusControlIssue(issue){
  const form=issue.form||'ВыделВ';if(form==='ВыделВ')showMain();else if(form==='Макет10')showMain('10');else showExtra(form);
  const scope=form==='ВыделВ'?'base':form;const fields=[...document.querySelectorAll('[data-ce-scope="'+scope+'"]')];
@@ -122,12 +149,12 @@ function showChecks(group=''){
  SolinControlUI.mount(host,{records:[r],database,draft:true,caption:'Квартал '+r.KV+' · выдел '+r.VD,group,onNavigate:issue=>{if(session===currentSession)focusControlIssue(issue);}});
 }
 function preview(print){const popup=window.open('','_blank');if(!popup)return toast('Разрешите открытие окна карточки');const paper=document.querySelector('.dt-board').cloneNode(true);paper.querySelectorAll('#ce-extra,#ce-action-panel,.ce-other').forEach(e=>e.remove());for(const el of paper.querySelectorAll('input,select')){const span=document.createElement('output');span.textContent=el.tagName==='SELECT'?el.selectedOptions[0]?.textContent||'':el.value;el.replaceWith(span);}paper.querySelectorAll('button').forEach(b=>b.disabled=true);paper.style.transform='none';const css=new URL('solin-card-editor.css?v=20261023-6',location.href).href;popup.document.write('<!doctype html><html lang="ru"><meta charset="utf-8"><title>Карточка таксации — КТ</title><link rel="stylesheet" href="'+h(css)+'"><style>body{margin:8px;background:#eee}.ce-print{display:block;position:static}.ce-print .dt-board{position:relative}.print-action{margin-bottom:8px}</style><button class="print-action" onclick="print()">Печать</button><div class="ce-modal ce-print">'+paper.outerHTML+'</div><p style="font:11px Arial">Предварительный просмотр карточки. Официальное таксационное описание формируется в настольной SOLI-N.</p></html>');popup.document.close();if(print)popup.addEventListener('load',()=>popup.print(),{once:true});}
-function newCard(e){const previous=session.draft,kv=previous.KV;if(!save(e))return;const q=D.quarters[kv],org=D.lesnichestvo?.[0]||{},r=Object.fromEntries((D.transfSchema['Выдел']||[]).map(f=>[f,null]));for(const f of numeric)if(f in r)r[f]=0;for(const f of ['CR','OZU','ErV','ErCt','M2PM1','M22','M23','PLG'])r[f]=0;Object.assign(r,{POS:previous.POS??org.POS,LESN:previous.LESN??org.LESN,KV:kv,KGLF:previous.KGLF,VD:Math.max(0,...q.compartments.map(x=>Number(x.VD)||0))+1,PLV:null,KU:null,Fzona:previous.Fzona,KlxrVD:previous.KlxrVD,_children:{},_local:true});open(r,{isNew:true});}
+function newCard(e){const previous=session.draft,kv=previous.KV;if(!save(e))return;const q=D.quarters[kv],org=D.lesnichestvo?.[0]||{},r=Object.fromEntries((D.transfSchema['Выдел']||[]).map(f=>[f,null]));for(const f of numeric)if(f in r)r[f]=0;for(const f of ['CR','OZU','ErV','ErCt','M2PM1','M22','M23','PLG'])r[f]=0;Object.assign(r,{POS:previous.POS??org.POS,LESN:previous.LESN??org.LESN,KV:kv,KGLF:previous.KGLF,VD:Math.max(0,...q.compartments.filter(x=>same(x.POS,previous.POS)&&same(x.LESN,previous.LESN)&&same(x.KGLF,previous.KGLF)).map(x=>Number(x.VD)||0))+1,PLV:null,KU:null,Fzona:previous.Fzona,KlxrVD:previous.KlxrVD,_children:{},_local:true});open(r,{isNew:true});}
 function updateBadges(form){const n=session.draft._children[form]?.length||0;document.querySelectorAll('[data-ce-badge="'+form+'"]').forEach(b=>b.textContent=n||'');}
 function validate(){
  const invalid=document.querySelector('#ce-form [aria-invalid="true"]');if(invalid)throw {message:invalid.validationMessage,el:invalid};
  if(!(Number(session.draft.PLV)>0))throw {message:'Площадь выдела должна быть больше нуля.',el:document.querySelector('[data-ce-field="PLV"]')};
- if(session.isNew){if(!Number.isInteger(Number(session.draft.VD))||Number(session.draft.VD)<1)throw {message:'Номер выдела должен быть положительным целым.',el:document.querySelector('[data-ce-field="VD"]')};if(D.quarters[session.draft.KV].compartments.some(r=>same(r.VD,session.draft.VD)&&same(r.KGLF,session.draft.KGLF)))throw {message:'Выдел с таким номером и категорией ГЛФ уже есть.',el:document.querySelector('[data-ce-field="VD"]')};if(session.draft.KU==null||Number(session.draft.KU)===0)throw {message:'Выберите категорию угодий.',el:document.querySelector('[data-ce-field="KU"]')};}
+ if(session.isNew){if(!Number.isInteger(Number(session.draft.VD))||Number(session.draft.VD)<1)throw {message:'Номер выдела должен быть положительным целым.',el:document.querySelector('[data-ce-field="VD"]')};if(D.quarters[session.draft.KV].compartments.some(r=>keys.every(k=>same(r[k],session.draft[k]))))throw {message:'Выдел с таким номером и категорией ГЛФ уже есть.',el:document.querySelector('[data-ce-field="VD"]')};if(session.draft.KU==null||Number(session.draft.KU)===0)throw {message:'Выберите категорию угодий.',el:document.querySelector('[data-ce-field="KU"]')};}
  const year=session.quarter.GodT;if(year!=null&&(!Number.isInteger(Number(year))||Number(year)<1900||Number(year)>2200))throw {message:'Укажите год таксации от 1900 до 2200.',el:document.querySelector('[data-ce-field="GodT"]')};
  const check=(form,row,before)=>{const failed=(solinCore.validateRow(form,row,session.draft)||[]).filter(m=>{const f=m.split(':')[0];return !before||!same(row[f],before[f]);});if(failed.length){const field=failed[0].split(':')[0],scope=form==='ВыделВ'?'base':form==='Квартал'?'quarter':form,index=form.startsWith('Макет')?session.draft._children[form].indexOf(row):null;throw {message:'Проверьте поле «'+title(form,field)+'»'+(form.startsWith('Макет')?' в макете '+form.replace('Макет',''):'')+'.',form,scope,field,index};}};
  check('ВыделВ',session.draft,session.original);check('Квартал',session.quarter,session.originalQuarter);
@@ -163,6 +190,13 @@ function save(e){e?.preventDefault();if(!session)return false;const s=session;
 function click(e){const b=e.target.closest('button');if(!b)return;
  if(b.dataset.ceZoom){setZoom(b.dataset.ceZoom);return;}
  if(b.hasAttribute('data-ce-support')){showSupport();return;}
+ if(b.hasAttribute('data-ce-makets')){showMaketNavigator();return;}
+ if(b.dataset.ceNavMaket){
+   const number=b.dataset.ceNavMaket;
+   if(['1','2','3','4','5','10','31','32'].includes(number))showMain(number);
+   else if(extras.includes(Number(number)))showExtra('Макет'+number);
+   return;
+ }
  if(b.hasAttribute('data-ce-controls')){showChecks(b.dataset.ceControls);return;}
  if(b.hasAttribute('data-ce-preview')||b.hasAttribute('data-ce-print')){preview(b.hasAttribute('data-ce-print'));return;}
  if(b.hasAttribute('data-ce-new')){newCard(e);return;}
@@ -180,10 +214,15 @@ function click(e){const b=e.target.closest('button');if(!b)return;
  if(b.dataset.ceAdd)document.getElementById('ce-table-'+form).querySelector('tbody tr:last-child input,tbody tr:last-child select')?.focus();
 }
 function selectRecord(form,value){const rows=session.draft._children[form]||[],table=document.getElementById('ce-table-'+form);let selected=session.selected?.[form]||0;selected=value==='first'?0:value==='last'?rows.length-1:value==='next'?selected+1:value==='previous'?selected-1:Number(value);selected=Math.max(0,Math.min(Math.max(0,rows.length-1),selected));(session.selected??={})[form]=selected;table.querySelectorAll('tbody tr').forEach((tr,i)=>{tr.classList.toggle('dt-selected',i===selected);tr.querySelector('th').textContent=i===selected?'►':'';});table.querySelector('[data-ce-delete]').dataset.ceIndex=selected;table.querySelector('[data-ce-count]').textContent=rows.length?(selected+1)+' из '+rows.length:'Новая';}
-function open(record,options={}){if(!record)return;previousFocus=document.activeElement;previousOverflow=document.body.style.overflow;
- const q=D.quarters[String(record.KV)],rows=q.quarterRows?.length?q.quarterRows:[q.meta||{}];
- const quarter=rows.find(x=>['POS','LESN','KV','KGLF'].every(k=>same(x[k]??D.lesnichestvo?.[0]?.[k],record[k]??D.lesnichestvo?.[0]?.[k])));
- if(!quarter)return toast('Не найден квартал с этой категорией ГЛФ. Проверьте адрес карточки.');
+function open(record,options={}){if(!record)return;
+ if(window.SolinWorkspace?.activeId &&
+    window.SolinWorkspace.activeId!==String(record.POS)+'::'+String(record.LESN))
+   return toast('Карточка принадлежит другому лесничеству. Переключите рабочее лесничество.');
+ const q=D.quarters?.[String(record.KV)];
+ if(!q)return toast('Квартал выбранной карточки не найден в рабочем лесничестве.');
+ const quarter=quarterForRecord(record);
+ if(!quarter)return toast('Строка квартала не найдена или неоднозначна по адресу, секции и функциональной зоне. Изменения не выполнялись.');
+ previousFocus=document.activeElement;previousOverflow=document.body.style.overflow;
  session={record,original:clone(record),draft:clone(record),quarterTarget:quarter,originalQuarter:clone(quarter),quarter:clone(quarter),dirty:false,changedMakets:new Set(),closeButton:document.querySelector('#modal .close').onclick};
  session.isNew=!!options.isNew;
  session.draft._children??={};
