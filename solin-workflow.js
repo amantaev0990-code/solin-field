@@ -143,8 +143,12 @@ if(index>=list.length)list.push(base);else list[index]=base;
 target[m]=list;
 let calculated=[];
 if(m==='Макет10'&&window.SolinCardCalculations){
- calculated=window.SolinCardCalculations.corrections(r,window.SOLIN_REFS?.tables).issues;
- for(const issue of calculated)r[issue.field]=issue.field==='M3B'?String(issue.expected):Number(issue.expected);
+ const org=db()?.lesnichestvo?.find(x=>String(x.POS)===String(r.POS)&&String(x.LESN)===String(r.LESN));
+ calculated=window.SolinCardCalculations.corrections(r,window.SOLIN_REFS?.tables,org).issues;
+ for(const issue of calculated){
+  if(issue.field==='ZAP'&&Number.isInteger(issue.index))r._children?.Макет10?.[issue.index]&&(r._children.Макет10[issue.index].ZAP=Number(issue.expected));
+  else r[issue.field]=issue.field==='M3B'?String(issue.expected):Number(issue.expected);
+ }
 }
 try{saveAll(r);}catch(e){Object.assign(r,JSON.parse(before));notify('Не удалось сохранить: '+e.message);return;}
 closeModal();openMaket(m);notify('Сохранено: '+m);
