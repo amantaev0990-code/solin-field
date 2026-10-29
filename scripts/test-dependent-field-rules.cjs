@@ -19,7 +19,7 @@ const ref={
  ],
  SLM:[{KM:0,PM2R:0,NMR:'Нет'},{KM:10,PM2R:1,NMR:'Первое'},{KM:20,PM2R:2,NMR:'Второе'},{KM:30,PM2R:0,NMR:'Общее'}],
  SOV:[{KOV:0,Priz:0,NOV:'Нет'},{KOV:135,Priz:1,NOV:'Запрещённый первый'},{KOV:205,Priz:1,NOV:'Специальный'},{KOV:206,Priz:0,NOV:'Общий'},{KOV:207,Priz:0,NOV:'Другой'}],
- SDP_Tip:[{KPC:'В',DKP2:202500,NDP:'Вяз'},{KPC:'Б',DKP2:302600,NDP:'Берёза'},{KPC:'ТВ',DKP2:825500,NDP:'Таволга'}],
+ SDP_Tip:[{KPC:'В',DKP2:202500,NDP:'Вяз'},{KPC:'Б',DKP2:302600,NDP:'Берёза'},{KPC:'ТВ',DKP2:825500,NDP:'Таволга'},{KPC:'КУСТ',DKP2:800000,NDP:'Кустарники'}],
  SSP:[{KSP:0,K84:0,NSP:'Нет'},{KSP:1,K84:0,NSP:'Обычная'},{KSP:2,K84:1,NSP:'Группа 84'}]
 };
 const org={KTO:150000000};
@@ -42,6 +42,8 @@ assert.equal(rule.currentIsAllowed('ВРТ1',grouped),false);
 assert.deepEqual(Array.from(rule.forestTypes({M3Pr:'ТВ',KlxrVD:8},org,ref).items,x=>x.value),['КУСТ']);
 assert.equal(rule.forestTypes({M3Pr:'В',KlxrVD:8},{KTO:null},ref).status,'unavailable');
 const values=(form,f,row,card=row)=>Array.from(rule.options(form,f,row,card,org,ref).items,x=>x.value);
+assert.ok(!values('ВыделВ','M3Pr',{}).includes('КУСТ'));
+assert.ok(values('ВыделВ','M3Pr',{}).includes('В'));
 assert.deepEqual(values('ВыделВ','M2PM1',{}),['0','10','20','30']);
 assert.deepEqual(values('ВыделВ','M22',{M2PM1:10}),['0','20','30']);
 assert.deepEqual(values('ВыделВ','M23',{M2PM1:10,M22:20}),['0','30']);
