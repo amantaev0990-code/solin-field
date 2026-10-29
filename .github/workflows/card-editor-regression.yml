@@ -4,6 +4,8 @@ on:
     paths:
       - 'solin-card-editor.js'
       - 'solin-card-editor.css'
+      - 'solin-card-assist.js'
+      - 'solin-card-assist.css'
       - 'scripts/card-editor-quarter-test.cjs'
       - '.github/workflows/card-editor-regression.yml'
   workflow_dispatch:
@@ -19,4 +21,6 @@ jobs:
       - name: Check exact original quarter rows and navigator
         run: node scripts/card-editor-quarter-test.cjs
       - name: Check card JavaScript syntax
-        run: node --check solin-card-editor.js
+        run: |
+          node --check solin-card-editor.js
+          node --check solin-card-assist.js
