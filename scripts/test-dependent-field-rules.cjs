@@ -19,7 +19,8 @@ const ref={
  ],
  SLM:[{KM:0,PM2R:0,NMR:'Нет'},{KM:10,PM2R:1,NMR:'Первое'},{KM:20,PM2R:2,NMR:'Второе'},{KM:30,PM2R:0,NMR:'Общее'}],
  SOV:[{KOV:0,Priz:0,NOV:'Нет'},{KOV:135,Priz:1,NOV:'Запрещённый первый'},{KOV:205,Priz:1,NOV:'Специальный'},{KOV:206,Priz:0,NOV:'Общий'},{KOV:207,Priz:0,NOV:'Другой'}],
- SDP_Tip:[{KPC:'В',DKP2:202500,NDP:'Вяз'},{KPC:'Б',DKP2:302600,NDP:'Берёза'},{KPC:'ТВ',DKP2:825500,NDP:'Таволга'}]
+ SDP_Tip:[{KPC:'В',DKP2:202500,NDP:'Вяз'},{KPC:'Б',DKP2:302600,NDP:'Берёза'},{KPC:'ТВ',DKP2:825500,NDP:'Таволга'}],
+ SSP:[{KSP:0,K84:0,NSP:'Нет'},{KSP:1,K84:0,NSP:'Обычная'},{KSP:2,K84:1,NSP:'Группа 84'}]
 };
 const org={KTO:150000000};
 const type=rule.forestTypes({M3Pr:'В',KlxrVD:8},org,ref);
@@ -51,5 +52,17 @@ assert.deepEqual(values('Макет23','K1',{}),['0','205','206','207']);
 assert.deepEqual(values('Макет23','K2',{K1:205}),['0','206','207']);
 assert.deepEqual(values('Макет23','K3',{K1:205,K2:206}),['0','207']);
 assert.equal(rule.currentIsAllowed(205,rule.options('Макет23','K2',{K1:205},null,org,ref)),false);
+assert.deepEqual(values('Макет12','SV',{KTP:84}),['0','2']);
+assert.deepEqual(values('Макет12','SV',{KTP:3}),['0','1']);
+assert.deepEqual(values('Макет12','SB',{KTP:84}),['0','1']);
+const stand={_children:{Макет10:[{POR:'В'},{POR:'Б'}]}};
+assert.deepEqual(values('Макет16','Por16',{},stand),['В','Б']);
+assert.equal(rule.options('Макет16','Por16',{}, {_children:{Макет10:[]}},org,ref).status,'waiting');
+assert.equal(rule.suggestedOrigin('Б',ref),null);
+ref.SLM.push({KM:51,PM2R:null,NMR:'NULL must not match zero'});
+assert.ok(!values('ВыделВ','M2PM1',{}).includes('51'));
+ref.SDP_Tip.push({KPC:'XX',DKP2:null,NDP:'NULL species group'});
+assert.ok(!values('ВыделВ','PRP1',{}).includes('XX'));
+
 assert.match(fs.readFileSync('solin-card-editor.js','utf8'),/function linkedIssues\(\)/);
-console.log('SOLIN_DEPENDENCIES_OK: region, zone, genus, group, raw text keys, event lists, understorey and maket 23');
+console.log('SOLIN_DEPENDENCIES_OK: region, zone, genus, group, raw text keys, event lists, understorey, makets 12/16/23 and NULL rules');
