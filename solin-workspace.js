@@ -54,7 +54,18 @@ async function importFile(file){if(!file)return;openModal('Чтение Transfer
     }catch(error){console.warn('Не удалось сохранить исходный MDB для экспорта:',error);}
   }
   closeModal();toast('Загружено лесничеств: '+groups.length)}catch(e){document.querySelector('#transferError').textContent=e.message;b.disabled=false}};}catch(e){openModal('Не удалось загрузить Transfer','<p>'+html(e.message)+'</p><button onclick="closeModal()">Закрыть</button>')}}
-function bind(){document.querySelector('#newForestButton').onclick=newForest;document.querySelector('#importForestButton').onclick=()=>document.querySelector('#transferForestInput').click();document.querySelector('#transferForestInput').onchange=e=>{importFile(e.target.files[0]);e.target.value=''};document.querySelector('#homeButton').onclick=()=>home().catch(e=>toast(e.message));const old=window.show;window.show=function(id){if(!initialized&&id!=='homeScreen'){return old('homeScreen');}document.body.classList.toggle('workspace-home',id==='homeScreen');old(id);};
+function bind(){document.querySelector('#newForestButton').onclick=newForest;// A real full-size file input sits over the visual Transfer button.
+ // This avoids iOS/Safari rejecting a scripted click on a hidden input.
+ const nativePicker=document.querySelector('#transferForestInput');
+ document.querySelector('#importForestButton').onclick=()=>nativePicker.click(); // keyboard/legacy fallback
+ nativePicker.onchange=e=>{
+   const file=e.currentTarget.files?.[0];
+   e.currentTarget.value=''; // selecting the same MDB again must still fire change
+   if(!file)return; // Cancelled the native picker: never import stale data.
+   const status=document.querySelector('#forestListStatus');
+   if(status)status.textContent='Выбран файл: '+file.name+'. Проверяю Transfer…';
+   void importFile(file);
+ };document.querySelector('#homeButton').onclick=()=>home().catch(e=>toast(e.message));const old=window.show;window.show=function(id){if(!initialized&&id!=='homeScreen'){return old('homeScreen');}document.body.classList.toggle('workspace-home',id==='homeScreen');old(id);};
  window.addEventListener('solin-saved',()=>persist().catch(e=>toast('Не удалось сохранить лесничество: '+e.message)));
  const prevBackup=window.solinCore.commitImport;window.solinCore.commitImport=function(x){if(x.lesnichestvo?.[0]&&idOf(x.lesnichestvo[0])!==activeId)throw Error('Эта копия относится к другому лесничеству. Загрузите её через главное окно');const result=prevBackup(x);persist().catch(e=>toast(e.message));return result;};
 }
