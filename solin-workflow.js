@@ -105,7 +105,24 @@ if(typeof openModal!=='function')return;
 openModal((index===rowsOf(r,m).length?'Новая запись · ':'Изменение · ')+(window.SolinHuman?.formName(m)||NAMES[m]),
 '<div class="wf-form-note">Данные сохраняются только в SOLI-N Field. Оригинальные базы SOLI-N не изменяются.</div><div class="formGrid wf-formgrid">'+humanInputs(fields,existing,'wf',m)+'</div><div class="formActions"><button class="secondary" onclick="closeModal()">Отмена</button><button class="primary" id="wfSaveMaket">Сохранить</button></div>');
 document.querySelector('#wfSaveMaket').onclick=()=>{const container=document.querySelector('#modalBody');let values;try{values=bindInputs(container,fields,'wf',existing);}catch(e){notify(e.message);return;}
-const before=JSON.stringify(r);const failures=window.solinCore?.validateRow(m,values,r)||[];if(failures.length){notify(failures.join("; "));return;}const target=(r._children=r._children||{});
+const dependent=window.SolinDependentRules,referenceTables=window.SOLIN_REFS?.tables;
+ if(dependent&&m==='Макет10'&&values.POR!=null&&values.PROI==null){
+  const origin=dependent.suggestedOrigin(values.POR,referenceTables);
+  if(origin!==null)values.PROI=origin;
+ }
+ if(dependent){
+  const candidate={...existing,...values};
+  for(const field of fields){
+   const list=dependent.options(m,field,candidate,r,db()?.lesnichestvo?.[0],referenceTables);
+   const good=dependent.currentIsAllowed(candidate[field],list);
+   const touched=index>=rowsOf(r,m).length||String(candidate[field]??'')!==String(existing[field]??'');
+   if(touched&&good===false&&String(candidate[field]??'').trim()!=='0'){
+    notify('Недопустимое сочетание в поле «'+(window.SolinHuman?.label(m,field)||field)+'». Выберите значение из справочника для этой карточки.');
+    return;
+   }
+  }
+ }
+ const before=JSON.stringify(r);const failures=window.solinCore?.validateRow(m,values,r)||[];if(failures.length){notify(failures.join("; "));return;}const target=(r._children=r._children||{});
 const list=[...rowsOf(r,m)],base={...existing,...values};
 for(const k of KEY_FIELDS)base[k]=r[k]??null;
 if(index>=list.length)list.push(base);else list[index]=base;
