@@ -93,6 +93,9 @@ function openModal(t,html){
 function closeModal(){
  const modal=$('#modal');
  if(!modal)return;
+ // Blur the active native input before hiding, so iOS does not leave its
+ // keyboard/select picker over the next dialog.
+ if(modal.contains(document.activeElement))document.activeElement?.blur?.();
  modal.classList.add('hidden');
  modal.removeAttribute('role');
  modal.removeAttribute('aria-modal');
