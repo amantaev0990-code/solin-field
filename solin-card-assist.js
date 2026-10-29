@@ -25,7 +25,33 @@
  function editSelectedRow(){editRow(currentRow());}
  function editPicker(){const fields=findElements();state={mode:'picker',fields};mount('Найти поле карточки','<p class="ce-assist-tip">Выберите поле по названию, шифру или макету. Расположение настольной карточки не меняется.</p><label class="ce-assist-searchlabel">Поиск<input id="ce-assist-query" type="search" autocomplete="off" placeholder="Площадь, порода, макет 31…"></label><div id="ce-assist-options" class="ce-assist-options"></div>',false);filterPicker('');}
  function filterPicker(query){if(state?.mode!=='picker')return;const q=String(query).toLocaleLowerCase('ru-RU').trim();const data=state.fields.map((el,i)=>({el,i,caption:fieldLabel(el),section:locationName(el)})).filter(x=>!q||[x.caption,x.el.dataset.ceField,x.section].some(s=>s.toLocaleLowerCase('ru-RU').includes(q))).slice(0,100);const target=document.querySelector('#ce-assist-options');if(target)target.innerHTML=data.map(x=>'<button type="button" class="ce-assist-option" data-ce-assist-pick="'+x.i+'"><b>'+h(x.section)+'</b><span>'+h(x.caption)+' · '+h(x.el.dataset.ceField)+'</span></button>').join('')+(!data.length?'<p class="ce-assist-tip">Поле не найдено.</p>':'');}
- function enhance(){const b=board();if(!b||!document.querySelector('.ce-modal #ce-form'))return;const toolbar=document.querySelector('.ce-modal .dt-toolbar');if(toolbar&&!toolbar.querySelector('.ce-assist-shortcuts')){const node=document.createElement('div');node.className='ce-assist-shortcuts';node.innerHTML='<button type="button" data-ce-assist-find>⌕ Найти поле</button><button type="button" data-ce-assist-row>▦ Строка древостоя</button>';toolbar.insertBefore(node,toolbar.querySelector('.dt-tools'));}
+ function editMaketPicker(){
+  const base=[[1,'Условия участка'],[2,'Хозяйственные мероприятия'],
+    [3,'Лесорастительная характеристика'],[4,'Захламлённость и сухостой'],
+    [5,'Возраст и запас'],[10,'Таксационная характеристика древостоя'],
+    [31,'Подрост'],[32,'Подлесок']];
+  const extras=[11,12,13,14,15,16,17,19,20,21,23,25,27,28]
+    .map(n=>[n,SolinHuman.formName('Макет'+n)]);
+  state={mode:'makets',items:[...base,...extras].sort((a,b)=>a[0]-b[0])};
+  mount('Макеты карточки',
+    '<p class="ce-assist-tip">Откройте нужный макет по номеру или названию. Данные выбранного лесничества не изменяются.</p>'+
+    '<label class="ce-assist-searchlabel">Поиск макета<input id="ce-assist-query" type="search" autocomplete="off" placeholder="Например: 28, транспорт"></label>'+
+    '<div id="ce-assist-options" class="ce-assist-options"></div>',false);
+  filterMakets('');
+ }
+ function filterMakets(query){
+  if(state?.mode!=='makets')return;
+  const q=String(query).toLocaleLowerCase('ru-RU').trim();
+  const results=state.items.filter(([number,name])=>!q||String(number).includes(q)||
+    String(name).toLocaleLowerCase('ru-RU').includes(q));
+  const root=document.querySelector('#ce-assist-options');
+  if(!root)return;
+  root.innerHTML=results.map(([number,name])=>
+    '<button type="button" class="ce-assist-option" data-ce-assist-maket="'+number+'">'+
+    '<b>Макет '+number+'</b><span>'+h(name)+'</span></button>').join('')+
+    (!results.length?'<p class="ce-assist-tip">Макет не найден.</p>':'');
+ }
+ function enhance(){const b=board();if(!b||!document.querySelector('.ce-modal #ce-form'))return;const toolbar=document.querySelector('.ce-modal .dt-toolbar');if(toolbar&&!toolbar.querySelector('.ce-assist-shortcuts')){const node=document.createElement('div');node.className='ce-assist-shortcuts';node.innerHTML='<button type="button" data-ce-assist-find>⌕ Найти поле</button><button type="button" data-ce-assist-row>▦ Древостой</button><button type="button" data-ce-assist-makets>Макеты</button>';toolbar.insertBefore(node,toolbar.querySelector('.dt-tools'));}
   if(!document.querySelector('.ce-mobile-tabs')){const nav=document.createElement('nav');nav.className='ce-mobile-tabs';nav.setAttribute('aria-label','Макеты карточки');nav.innerHTML=[['main','Карточка'],...[1,2,3,4,5,10,31,32].map(n=>[String(n),'М'+n])].map(([id,label])=>'<button type="button" data-ce-jump="'+id+'">'+label+'</button>').join('');nav.insertAdjacentHTML('beforeend',[11,12,13,14,15,16,17,19,20,21,23,25,27,28].map(n=>'<button type="button" data-ce-mobile-extra="Макет'+n+'" title="'+h(SolinHuman.formName('Макет'+n))+'">М'+n+'</button>').join(''));toolbar.after(nav);}
  }
  function back(){if(state?.mode==='field'&&state.returnRow!=null)editRow(state.returnRow);else dismiss();}
@@ -36,14 +62,29 @@
   if(target.hasAttribute('data-ce-assist-option')){const option=state?.list?.[Number(target.dataset.ceAssistOption)];if(option)finishField(option.value);return;}
   if(target.hasAttribute('data-ce-assist-row-field')){const i=Number(target.dataset.ceAssistRowField),s=state;if(s?.mode==='row')editField(s.cols[i],s.index);return;}
   if(target.hasAttribute('data-ce-assist-pick')){const el=state?.fields?.[Number(target.dataset.ceAssistPick)];if(el)editField(el);return;}
+  if(target.hasAttribute('data-ce-assist-maket')){
+    const number=target.dataset.ceAssistMaket;
+    dismiss();
+    const mobileTab=document.querySelector('.ce-mobile-tabs [data-ce-jump="'+number+'"],.ce-mobile-tabs [data-ce-mobile-extra="Макет'+number+'"]');
+    if(mobileTab)mobileTab.click();
+    return;
+  }
  }
  document.addEventListener('pointerdown',e=>{if(!mobile()||!board()||!e.target?.closest)return;const el=e.target.closest('.dt-board select[data-ce-field]');if(!el||el.disabled||el.readOnly||!host()||layer()?.hidden===false)return;e.preventDefault();e.stopPropagation();editField(el);},true);
  document.addEventListener('click',e=>{if(!document.querySelector('.ce-modal'))return;const lay=layer();if(lay&&!lay.hidden&&lay.contains(e.target)){overlayAction(e);return;}
-  const shortcut=e.target.closest?.('[data-ce-assist-find],[data-ce-assist-row]');if(shortcut&&mobile()){e.preventDefault();e.stopPropagation();shortcut.hasAttribute('data-ce-assist-find')?editPicker():editSelectedRow();return;}
-  const extra=e.target.closest?.('[data-ce-mobile-extra]');if(extra){document.querySelector('.dt-footer [data-ce-extra="'+extra.dataset.ceMobileExtra+'"]').click();return;}
+  const shortcut=e.target.closest?.('[data-ce-assist-find],[data-ce-assist-row],[data-ce-assist-makets]');if(shortcut&&mobile()){e.preventDefault();e.stopPropagation();if(shortcut.hasAttribute('data-ce-assist-find'))editPicker();else if(shortcut.hasAttribute('data-ce-assist-makets'))editMaketPicker();else editSelectedRow();return;}
+  const extra=e.target.closest?.('[data-ce-mobile-extra]');if(extra){
+   const direct=document.querySelector('.dt-footer [data-ce-extra="'+extra.dataset.ceMobileExtra+'"]');
+   if(direct)direct.click();
+   else{
+     const select=document.querySelector('.dt-maket-select');
+     if(select){select.value=extra.dataset.ceMobileExtra.replace('Макет','');select.dispatchEvent(new Event('change',{bubbles:true}));}
+   }
+   return;
+  }
   const jump=e.target.closest?.('[data-ce-jump]');if(jump){const id=jump.dataset.ceJump;document.querySelectorAll('.ce-mobile-tabs button').forEach(b=>{if(b===jump)b.setAttribute('aria-current','true');else b.removeAttribute('aria-current');});document.querySelector('#ce-extra').hidden=true;document.querySelector('#ce-action-panel').hidden=true;document.querySelector(id==='main'?'.dt-header':'#ce-section-'+id)?.scrollIntoView({block:'start'});return;}
   const el=e.target.closest?.('.dt-board select[data-ce-field]');if(el&&mobile()&&lay?.hidden!==false){e.preventDefault();e.stopPropagation();editField(el);}},true);
- document.addEventListener('input',e=>{if(e.target?.id==='ce-assist-query'){if(state?.mode==='picker')filterPicker(e.target.value);else filterOptions(e.target.value);}},true);
+ document.addEventListener('input',e=>{if(e.target?.id==='ce-assist-query'){if(state?.mode==='picker')filterPicker(e.target.value);else if(state?.mode==='makets')filterMakets(e.target.value);else filterOptions(e.target.value);}},true);
  document.addEventListener('keydown',e=>{const lay=document.querySelector('#ce-assist');if(!lay||lay.hidden)return;if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();back();}if(e.key==='Enter'&&e.target?.id==='ce-assist-value'){e.preventDefault();finishField(e.target.value);}},true);
  const observer=new MutationObserver(()=>{enhance();const lay=document.querySelector('#ce-assist');if(lay&&!document.querySelector('.ce-modal'))dismiss();});observer.observe(document.getElementById('modal')||document.body,{subtree:true,childList:true});
  enhance();
