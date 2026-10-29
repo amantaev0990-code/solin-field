@@ -53,9 +53,67 @@ function renderComp(){const r=current;$('#cardTitle').textContent=`Кварта�
 function renderChild(n,btn){$$('.chip').forEach(x=>x.classList.remove('active'));btn?.classList.add('active');const rs=current._children?.[n]||[];$('#childContent').innerHTML=`<div class="humanSection"><h3>${childNames[n]||n}</h3>${rs.map(r=>`<div class="humanGrid">${Object.entries(r).filter(([k,v])=>!['POS','LESN','KV','KGLF','VD'].includes(k)&&v!==null&&v!=='').map(([k,v])=>field(k,v)).join('')}</div>`).join('')||'<div class="empty">Нет данных</div>'}</div>`}
 function openQuarterForm(){openModal('Новый квартал',`<div class="formGrid"><label><span>Номер квартала</span><input id="newKV" inputmode="numeric" placeholder="Например, 91"></label><label><span>Категория лесного фонда</span><input id="newKGLF" inputmode="numeric" placeholder="Шифр, если известен"></label><label><span>Природная зона</span><input id="newKpz" inputmode="numeric" placeholder="Шифр"></label><label><span>Лесорастительная зона</span><input id="newKlxr" inputmode="numeric" placeholder="Шифр"></label></div><div class="formActions"><button class="secondary" onclick="closeModal()">Отмена</button><button class="primary" onclick="createQuarter()">Создать</button></div>`)}
 function createQuarter(){const raw=$('#newKV').value.trim();if(!/^\d+$/.test(raw)||Number(raw)<=0)return toast('Номер квартала должен быть положительным целым');const k=String(Number(raw));if(!k)return toast('Укажи номер квартала');if(D.quarters[k])return toast('Такой квартал уже есть');D.quarters[k]={meta:{POS:D.lesnichestvo?.[0]?.POS,LESN:D.lesnichestvo?.[0]?.LESN,KV:+k||k,KGLF:$('#newKGLF').value||null,Kpz:$('#newKpz').value||null,Klxr:$('#newKlxr').value||null},compartments:[],_local:true};saveLocal();closeModal();refresh();show('quartersScreen');toast('Квартал создан')}
-function openCompForm(k='',selectedKGLF=null){const opts=Object.keys(D.quarters).sort((a,b)=>+a-+b).map(x=>`<option value="${esc(x)}" ${String(x)===String(k)?'selected':''}>Квартал ${esc(x)}</option>`).join('');const ku=Object.entries(D.fieldLookups?.KU||{}).filter(([c,n])=>c&&n).map(([c,n])=>`<option value="${esc(c)}">${esc(n)} · ${esc(c)}</option>`).join('');openModal('Новый выдел',`<div class="formGrid"><label><span>Квартал</span><select id="newCompKV" onchange="openCompForm(this.value)">${opts}</select></label><label><span>Категория ГЛФ</span><select id="newCompKGLF">${(D.quarters[k]?.quarterRows||[D.quarters[k]?.meta||{}]).map(x=>`<option value="${esc(x.KGLF??'')}" ${selectedKGLF!=null&&String(x.KGLF)===String(selectedKGLF)?'selected':''}>${esc(x.KGLF)}</option>`).join('')}</select></label><label><span>Номер выдела</span><input id="newVD" inputmode="numeric" placeholder="Например, 12"></label><label><span>Площадь, га</span><input id="newPLV" inputmode="decimal" placeholder="Например, 4.6"></label><label><span>Категория угодий</span><select id="newKU"><option value="">Выбрать…</option>${ku}</select></label><label><span>Преобладающая порода</span><input id="newPOR" inputmode="numeric" placeholder="Шифр породы"></label><label><span>Класс бонитета</span><input id="newBon" inputmode="numeric" placeholder="Шифр"></label></div><div class="formActions"><button class="secondary" onclick="closeModal()">Отмена</button><button class="primary" onclick="createComp()">Создать</button></div>`)}
+function openCompForm(k='',selectedKGLF=null){if(!D?.quarters)return;const quarterIds=Object.keys(D.quarters).sort((a,b)=>+a-+b);if(!quarterIds.length)return toast('Сначала создайте квартал');if(!D.quarters[k])k=quarterIds[0];const opts=quarterIds.map(x=>`<option value="${esc(x)}" ${String(x)===String(k)?'selected':''}>Квартал ${esc(x)}</option>`).join('');const ku=Object.entries(D.fieldLookups?.KU||{}).filter(([c,n])=>c&&n).map(([c,n])=>`<option value="${esc(c)}">${esc(n)} · ${esc(c)}</option>`).join('');openModal('Новый выдел',`<div class="formGrid"><label><span>Квартал</span><select id="newCompKV" onchange="updateNewCompQuarter(this.value)">${opts}</select></label><label><span>Категория ГЛФ</span><select id="newCompKGLF">${(D.quarters[k]?.quarterRows||[D.quarters[k]?.meta||{}]).map(x=>`<option value="${esc(x.KGLF??'')}" ${selectedKGLF!=null&&String(x.KGLF)===String(selectedKGLF)?'selected':''}>${esc(x.KGLF)}</option>`).join('')}</select></label><label><span>Номер выдела</span><input id="newVD" inputmode="numeric" placeholder="Например, 12"></label><label><span>Площадь, га</span><input id="newPLV" inputmode="decimal" placeholder="Например, 4.6"></label><label><span>Категория угодий</span><select id="newKU"><option value="">Выбрать…</option>${ku}</select></label><label><span>Преобладающая порода</span><input id="newPOR" inputmode="numeric" placeholder="Шифр породы"></label><label><span>Класс бонитета</span><input id="newBon" inputmode="numeric" placeholder="Шифр"></label></div><div class="formActions"><button class="secondary" onclick="closeModal()">Отмена</button><button class="primary" onclick="createComp()">Создать</button></div>`)}
+// The native iOS <select> is still finishing its change event here.
+// Rebuilding the entire modal in that event can strand an invisible picker
+// above the form, blocking every tap. Update only the dependent KGLF list.
+function updateNewCompQuarter(k){
+ const category=document.getElementById('newCompKGLF');
+ const q=D?.quarters?.[k];
+ if(!category||!q)return;
+ const rows=q.quarterRows?.length?q.quarterRows:[q.meta||{}];
+ const selected=category.value;
+ const used=new Set();
+ const options=[];
+ for(const row of rows){
+  const value=row.KGLF==null?'':String(row.KGLF);
+  if(used.has(value))continue;
+  used.add(value);
+  options.push(new Option(value?'КГЛФ '+value:'Не указано',value));
+ }
+ category.replaceChildren(...options);
+ if(options.some(o=>o.value===selected))category.value=selected;
+}
 function createComp(){const k=$('#newCompKV').value,vd=$('#newVD').value.trim(),pl=Number($('#newPLV').value.replace(',','.'));if(!k||!vd)return toast('Укажи квартал и выдел');if(!Number.isFinite(pl)||pl<=0)return toast('Проверь площадь');if(D.quarters[k].compartments.some(r=>Number(r.VD)===Number(vd)&&String(r.KGLF??'')===String($('#newCompKGLF')?.value??'')))return toast('Такой выдел уже есть');if(!/^\d+$/.test(vd)||Number(vd)<=0)return toast('Номер выдела должен быть положительным целым');const source=(D.quarters[k].quarterRows||[]).find(q=>String(q.KGLF)===String($('#newCompKGLF')?.value))||D.quarters[k].meta||{};const r={POS:source.POS??D.lesnichestvo?.[0]?.POS,LESN:source.LESN??D.lesnichestvo?.[0]?.LESN,KGLF:source.KGLF??null,KV:+k||k,VD:+vd||vd,PLV:pl,KU:$('#newKU').value||null,M3Pr:$('#newPOR').value||null,M3B:$('#newBon').value||null,_children:{},_local:true};D.quarters[k].compartments.push(r);saveLocal();closeModal();refresh();show('quartersScreen');openQuarter(k);toast('Выдел создан')}
-function openModal(t,html){$('#modalTitle').textContent=t;$('#modalBody').innerHTML=html;$('#modal').classList.remove('hidden')}function closeModal(){$('#modal').classList.add('hidden')}
+// A single modal root for every standard SOLI-N Field window. Keep it
+// above fullscreen map/sheets; never recreate that root while an iOS
+// native picker is active. The taxation card supplies its own close guard.
+function openModal(t,html){
+ const modal=$('#modal');
+ if(!modal)return;
+ $('#modalTitle').textContent=t;
+ $('#modalBody').innerHTML=html;
+ modal.classList.remove('hidden');
+ modal.setAttribute('role','dialog');
+ modal.setAttribute('aria-modal','true');
+ modal.setAttribute('aria-labelledby','modalTitle');
+ const x=modal.querySelector('.modalHead .close');
+ if(x){x.type='button';x.setAttribute('aria-label','Закрыть окно');}
+}
+function closeModal(){
+ const modal=$('#modal');
+ if(!modal)return;
+ modal.classList.add('hidden');
+ modal.removeAttribute('role');
+ modal.removeAttribute('aria-modal');
+ modal.removeAttribute('aria-labelledby');
+}
+// Always route backdrop and Escape through the current close button, since
+// the card editor may have replaced it with a confirm-unsaved-changes guard.
+document.addEventListener('click',event=>{
+ const modal=$('#modal');
+ if(!modal||modal.classList.contains('hidden')||event.target!==modal)return;
+ modal.querySelector('.modalHead .close')?.click();
+});
+document.addEventListener('keydown',event=>{
+ const modal=$('#modal');
+ if(event.key!=='Escape'||event.defaultPrevented||!modal||modal.classList.contains('hidden'))return;
+ const overlay=modal.querySelector('#ce-assist');
+ if(overlay&&!overlay.hidden)return; // card assistant handles its own Escape
+ event.preventDefault();
+ event.stopImmediatePropagation();
+ modal.querySelector('.modalHead .close')?.click();
+});
 function toggleQuarterSearch(){$('#qSearch').classList.toggle('hidden')}function toggleCompSearch(){$('#vSearch').classList.toggle('hidden')}
 function renderFriendlyRefs(q=''){q=q.trim().toLowerCase();const box=$('#friendlyRefs');if(!D)return;const wanted=Object.entries(refNames).filter(([code,name])=>!q||code.toLowerCase().includes(q)||name.toLowerCase().includes(q));box.innerHTML=wanted.map(([code,name])=>{const lookupKey=code==='SKU'?'KU':code==='SDP'?'POR':code==='SIAR'?'IAR':code==='SBon'?'M3B':code==='STB'?'TB':null;const rows=lookupKey?Object.entries(D.fieldLookups?.[lookupKey]||{}).filter(([c,n])=>c&&n):[];return `<details class="refCard"><summary><b>${name}</b><small>${rows.length?rows.length+' значений':'внутренний справочник SOLI-N'}</small></summary>${rows.length?`<div class="refRows">${rows.slice(0,250).map(([c,n])=>`<div class="refRow"><span class="refCode">${esc(c)}</span><span>${esc(n)}</span></div>`).join('')}</div>`:''}</details>`}).join('')}
 function renderDb(){const box=$('#dbTables');if(!box||!D)return;box.innerHTML=Object.entries(D.transfSchema||{}).map(([n,cols])=>`<div class="dbRow"><b>${childNames[n]||n.replace('Макет','Макет ')}</b><small>${cols.length} полей</small></div>`).join('')}
