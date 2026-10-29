@@ -184,8 +184,23 @@ function capture(el){if(!el.matches('[data-ce-field]'))return;
  const {ceScope:scope,ceField:field,ceRow:index}=el.dataset;
  if(scope.startsWith('Макет')&&!session.draft._children[scope]?.[Number(index)]){(session.draft._children[scope]??=[]).push(newTableRow(scope));el.closest('tr')?.removeAttribute('data-ce-placeholder');session.changedMakets.add(scope);}
  const target=scope==='base'?session.draft:scope==='quarter'?session.quarter:session.draft._children[scope][Number(index)];
+ const previous=target[field];
  try{target[field]=readValue(el,target[field]);el.removeAttribute('aria-invalid');el.setCustomValidity('');}
  catch(e){el.setAttribute('aria-invalid','true');el.setCustomValidity(e.message);}
+ if(scope==='Макет10'&&field==='POR'&&window.SolinDependentRules){
+  const engine=window.SolinDependentRules,refs=window.SOLIN_REFS?.tables;
+  const suggested=engine.suggestedOrigin(target.POR,refs),oldSuggested=engine.suggestedOrigin(previous,refs);
+  const currentOrigin=target.PROI;
+  if(suggested!==null&&(currentOrigin==null||String(currentOrigin)==='0'||oldSuggested!==null&&String(currentOrigin)===String(oldSuggested))){
+   target.PROI=suggested;
+   const originEl=document.getElementById('ce_'+scope+'_'+index+'_PROI');
+   if(originEl){
+    if(originEl.tagName==='SELECT'&&!Array.from(originEl.options).some(o=>o.value===String(suggested)))
+      originEl.add(new Option(String(suggested),String(suggested)));
+    originEl.value=String(suggested);
+   }
+  }
+ }
  const output=document.querySelector('[data-ce-display-for="'+el.id+'"]');if(output)output.textContent=description(el.dataset.ceForm,field,target[field]);
  session.dirty=true;document.querySelector('#ce-status').textContent='Изменено';
  refreshLinked();
