@@ -8,6 +8,10 @@
 const defined=x=>x!==null&&x!==undefined&&String(x).trim()!=='';
 const n=x=>defined(x)&&Number.isFinite(Number(x))?Number(x):null;
 const same=(a,b)=>defined(a)&&defined(b)&&String(a).trim()===String(b).trim();
+const address=['POS','LESN','KV','KGLF','VD'];
+function childMatches(record,row){
+ return address.every(k=>!defined(row[k])||same(row[k],record[k]));
+}
 function status(message,reason='unavailable'){return {status:reason,reason:message,corrections:[]};}
 function safeRoundHalf(numb,places=0){
  if(!Number.isFinite(numb)||numb<0)return null;
@@ -21,7 +25,7 @@ function bonitet(record,refs){
  const category=n(record?.KU);
  if(category===null)return status('Сначала выберите категорию угодий','waiting');
  if(category>=11)return status('Контроль К58 относится к категориям KU меньше 11','not-applicable');
- const rows=(record?._children?.['Макет10']||[]).filter(row=>n(row.IAR)===1&&n(row.POL)!==null&&n(row.POL)!==0&&same(row.POR,record.M3Pr));
+ const rows=(record?._children?.['Макет10']||[]).filter(row=>childMatches(record,row)&&n(row.IAR)===1&&n(row.POL)!==null&&n(row.POL)!==0&&same(row.POR,record.M3Pr));
  if(rows.length!==1)return status('К58: нужна одна однозначная ведущая строка 1-го яруса макета 10'+(rows.length?' (найдено '+rows.length+')':'') ,rows.length?'ambiguous':'waiting');
  const row=rows[0],age=n(row.LET),height=n(row.PH),origin=n(row.PROI);
  if(age===null||height===null||origin===null||age<=0||height<0)return status('К58: не хватает возраста, высоты или происхождения','waiting');
@@ -48,7 +52,7 @@ function standStock(record){
  if(category===null||area===null||area<=0)return status('Не заданы категория угодий или площадь','waiting');
  if(category>=20)return status('Расчёт Макет10ЗАП1 применяется к KU меньше 20','not-applicable');
  const eligible=(record?._children?.['Макет10']||[]).filter(row=>
-   same(row.POR,record.M3Pr)&&n(row.IAR)!==null&&(n(row.IAR)<4||n(row.IAR)===8)&&
+   childMatches(record,row)&&same(row.POR,record.M3Pr)&&n(row.IAR)!==null&&(n(row.IAR)<4||n(row.IAR)===8)&&
    n(row.ZAP)!==null&&n(row.ZAP)!==0);
  if(!eligible.length)return status('В макете 10 нет подходящих строк с запасом главной породы','waiting');
  const grouped=eligible.map(x=>['IAR','KOEF','LET','PH','PD2','POL'].map(k=>String(x[k]??'')).join('|'));
