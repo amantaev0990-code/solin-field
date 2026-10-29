@@ -6,7 +6,7 @@ const vm=require('node:vm');
 const assert=require('node:assert/strict');
 const source=fs.readFileSync('solin-card-editor.js','utf8');
 function launch(quarters){
- const context={window:{},D:{quarters}};
+ const context={window:{addEventListener(){}},D:{quarters}};
  vm.runInNewContext(source,context,{filename:'solin-card-editor.js'});
  return context.window.SolinCardEditor.resolveQuarter;
 }
