@@ -63,7 +63,63 @@ function standStock(record){
  return {status:'complete',reason:'Макет10ЗАП · ΣZAP главной породы '+perHa+' м³/га × '+area+' га',
    expectedPerHa:perHa,expectedTotal:total,area};
 }
-function corrections(record,refs){
+// K59, constrained to one main-species Maket 10 row, with an exact
+// (KTO, POR, KlxrVD, KUL) lookup in original Szap. The physical Szap
+// table has 2389 unique keys. No approximate height extrapolation.
+function stockPerHectare(record,refs,org){
+ if(!refs?.Szap?.length)return status('Таблица запасов Szap недоступна');
+ const category=n(record?.KU),area=n(record?.PLV),region=n(org?.KTO),zone=n(record?.KlxrVD);
+ if(category===null||area===null||area<=0||region===null||zone===null)
+  return status('К59: не указаны категория, площадь, лесохозяйственная зона или KTO','waiting');
+ if(category>=11)return status('К59 проверяет KU10 меньше 11','not-applicable');
+ const all=record?._children?.['Макет10']||[];
+ const selected=all.map((row,index)=>({row,index})).filter(({row})=>
+   childMatches(record,row)&&same(row.POR,record.M3Pr)&&
+   [1,2,3,5].includes(n(row.IAR))&&n(row.KOEF)!==null&&n(row.KOEF)!==0&&
+   n(row.POL)!==null&&n(row.POL)>0);
+ if(selected.length!==1)return status('К59: не найдена однозначная строка основного яруса для расчёта',selected.length?'ambiguous':'waiting');
+ const {row,index}=selected[0],sameLayer=all.filter(r=>childMatches(record,r)&&same(r.IAR,row.IAR));
+ if(sameLayer.length!==1)return status('К59: несколько строк с одинаковым ярусом; необходимо суммирование по запросу','ambiguous');
+ const weighted=n(row.KOEF)*n(row.PH)/10;
+ if(!Number.isFinite(weighted)||weighted<=0)return status('К59: не указаны коэффициент состава или высота','waiting');
+ const height=safeRoundHalf(weighted,0);
+ if(height===null||height<1||height>39)return status('К59: неоднозначная или недоступная высота в таблице Szap','ambiguous');
+ const specie=String(row.POR).trim();
+ const cul=(([2,4,7].includes(category)&&['С','СО'].includes(specie))||
+   (n(row.IAR)===5&&['С','СО'].includes(specie)))?'К':
+   n(record.POS)===1424&&specie==='Л'?'З':'.';
+ const rows=refs.Szap.filter(r=>same(r.Obl,region)&&same(r.p1,row.POR)&&same(r.LXZ,zone)&&same(r.KUL,cul));
+ if(rows.length!==1)return status('К59: таблица Szap не имеет единственной строки для KTO, POR, LXZ и KUL','ambiguous');
+ const v=n(rows[0]['v'+height]),pol=n(row.POL);
+ if(v===null||v<=0)return status('К59: нет нормативного запаса для этой высоты','ambiguous');
+ const standard=safeRoundHalf(v*pol,0);
+ if(standard===null)return status('К59: расчёт попал на неоднозначное округление','ambiguous');
+ let expected=standard,source='Szap, высота '+height+' м, полнота '+pol;
+ const CK=(refs.SzapCK||[]).filter(r=>same(r.Obl,region)&&same(r.p1,row.POR)&&same(r.Boni,record.M3B));
+ if(CK.length>1)return status('К59: несколько совпадающих таблиц SzapCK','ambiguous');
+ if(CK.length){
+   const step=safeRoundHalf(weighted,1);
+   if(step===null)return status('К59: неоднозначное округление высоты в SzapCK','ambiguous');
+   const col='v'+Math.round(step*10).toString().padStart(2,'0')+'c';
+   const vck=n(CK[0][col]);
+   if(vck!==null&&vck>0){
+     const year=n(record.GodT1);
+     // QueryDef uses ВыделВыб.GodT1, NOT the quarter's current GodT.
+     if(year===null)return status('К59: для выбора SzapCK нужен исходный GodT1 (год таксации выдела)','ambiguous');
+     if(year>2016){
+       const species=(refs.SDP_Tip||refs.SDP||[]).find(r=>same(r.KPC,row.POR));
+       const ndr=n(species?.NDR);
+       if(ndr===null)return status('К59: группа NDR неизвестна для выбора нормы SzapCK','ambiguous');
+       expected=safeRoundHalf(vck*pol,ndr===4?1:0);
+       if(expected===null)return status('К59: неоднозначное округление SzapCK','ambiguous');
+       source='SzapCK, высота '+step+' м, полнота '+pol+', год '+year;
+     }
+   }
+ }
+ return {status:'complete',field:'ZAP',index,expected,reason:'К59 · '+source+
+  ' · POR '+specie+', KTO '+region+', LXZ '+zone+', KUL '+cul};
+}
+function corrections(record,refs,org){
  const issues=[],unknown=[];
  const b=bonitet(record,refs);
  if(b.status==='complete'&&defined(record.M3B)&&!same(record.M3B,b.expected))
@@ -71,7 +127,21 @@ function corrections(record,refs){
  else if(b.status==='complete'&&!defined(record.M3B))
   issues.push({field:'M3B',label:'Бонитет',previous:'Не указан',expected:String(b.expected),reason:b.reason});
  else if(b.status!=='complete')unknown.push({field:'M3B',...b});
- const stock=standStock(record);
+ const k59=stockPerHectare(record,refs,org);
+ let computedRecord=record;
+ if(k59.status==='complete'){
+  const current=record._children.Макет10[k59.index].ZAP;
+  if(!defined(current)||n(current)!==k59.expected){
+    issues.push({field:'ZAP',scope:'Макет10',index:k59.index,label:'Запас на 1 га (макет 10), м³/га',
+      previous:defined(current)?String(current):'Не указан',expected:k59.expected,reason:k59.reason});
+    // Recalculate STUR from the corrected per-hectare value, not from
+    // the user-entered wrong ZAP; never modify the supplied record.
+    const children={...record._children,Макет10:record._children.Макет10.map((r,i)=>
+      i===k59.index?{...r,ZAP:k59.expected}:r)};
+    computedRecord={...record,_children:children};
+  }
+ }else unknown.push({field:'ZAP',...k59});
+ const stock=standStock(computedRecord);
  if(stock.status==='complete'){
   for(const [field,label,expected] of [['STUR1','Запас на 1 га, м³/га',stock.expectedPerHa],['STUR','Запас выдела, м³',stock.expectedTotal]]){
    const value=record?.[field];
@@ -79,7 +149,7 @@ function corrections(record,refs){
     issues.push({field,label,previous:defined(value)?String(value):'Не указан',expected,reason:stock.reason});
   }
  }else unknown.push({field:'STUR',...stock});
- return {issues,unknown,bonitet:b,standStock:stock};
+ return {issues,unknown,bonitet:b,standStock:stock,stockPerHectare:k59};
 }
-window.SolinCardCalculations={bonitet,standStock,corrections,safeRoundHalf};
+window.SolinCardCalculations={bonitet,standStock,stockPerHectare,corrections,safeRoundHalf};
 })();
