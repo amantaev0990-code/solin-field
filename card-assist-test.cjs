@@ -14,6 +14,14 @@ const server=http.createServer((req,res)=>{const rel=decodeURIComponent(req.url.
   await page.goto(process.env.TARGET_URL||'http://127.0.0.1:'+port+'/');
   await page.waitForFunction(()=>window.SolinWorkspace&&window.SOLIN_REFS&&window.SolinCardAssist);
   await page.evaluate(()=>SolinWorkspace.ready);
+  // The new-quarter native dropdowns must show original shifr alongside names.
+  await page.evaluate(()=>openQuarterForm());
+  for(const id of ['newKGLF','newKpz','newKlxr']){
+    const options=await page.locator('#'+id).evaluate(el=>el.tagName==='SELECT'?[...el.options].filter(o=>o.value).map(o=>[o.value,o.textContent]):[]);
+    assert(options.length>0,id+' must have original reference codes');
+    assert(options.every(([code,label])=>label.startsWith(code+' — ')||label===code),id+' hides source shifr');
+  }
+  await page.evaluate(()=>closeModal());
   await page.evaluate(async()=>{const f=(await SolinWorkspace.list())[0];await SolinWorkspace.activate(f.id);current=Object.values(D.quarters).flatMap(q=>q.compartments).find(r=>r._children?.Макет10?.length)||Object.values(D.quarters).flatMap(q=>q.compartments)[0];renderComp();show('card');});
   await page.locator('#wfEditBase').click();
   await page.locator('#ce-form').waitFor();
@@ -72,6 +80,23 @@ const server=http.createServer((req,res)=>{const rel=decodeURIComponent(req.url.
   await page.locator('#ce-cancel').click();
   assert(await page.locator('#ce-form').isHidden());
   assert(Math.abs(Number(await page.evaluate(()=>current.PLV))-Number(original.replace(',','.')))<0.00001,'Cancel must discard edited values (float32 precision)');
+  // Closing the desktop card must not leave its dark assist backdrop above
+  // subsequent ordinary modal forms (regression from CSS display:flex + hidden).
+  await page.evaluate(()=>solinWorkflow.editMaket('Макет10',(current._children?.Макет10||[]).length));
+  assert(await page.locator('#modalTitle').innerText().then(t=>t.includes('Новая запись')));
+  assert.equal(await page.locator('#ce-assist').evaluate(el=>getComputedStyle(el).display),'none');
+  assert(await page.locator('.modalCard').evaluate(el=>{const c=getComputedStyle(el);return c.backgroundColor==='rgb(255, 255, 255)'&&c.opacity==='1';}));
+  const coefficient=page.locator('#wf_KOEF');
+  assert.equal(await coefficient.getAttribute('placeholder'),'0');
+  assert.equal(await coefficient.inputValue(),'');
+  await coefficient.evaluate(el=>el.value='0');
+  await coefficient.focus();
+  assert.equal(await coefficient.inputValue(),'','zero should clear on focus');
+  await page.locator('#modalTitle').click();
+  assert.equal(await coefficient.inputValue(),'0','untouched genuine zero must be restored');
+  await coefficient.focus();await coefficient.fill('3');
+  assert.equal(await coefficient.inputValue(),'3','user should be able to type without deleting zero');
+  await page.evaluate(()=>closeModal());
   await page.setViewportSize({width:320,height:700});
   await page.locator('#wfEditBase').click();
   await page.locator('[data-ce-jump="1"]').click();

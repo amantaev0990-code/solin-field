@@ -19,6 +19,7 @@ const makeNode=(key='')=>{
   return node;
 };
 const document={
+  addEventListener(){}, // App delegates modal backdrop/Escape to document; no DOM events in this VM fixture.
   querySelector(q){return nodes[q]||(nodes[q]=makeNode(q));},
   createElement:()=>makeNode()
 };
