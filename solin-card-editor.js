@@ -87,10 +87,12 @@ function markup(){const s=session,r=s.draft,o=D.lesnichestvo?.find(x=>same(x.POS
  maket('32',cell('PLG',r.PLG,'base','ВыделВ',{label:'Густота',weight:2,split:true})+cell('PLP1',r.PLP1,'base','ВыделВ',{label:'1 порода',weight:2.8,split:true})+cell('PLP2',r.PLP2,'base','ВыделВ',{label:'2 порода',weight:2.8,split:true})+cell('PLP3',r.PLP3,'base','ВыделВ',{label:'3 порода',weight:2.8,split:true}))+footer()+'</div><div id="ce-extra" hidden></div><div id="ce-action-panel" hidden></div><div class="ce-other" hidden><div class="ce-grid">'+fields('ВыделВ',rest,r,'base')+cell('STUR1',r.STUR1,'base','ВыделВ',{label:'Запас на гектар'})+'</div></div></div></div></div><div id="ce-error" role="alert" tabindex="-1"></div></form>';
 }
 
-function readValue(el,old){const raw=el.value.trim(),field=el.dataset.ceField;
+function readValue(el,old){const raw=el.tagName==='SELECT'?el.value:el.value.trim(),field=el.dataset.ceField;
  if(raw==='')return null;
- if(numeric.has(field)){const n=Number(raw.replace(',','.'));if(!Number.isFinite(n))throw Error('Проверьте число: '+el.getAttribute('aria-label'));return n;}
- if(old!=null&&same(raw,old))return old;
+ if(numeric.has(field)){const n=Number(raw.trim().replace(',','.'));if(!Number.isFinite(n))throw Error('Проверьте число: '+el.getAttribute('aria-label'));return n;}
+ if(old!=null&&raw===String(old))return old;
+ // Access TEXT keys (STL.KTL in particular) may have significant whitespace.
+ // Never trim a selected original reference code.
  return el.tagName==='SELECT'&&typeof old==='number'&&Number.isFinite(Number(raw))?Number(raw):raw;
 }
 function linkedRow(el){
