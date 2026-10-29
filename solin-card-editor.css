@@ -33,3 +33,7 @@
 .ce-calc-table-wrap table{width:100%;border-collapse:collapse;min-width:560px;text-align:left;font-size:12px}
 .ce-calc-table-wrap th,.ce-calc-table-wrap td{border:1px solid #c9d6ca;padding:6px 8px;vertical-align:top;white-space:normal}
 .ce-calc-table-wrap th{background:#e9f1e7;font-weight:700}
+
+.wf-calc-warning{border-collapse:collapse;min-width:540px;width:100%;font-size:13px;margin:12px 0}
+.wf-calc-warning th,.wf-calc-warning td{border:1px solid #d4dfd4;padding:7px 9px;text-align:left;vertical-align:top;overflow-wrap:anywhere}
+.wf-calc-warning th{background:#edf4ee;color:#254a35}
