@@ -176,23 +176,28 @@ function recalculateEditedField(el){
  if(!(scope==='base'&&baseFields.has(field)||scope==='Макет10'&&standFields.has(field)))return;
  // Keep malformed numeric input and its error visible instead of overwriting it.
  if(el.getAttribute('aria-invalid')==='true')return;
- const check=calc.corrections(session.draft,window.SOLIN_REFS?.tables);
+ const check=calc.corrections(session.draft,window.SOLIN_REFS?.tables,linkedOrg());
  const changed=[];
  for(const issue of check.issues){
-   if(!['M3B','STUR1','STUR'].includes(issue.field))continue;
-   const prior=session.draft[issue.field];
-   // A real change in an associated field triggers the original calculation.
+   if(!['M3B','STUR1','STUR','ZAP'].includes(issue.field))continue;
+   const isTree=issue.field==='ZAP'&&Number.isInteger(issue.index);
+   const prior=isTree?session.draft._children?.Макет10?.[issue.index]?.ZAP:session.draft[issue.field];
    const corrected=issue.field==='M3B'?String(issue.expected):Number(issue.expected);
    if(String(prior??'')===String(corrected))continue;
-   session.draft[issue.field]=corrected;
+   if(isTree){
+     session.draft._children.Макет10[issue.index].ZAP=corrected;
+     session.changedMakets.add('Макет10');
+   }else session.draft[issue.field]=corrected;
    changed.push({...issue,previous:prior==null?'Не указано':String(prior),expected:String(corrected)});
-   const fieldEl=document.querySelector('#ce-form [data-ce-field="'+issue.field+'"][data-ce-scope="base"]');
+   const fieldEl=isTree?
+     document.querySelector('#ce-form [data-ce-field="ZAP"][data-ce-scope="Макет10"][data-ce-row="'+issue.index+'"]'):
+     document.querySelector('#ce-form [data-ce-field="'+issue.field+'"][data-ce-scope="base"]');
    if(fieldEl){
      if(fieldEl.tagName==='SELECT'&&!Array.from(fieldEl.options).some(o=>o.value===String(corrected)))
        fieldEl.add(new Option(String(corrected),String(corrected)));
      fieldEl.value=String(corrected);
      const output=document.querySelector('[data-ce-display-for="'+fieldEl.id+'"]');
-     if(output)output.textContent=description('ВыделВ',issue.field,corrected);
+     if(output)output.textContent=description(isTree?'Макет10':'ВыделВ',issue.field,corrected);
    }
  }
  if(!changed.length)return;
