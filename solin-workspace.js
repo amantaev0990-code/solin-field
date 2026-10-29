@@ -31,8 +31,140 @@ function showHome(){opened=false;show('homeScreen');heading();return renderHome(
 async function home(){await persist();return showHome();}
 async function renderHome(){const forests=await list(),host=document.querySelector('#forestList');host.innerHTML=forests.length?'':'<p class="home-empty">Добавьте лесничество из Transfer или создайте новое.</p>';for(const f of forests){const qs=Object.values(f.quarters),rows=qs.flatMap(q=>q.compartments||[]),area=rows.reduce((n,r)=>n+(Number(r.PLV)||0),0);const b=document.createElement('button');b.className='forest-option';b.dataset.forest=f.id;b.innerHTML='<span class="forest-option-icon">♧</span><span><strong>'+html(f.org.NOS)+'</strong><small>'+html(f.org.NLX||'Лесовладелец не указан')+'</small><span class="forest-summary">'+qs.length+' кварталов · '+rows.length+' выделов · '+num(area)+' га</span></span><span class="forest-option-open">Открыть →</span>';b.onclick=()=>activate(f.id).catch(e=>toast(e.message));host.append(b);}document.querySelector('#forestListStatus').textContent=forests.length?'Сохранено на этом устройстве: '+forests.length:'Готово к началу работы';}
 function codes(org){for(const [key,name]of [['POS','лесовладельца'],['LESN','лесничества']])if(!/^\d+$/.test(String(org[key]))||Number(org[key])<1||Number(org[key])>32767)throw Error('Номер '+name+' должен быть от 1 до 32767');org.POS=Number(org.POS);org.LESN=Number(org.LESN);return org;}
-async function create(input){const forests=await list();const org={...input,NOS:String(input.NOS||'').trim(),NLX:String(input.NLX||'').trim(),GodT:Number(input.GodT||new Date().getFullYear())};if(!org.NOS||!org.NLX)throw Error('Укажите названия лесничества и лесовладельца');if(!Number.isInteger(org.GodT)||org.GodT<1900||org.GodT>2200)throw Error('Проверьте год таксации');if(!org.POS)org.POS=Math.max(0,...forests.map(f=>Number(f.org.POS)))+1;if(!org.LESN)org.LESN=1;codes(org);const id=idOf(org);if(forests.some(r=>r.id===id))throw Error('Это лесничество уже существует. Выберите его на главном экране');const forest={id,org,quarters:{},source:{forestDistrict:org.NOS,year:org.GodT,notes:'Создано в SOLI-N Field'},history:[],updatedAt:new Date().toISOString()};await putMany([forest]);await activate(id);closeModal();return forest;}
-function newForest(){openModal('Новое лесничество','<p class="form-intro">Начните с названий. Номера для обмена присвоятся автоматически; при необходимости укажите номера настольной базы.</p><div class="formGrid"><label><span>Название лесничества</span><input id="orgName" placeholder="Название без сокращений" autocomplete="organization"></label><label><span>Лесовладелец / учреждение</span><input id="ownerName" placeholder="Полное название учреждения"></label><label><span>Год таксации</span><input id="inventoryYear" type="number" value="'+new Date().getFullYear()+'"></label></div><details class="exchange-details"><summary>Номера для обмена с настольной базой</summary><div class="formGrid"><label>Номер лесовладельца<input id="ownerCode" inputmode="numeric" placeholder="Автоматически"></label><label>Номер лесничества<input id="districtCode" inputmode="numeric" placeholder="Автоматически"></label></div></details><p id="forestFormError" role="alert"></p><div class="formActions"><button onclick="closeModal()">Отмена</button><button id="saveForest" class="primary">Создать и начать работу</button></div>');document.querySelector('#saveForest').onclick=async()=>{const b=document.querySelector('#saveForest');b.disabled=true;try{await create({NOS:document.querySelector('#orgName').value,NLX:document.querySelector('#ownerName').value,GodT:document.querySelector('#inventoryYear').value,POS:document.querySelector('#ownerCode').value,LESN:document.querySelector('#districtCode').value})}catch(e){document.querySelector('#forestFormError').textContent=e.message;b.disabled=false}};}
+// SOLI-N desktop hierarchy: область → лесовладелец → лесничество.
+// Names and identifiers below were transcribed from the user's three 10.31 screenshots.
+// No fabricated districts are added for owners absent from the photographed list.
+const SOLIN_REGIONS=[
+ {code:100,name:'Акмолинская область включая г. Астана'},
+ {code:200,name:'Актюбинская область'},
+ {code:300,name:'Алматинская область включая г. Алматы'},
+ {code:400,name:'Атырауская область'},
+ {code:1400,name:'Восточно-Казахстанская область'},
+ {code:600,name:'Жамбылская область'},
+ {code:500,name:'Западно-Казахстанская область'},
+ {code:700,name:'Карагандинская область'},
+ {code:800,name:'Костанайская область'},
+ {code:900,name:'Кызылординская область'},
+ {code:1000,name:'Мангистауская область'},
+ {code:1200,name:'Павлодарская область'},
+ {code:1300,name:'Северо-Казахстанская область'},
+ {code:1100,name:'Туркестанская область включая г. Шымкент'}
+];
+const SOLIN_REGION_OWNERS={
+ 200:[
+  {code:201,name:'Иргиз-Тургайский государственный природный резерват'},
+  {code:211,name:'Актюбинское государственное учреждение лесного хозяйства'},
+  {code:212,name:'Больше-Борсукское государственное учреждение лесного хозяйства'},
+  {code:213,name:'Карабутакское государственное учреждение лесного хозяйства'},
+  {code:214,name:'Мартукское государственное учреждение лесного хозяйства'},
+  {code:215,name:'Темирское государственное учреждение лесного хозяйства'},
+  {code:216,name:'Уилское государственное учреждение лесного хозяйства'},
+  {code:217,name:'Хобдинское государственное учреждение лесного хозяйства'},
+  {code:218,name:'Государственное учреждение "Лесное хозяйство «Оркаш»"'},
+  {code:219,name:'Байганинское государственное учреждение лесного хозяйства'},
+  {code:230,name:'Актюбинский филиал АО "НК" КазАвтоЖол'},
+  {code:251,name:'Актюбинская дистанция защитных лесонасаждений Актюбинское ЛЭП'}
+ ]
+};
+const SOLIN_OWNER_FORESTS={
+ 213:[{code:1,name:'Комсомольское'},{code:2,name:'Бугетсайское'},{code:3,name:'Карабутакское'}]
+};
+const matchCode=(a,b)=>String(a)===String(b);
+function forestRegionCode(f){
+ const known=f?.source?.regionCode??f?.org?.regionCode;
+ if(known!=null&&SOLIN_REGIONS.some(x=>matchCode(x.code,known)))return Number(known);
+ const owner=Number(f?.org?.POS);
+ return SOLIN_REGIONS.find(r=>(SOLIN_REGION_OWNERS[r.code]||[]).some(o=>o.code===owner))?.code??null;
+}
+function catalogOwners(regionCode,forests){
+ const owners=new Map((SOLIN_REGION_OWNERS[regionCode]||[]).map(o=>[String(o.code),o]));
+ for(const f of forests)if(matchCode(forestRegionCode(f),regionCode)&&f.org?.POS&&f.org?.NLX){
+  const key=String(f.org.POS);if(!owners.has(key))owners.set(key,{code:Number(f.org.POS),name:f.org.NLX});
+ }
+ return [...owners.values()].sort((a,b)=>Number(a.code)-Number(b.code));
+}
+function catalogForests(ownerCode,forests){
+ const districts=new Map((SOLIN_OWNER_FORESTS[ownerCode]||[]).map(o=>[String(o.code),o]));
+ for(const f of forests)if(matchCode(f.org?.POS,ownerCode)&&f.org?.LESN&&f.org?.NOS){
+  const key=String(f.org.LESN);if(!districts.has(key))districts.set(key,{code:Number(f.org.LESN),name:f.org.NOS});
+ }
+ return [...districts.values()].sort((a,b)=>Number(a.code)-Number(b.code));
+}
+function selectedFromCatalog(input,forests){
+ const region=SOLIN_REGIONS.find(r=>matchCode(r.code,input.regionCode));
+ if(!region)throw Error('Выберите область');
+ const owner=catalogOwners(region.code,forests).find(x=>matchCode(x.code,input.ownerCode));
+ if(!owner)throw Error('Выберите лесовладельца из указанной области');
+ const district=catalogForests(owner.code,forests).find(x=>matchCode(x.code,input.districtCode));
+ if(!district)throw Error('Выберите лесничество выбранного лесовладельца');
+ return {region,owner,district};
+}
+async function create(input){
+ const forests=await list();
+ let prepared={...input},region=null;
+ if(input.regionCode!=null){
+  const selected=selectedFromCatalog(input,forests);
+  region=selected.region;
+  prepared={POS:selected.owner.code,LESN:selected.district.code,NLX:selected.owner.name,NOS:selected.district.name,GodT:new Date().getFullYear()};
+ }
+ const org={...prepared,NOS:String(prepared.NOS||'').trim(),NLX:String(prepared.NLX||'').trim(),GodT:Number(prepared.GodT||new Date().getFullYear())};
+ if(!org.NOS||!org.NLX)throw Error('Укажите названия лесничества и лесовладельца');
+ if(!Number.isInteger(org.GodT)||org.GodT<1900||org.GodT>2200)throw Error('Проверьте год таксации');
+ if(!org.POS)org.POS=Math.max(0,...forests.map(f=>Number(f.org.POS)))+1;
+ if(!org.LESN)org.LESN=1;
+ codes(org);
+ const id=idOf(org);
+ if(forests.some(r=>r.id===id))throw Error('Это лесничество уже существует. Откройте его на главном экране — существующие кварталы и выделы не изменены.');
+ const forest={id,org,quarters:{},source:{forestDistrict:org.NOS,year:org.GodT,notes:'Создано в SOLI-N Field',...(region?{regionCode:region.code,regionName:region.name}:{})},history:[],updatedAt:new Date().toISOString()};
+ await putMany([forest]);
+ await activate(id);
+ closeModal();
+ return forest;
+}
+async function newForest(){
+ const forests=await list();
+ const regionOptions=SOLIN_REGIONS.map(r=>'<option value="'+html(r.code)+'">'+html(r.name)+'</option>').join('');
+ openModal('Добавить лесничество',
+  '<p class="form-intro">Выберите данные как в настольном SOLI-N. Лесничество будет создано пустым; кварталы и выделы добавляются внутри.</p>'+
+  '<div class="formGrid forest-three-selects">'+
+  '<label><span>1. Область</span><select id="orgRegion"><option value="">Выберите область…</option>'+regionOptions+'</select></label>'+
+  '<label><span>2. Лесовладелец</span><select id="orgOwner" disabled><option value="">Сначала выберите область</option></select></label>'+
+  '<label><span>3. Лесничество</span><select id="orgDistrict" disabled><option value="">Сначала выберите лесовладельца</option></select></label>'+
+  '</div><p id="forestSelectHint" class="form-intro" aria-live="polite"></p>'+
+  '<p id="forestFormError" role="alert"></p>'+
+  '<div class="formActions"><button type="button" id="cancelForest">Отмена</button><button type="button" id="saveForest" class="primary" disabled>Создать пустое лесничество</button></div>');
+ const region=document.querySelector('#orgRegion'),owner=document.querySelector('#orgOwner'),district=document.querySelector('#orgDistrict');
+ const hint=document.querySelector('#forestSelectHint'),save=document.querySelector('#saveForest'),error=document.querySelector('#forestFormError');
+ const setOptions=(el,items,placeholder)=>{
+  // Keep the native iPhone select mounted: replacing the whole modal while a
+  // picker is open can leave an invisible overlay over the form.
+  el.replaceChildren(new Option(placeholder,''),
+   ...items.map(x=>new Option(x.name+' · '+x.code,String(x.code))));
+  el.disabled=!items.length;
+ };
+ const syncSave=()=>{save.disabled=!(region.value&&owner.value&&district.value);error.textContent='';};
+ region.onchange=()=>{
+  const owners=catalogOwners(region.value,forests);
+  setOptions(owner,owners,owners.length?'Выберите лесовладельца…':'Нет данных лесовладельцев');
+  setOptions(district,[],'Сначала выберите лесовладельца');
+  hint.textContent=region.value&&!owners.length?'Справочник лесовладельцев этой области ещё не загружен. Нужны данные из оригинального SOLI-N.':'';
+  syncSave();
+ };
+ owner.onchange=()=>{
+  const items=catalogForests(owner.value,forests);
+  setOptions(district,items,items.length?'Выберите лесничество…':'Нет данных лесничеств');
+  hint.textContent=owner.value&&!items.length?'Для выбранного лесовладельца справочник лесничеств ещё не загружен.':'';
+  syncSave();
+ };
+ district.onchange=syncSave;
+ document.querySelector('#cancelForest').onclick=closeModal;
+ save.onclick=async()=>{
+  if(save.disabled)return;
+  save.disabled=true;error.textContent='';
+  try{await create({regionCode:region.value,ownerCode:owner.value,districtCode:district.value});}
+  catch(e){error.textContent=e.message;syncSave();}
+ };
+}
 function previewTransfer(payload){const tables=payload?.tables;if(!tables||!Array.isArray(tables['Лесничество'])||!Array.isArray(tables['Выдел']))throw Error('В Transfer нужны таблицы «Лесничество» и «Выдел»');const groups=new Map();for(const raw of tables['Лесничество']){const org=codes(copy(raw));if(!org.NOS?.trim()||!org.NLX?.trim())throw Error('В Transfer отсутствует название лесничества или лесовладельца');const id=idOf(org);if(groups.has(id))throw Error('Повторяется адрес лесничества '+org.NOS);groups.set(id,{id,org,quarters:{},history:[],source:{forestDistrict:org.NOS,year:org.GodT,notes:'Загружено из Transfer'},updatedAt:new Date().toISOString()});}
  const owner=row=>{const forest=groups.get(idOf(row));if(!forest)throw Error('Запись не привязана к лесничеству в Transfer');return forest;};
  const key=row=>['POS','LESN','KV','KGLF','VD'].map(k=>row[k]??'').join('::');const stands=new Map(),quarterKeys=new Set();
