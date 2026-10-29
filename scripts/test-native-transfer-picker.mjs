@@ -25,6 +25,13 @@ try{
  await chooser.setFiles({name:'Transf_213_2_2026.mdb',mimeType:'application/octet-stream',buffer:Buffer.from('not a valid Jet database')});
  await page.waitForFunction(()=>document.querySelector('#modalTitle')?.textContent.includes('Не удалось загрузить Transfer'),{timeout:30000});
  assert.match(await page.locator('#modalBody').innerText(),/MDB|Access|Transfer/i);
+ // Selecting the same file again must work after an error.
+ await page.evaluate(()=>window.closeModal());
+ const again=page.waitForEvent('filechooser',{timeout:15000});
+ await page.locator('.transfer-file-picker').click({position:{x:32,y:20}});
+ const repeat=await again;
+ await repeat.setFiles({name:'Transf_213_2_2026.mdb',mimeType:'application/octet-stream',buffer:Buffer.from('not a valid Jet database')});
+ await page.waitForFunction(()=>document.querySelector('#modalTitle')?.textContent.includes('Не удалось загрузить Transfer'));
  const list=await page.evaluate(()=>window.SolinWorkspace.list());
  assert.ok(Array.isArray(list)&&list.length>=1,'Existing forest list stays available');
  console.log('NATIVE_TRANSFER_PICKER_OK: iPhone tap, file choice, explicit invalid-MDB error, no replacement');
