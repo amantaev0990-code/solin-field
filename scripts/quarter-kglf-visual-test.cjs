@@ -43,5 +43,5 @@ nodes['#qCategoryList'].children[1].onclick();
 assert.match(nodes['#quarters'].innerHTML,/7 выделов · 164 га · КГЛФ 27/);
 assert.equal(nodes['#qComps'].children.length,7);
 assert.equal(fixture.quarters['1'].compartments.length,12);
-assert.equal(fixture.quarters['1'].compartments.reduce((a,x)=>a+x.PLV,0),166);
+assert.ok(Math.abs(fixture.quarters['1'].compartments.reduce((a,x)=>a+x.PLV,0)-166)<1e-9);
 console.log('VISUAL_QUARTER_KGLF_OK: 5 / 7 stands, 2 / 164 ha, no data edits');
