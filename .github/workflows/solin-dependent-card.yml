@@ -1,0 +1,28 @@
+name: SOLI-N Field — dependent tax card values
+on:
+  push:
+    paths:
+      - 'solin-dependent-rules.js'
+      - 'solin-card-editor.js'
+      - 'solin-workflow.js'
+      - 'scripts/test-dependent-field-rules.cjs'
+      - '.github/workflows/solin-dependent-card.yml'
+  workflow_dispatch:
+jobs:
+  original-reference-dependencies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax and schema safety
+        run: |
+          node --check solin-dependent-rules.js
+          node --check solin-card-editor.js
+          node --check solin-workflow.js
+      - name: Regression — forest type, species, zone, region and Access combo rules
+        run: |
+          node scripts/test-dependent-field-rules.cjs
+          node scripts/card-editor-quarter-test.cjs
