@@ -58,6 +58,12 @@ function options(form,field,row,card,org,refs=ref()){
   const r=forestTypes(card,org,refs);
   return {status:r.status,reason:r.reason,items:r.items};
  }
+ if(form==='ВыделВ'&&field==='M3Pr'&&refs?.SDP_Tip){
+  // Original ВыделВ main-species RowSource explicitly excludes "КУСТ".
+  return {status:'complete',reason:'Оригинальный список главной породы исключает КУСТ',
+   items:refs.SDP_Tip.filter(r=>filled(r.KPC)&&code(r.KPC)!=='КУСТ')
+    .map(r=>({value:String(r.KPC),label:String(r.NDP||'')}))};
+ }
  if(!refs)return {status:'unavailable',reason:'Справочники ещё не загружены',items:[]};
  if(form==='Квартал'&&field==='Klxr'&&refs.Slxr){
   if(!filled(row.Kpz))return {status:'waiting',reason:'Выберите природную зону квартала',items:[]};
