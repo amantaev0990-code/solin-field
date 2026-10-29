@@ -7,6 +7,8 @@ on:
       - 'solin-workflow.js'
       - 'scripts/test-dependent-field-rules.cjs'
       - 'scripts/test-category-layer-dependencies.cjs'
+      - 'solin-card-calculations.js'
+      - 'scripts/test-card-calculations.cjs'
       - '.github/workflows/solin-dependent-card.yml'
   workflow_dispatch:
 jobs:
@@ -22,9 +24,11 @@ jobs:
         run: |
           node --check solin-dependent-rules.js
           node --check solin-card-editor.js
+          node --check solin-card-calculations.js
           node --check solin-workflow.js
       - name: Regression — forest type, species, zone, region and Access combo rules
         run: |
           node scripts/test-dependent-field-rules.cjs
           node scripts/test-category-layer-dependencies.cjs
+          node scripts/test-card-calculations.cjs
           node scripts/card-editor-quarter-test.cjs
