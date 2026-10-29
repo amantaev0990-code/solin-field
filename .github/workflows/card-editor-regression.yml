@@ -1,0 +1,22 @@
+name: SOLI-N Field — taxation card regressions
+on:
+  push:
+    paths:
+      - 'solin-card-editor.js'
+      - 'solin-card-editor.css'
+      - 'scripts/card-editor-quarter-test.cjs'
+      - '.github/workflows/card-editor-regression.yml'
+  workflow_dispatch:
+jobs:
+  verify-quarter-and-makets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check exact original quarter rows and navigator
+        run: node scripts/card-editor-quarter-test.cjs
+      - name: Check card JavaScript syntax
+        run: node --check solin-card-editor.js
