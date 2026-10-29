@@ -112,7 +112,12 @@ function refreshLinked(){
   const result=linkedOptions(el);
   if(!result)continue;
   el.title=result.reason||'';
-  if(result.status==='unavailable')continue; // Keep original list when sources missing.
+  if(result.status==='unavailable'){
+   if(el.dataset.ceField==='M3TLU')el.disabled=true; // Never allow an unverified forest type.
+   continue;
+  }
+  if(el.dataset.ceField==='M3TLU')
+   el.disabled=['waiting','empty','ambiguous'].includes(result.status);
   const raw=linkedRow(el)[el.dataset.ceField];
   const current=raw==null?'':String(raw),list=result.items||[];
   const old=el.value;
@@ -162,6 +167,8 @@ function linkedIssues(){
   if(!changed(base,before,deps)&&!session.isNew)continue;
   const result=engine.options('ВыделВ',field,base,base,linkedOrg());
   const valid=engine.currentIsAllowed(base[field],result);
+  if(field==='M3TLU'&&String(base[field]??'').trim()!==''&&result?.status==='unavailable')
+   return {message:'Не удалось проверить тип леса: нет справочника пород, кода региона или лесохозяйственной зоны. Сначала восстановите справочники/контекст.',form:'ВыделВ',scope:'base',field};
   if(valid===false && String(base[field]??'').trim()!=='0'){
    return {message:'Значение «'+title('ВыделВ',field)+'» не соответствует выбранной породе или предыдущим полям. Выберите значение из подходящего списка.',form:'ВыделВ',scope:'base',field};
   }
