@@ -141,8 +141,20 @@ const list=[...rowsOf(r,m)],base={...existing,...values};
 for(const k of KEY_FIELDS)base[k]=r[k]??null;
 if(index>=list.length)list.push(base);else list[index]=base;
 target[m]=list;
+let calculated=[];
+if(m==='Макет10'&&window.SolinCardCalculations){
+ calculated=window.SolinCardCalculations.corrections(r,window.SOLIN_REFS?.tables).issues;
+ for(const issue of calculated)r[issue.field]=issue.field==='M3B'?String(issue.expected):Number(issue.expected);
+}
 try{saveAll(r);}catch(e){Object.assign(r,JSON.parse(before));notify('Не удалось сохранить: '+e.message);return;}
 closeModal();openMaket(m);notify('Сохранено: '+m);
+if(calculated.length){
+ const rows=calculated.map(x=>'<tr><td>'+h(x.label)+'</td><td>'+h(x.previous)+'</td><td><b>'+h(x.expected)+'</b></td><td>'+h(x.reason)+'</td></tr>').join('');
+ openModal('Проверка расчётов SOLI-N','<p>Обнаружены неверные исходные значения. Расчётные значения подставлены и сохранены вместе с макетом 10.</p>'+
+ '<div style="overflow-x:auto"><table class="wf-calc-warning"><thead><tr><th>Показатель</th><th>Введено впервые</th><th>Исправлено</th><th>Основание</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+ '<button type="button" class="primary" onclick="closeModal()">Понятно</button>');
+}
+
 };}
 function saveAll(r){const makets={};for(const m of CORE){const list=rowsOf(r,m);makets[m]=list.map(row=>({...row}));}store(r,{makets,base:Object.fromEntries(EDIT_FIELDS.map(k=>[k,r[k]??null]))});}
 function deleteMaket(m,index){const r=record();if(!r)return;
