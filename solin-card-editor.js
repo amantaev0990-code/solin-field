@@ -192,6 +192,8 @@ function click(e){const b=e.target.closest('button');if(!b)return;
  if(b.hasAttribute('data-ce-support')){showSupport();return;}
  if(b.hasAttribute('data-ce-makets')){showMaketNavigator();return;}
  if(b.dataset.ceNavMaket){
+   const invalid=document.querySelector('#ce-form [aria-invalid="true"]');
+   if(invalid){error(invalid.validationMessage,invalid);return;}
    const number=b.dataset.ceNavMaket;
    if(['1','2','3','4','5','10','31','32'].includes(number))showMain(number);
    else if(extras.includes(Number(number)))showExtra('Макет'+number);
