@@ -53,13 +53,13 @@ function fieldInput(name,value='',prefix='wf',form='ВыделВ'){
  const options=Object.entries(lookup).filter(([k,v])=>k!==''&&v!=null).map(([k,v])=>'<option value="'+h(k)+'"'+(String(k)===str?' selected':'')+'>'+h(v)+'</option>').join('');
  return '<label class="wf-field"><span>'+h(label)+' <small>'+h('')+'</small></span><select id="'+h(id)+'" data-wffield="'+h(name)+'"><option value="">— не указано —</option>'+options+'</select></label>';
  }
- const numeric=DECIMAL.has(name)||['LET','VNUM','PRA','PRkol','KOEF','PH','PD2','ZAP','POL','MTC','G15','GZ'].includes(name);
+ const numeric=DECIMAL.has(name)||['IAR','LET','VNUM','PRA','PRkol','KOEF','PH','PD2','ZAP','POL','MTC','G15','GZ'].includes(name);
  return '<label class="wf-field"><span>'+h(label)+' <small>'+h('')+'</small></span><input id="'+h(id)+'" data-wffield="'+h(name)+'" '+(numeric?'inputmode="decimal"':'')+' autocomplete="off" value="'+h(str)+'" placeholder="—"></label>';
 }
 function humanInputs(fields,values,prefix,form){const isTech=f=>window.SolinHuman?.isTechnical(form,f);const main=fields.filter(f=>!isTech(f)).map(f=>fieldInput(f,values[f]??'',prefix,form)).join('');const technical=fields.filter(isTech).map(f=>fieldInput(f,values[f]??'',prefix,form)).join('');return main+(technical?'<details class="human-technical"><summary>Служебные поля · значения сохранены</summary><div class="formGrid">'+technical+'</div></details>':'');}
 function bindInputs(root,schema,prefix,values){const obj={};for(const key of schema){const el=root.querySelector('#'+prefix+'_'+key);if(!el)continue;const raw=el.value.trim();if(raw===''){obj[key]=null;continue;}
-if((DECIMAL.has(key)||['LET','VNUM','PRA','PRkol','MTC','G15','GZ','PH','PD2','ZAP','POL'].includes(key))&&!Number.isFinite(Number(raw.replace(',','.'))))throw Error('Проверь число: '+(LABELS[key]||key));
-obj[key]=DECIMAL.has(key)||['LET','VNUM','PRA','PRkol','MTC','G15','GZ','PH','PD2','ZAP','POL'].includes(key)?Number(raw.replace(',','.')):raw;
+if((DECIMAL.has(key)||['IAR','LET','VNUM','PRA','PRkol','MTC','G15','GZ','PH','PD2','ZAP','POL'].includes(key))&&!Number.isFinite(Number(raw.replace(',','.'))))throw Error('Проверь число: '+(LABELS[key]||key));
+obj[key]=DECIMAL.has(key)||['IAR','LET','VNUM','PRA','PRkol','MTC','G15','GZ','PH','PD2','ZAP','POL'].includes(key)?Number(raw.replace(',','.')):raw;
 }return obj;}
 function maketsOf(r){return r?Object.keys(r._children||{}):[];}
 function rowsOf(r,m){const rows=r?._children?.[m];return Array.isArray(rows)?rows:[];}
@@ -104,6 +104,20 @@ const fields=(db()?.transfSchema?.[m]||[]).filter(n=>!KEY_FIELDS.includes(n)),ex
 if(typeof openModal!=='function')return;
 openModal((index===rowsOf(r,m).length?'Новая запись · ':'Изменение · ')+(window.SolinHuman?.formName(m)||NAMES[m]),
 '<div class="wf-form-note">Данные сохраняются только в SOLI-N Field. Оригинальные базы SOLI-N не изменяются.</div><div class="formGrid wf-formgrid">'+humanInputs(fields,existing,'wf',m)+'</div><div class="formActions"><button class="secondary" onclick="closeModal()">Отмена</button><button class="primary" id="wfSaveMaket">Сохранить</button></div>');
+if(m==='Макет10'&&window.SolinDependentRules){
+ const element=document.getElementById('wf_IAR');
+ const result=window.SolinDependentRules.allowedLayers(r,window.SOLIN_REFS?.tables);
+ if(element&&element.tagName==='SELECT'&&result.status==='complete'){
+  const raw=existing.IAR==null?'':String(existing.IAR);
+  const options=[new Option('— Не указано —',''),
+   ...result.items.map(x=>new Option(x.value+' — '+x.label,x.value))];
+  if(raw&&!options.some(x=>x.value===raw))
+   options.push(new Option('Сохранённый ярус: '+raw+' (проверьте категорию)',raw));
+  element.replaceChildren(...options);
+  element.value=raw;
+  element.title=result.reason;
+ }
+}
 document.querySelector('#wfSaveMaket').onclick=()=>{const container=document.querySelector('#modalBody');let values;try{values=bindInputs(container,fields,'wf',existing);}catch(e){notify(e.message);return;}
 const dependent=window.SolinDependentRules,referenceTables=window.SOLIN_REFS?.tables;
  if(dependent&&m==='Макет10'&&values.POR!=null&&values.PROI==null){
