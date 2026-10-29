@@ -1,0 +1,33 @@
+name: SOLI-N Field — Transfer file picker
+on:
+  push:
+    paths:
+      - 'index.html'
+      - 'solin-workspace.js'
+      - 'solin-workspace.css'
+      - 'solin-transfer-reader.js'
+      - 'scripts/test-native-transfer-picker.mjs'
+      - '.github/workflows/transfer-picker-regression.yml'
+  workflow_dispatch:
+jobs:
+  ios-mdb-picker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JavaScript syntax checks
+        run: |
+          node --check solin-workspace.js
+          node --check solin-transfer-reader.js
+          node --check scripts/test-native-transfer-picker.mjs
+      - name: Install WebKit for mobile file-picker test
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.0
+          npx playwright install --with-deps webkit
+      - name: Tap native Transfer button and select a broken MDB
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 --directory . &
+          node scripts/test-native-transfer-picker.mjs
