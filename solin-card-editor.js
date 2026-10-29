@@ -52,7 +52,7 @@ function input(form,field,value,scope,index){
    // In original Access the expanded list shows a code *and* its meaning.
    // Leave the actual option.value unchanged for Transfer/MDB compatibility.
    option.textContent=option.value
-      ? option.value+(description&&description!==option.value?' — '+description:'')
+      ? (description===option.value||description.startsWith(option.value+' — ')?description:option.value+' — '+description)
       : '—';
  }
  else{el.placeholder=numeric.has(field)?'0':'';if(numeric.has(field))el.inputMode='decimal';}
@@ -66,7 +66,14 @@ function cell(field,value,scope='base',form='ВыделВ',opts={}){const name=o
 function fixed(label,value,width,opts={}){return '<div class="dt-fixed'+(opts.inline?' dt-inline':'')+'"'+(width?' style="width:'+width+'px"':'')+'>'+(label?'<span>'+h(label)+'</span>':'')+'<input readonly aria-label="'+h(label||opts.aria||'')+'" value="'+h(value??'')+'"'+(opts.unavailable?' title="Поле пока недоступно для редактирования"':'')+'></div>';}
 function maket(n,body){return '<section class="dt-section" id="ce-section-'+n+'" aria-label="Макет '+n+'"><b class="dt-maket">'+(n==='31'?'Подрост<br>':n==='32'?'Подлесок<br>':'')+'Макет '+n+'</b><div class="dt-fields">'+body+'</div></section>';}
 function block(number,name,body){return '<section class="dt-section" id="ce-section-'+number+'" aria-label="Макет '+number+'">'+body+'</section>';}
-function newTableRow(form){return Object.fromEntries((D.transfSchema[form]||[]).map(f=>[f,keys.includes(f)?session.draft[f]??null:numeric.has(f)?0:form==='Макет10'&&f==='IAR'?Number(window.SolinDependentRules?.allowedLayers(session.draft,window.SOLIN_REFS?.tables)?.items?.[0]?.value??0)||null:form==='Макет10'&&f==='PROI'?0:null]));}
+function newTableRow(form){
+ // Blank Maket 10 cells are not real zeros. Keep origin=0 only when actually
+ // selected/suggested and preserve existing saved zeros without coercion.
+ return Object.fromEntries((D.transfSchema[form]||[]).map(f=>[f,
+  keys.includes(f)?session.draft[f]??null:
+  form==='Макет10'?(f==='IAR'?Number(window.SolinDependentRules?.allowedLayers(session.draft,window.SOLIN_REFS?.tables)?.items?.[0]?.value??0)||null:null):
+  numeric.has(f)?0:null]));
+}
 function table(form){const rs=session.draft._children[form]||[],schema=(D.transfSchema[form]||[]).filter(f=>!keys.includes(f)),shown=rs.length?rs:[newTableRow(form)];
  const m10=form==='Макет10';
  return '<div class="ce-table-wrap" tabindex="0" aria-label="Таблица '+h(form)+'"><table class="ce-table"><caption class="ce-sr-only">'+h(form)+' — '+h(SolinHuman.formName(form))+'</caption><colgroup><col style="width:24px">'+schema.map(f=>'<col'+(m10?' style="width:'+({IAR:145,KOEF:85,POR:190,LET:55,PH:55,PD2:55,KT:70,PROI:160,POL:80,SPS:75,ZAP:110}[f]||90)+'px"':'')+'>').join('')+'</colgroup><thead><tr><th scope="col"></th>'+schema.map(f=>'<th scope="col">'+h(m10?desktopLabels[f]:SolinHuman.label(form,f))+'</th>').join('')+'</tr></thead><tbody>'+shown.map((row,i)=>'<tr'+(!rs.length?' data-ce-placeholder="true"':'')+'><th scope="row" tabindex="0" data-ce-select="'+i+'" data-ce-select-form="'+h(form)+'" aria-label="Запись '+(i+1)+'">'+(i===0?'►':'')+'</th>'+schema.map(f=>'<td>'+input(form,f,row[f],form,i)+'</td>').join('')+'</tr>').join('')+'</tbody></table></div><div class="dt-record-nav"><span>Запись: </span><button type="button" data-ce-record="first" data-ce-table="'+form+'" aria-label="Первая запись">|◀</button><button type="button" data-ce-record="previous" data-ce-table="'+form+'" aria-label="Предыдущая запись">◀</button><span data-ce-count="'+form+'">'+(rs.length?'1 из '+rs.length:'Новая')+'</span><button type="button" data-ce-record="next" data-ce-table="'+form+'" aria-label="Следующая запись">▶</button><button type="button" data-ce-record="last" data-ce-table="'+form+'" aria-label="Последняя запись">▶|</button><button type="button" data-ce-add="'+form+'" aria-label="Добавить запись">▶*</button><button type="button" data-ce-delete="'+form+'" data-ce-index="0" aria-label="Удалить выбранную запись">×</button></div>';
