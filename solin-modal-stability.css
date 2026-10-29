@@ -1,0 +1,68 @@
+/* Unified modal interaction layer (iOS Safari / installed PWA).
+ * Keep the existing SOLI-N Field design; this file only fixes stacking,
+ * touch targets, scroll containment, and clickability. Loaded last. */
+#modal.modal:not(.hidden){
+ position:fixed!important;
+ inset:0!important;
+ z-index:1000000!important;
+ pointer-events:auto!important;
+ isolation:isolate;
+ overflow:hidden;
+ overscroll-behavior:contain;
+ touch-action:auto;
+}
+#modal.modal:not(.hidden)>.modalCard{
+ position:relative;
+ z-index:1;
+ pointer-events:auto!important;
+ touch-action:auto;
+ min-width:0;
+ max-width:100%;
+ overscroll-behavior:contain;
+}
+#modal.modal:not(.hidden) .modalHead{
+ position:relative;
+ z-index:2;
+ flex-shrink:0;
+}
+#modal.modal:not(.hidden) .modalHead>.close{
+ position:relative;
+ z-index:3;
+ flex:none;
+ display:inline-flex;
+ align-items:center;
+ justify-content:center;
+ min-width:40px;
+ min-height:40px;
+ cursor:pointer;
+ pointer-events:auto!important;
+ touch-action:manipulation;
+}
+#modal.modal:not(.hidden) #modalBody{
+ position:relative;
+ z-index:1;
+ pointer-events:auto!important;
+ min-width:0;
+ min-height:0;
+ overflow-y:auto;
+ -webkit-overflow-scrolling:touch;
+}
+/* Classic fixed-size taxation cards own their internal viewport. */
+#modal.ce-modal #modalBody{
+ overflow:hidden;
+}
+#modal.ce-modal .modalHead>.close{
+ min-width:40px;
+ min-height:40px;
+ width:40px;
+ height:40px;
+}
+/* Give the close control a tappable 44px hit target on iPhone. */
+@media (pointer:coarse){
+ #modal.modal:not(.hidden) .modalHead>.close{
+  min-width:44px!important;
+  min-height:44px!important;
+  width:44px!important;
+  height:44px!important;
+ }
+}
