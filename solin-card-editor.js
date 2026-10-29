@@ -156,6 +156,11 @@ function linkedIssues(){
  const engine=window.SolinDependentRules;
  if(!engine||!session)return null;
  const base=session.draft,before=session.original;
+ if(changed(base,before,['M3Pr'])||session.isNew){
+  const speciesChoice=engine.options('ВыделВ','M3Pr',base,base,linkedOrg());
+  if(engine.currentIsAllowed(base.M3Pr,speciesChoice)===false)
+   return {message:'Выберите допустимую главную породу из оригинального справочника.',form:'ВыделВ',scope:'base',field:'M3Pr'};
+ }
  const affected={
   M3TLU:['M3Pr','M3TLU','KlxrVD','NE2A'],
   M22:['M2PM1','M22'],M23:['M2PM1','M22','M23'],
