@@ -32,11 +32,42 @@ function lookup(form,field){form=canonical(form);const key=form+'.'+field;if(loc
 function label(form,field){form=canonical(form);return dict.fields[form]?.[field]||dict.fields['ВыделВ']?.[field]||'Служебное поле';}
 function isTechnical(form,field){form=canonical(form);return (dict.unresolved?.[form]||[]).includes(field)||!dict.fields[form]?.[field]&&!dict.fields['ВыделВ']?.[field];}
 function value(form,field,v,row){if(v==null||v==='')return 'Не указано';const list=lookup(form,field);if(list){const k=normalize(v);return list[k]??'Неизвестное значение (код '+String(v)+')';}if(isTechnical(form,field))return String(v);if(typeof v==='number'||/^[-+]?\d+(\.\d+)?$/.test(String(v)))return Number(v).toLocaleString('ru-RU',{maximumFractionDigits:3});return text(v);}
-function input(name,v='',prefix='wf',form='ВыделВ'){const id=prefix+'_'+name,list=lookup(form,name),str=String(v??'');let control;
- if(list){const current=normalize(v),entries=Object.entries(list).filter(([k])=>k!=='');const exists=Object.prototype.hasOwnProperty.call(list,current);control='<select id="'+h(id)+'" data-wffield="'+h(name)+'"><option value="">Не указано</option>'+(!exists&&str?'<option selected value="'+h(str)+'">'+h(value(form,name,v))+'</option>':'')+entries.map(([k,n])=>'<option value="'+h(current===k?str:k)+'"'+(current===k?' selected':'')+' title="Исходный код: '+h(k)+'">'+h(n)+'</option>').join('')+'</select>';}
- else control='<input id="'+h(id)+'" data-wffield="'+h(name)+'" autocomplete="off" value="'+h(str)+'" placeholder="Не указано">';
+function codeLabel(code,label){
+ const k=String(code??'').trim(),n=String(label??'').trim();
+ if(!k)return n||'Не указано';
+ if(!n||n===k||n.startsWith(k+' — '))return n||k;
+ return k+' — '+n;
+}
+function input(name,v='',prefix='wf',form='ВыделВ'){
+ const id=prefix+'_'+name,list=lookup(form,name),str=String(v??'');
+ const phantom=form==='Макет10'&&['KOEF','LET','PH','PD2','KT','POL','SPS','ZAP'].includes(name);
+ let control;
+ if(list){
+  const current=normalize(v),entries=Object.entries(list).filter(([k])=>k!=='');
+  const exists=Object.prototype.hasOwnProperty.call(list,current);
+  control='<select id="'+h(id)+'" data-wffield="'+h(name)+'"><option value="">Не указано</option>'+
+   (!exists&&str?'<option selected value="'+h(str)+'">'+h(codeLabel(str,value(form,name,v)))+'</option>':'')+
+   entries.map(([k,n])=>'<option value="'+h(current===k?str:k)+'"'+(current===k?' selected':'')+' title="Исходный код: '+h(k)+'">'+h(codeLabel(k,n))+'</option>').join('')+'</select>';
+ }else{
+  control='<input id="'+h(id)+'" data-wffield="'+h(name)+'"'+(phantom?' data-phantom-zero="1" inputmode="decimal"':'')+
+    ' autocomplete="off" value="'+h(str)+'" placeholder="'+(phantom?'0':'Не указано')+'">';
+ }
  return '<label class="wf-field'+(isTechnical(form,name)?' human-technical-field':'')+'" title="Поле исходной базы: '+h(name)+'"><span>'+h(label(form,name))+(isTechnical(form,name)?' <small>'+h(name)+' · назначение не подтверждено</small>':'')+'</span>'+control+'</label>';
 }
+// An actual saved 0 remains a valid value (e.g. origin 0 means seed-grown).
+// While typing, make a visible 0 behave like a placeholder, but restore it if untouched.
+document.addEventListener('focusin',event=>{
+ const el=event.target;if(!el?.matches?.('input[data-phantom-zero="1"]')||el.readOnly||el.disabled)return;
+ if(el.value==='0'){el.dataset.zeroBeforeFocus='1';el.dataset.zeroEdited='0';el.value='';}
+},true);
+document.addEventListener('input',event=>{
+ if(event.target?.dataset?.zeroBeforeFocus==='1')event.target.dataset.zeroEdited='1';
+},true);
+document.addEventListener('focusout',event=>{
+ const el=event.target;if(el?.dataset?.zeroBeforeFocus!=='1')return;
+ if(el.dataset.zeroEdited==='0'&&el.value==='')el.value='0';
+ delete el.dataset.zeroBeforeFocus;delete el.dataset.zeroEdited;
+},true);
 const referenceTitles={SKU:'Категории угодий',SDP:'Древесные и кустарниковые породы',SDP_Tip:'Группы древесных пород',SIAR:'Ярусы древостоя',SPR:'Происхождение и возрастные шкалы',SProi:'Происхождение насаждений',SBon:'Классы бонитета',SLM:'Лесохозяйственные мероприятия',Sples:'Категории государственного лесного фонда',SFZ:'Функциональные зоны',Spzon:'Природные зоны',Slxr:'Лесохозяйственные зоны',STL:'Типы леса',SErv:'Виды эрозии',SErCt:'Степени эрозии',SOZU:'Особо защитные участки',SSR:'Способы рубки',SPP:'Способы подготовки почвы',SSSK:'Способы создания лесных культур',SSLK:'Состояние лесных культур',SPG:'Причины повреждения и гибели',SBR:'Вредители и болезни',SSP:'Степени повреждения',SSD:'Состояние линейных объектов',SND:'Назначение дороги',STPD:'Типы покрытия дороги',SSV:'Сезоны доступности дорог',STP:'Травяные растения и ягодники',SUR:'Учётные категории растений',SPV:'Анализ выполнения мероприятий',SOXM:'Оценки выполненных мероприятий',SNMP:'Причины невыполнения мероприятий',SNeds:'Недревесное сырьё',SSbor:'Способы сбора сырья',SPN:'Пользователи сельскохозяйственных угодий',SKSU:'Качество сельскохозяйственных угодий',STC:'Типы сенокосов и пастбищ',SSU:'Состояние сельскохозяйственных угодий',STB:'Типы болот',SVBR:'Болотная растительность',SKPD:'Категории потерь древесины',SMP:'Места потерь древесины',SLX:'Типы ландшафта',SOE:'Эстетическая оценка',SOR:'Рекреационная оценка',SUN:'Устойчивость насаждений',SOPP:'Проходимость',SOPR:'Просматриваемость',SDL:'Стадии дигрессии',SOV:'Особенности выдела',SVP:'Назначение плантаций',SDD:'Доступность для транспорта',STT:'Типы транспорта',SGP:'Густота подлеска',SEdiz:'Единицы измерения',STLU:'Типы лесорастительных условий',SSLes:'Состояние насаждений'};
 function tableTitle(name){if(referenceTitles[name])return referenceTitles[name];const f=dict.referenceForms?.[name];return f?.caption&&/[А-Яа-яЁё]{3}/.test(f.caption)?clean(f.caption):'Расчётная таблица';}
 const columnTitles={KPC:'Код породы',NDP:'Порода',NDPKZ:'Название на казахском',NKU:'Категория угодий',KU:'Код угодья',KIAR:'Код яруса',NIAR:'Ярус',Ia:'Группа ярусов',KM:'Код мероприятия',NMR:'Мероприятие',M3B:'Класс бонитета',KTL:'Код типа леса',NTL:'Тип леса',NTLKZ:'Название на казахском',GPor:'Главная порода',Lxz:'Лесохозяйственная зона',KLPoj:'Класс пожарной опасности',NPV:'Анализ выполнения',NOXM:'Оценка выполнения',NPN:'Причина невыполнения',NPL:'Пользователь угодья',Nkah:'Качество угодья',NTS:'Тип угодья',NSU:'Состояние угодья',NTB:'Тип болота',NBR:'Растительность',NPD:'Категория потерь',NMP:'Место потерь',NVBR:'Тип ландшафта',NOE:'Эстетическая оценка',NOR:'Рекреационная оценка',NUN:'Устойчивость',NOPP:'Характеристика',Klass:'Стадия дигрессии',NOV:'Особенность',NVP:'Назначение плантации',NDD:'Доступность',NTT:'Транспорт',GUS:'Густота',Nsbor:'Способ сбора',NNeds:'Недревесное сырьё',Kpz:'Природная зона',Npz:'Природная зона',Klxz:'Код лесохозяйственной зоны',Nlxr:'Лесохозяйственная зона',KOD:'Код категории',T1:'Категория лесного фонда',KFZ:'Код зоны',NFZ:'Функциональная зона',NFZK:'Краткое название',NOZ:'Особо защитный участок',NEX:'Экспозиция склона',Erv:'Вид эрозии',Erct:'Степень эрозии'};
@@ -65,7 +96,7 @@ function arrange(){const menu=document.querySelector('#menuScreen .workspace');i
  const rs=document.querySelector('#refsScreen input');if(rs){rs.placeholder='Название, макет или шифр…';rs.oninput=e=>refs(e.target.value);}const p=document.querySelector('#refsScreen .screenHead p');if(p)p.textContent='Названия, шифры и макеты, в которых они используются.';
 }
 function coverage(){const tables=window.SOLIN_REFS?.tables||{},schemas=database()?.transfSchema||{},bindings=sources().filter(x=>schemas[canonical(x.form)]?.includes(x.field)),unresolved=[];for(const [form,fields] of Object.entries(schemas))for(const field of fields)if(!['POS','LESN','KV','KGLF','VD'].includes(field)&&isTechnical(form,field))unresolved.push({form,field,reason:'Нет подтверждённой подписи привязанного поля в выбранных оригинальных формах'});return {source:dict.source,labels:Object.values(dict.fields).reduce((s,x)=>s+Object.keys(x).length,0),referenceTables:Object.keys(tables).length,namedReferenceTables:Object.keys(tables).filter(k=>referenceTitles[k]).length,bindings:bindings.length,unresolved,limitations:['Динамические фильтры списков Access не исполняются','Неоднозначные значения не выбираются автоматически','Названия скрытых служебных полей не придуманы']};}
-window.SolinHuman={label,value,lookup,input,isTechnical,formName:m=>dict.formNames[m]||m,text,refs,coverage,tableTitle};
+window.SolinHuman={label,value,lookup,input,codeLabel,isTechnical,formName:m=>dict.formNames[m]||m,text,refs,coverage,tableTitle};
 window.renderFriendlyRefs=refs;
 window.addEventListener('solin-refs-ready',()=>{cache.clear();refs(document.querySelector('#refsScreen input')?.value||'');arrange();});
 window.addEventListener('solin-ready',()=>{arrange();window.renderFriendlyRefs=refs;});
