@@ -1,0 +1,55 @@
+name: Temporary personal face swap from own images
+on:
+  push:
+    branches: [video-faceswap-20261030]
+permissions:
+  contents: read
+jobs:
+  faceswap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Install FFmpeg and Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg libgl1 libglib2.0-0
+          git clone --depth 1 https://github.com/facefusion/facefusion.git facefusion
+          cd facefusion
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Fetch reference images and original movie
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p private_inputs
+          curl -fL --retry 3 --silent --show-error 'https://cdn.openart.ai/openart-uploads/production/attachment-transfers/9fd04e9fc6c76aba12d8f7c25519465130362d8e387b2910feda447e2db2af15.mp4' -o private_inputs/target.mp4
+          curl -fL --retry 3 --silent --show-error 'https://cdn.openart.ai/openart-uploads/production/attachment-transfers/218bfe30b77d02af8c613671268594a7bd8d4928247f86586ab24651edd1d38f.jpg' -o private_inputs/face1.jpg
+          curl -fL --retry 3 --silent --show-error 'https://cdn.openart.ai/openart-uploads/production/attachment-transfers/a44d9f12089b76369bc74cdabb80cc656fd21880f8e4f5325b82b21588975e47.jpg' -o private_inputs/face2.jpg
+          ffprobe -v error -show_entries format=duration:stream=codec_name,codec_type,width,height -of json private_inputs/target.mp4
+          file private_inputs/*
+      - name: Replace actor's face in original footage preserving cuts
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd facefusion
+          python facefusion.py headless-run --source-paths ../private_inputs/face1.jpg ../private_inputs/face2.jpg --target-path ../private_inputs/target.mp4 --output-path ../faceswap_intermediate.mp4 --processors face_swapper --face-swapper-model inswapper_128_fp16 --face-selector-mode one --execution-providers cpu --execution-thread-count 4 --output-video-preset veryfast --output-video-quality 90 --log-level info
+          test -s ../faceswap_intermediate.mp4
+      - name: Reattach original audio unchanged for exact soundtrack
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ffmpeg -v warning -y -i faceswap_intermediate.mp4 -i private_inputs/target.mp4 -map 0:v:0 -map 1:a:0? -c:v copy -c:a copy -movflags +faststart -shortest Aidyn_Original_23sec_Real_Face_Swap.mp4
+          test -s Aidyn_Original_23sec_Real_Face_Swap.mp4
+          ffprobe -v error -show_entries format=duration,size:stream=codec_name,codec_type,width,height -of json Aidyn_Original_23sec_Real_Face_Swap.mp4
+      - name: Save result for iPhone
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aidyn_Original_23sec_Face_Swap
+          path: Aidyn_Original_23sec_Real_Face_Swap.mp4
+          retention-days: 7
