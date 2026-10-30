@@ -1,0 +1,39 @@
+name: Temporary personal video merge (isolated branch)
+on:
+  push:
+    branches:
+      - video-merge-20261030
+permissions:
+  contents: read
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Download 8 video scenes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p scenes
+          curl --fail --location --retry 3 --retry-delay 2 --silent --show-error 'https://cdn.openart.ai/openart-ai/production/2026-10/create-video/DvwWjx9WtM2qR0xDnoBF/sample_0_1793357123815_f237950c.mp4' -o scenes/01.mp4
+          curl --fail --location --retry 3 --retry-delay 2 --silent --show-error 'https://cdn.openart.ai/openart-ai/production/2026-10/create-video/DvwWjx9WtM2qR0xDnoBF/sample_0_1793357490257_b6137d24.mp4' -o scenes/02.mp4
+          curl --fail --location --retry 3 --retry-delay 2 --silent --show-error 'https://cdn.openart.ai/openart-ai/production/2026-10/create-video/DvwWjx9WtM2qR0xDnoBF/sample_0_1793357484552_9dcfcd8b.mp4' -o scenes/03.mp4
+          curl --fail --location --retry 3 --retry-delay 2 --silent --show-error 'https://cdn.openart.ai/openart-ai/production/2026-10/create-video/DvwWjx9WtM2qR0xDnoBF/sample_0_1793357804559_a4902fa6.mp4' -o scenes/04.mp4
+          curl --fail --location --retry 3 --retry-delay 2 --silent --show-error 'https://cdn.openart.ai/openart-ai/production/2026-10/create-video/DvwWjx9WtM2qR0xDnoBF/sample_0_1793357803931_d4d9d5c5.mp4' -o scenes/05.mp4
+          curl --fail --location --retry 3 --retry-delay 2 --silent --show-error 'https://cdn.openart.ai/openart-ai/production/2026-10/create-video/DvwWjx9WtM2qR0xDnoBF/sample_0_1793357904852_47c97402.mp4' -o scenes/06.mp4
+          curl --fail --location --retry 3 --retry-delay 2 --silent --show-error 'https://cdn.openart.ai/openart-ai/production/2026-10/create-video/DvwWjx9WtM2qR0xDnoBF/sample_0_1793357931730_28ac4b41.mp4' -o scenes/07.mp4
+          curl --fail --location --retry 3 --retry-delay 2 --silent --show-error 'https://cdn.openart.ai/openart-ai/production/2026-10/create-video/DvwWjx9WtM2qR0xDnoBF/sample_0_1793358046445_1f35b2a1.mp4' -o scenes/08.mp4
+          for f in scenes/*.mp4; do test -s "$f"; ffprobe -v error -show_entries format=duration -of default=nk=1:nw=1 "$f"; done
+      - name: Join scenes into one MP4 with original speech
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in {01..08}; do echo "file 'scenes/$i.mp4'"; done > video-files.txt
+          ffmpeg -hide_banner -y -f concat -safe 0 -i video-files.txt -c copy -movflags +faststart Aidyn_Amantaev_Profession_SOLIN_Field_64_seconds.mp4
+          ffprobe -hide_banner -v error -show_entries format=duration,size -of default=noprint_wrappers=1 Aidyn_Amantaev_Profession_SOLIN_Field_64_seconds.mp4
+      - name: Make iPhone-friendly downloadable finished video
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aidyn_Amantaev_Profession_SOLIN_Field_64_seconds
+          path: Aidyn_Amantaev_Profession_SOLIN_Field_64_seconds.mp4
+          retention-days: 7
