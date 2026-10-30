@@ -37,3 +37,11 @@
 .wf-calc-warning{border-collapse:collapse;min-width:540px;width:100%;font-size:13px;margin:12px 0}
 .wf-calc-warning th,.wf-calc-warning td{border:1px solid #d4dfd4;padding:7px 9px;text-align:left;vertical-align:top;overflow-wrap:anywhere}
 .wf-calc-warning th{background:#edf4ee;color:#254a35}
+
+.ce-area-help{margin:0;padding:7px 12px;background:#f1f5ed;color:#355332;font:12px/1.4 Arial,sans-serif;overflow-wrap:anywhere}
+.ce-entry-checks{box-sizing:border-box;max-width:100%;padding:9px 12px;border:1px solid #d8b56b;background:#fff8e7;color:#634614;font:13px/1.4 Arial,sans-serif;overflow-wrap:anywhere}
+.ce-entry-checks[hidden]{display:none!important}
+.ce-entry-checks ul{margin:5px 0;padding-left:18px}
+.ce-entry-checks button{padding:4px 0;border:0;background:transparent;color:inherit;text-align:left;text-decoration:underline;font:inherit;cursor:pointer}
+.ce-entry-checks button:focus-visible{outline:2px solid #78581f;outline-offset:2px}
+.ce-entry-warning{outline:2px solid #bc841e!important;outline-offset:-2px}

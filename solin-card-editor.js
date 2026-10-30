@@ -321,8 +321,13 @@ function capture(el){if(!el.matches('[data-ce-field]'))return;
  if(scope.startsWith('Макет')&&!session.draft._children[scope]?.[Number(index)]){(session.draft._children[scope]??=[]).push(newTableRow(scope));el.closest('tr')?.removeAttribute('data-ce-placeholder');session.changedMakets.add(scope);}
  const target=scope==='base'?session.draft:scope==='quarter'?session.quarter:session.draft._children[scope][Number(index)];
  const previous=target[field];
- try{target[field]=readValue(el,target[field]);el.removeAttribute('aria-invalid');el.setCustomValidity('');}
+ try{target[field]=readValue(el,target[field]);
+  if(field==='PLV'&&!(Number(target[field])>0))throw Error('Не задана площадь выдела. Введите значение больше нуля.');
+  if(scope==='Макет10'&&field==='POL'&&(solinCore.validateRow('Макет10',target,session.draft)||[]).some(x=>x.startsWith('POL:')))
+   throw Error('Полнота или процент приживаемости не входит в диапазон значений. Пустое значение недопустимо — введите ноль (0).');
+  el.removeAttribute('aria-invalid');el.setCustomValidity('');}
  catch(e){el.setAttribute('aria-invalid','true');el.setCustomValidity(e.message);}
+ if(!document.querySelector('#ce-form [aria-invalid="true"]'))document.querySelector('#ce-error').textContent='';
  if(scope==='Макет10'&&field==='POR'&&window.SolinDependentRules){
   const engine=window.SolinDependentRules,refs=window.SOLIN_REFS?.tables;
   const suggested=engine.suggestedOrigin(target.POR,refs),oldSuggested=engine.suggestedOrigin(previous,refs);
@@ -340,6 +345,41 @@ function capture(el){if(!el.matches('[data-ce-field]'))return;
  const output=document.querySelector('[data-ce-display-for="'+el.id+'"]');if(output)output.textContent=description(el.dataset.ceForm,field,target[field]);
  session.dirty=true;document.querySelector('#ce-status').textContent='Изменено';
  refreshLinked();
+}
+// Observed Access OnExit messages: informative cross-field checks, not Save rules.
+// Never change a value or run the desktop cleanup from this panel.
+function refreshEntryChecks(){
+ const root=document.getElementById('ce-entry-checks');if(!session||!root)return;
+ const r=session.draft,n=v=>v==null||v===''?0:Number(v),issues=[];
+ const add=(scope,field,message,index)=>issues.push({scope,field,message,index});
+ const touched=(scope,...fields)=>fields.some(f=>session.entryTouched?.has(scope+':'+f));
+ if(touched('base','CkEk','CkKr')&&!String(r.CkEk??'').trim()&&n(r.CkKr)!==0)
+  add('base','CkEk','Не задана экспозиция склона при заданной крутизне склона.');
+ if(touched('base','VNUM')&&n(r.VNUM)>6000)add('base','VNUM','ВНУМ превышает значение 6000.');
+ if(touched('base','M4ZO','M4ZL')&&n(r.M4ZL)>n(r.M4ZO))
+  add('base','M4ZL','Ликвидная захламлённость превышает общую захламлённость.');
+ if(touched('base','M4SS')&&n(r.M4SS)>200)add('base','M4SS','Сухостой превышает значение 200.');
+ if(touched('base','PRkol','PRH')&&(n(r.PRH)>10||n(r.PRH)>0&&n(r.PRkol)===0))
+  add('base','PRH','Не задано количество подроста или высота превышает значение 10 м.');
+ // Only the missing-quantity branch was exercised; do not infer an age limit.
+ if(touched('base','PRkol','PRA')&&n(r.PRA)>0&&n(r.PRkol)===0)
+  add('base','PRkol','Не задано количество подроста при заданном возрасте.');
+ if(touched('Макет10','KOEF'))(r._children?.Макет10||[]).forEach((row,index)=>{
+  if(n(row.KOEF)>10)add('Макет10','KOEF','Коэффициент превышает значение 10.',index);
+ });
+ for(const el of document.querySelectorAll('#ce-form [aria-invalid="true"][data-ce-field]'))
+  add(el.dataset.ceScope,el.dataset.ceField,el.validationMessage,el.dataset.ceRow==null?undefined:Number(el.dataset.ceRow));
+ session.entryIssues=issues;
+ for(const el of document.querySelectorAll('#ce-form [data-ce-field]')){
+  const marked=issues.some(x=>x.scope===el.dataset.ceScope&&x.field===el.dataset.ceField&&(x.index==null||x.index===Number(el.dataset.ceRow)));
+  el.classList.toggle('ce-entry-warning',marked);
+  if(marked)el.setAttribute('aria-describedby','ce-entry-checks');
+  else if(el.getAttribute('aria-describedby')==='ce-entry-checks')el.removeAttribute('aria-describedby');
+ }
+ root.hidden=!issues.length;
+ const html=issues.length?'<strong>Проверьте при заполнении</strong><ul>'+issues.map((x,i)=>
+  '<li><button type="button" data-ce-entry-issue="'+i+'">'+h(x.message)+(x.index==null?'':' · строка '+(x.index+1))+'</button></li>').join('')+'</ul><small>Нажмите сообщение, чтобы перейти к полю. Связанные показатели проверяются без изменения ваших значений.</small>':'';
+ if(root.innerHTML!==html)root.innerHTML=html;
 }
 function error(message,el,location){const box=document.querySelector('#ce-error');box.textContent=message;
  if(location?.form){if(location.form.startsWith('Макет')&&location.form!=='Макет10')showExtra(location.form);else showMain();el=document.querySelector('[data-ce-scope="'+location.scope+'"][data-ce-field="'+location.field+'"]'+(location.index==null?'':'[data-ce-row="'+location.index+'"]'));}
@@ -396,7 +436,7 @@ function showChecks(group=''){
  SolinControlUI.mount(host,{records:[r],database,draft:true,caption:'Квартал '+r.KV+' · выдел '+r.VD,group,onNavigate:issue=>{if(session===currentSession)focusControlIssue(issue);}});
 }
 function preview(print){const popup=window.open('','_blank');if(!popup)return toast('Разрешите открытие окна карточки');const paper=document.querySelector('.dt-board').cloneNode(true);paper.querySelectorAll('#ce-extra,#ce-action-panel,.ce-other').forEach(e=>e.remove());for(const el of paper.querySelectorAll('input,select')){const span=document.createElement('output');span.textContent=el.tagName==='SELECT'?el.selectedOptions[0]?.textContent||'':el.value;el.replaceWith(span);}paper.querySelectorAll('button').forEach(b=>b.disabled=true);paper.style.transform='none';const css=new URL('solin-card-editor.css?v=20261023-6',location.href).href;popup.document.write('<!doctype html><html lang="ru"><meta charset="utf-8"><title>Карточка таксации — КТ</title><link rel="stylesheet" href="'+h(css)+'"><style>body{margin:8px;background:#eee}.ce-print{display:block;position:static}.ce-print .dt-board{position:relative}.print-action{margin-bottom:8px}</style><button class="print-action" onclick="print()">Печать</button><div class="ce-modal ce-print">'+paper.outerHTML+'</div><p style="font:11px Arial">Предварительный просмотр карточки. Официальное таксационное описание формируется в настольной SOLI-N.</p></html>');popup.document.close();if(print)popup.addEventListener('load',()=>popup.print(),{once:true});}
-function newCard(e){const previous=session.draft,kv=previous.KV;if(!save(e))return;const q=D.quarters[kv],org=D.lesnichestvo?.[0]||{},r=Object.fromEntries((D.transfSchema['Выдел']||[]).map(f=>[f,null]));for(const f of numeric)if(f in r)r[f]=0;for(const f of ['CR','OZU','ErV','ErCt','M2PM1','M22','M23','PLG'])r[f]=0;Object.assign(r,{POS:previous.POS??org.POS,LESN:previous.LESN??org.LESN,KV:kv,KGLF:previous.KGLF,VD:Math.max(0,...q.compartments.filter(x=>same(x.POS,previous.POS)&&same(x.LESN,previous.LESN)&&same(x.KGLF,previous.KGLF)).map(x=>Number(x.VD)||0))+1,PLV:null,KU:null,Fzona:previous.Fzona,KlxrVD:previous.KlxrVD,_children:{},_local:true});open(r,{isNew:true});}
+function newCard(e){const previous=session.draft,kv=previous.KV;if(!save(e))return;const q=D.quarters[kv],org=D.lesnichestvo?.[0]||{},r=Object.fromEntries((D.transfSchema['Выдел']||[]).map(f=>[f,null]));for(const f of numeric)if(f in r)r[f]=0;for(const f of ['CR','OZU','ErV','ErCt','M2PM1','M22','M23','PLG'])r[f]=0;Object.assign(r,{POS:previous.POS??org.POS,LESN:previous.LESN??org.LESN,KV:kv,KGLF:previous.KGLF,VD:Math.max(0,...q.compartments.filter(x=>same(x.POS,previous.POS)&&same(x.LESN,previous.LESN)&&same(x.KGLF,previous.KGLF)).map(x=>Number(x.VD)||0))+1,PLV:1,KU:null,Fzona:previous.Fzona,KlxrVD:previous.KlxrVD,_children:{},_local:true});open(r,{isNew:true});}
 function updateBadges(form){const n=session.draft._children[form]?.length||0;document.querySelectorAll('[data-ce-badge="'+form+'"]').forEach(b=>b.textContent=n||'');}
 function validate(){
  const linkIssue=linkedIssues();if(linkIssue)throw linkIssue;
@@ -475,19 +515,30 @@ function open(record,options={}){if(!record)return;
  previousFocus=document.activeElement;previousOverflow=document.body.style.overflow;
  session={record,original:clone(record),draft:clone(record),quarterTarget:quarter,originalQuarter:clone(quarter),quarter:clone(quarter),dirty:false,changedMakets:new Set(),closeButton:document.querySelector('#modal .close').onclick};
  session.isNew=!!options.isNew;
+ if(session.isNew&&session.draft.PLV==null)session.draft.PLV=1;
  session.draft._children??={};
  session.baselines=new WeakMap();for(const [form,children]of Object.entries(session.draft._children))children.forEach((row,i)=>session.baselines.set(row,session.original._children[form][i]));
  if(session.quarter.GodT==null)session.quarter.GodT=D.lesnichestvo?.[0]?.GodT??null;
  openModal('Карточка таксации',markup());const modal=document.querySelector('#modal');modal.classList.add('ce-modal');modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');modal.setAttribute('aria-labelledby','modalTitle');document.body.style.overflow='hidden';session.supportGrid=document.querySelector('.ce-other .ce-grid');setZoom('actual');
  modal.querySelector('.close').onclick=cancel;
- const form=document.querySelector('#ce-form');form.addEventListener('input',e=>{capture(e.target);if(e.target.dataset.ceScope?.startsWith('Макет'))session.changedMakets.add(e.target.dataset.ceScope)});
+ const form=document.querySelector('#ce-form');
+ const entry=document.createElement('div');entry.id='ce-entry-checks';entry.className='ce-entry-checks';entry.hidden=true;entry.setAttribute('role','status');entry.setAttribute('aria-live','polite');
+ form.querySelector('.dt-toolbar').after(entry);
+ const areaHelp=document.createElement('p');areaHelp.className='ce-area-help';areaHelp.textContent='При наборе можно оставить площадь 1.0 га. Точные площади полигонов переносятся позже: MapInfo → Excel → SOLI-N.';
+ entry.after(areaHelp);
+ form.addEventListener('input',e=>{capture(e.target);if(e.target.dataset.ceScope?.startsWith('Макет'))session.changedMakets.add(e.target.dataset.ceScope);if(session.entryTouched?.has(e.target.dataset.ceScope+':'+e.target.dataset.ceField))refreshEntryChecks()});
+ form.addEventListener('focusout',e=>{if(!e.target.matches('[data-ce-field]'))return;(session.entryTouched??=new Set()).add(e.target.dataset.ceScope+':'+e.target.dataset.ceField);refreshEntryChecks();});
  form.addEventListener('change',e=>{
   if(e.target.matches('.dt-maket-select')){const n=e.target.value;e.target.value='';if(n==='10'||n==='31'||n==='32')showMain(n);else if(n)showExtra('Макет'+n);return;}
   capture(e.target);
   if(e.target.dataset.ceScope?.startsWith('Макет'))session.changedMakets.add(e.target.dataset.ceScope);
   recalculateEditedField(e.target);
+  if(e.target.matches('[data-ce-field]'))(session.entryTouched??=new Set()).add(e.target.dataset.ceScope+':'+e.target.dataset.ceField);
+  refreshEntryChecks();
  });
  form.addEventListener('click',e=>{
+  const jump=e.target.closest('[data-ce-entry-issue]');
+  if(jump){const issue=session.entryIssues?.[Number(jump.dataset.ceEntryIssue)];if(issue)focusControlIssue({form:issue.scope==='base'?'ВыделВ':issue.scope,field:issue.field,row:issue.index});return;}
   if(e.target.closest('[data-ce-calc-close]')){const notice=document.getElementById('ce-calc-notice');if(notice)notice.hidden=true;return;}
   const cell=e.target.closest('[data-ce-select]');if(cell)selectRecord(cell.dataset.ceSelectForm,Number(cell.dataset.ceSelect));
  });
