@@ -210,6 +210,79 @@ function treeDependencies(card,refs=ref()){
  }
  return issues;
 }
+// Audit a whole card transition instead of validating only the currently
+// open form. The same source rules apply to edit, delete and Save. Unchanged
+// legacy/imported values do not block an unrelated correction.
+const BASE_CHAIN={
+ M3Pr:['M3Pr'],
+ M3TLU:['M3Pr','M3TLU','KlxrVD','NE2A'],
+ M2PM1:['M2PM1'],M22:['M2PM1','M22'],M23:['M2PM1','M22','M23'],
+ PRP1:['PRP1'],PRP2:['PRP1','PRP2'],PRP3:['PRP1','PRP2','PRP3'],
+ PLP1:['PLP1'],PLP2:['PLP1','PLP2'],PLP3:['PLP1','PLP2','PLP3']
+};
+const MAKET_CHAIN={
+ 'Макет10':{IAR:['IAR','KU']},
+ 'Макет12':{SV:['KTP','SV'],SB:['SB'],VV:['VV','VB'],VB:['VV','VB']},
+ 'Макет16':{Por16:['Por16','Макет10']},
+ 'Макет23':Object.fromEntries(Array.from({length:8},(_,i)=>[
+  'K'+(i+1),Array.from({length:i+1},(_,j)=>'K'+(j+1))
+ ]))
+};
+const changedValue=(a,b)=>code(a)!==code(b);
+const treeKey=x=>[x.form,x.field,x.index,x.value].join('|');
+function validateTransition(before,after,org,refs=ref(),opts={}){
+ const errors=[],warnings=[];
+ if(!after)return {errors:[{reason:'Не передана карточка для контроля'}],warnings};
+ const isNew=!before||opts.isNew===true;
+ const baseDirty=deps=>isNew||deps.some(k=>changedValue(before?.[k],after[k]));
+ const changedRow=(a,b,deps)=>isNew||!a||
+  deps.some(k=>changedValue(a[k],b[k]));
+ const issue=(form,field,index,value,reason,unknown=false)=>{
+  (unknown?warnings:errors).push({form,field,index,value:code(value),reason});
+ };
+ const inspect=(form,field,row,index,enabled)=>{
+  if(!enabled||!filled(row?.[field]))return;
+  const result=options(form,field,row,after,org,refs);
+  if(!result)return; // No source-backed RowSource for this field yet.
+  const valid=currentIsAllowed(row[field],result);
+  if(valid===false&&['complete','empty'].includes(result.status))
+   issue(form,field,index,row[field],
+    form+'.'+field+': код '+code(row[field])+' не входит в разрешённые значения. '+(result.reason||''));
+  else if(result.status==='partial'||result.status==='ambiguous'||
+          (valid===null&&['waiting','unavailable','unknown'].includes(result.status)))
+   issue(form,field,index,row[field],
+    form+'.'+field+': зависимость пока не подтверждена полностью. '+(result.reason||''),true);
+ };
+ for(const [field,deps] of Object.entries(BASE_CHAIN))
+  inspect('ВыделВ',field,after,null,baseDirty(deps));
+ const beforeChildren=before?._children||{},children=after._children||{};
+ const maket10Changed=JSON.stringify(beforeChildren.Макет10||[])!==
+   JSON.stringify(children.Макет10||[]);
+ const kuChanged=baseDirty(['KU']);
+ for(const [form,fields] of Object.entries(MAKET_CHAIN)){
+  const rows=children[form]||[],oldRows=beforeChildren[form]||[];
+  for(let i=0;i<rows.length;i++){
+   for(const [field,deps] of Object.entries(fields)){
+    const row=rows[i],prior=oldRows[i];
+    const upstream=form==='Макет10'&&kuChanged||
+      form==='Макет16'&&maket10Changed;
+    inspect(form,field,row,i,upstream||changedRow(prior,row,deps));
+   }
+  }
+ }
+ // Match only newly introduced cross-form conflicts. This prevents an old
+ // imported inconsistency from blocking unrelated edits.
+ if(isNew||kuChanged||maket10Changed||
+    JSON.stringify(beforeChildren.Макет16||[])!==JSON.stringify(children.Макет16||[])){
+  const existing=new Set(before?treeDependencies(before,refs).map(treeKey):[]);
+  for(const found of treeDependencies(after,refs)){
+   if(existing.has(treeKey(found)))continue;
+   if(!errors.some(e=>e.form===found.form&&e.field===found.field&&e.index===found.index))
+    errors.push(found);
+  }
+ }
+ return {errors,warnings};
+}
 function applySelect(select,result,opts={}){
  if(!select||!result)return null;
  const old=String(opts.current??select.value??'');
@@ -257,5 +330,5 @@ function currentIsAllowed(value,result){
  if(code(value)==='0' && !result.items.some(r=>same(r.value,0)))return null;
  return result.items.some(r=>same(r.value,value));
 }
-window.SolinDependentRules={forestTypes,options,currentIsAllowed,applySelect,treeDependencies,kto,region,speciesGroup,suggestedOrigin,landCategory,allowedLayers};
+window.SolinDependentRules={forestTypes,options,currentIsAllowed,applySelect,treeDependencies,validateTransition,kto,region,speciesGroup,suggestedOrigin,landCategory,allowedLayers};
 })();
