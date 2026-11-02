@@ -30,8 +30,25 @@ assert.equal(original.status,'complete');
 assert.equal(original.expected,35);
 assert.equal(original.index,0);
 const cascaded=calc.corrections(k59Card,stockRefs,{KTO:150000000});
-assert.deepEqual(Array.from(cascaded.issues,x=>x.field),['ZAP','STUR1','STUR']);
-assert.deepEqual(Array.from(cascaded.issues,x=>x.expected),[35,35,70]);
+assert.deepEqual(Array.from(cascaded.issues,x=>x.field),[],
+ 'K59 is only a diagnostic: correct STUR must not change with a differing norm');
+assert.equal(cascaded.advisories.length,1);
+assert.equal(cascaded.advisories[0].entered,99);
+assert.equal(cascaded.advisories[0].estimated,35);
+const measured={...k59Card,_children:{Макет10:[{...k59Card._children.Макет10[0],ZAP:40}]}};
+const measuredCorrections=calc.corrections(measured,stockRefs,{KTO:150000000});
+assert.deepEqual(Array.from(measuredCorrections.issues,x=>x.field),['STUR1','STUR']);
+assert.deepEqual(Array.from(measuredCorrections.issues,x=>x.expected),[40,80]);
+assert.equal(measured._children.Макет10[0].ZAP,40,'Entered ZAP survives K59 diagnostic');
+assert.equal(calc.corrections({...measured,PLV:3},stockRefs,{KTO:150000000}).issues.find(x=>x.field==='STUR').expected,120,
+ 'Editing area recalculates total by field-measured ZAP');
+const halfUp={...k59Card,_children:{Макет10:[{...k59Card._children.Макет10[0],POL:0.5}]}};
+assert.equal(calc.stockPerHectare(halfUp,stockRefs,{KTO:150000000}).expected,30,
+ 'K59_1 rounds 59*0.5 upward, unlike Jet Round in Макет10ЗАП');
+const changedHeight={...k59Card,_children:{Макет10:[{...k59Card._children.Макет10[0],PH:6.5}]}};
+assert.equal(calc.stockPerHectare(changedHeight,{Szap:[{...stockRefs.Szap[0],v7:80}],SzapCK:[]},{KTO:150000000}).expected,48,
+ 'K59_1 explicitly rounds 6.5 m up to 7 m');
+
 assert.equal(JSON.stringify(k59Card),k59Snapshot,'K59 corrections must not modify source data');
 assert.equal(calc.stockPerHectare(k59Card,stockRefs,null).status,'waiting');
 assert.equal(calc.stockPerHectare({...k59Card,KU:21},stockRefs,{KTO:150000000}).status,'not-applicable');
@@ -59,5 +76,10 @@ assert.match(editor,/function recalculateEditedField\(el\)/);
 assert.match(editor,/recalculateEditedField\(e\.target\)/);
 assert.match(editor,/Введено впервые/);
 assert.match(editor,/Пересчитано · не сохранено/);
+assert.match(editor,/session\.calcNotices=changed/,'Notice must reflect latest correction');
+assert.match(editor,/if\(trigger\)recalculateEditedField\(trigger\)/,'Save must recalculate draft');
+const workflow=fs.readFileSync('solin-workflow.js','utf8');
+assert.doesNotMatch(workflow,/r\.STUR1=m\.ZAP/,'Exit must not copy first stand row');
+assert.match(workflow,/SolinCardCalculations\?\.standStock\(r\)/);
 assert.match(editor,/const changed=\(row,prior,names\)/);
-console.log('K58_AND_STOCK_OK: 43-row historical bonitet fixture, K59 table-backed ZAP and STUR previews, typed correction banner, no data mutation');
+console.log('K58_AND_STOCK_OK: 43-row historical bonitet fixture, K59 advisory without ZAP overwrite and original STUR totals, typed correction banner, no data mutation');
