@@ -281,10 +281,14 @@ function recalculateEditedField(el){
    }
  }
  if(!changed.length){
-  // K59 needs authoritative source lookups; do not imply correction if unavailable.
-  if(scope==='Макет10'&&standFields.has(field)&&check.stockPerHectare?.status!=='complete'){
-   const root=document.getElementById('ce-calc-notice');
-   if(root){root.hidden=false;root.innerHTML='<strong>Запас пока не исправлен</strong><p>'+h(check.stockPerHectare.reason||'Нет данных исходной шкалы К59')+'. Введённое значение осталось в черновике.</p>';}
+  if(scope==='Макет10'&&standFields.has(field)){
+   const root=document.getElementById('ce-calc-notice'),k59=check.stockPerHectare;
+   if(root){
+    root.hidden=false;
+    root.innerHTML=k59?.status==='complete'?
+     '<strong>К59: нормативный запас проверен</strong><p>Расчётный запас '+h(k59.expected)+' м³/га совпадает со значением макета 10. Автоматическая замена не требовалась.</p>':
+     '<strong>Запас не проверен по К59</strong><p>'+h(k59?.reason||'Не удалось получить нормативный запас')+'. Введённое значение не признано правильным и не исправлено автоматически.</p>';
+   }
   }
   return;
  }
@@ -302,11 +306,22 @@ function recalculateEditedField(el){
  }
  const notice=document.getElementById('ce-calc-notice');
  if(!notice)return;
+ const normativeCorrected=changed.some(item=>item.field==='ZAP');
+ const k59=check.stockPerHectare,normativeVerified=k59?.status==='complete';
+ if(!normativeVerified)session.calcNotices=session.calcNotices.filter(x=>x.field!=='ZAP');
+ const headline=normativeCorrected?'К59: нормативный ZAP исправлен':
+  normativeVerified?'К59: запас проверен, итоги пересчитаны':'Запас не проверен по К59 · пересчитаны только зависимые значения';
+ const explanation=normativeCorrected?
+  'Неверный ZAP автоматически исправлен по исходной таблице SOLI-N. Итоговые запасы пересчитаны из нормативного значения. Изменения пока находятся в черновике.':
+  normativeVerified?
+   'Введённый ZAP соответствует расчёту К59. Зависимые запасы пересчитаны. Изменения пока не сохранены.':
+   'К59 не подтвердил введённый ZAP: '+(k59?.reason||'нет однозначного расчёта')+
+   '. Итоги STUR1 и STUR рассчитаны из введённого ZAP, но это не доказывает, что запас на гектар правильный.';
  notice.hidden=false;
- notice.innerHTML='<div class="ce-calc-heading"><strong>Проверка расчётов SOLI-N · исправлено в черновике</strong>'+
+ notice.innerHTML='<div class="ce-calc-heading"><strong>'+h(headline)+'</strong>'+
    '<button type="button" data-ce-calc-close aria-label="Скрыть таблицу расчётов">×</button></div>'+
-   '<p>Первоначальное значение не совпало с расчётом. Правильное значение уже подставлено в карточку, но <b>запись ещё не сохранена</b>.</p>'+
-   '<div class="ce-calc-table-wrap"><table><thead><tr><th>Поле</th><th>До исправления</th><th>Расчётное</th><th>Основание</th></tr></thead><tbody>'+
+   '<p>'+h(explanation)+'</p>'+
+   '<div class="ce-calc-table-wrap"><table><thead><tr><th>Поле</th><th>Было</th><th>Стало</th><th>Основание</th></tr></thead><tbody>'+
    session.calcNotices.map(item=>'<tr><td>'+h(item.label)+'</td><td>'+h(item.previous)+'</td><td><b>'+h(item.expected)+'</b></td><td>'+h(item.reason)+'</td></tr>').join('')+
    '</tbody></table></div>';
  notice.scrollIntoView({block:'nearest',behavior:'smooth'});
@@ -566,7 +581,7 @@ function save(e){e?.preventDefault();if(!session||session.pendingRecovery)return
  try{for(const [key,value]of[['solin_field_audited_work_v1',oldWork],['solin_field_checkpoint_v2',oldCheckpoint]])if(value===null)localStorage.removeItem(key);else localStorage.setItem(key,value);}catch(_){}
  error('Не удалось сохранить карточку: '+err.message);return;}
  const recap=(s.calcNotices||[]).map(i=>i.field+' '+i.previous+' → '+i.expected).join('; ');
- discardRecovery(s);current=s.record;close();renderComp();refresh();toast('Карточка сохранена'+(recap?' · исправлено: '+recap:''));return true;
+ discardRecovery(s);current=s.record;close();renderComp();refresh();toast('Карточка сохранена'+(recap?' · изменения: '+recap:''));return true;
 }
 function click(e){const b=e.target.closest('button');if(!b)return;
  if(b.dataset.ceZoom){setZoom(b.dataset.ceZoom);return;}

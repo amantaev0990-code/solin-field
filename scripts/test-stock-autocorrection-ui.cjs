@@ -34,11 +34,14 @@ async function fixture(p){
   r._children.Макет10=[{...r._children.Макет10[0],POS:r.POS,LESN:r.LESN,KV:r.KV,KGLF:r.KGLF,VD:r.VD,
    IAR:1,POR:'В',KOEF:10,PH:6,POL:0.6,LET:5,PROI:7,ZAP:99}];
   const refs=window.SOLIN_REFS.tables;
-  refs.Szap=[{Obl:150000000,p1:'В',LXZ:8,KUL:'.',v6:59,v7:80}];refs.SzapCK=[];refs.SSHB=[];
+  const real=refs.Szap?.find(x=>Number(x.Obl)===150000000&&x.p1==='В'&&Number(x.LXZ)===8&&x.KUL==='.');
+  if(!real||Number(real.v6)!==59)throw Error('Expected original Solim.mdb Szap v6=59 not found');
   const estimate=SolinCardCalculations.stockPerHectare(r,refs,org);
   if(estimate.status!=='complete'||estimate.expected!==35)throw Error('K59 test fixture invalid: '+JSON.stringify(estimate));
   current=r;renderComp();show('card');
-  return {forestId:forest.id,address:{POS:r.POS,LESN:r.LESN,KV:r.KV,KGLF:r.KGLF,VD:r.VD}};
+  return {forestId:forest.id,address:{POS:r.POS,LESN:r.LESN,KV:r.KV,KGLF:r.KGLF,VD:r.VD},
+   norms:{height7:SolinCardCalculations.k59Round(Number(real.v7)*0.6),
+    half:SolinCardCalculations.k59Round(Number(real.v7)*0.5)}};
  });
  await p.locator('#wfEditBase').click();await p.locator('#ce-form').waitFor();
  return info;
@@ -71,28 +74,31 @@ async function reopen(p,info){
  assert.equal(await val(p,'base','STUR'),70);
  assert.match(await p.locator('#ce-calc-notice').innerText(),/50.*35/s);
  console.log('PASS desktop typing, blur, K59 auto-correct and before/after');
- await zap.fill('42');await zap.press('Tab');
- assert.equal(await val(p,'Макет10','ZAP'),35);
- assert.match(await p.locator('#ce-calc-notice').innerText(),/42.*35/s,'Repeat edit should replace stale message');
- console.log('PASS repeat correction updates original and corrected values in notice');
+ for(const typed of [30,40,50]){
+  await zap.fill(String(typed));await zap.press('Tab');
+  assert.equal(await val(p,'Макет10','ZAP'),35,'Typed '+typed+' must be corrected to the same original normative value');
+  assert.match(await p.locator('#ce-calc-notice').innerText(),new RegExp(typed+'.*35','s'),
+   'Correction notice must show the latest wrong '+typed+' and verified 35');
+ }
+ console.log('PASS original Szap correction for repeated 30 → 40 → 50 inputs');
  await field(p,'Макет10','PH').fill('7');
  await field(p,'Макет10','PH').press('Tab');
- assert.equal(await val(p,'Макет10','ZAP'),48);
- assert.equal(await val(p,'base','STUR'),96);
+ assert.equal(await val(p,'Макет10','ZAP'),info.norms.height7);
+ assert.equal(await val(p,'base','STUR'),info.norms.height7*2);
  await field(p,'Макет10','POL').fill('0,5');
  await field(p,'Макет10','POL').press('Tab');
- assert.equal(await val(p,'Макет10','ZAP'),40);
- assert.equal(await val(p,'base','STUR'),80);
+ assert.equal(await val(p,'Макет10','ZAP'),info.norms.half);
+ assert.equal(await val(p,'base','STUR'),info.norms.half*2);
  await field(p,'base','PLV').fill('3');
  await field(p,'base','PLV').press('Tab');
- assert.equal(await val(p,'base','STUR1'),40);
- assert.equal(await val(p,'base','STUR'),120);
+ assert.equal(await val(p,'base','STUR1'),info.norms.half);
+ assert.equal(await val(p,'base','STUR'),info.norms.half*3);
  console.log('PASS height, fullness and area recompute ZAP/STUR in original order');
  await p.locator('#ce-save').click();await p.waitForFunction(()=>!document.querySelector('#ce-form'));
- assert.equal(Number(await p.evaluate(()=>current._children.Макет10[0].ZAP)),40);
+ assert.equal(Number(await p.evaluate(()=>current._children.Макет10[0].ZAP)),info.norms.half);
  await reopen(p,info);
- assert.equal(await val(p,'Макет10','ZAP'),40);
- assert.equal(await val(p,'base','STUR'),120);
+ assert.equal(await val(p,'Макет10','ZAP'),info.norms.half);
+ assert.equal(await val(p,'base','STUR'),info.norms.half*3);
  console.log('PASS save + reload persisted corrected stock');
  await p.locator('#ce-cancel').click();
  await p.evaluate(()=>{
@@ -100,9 +106,31 @@ async function reopen(p,info){
   current._children.Макет10.push({...base,ZAP:10});
   current.STUR=0;current.STUR1=0;solinWorkflow.exitCard();
  });
- assert.equal(await p.evaluate(()=>current.STUR1),50);
- assert.equal(await p.evaluate(()=>current.STUR),150);
+ assert.equal(await p.evaluate(()=>current.STUR1),info.norms.half+10);
+ assert.equal(await p.evaluate(()=>current.STUR),(info.norms.half+10)*3);
  console.log('PASS alternate exit aggregates Maket10 ZAP and recalculates STUR');
+ // Deliberately make the normative source unavailable. The entered ZAP must
+ // never be presented as independently verified merely because STUR follows it.
+ await p.evaluate(()=>{
+   window.SOLIN_REFS.tables.Szap=[];
+   show('card');renderComp();
+ });
+ await p.locator('#wfEditBase').click();await p.locator('#ce-form').waitFor();
+ const unverified=field(p,'Макет10','ZAP');
+ for(const typed of [30,40,50]){
+  await unverified.fill(String(typed));await unverified.press('Tab');
+  assert.equal(await val(p,'Макет10','ZAP'),typed,'No K59 norm: preserve typed ZAP');
+  assert.match(await p.locator('#ce-calc-notice').innerText(),/не проверен по К59/i);
+  assert.match(await p.locator('#ce-calc-notice').innerText(),/не доказывает|не признано правильным/i);
+ }
+ console.log('PASS 30 → 40 → 50 without normative source: not falsely confirmed');
+ await p.locator('#ce-save').click();await p.waitForFunction(()=>!document.querySelector('#ce-form'));
+ await p.evaluate(()=>{show('card');renderComp();solinWorkflow.editMaket('Макет10',0)});
+ await p.locator('#wf_ZAP').fill('40');await p.locator('#wfSaveMaket').click();
+ assert.match(await p.locator('#modalBody').innerText(),/не подтверждён по К59/i);
+ assert.match(await p.locator('#modalBody').innerText(),/арифметический пересчёт, а не исправление запаса/i);
+ assert.doesNotMatch(await p.locator('#modalBody').innerText(),/Обнаружены неверные исходные значения/i);
+ console.log('PASS alternate Maket10 editor: no false original correction');
  await desktop.close();
  const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
  const m=await mobile.newPage();m.on('pageerror',e=>errors.push(e.message));
