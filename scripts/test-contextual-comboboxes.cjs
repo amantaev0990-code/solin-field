@@ -22,6 +22,31 @@ const qRefs={...tables,
 assert.deepEqual(values('Квартал','KGLF',{},null,{KTO:350000000},qRefs),['1']);
 assert.deepEqual(values('Квартал','Kpz',{},null,{KTO:350000000},qRefs),['2','3']);
 assert.equal(engine.options('Квартал','KGLF',{},null,{KTO:350000000},{...tables,Sples:[]}).status,'unavailable');
+// Incomplete original RowSource must be honest: SFZ.KLF is a proven
+// association, but the WHERE tail is missing and cannot justify "complete".
+const functional=engine.options('Квартал','Fzona',{KGLF:54},null,{KTO:350000000},tables);
+assert.equal(functional.status,'partial');
+assert.deepEqual(Array.from(functional.items,x=>x.value),['1']);
+assert.match(functional.reason,/не восстановлена/);
+const otherFunctional=engine.options('Квартал','Fzona',{KGLF:24},null,{KTO:350000000},tables);
+assert.equal(otherFunctional.status,'unavailable',
+ 'No matching SFZ.KLF; never substitute unrelated category values');
+assert.equal(engine.options('Квартал','Raion',{KGLF:54},null,{KTO:350000000},tables).status,
+ 'unavailable','Кл_Рай is absent from the extracted source package');
+for(const [form,field] of [['Макет17','P17'],['Макет19','ZP']]){
+ const result=engine.options(form,field,{},null,{KTO:350000000},tables);
+ assert.equal(result.status,'partial','Unfinished DKP2>70… cannot be authoritative');
+ assert(result.items.length>0);
+ assert(result.items.every(o=>tables.SDP.some(r=>String(r.KPC)===o.value&&
+    (Number(r.DKP2)===0||Number(r.DKP2)>70))),
+  'May only offer entries satisfying the archived necessary condition');
+ const projected={_children:{[form]:[{[field]:result.items[0].value}]}};
+ const audit=engine.validateTransition(null,projected,{KTO:350000000},tables,{isNew:true});
+ assert.equal(audit.errors.filter(x=>x.form===form).length,0,
+   'Incomplete source restriction must never hard-reject species');
+ assert(audit.warnings.some(x=>x.form===form&&x.field===field),
+   'Incomplete Maket RowSource must be flagged as not fully verified');
+}
 const trees={_children:{Макет10:[{POR:'В'},{POR:'Б'}]}};
 const p16=engine.options('Макет16','Por16',{},trees,{KTO:350000000},tables);
 assert.equal(p16.status,'complete');
