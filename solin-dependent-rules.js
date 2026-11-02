@@ -10,8 +10,13 @@ const num=v=>filled(v)&&code(v)!==''&&Number.isFinite(Number(v))?Number(v):null;
 const same=(a,b)=>filled(a)&&filled(b)&&code(a)===code(b);
 const ref=()=>window.SOLIN_REFS?.tables||null;
 const name=r=>String(r?.NTL??r?.NDP??r?.NOV??r?.NMR??'');
+function kto(org){
+ const direct=Number(org?.KTO);
+ if(Number.isFinite(direct)&&direct>0)return direct;
+ return window.SolinAddressContext?.originalKTO?.(org?.POS,org?.LESN)??null;
+}
 function region(org){
- const raw=Number(org?.KTO);
+ const raw=kto(org);
  const value=raw/10000000; // Original query ВыделЛес.KTOKR.
  return Number.isInteger(value)&&value>0?value:null;
 }
@@ -89,9 +94,24 @@ function options(form,field,row,card,org,refs=ref()){
     .map(r=>({value:String(r.KPC),label:String(r.NDP||'')}))};
  }
  if(!refs)return {status:'unavailable',reason:'Справочники ещё не загружены',items:[]};
- if(form==='Квартал'&&field==='Klxr'&&refs.Slxr){
-  if(!filled(row.Kpz))return {status:'waiting',reason:'Выберите природную зону квартала',items:[]};
-  return {status:'complete',reason:'Секции Slxr зависят от природной зоны квартала',items:refs.Slxr.filter(r=>filled(r.Klxz)&&same(r.Kpz,row.Kpz)&&!same(r.Klxz,0)).map(r=>({value:String(r.Klxz),label:String(r.Nlxr||'')}))};
+ if(form==='Квартал'&&field==='Klxr'){
+  if(!filled(row?.Kpz))return {status:'waiting',reason:'Сначала укажите природную зону Kpz квартала',items:[]};
+  if(!Array.isArray(refs.Slxr)||!Array.isArray(refs.Szap)||!refs.Szap.length)
+   return {status:'unavailable',reason:'Требуются исходные таблицы Slxr и Szap; общий список не является допустимым',items:[]};
+  const obl=kto(org);
+  if(!obl)return {status:'unavailable',reason:'Сначала определите код области KTO лесничества',items:[]};
+  const allowed=new Set(refs.Szap.filter(r=>same(r.Obl,obl)&&filled(r.LXZ)).map(r=>code(r.LXZ)));
+  if(!allowed.size)return {status:'unavailable',reason:'Для KTO '+obl+' отсутствуют нормативные зоны Szap',items:[]};
+  const found=new Map();
+  for(const r of refs.Slxr){
+   if(!filled(r.Klxz)||same(r.Klxz,0)||!same(r.Kpz,row.Kpz)||!allowed.has(code(r.Klxz)))continue;
+   const key=code(r.Klxz);
+   if(!found.has(key))found.set(key,{value:key,label:String(r.Nlxr||'')});
+  }
+  const items=[...found.values()];
+  return {status:items.length?'complete':'empty',
+   reason:'Slxr.Kpz='+code(row.Kpz)+' ∩ Szap.Obl='+obl+' (LXZ): '+(items.map(x=>x.value).join(', ')||'совпадений нет'),
+   items,dependencies:['Kpz','KTO'],region:obl};
  }
  if(form==='Макет16'&&field==='Por16'&&refs.SDP){
   // Original RowSource reads Maket10Выд.POR for this same stand.
@@ -144,11 +164,55 @@ function options(form,field,row,card,org,refs=ref()){
  }
  return null;
 }
+// Shared UI adapter for every form: never display the unrestricted SolinHuman
+// lookup after a verified Access RowSource has reduced the permitted choices.
+// Existing imported codes remain visible but are not advertised as permitted.
+function applySelect(select,result,opts={}){
+ if(!select||!result)return null;
+ const old=String(opts.current??select.value??'');
+ let input=select;
+ if(input.tagName!=='SELECT'){
+  if(input.tagName!=='INPUT'||!input.parentElement)return null;
+  const replacement=document.createElement('select');
+  for(const attr of input.attributes){
+   if(!['type','inputmode','list','value','placeholder','autocomplete'].includes(attr.name))
+    replacement.setAttribute(attr.name,attr.value);
+  }
+  input.replaceWith(replacement);input=replacement;
+ }
+ const status=result.status||'unavailable';
+ const ready=['complete','partial'].includes(status);
+ const items=ready?(result.items||[]):[];
+ const seen=new Set();
+ const options=[new Option('— Не указано —','')];
+ for(const item of items){
+  const val=String(item.value??'');
+  if(!val||seen.has(val))continue;
+  seen.add(val);
+  options.push(new Option(val+(item.label?' — '+item.label:''),val));
+ }
+ const has=old&&seen.has(old);
+ if(old&&!has){
+  const saved=new Option('Сохранённый, сейчас недопустимый: '+old,old);
+  saved.disabled=true;options.push(saved);
+ }
+ const signature=status+'|'+options.map(o=>o.value+'='+o.textContent).join(';');
+ if(input.dataset.dependentSignature!==signature){
+  input.replaceChildren(...options);
+  input.dataset.dependentSignature=signature;
+ }
+ input.value=old;
+ input.disabled=!ready;
+ input.dataset.dependentStatus=status;
+ input.dataset.dependentAllowed=old&&!has?'false':'true';
+ input.title=result.reason||'';
+ return input;
+}
 function currentIsAllowed(value,result){
  if(!result||result.status==='waiting'||result.status==='unavailable')return null;
  if(!filled(value))return null;
  if(code(value)==='0' && !result.items.some(r=>same(r.value,0)))return null;
  return result.items.some(r=>same(r.value,value));
 }
-window.SolinDependentRules={forestTypes,options,currentIsAllowed,region,speciesGroup,suggestedOrigin,landCategory,allowedLayers};
+window.SolinDependentRules={forestTypes,options,currentIsAllowed,applySelect,kto,region,speciesGroup,suggestedOrigin,landCategory,allowedLayers};
 })();
