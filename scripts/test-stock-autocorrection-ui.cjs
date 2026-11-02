@@ -127,7 +127,7 @@ async function reopen(p,info){
  await p.locator('#ce-save').click();await p.waitForFunction(()=>!document.querySelector('#ce-form'));
  await p.evaluate(()=>{show('card');renderComp();solinWorkflow.editMaket('Макет10',0)});
  await p.locator('#wf_ZAP').fill('40');await p.locator('#wfSaveMaket').click();
- assert.match(await p.locator('#modalBody').innerText(),/не проверен по нормативу К59/i);
+ assert.match(await p.locator('#modalBody').innerText(),/не подтверждён по К59/i);
  assert.match(await p.locator('#modalBody').innerText(),/арифметический пересчёт, а не исправление запаса/i);
  assert.doesNotMatch(await p.locator('#modalBody').innerText(),/Обнаружены неверные исходные значения/i);
  console.log('PASS alternate Maket10 editor: no false original correction');
