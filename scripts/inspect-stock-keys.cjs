@@ -1,6 +1,6 @@
 'use strict';
 const fs=require('node:fs'),zlib=require('node:zlib');
-const refs=JSON.parse(zlib.gunzipSync(fs.readFileSync('refs-audit.json.gz'))).toString();
+const refs=JSON.parse(zlib.gunzipSync(fs.readFileSync('refs-audit.json.gz')).toString());
 const tables=refs.tables||{};
 for(const table of ['Szap','SzapCK','SSHB']){
  const rows=tables[table]||[];
