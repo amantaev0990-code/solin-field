@@ -87,14 +87,16 @@ function originalForestKTO(record){
 // K59, constrained to one main-species Maket 10 row, with an exact
 // (KTO, POR, KlxrVD, KUL) lookup in original Szap. The physical Szap
 // table has 2389 unique keys. No approximate height extrapolation.
-function stockPerHectare(record,refs,org){
+function stockPerHectare(record,refs,org,quarterRow=null){
  if(!refs?.Szap?.length)return status('Таблица запасов Szap недоступна');
  const category=n(record?.KU),area=n(record?.PLV),original=originalForestKTO(record);
- const direct=n(org?.KTO),region=direct!==null&&direct>0?direct:original,zone=n(record?.KlxrVD);
+ const direct=n(org?.KTO),region=direct!==null&&direct>0?direct:original;
+ const explicit=n(record?.KlxrVD),quarterZone=n(quarterRow?.Klxr);
+ const zone=explicit!==null&&explicit>0?explicit:(!defined(record?.KlxrVD)&&quarterZone!==null&&quarterZone>0?quarterZone:explicit);
  const missing=[];
  if(category===null)missing.push('KU (категория угодий)');
  if(area===null||area<=0)missing.push('PLV (площадь)');
- if(zone===null||zone<=0)missing.push('KlxrVD (хозяйственная секция)');
+ if(zone===null||zone<=0)missing.push('KlxrVD (нет кода в выделе и однозначной строки Квартал.Klxr — укажите лесохозяйственную зону при редактировании квартала)');
  if(region===null)missing.push('KTO (код области лесничества)');
  if(missing.length)return status('К59: отсутствует '+missing.join('; ')+'. Адрес '+[record?.POS,record?.LESN,record?.KV,record?.VD].join('/') ,'waiting');
  if(category>=11)return status('К59 проверяет KU10 меньше 11','not-applicable');
@@ -129,7 +131,7 @@ function stockPerHectare(record,refs,org){
    const col='v'+Math.round(step*10).toString().padStart(2,'0')+'c';
    const vck=n(CK[0][col]);
    if(vck!==null&&vck>0){
-     const year=n(record.GodT1);
+     const year=n(record.GodT1)??n(quarterRow?.GodT);
      // QueryDef uses ВыделВыб.GodT1, NOT the quarter's current GodT.
      if(year===null)return status('К59: для выбора SzapCK нужен исходный GodT1 (год таксации выдела)','ambiguous');
      if(year>2016){
@@ -145,7 +147,7 @@ function stockPerHectare(record,refs,org){
  return {status:'complete',field:'ZAP',index,expected,reason:'К59 · '+source+
   ' · POR '+specie+', KTO '+region+', LXZ '+zone+', KUL '+cul};
 }
-function corrections(record,refs,org){
+function corrections(record,refs,org,quarterRow=null){
  const issues=[],unknown=[];
  const b=bonitet(record,refs);
  if(b.status==='complete'&&defined(record.M3B)&&!same(record.M3B,b.expected))
@@ -157,7 +159,7 @@ function corrections(record,refs,org){
  // must use that value, never the stale manually entered class.
  const bonitetChecked=b.status==='complete'&&!same(record.M3B,b.expected)?
    {...record,M3B:b.expected}:record;
- const k59=stockPerHectare(bonitetChecked,refs,org);
+ const k59=stockPerHectare(bonitetChecked,refs,org,quarterRow);
  let computedRecord=record;
  if(k59.status==='complete'){
   const current=record._children.Макет10[k59.index].ZAP;

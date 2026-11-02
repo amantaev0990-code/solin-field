@@ -153,6 +153,47 @@ async function reopen(p,info){
  });
  assert.equal(repair.code,150000000);
  console.log('PASS new 3-select forest KTO and existing saved forest KTO repair');
+ // Reproduce the user's address 723/4/1/1 with standard New quarter/New stand
+ // screens. "8" is a test-selected quarter zone, NOT a guessed 723 norm.
+ const forestCodes=await p.evaluate(async()=>{
+  const forest=await SolinWorkspace.create({regionCode:700,ownerCode:723,districtCode:4});
+  if(Number(D.lesnichestvo?.[0]?.KTO)!==350000000)throw Error('Original 723/4 KTO was lost');
+  openQuarterForm();
+  document.querySelector('#newKV').value='1';
+  document.querySelector('#newKGLF').value='1';
+  document.querySelector('#newKpz').value='2';
+  document.querySelector('#newKlxr').value='8';
+  createQuarter();
+  if(Number(D.quarters['1']?.meta?.GodT)!==Number(D.lesnichestvo[0].GodT))throw Error('Quarter year not inherited');
+  openCompForm('1');
+  document.querySelector('#newVD').value='1';
+  document.querySelector('#newPLV').value='1';
+  document.querySelector('#newKU').value='2';
+  document.querySelector('#newPOR').value='В';
+  createComp();
+  let r=D.quarters['1'].compartments[0];
+  if(!r||Number(r.KlxrVD)!==8||Number(r.KGLF)!==1||Number(r.POS)!==723||Number(r.LESN)!==4)
+   throw Error('New stand lost quarter/forest inherited address '+JSON.stringify(r));
+  r._children.Макет10=[{IAR:1,POR:'В',ZAP:40}];
+  delete r.KlxrVD;await SolinWorkspace.persist();
+  await SolinWorkspace.activate(forest.id);
+  r=D.quarters['1'].compartments[0];
+  if(Number(r.KlxrVD)!==8||Number(r._children.Макет10[0].POS)!==723)
+   throw Error('Existing 723/4/1/1 code restore failed');
+  const stored=(await SolinWorkspace.list()).find(f=>f.id===forest.id);
+  if(Number(stored?.quarters?.['1']?.compartments?.[0]?.KlxrVD)!==8)
+   throw Error('Inherited stand zone was not persisted to IndexedDB');
+  r.KlxrVD=9;await SolinWorkspace.persist();await SolinWorkspace.activate(forest.id);
+  if(Number(D.quarters['1'].compartments[0].KlxrVD)!==9)
+   throw Error('Explicit zone was silently overwritten');
+  const multi={quarterRows:[{POS:723,LESN:4,KV:1,KGLF:1,Klxr:7},{POS:723,LESN:4,KV:1,KGLF:1,Klxr:8}]};
+  if(window.SolinAddressContext.resolveQuarter({POS:723,LESN:4,KV:1,KGLF:1,VD:1},multi)!==null)
+   throw Error('Ambiguous quarter rows must not be guessed');
+  return {KTO:D.lesnichestvo[0].KTO,zone:stored.quarters['1'].compartments[0].KlxrVD};
+ });
+ assert.equal(forestCodes.KTO,350000000);
+ assert.equal(Number(forestCodes.zone),8);
+ console.log('PASS real 723/4/1/1 UI create: KTO, quarter year, KlxrVD, children, old-record repair and ambiguity');
  await desktop.close();
  const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
  const m=await mobile.newPage();m.on('pageerror',e=>errors.push(e.message));

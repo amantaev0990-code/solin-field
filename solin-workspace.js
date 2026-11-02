@@ -20,6 +20,50 @@ async function restoreSourceFields(forests){
 async function downloadSourceRecoveryBackup(){const db=await openDB();let backup;try{backup=await new Promise((resolve,reject)=>{const r=db.transaction('source-recovery-backups').objectStore('source-recovery-backups').get(activeId+'::'+window.SolinControlSourceRecovery.version);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}finally{db.close();}if(!backup)throw Error('Копия до восстановления не найдена');const url=URL.createObjectURL(new Blob([JSON.stringify(checkpointFor(backup.forest),null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='SOLIN-before-source-recovery.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);}
 async function list(){const db=await openDB();try{return await new Promise((resolve,reject)=>{const tx=db.transaction('forests'),r=tx.objectStore('forests').getAll();r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}finally{db.close()}}
 async function putMany(records){const db=await openDB();try{await new Promise((resolve,reject)=>{const tx=db.transaction('forests','readwrite');for(const r of records)tx.objectStore('forests').put(r);tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error||Error('Запись отменена'));tx.onerror=()=>reject(tx.error)})}finally{db.close()}}
+async function repairAddressCodes(forest){
+ const ctx=window.SolinAddressContext;if(!ctx||!forest?.org)return 0;
+ const before=copy(forest),org=forest.org;
+ let count=0;
+ if(!(Number(org.KTO)>0)){
+  const code=ctx.originalKTO(org.POS,org.LESN);
+  if(code!==null){org.KTO=code;count++;}
+ }
+ const missing=v=>v===null||v===undefined||String(v).trim()==='';
+ for(const [kv,q] of Object.entries(forest.quarters||{})){
+  if(!q||typeof q!=='object')continue;
+  const rows=q.quarterRows?.length?q.quarterRows:[q.meta||{}];
+  for(const row of rows){
+   if(missing(row.Klxr)){
+    const unique=ctx.uniqueQuarterZone(row);
+    if(unique!==null){row.Klxr=unique;count++;}
+   }
+   for(const [k,value] of Object.entries({POS:org.POS,LESN:org.LESN,KV:Number(kv)})){
+    if(missing(row[k])&&!missing(value)){row[k]=value;count++;}
+   }
+  }
+  if(!q.quarterRows?.length)q.meta=rows[0];
+  for(const stand of q.compartments||[]){
+   if(missing(stand.KV)){stand.KV=Number(kv);count++;}
+   const inherited=ctx.enrichStand(stand,q,org);
+   count+=Object.keys(inherited.values).length;
+   count+=ctx.enrichMakets(stand);
+  }
+ }
+ if(!count)return 0;
+ // Preserve one immutable backup of the unmodified forest before first
+ // automatic code repair, in the existing IndexedDB recovery store.
+ const db=await openDB();
+ try{await new Promise((resolve,reject)=>{
+  const tx=db.transaction(['forests','source-recovery-backups'],'readwrite'),
+   backups=tx.objectStore('source-recovery-backups'),id=forest.id+'::forest-address-inheritance-v1';
+  const req=backups.get(id);
+  req.onsuccess=()=>{if(!req.result)backups.put({id,forest:before});};
+  tx.objectStore('forests').put(forest);
+  tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||Error('Не удалось восстановить адресные коды'));
+  tx.onabort=()=>reject(tx.error||Error('Восстановление адресных кодов отменено'));
+ });}finally{db.close();}
+ return count;
+}
 function snapshot(){return {id:activeId,org:copy(D.lesnichestvo[0]),quarters:copy(D.quarters),source:copy(D.source||{}),extraTables:copy(D._transferExtras||{}),updatedAt:new Date().toISOString(),history:JSON.parse(localStorage.getItem(CHECKPOINT)||'{}').history||[]};}
 async function persist(){if(!initialized||!activeId)return;const next=snapshot();tail=tail.catch(()=>{}).then(()=>putMany([next]));await tail;return next;}
 function legacyClear(){for(const key of ['solin_field_audited_work_v1','solin_user_data_v1','solin_field_overrides_v3'])localStorage.removeItem(key);}
@@ -27,16 +71,9 @@ function checkpointFor(forest){return {format:'SOLIN-Field-Backup-v2',at:new Dat
 function clearMap(){if(typeof importedMapLayers!=='undefined'){for(const entry of importedMapLayers){for(const layer of [entry.layer,...(entry.geometryEntries||[]).map(g=>g.layer),...Object.values(entry.labelLayers||{})])if(layer?.removeFrom&&typeof fieldMap!=='undefined')fieldMap?.removeLayer(layer);}importedMapLayers.splice(0);}window.__solinMapRestored=false;window.__cmfSelectedLayer=null;window.closeCmfSheet?.();window.renderMapLayerList?.();}
 function heading(){const org=D.lesnichestvo?.[0]||{};document.querySelector('.forestTitle h2').textContent=org.NOS||'Лесничество';document.querySelector('.forestTitle p').textContent=org.NLX||'Лесовладелец не указан';const b=document.querySelector('.forestTitle .change');b.textContent='Сменить';b.onclick=home;b.style.display='inline-flex';document.querySelector('.brand p').textContent=opened?(org.NOS||'Полевые работы'):'Выбор рабочего лесничества';}
 async function activate(id){await window.__solinMapImportPromise?.catch(()=>{});await persist();const forest=(await list()).find(r=>r.id===id);if(!forest)throw Error('Лесничество не найдено');
- // Earlier 3-select creation wrote POS/LESN but discarded the original KTO.
- // Repair only genuinely missing KTO, and persist in the SAME forest record;
- // existing quarters, plots and user edits remain untouched.
- if(!Number.isFinite(Number(forest.org?.KTO))||Number(forest.org.KTO)<=0){
-  const recovered=originalForestKTO(forest.org?.POS,forest.org?.LESN);
-  if(recovered!==null){
-   forest.org.KTO=recovered;
-   await putMany([forest]);
-  }
- }
+ // Recover only missing fields with a proven source row. Never rewrite
+ // explicit imported MDB values or infer Klxr from a region/owner alone.
+ await repairAddressCodes(forest);
  localStorage.setItem(CHECKPOINT,JSON.stringify(checkpointFor(forest)));legacyClear();clearMap();activeId=id;D.lesnichestvo=[copy(forest.org)];D.quarters=copy(forest.quarters);D._transferExtras=copy(forest.extraTables||{});D.source={...copy(forest.source||{}),forestDistrict:forest.org.NOS,year:forest.org.GodT};current=null;gps=null;opened=true;localStorage.setItem(ACTIVE,id);heading();refresh();show('quartersScreen');window.dispatchEvent(new Event('solin-forest-changed'));return forest;}
 function showHome(){opened=false;show('homeScreen');heading();return renderHome();}
 async function home(){await persist();return showHome();}
@@ -247,7 +284,7 @@ async function init(){try{bind();let forests=await list();const recovery=JSON.pa
  try{forests=await restoreSourceFields(forests);}catch(e){if(window.SolinControlSourceRecovery)window.SolinControlSourceRecovery.lastError=e?.message||String(e);forests=await list();}
  activeId=null;initialized=true;const last=forests.find(r=>r.id===localStorage.getItem(ACTIVE))||forests[0];localStorage.setItem(CHECKPOINT,JSON.stringify(checkpointFor(last)));legacyClear();D.lesnichestvo=[copy(last.org)];D.quarters=copy(last.quarters);D._transferExtras=copy(last.extraTables||{});D.source=copy(last.source||{});activeId=last.id;refresh();await showHome();window.dispatchEvent(new Event('solin-workspaces-ready'));}catch(e){document.querySelector('#forestListStatus').textContent='Ошибка локального хранилища: '+e.message;throw e;}}
 let readyResolve,readyReject;const ready=new Promise((r,j)=>{readyResolve=r;readyReject=j});
-window.SolinWorkspace={list,activate,create,previewTransfer,importTransfer,persist,home,importFile,downloadSourceRecoveryBackup,get activeId(){return activeId},ready};
+window.SolinWorkspace={list,activate,create,previewTransfer,importTransfer,persist,home,importFile,downloadSourceRecoveryBackup,repairAddressCodes,get activeId(){return activeId},ready};
 window.addEventListener('solin-ready',()=>init().then(readyResolve,readyReject),{once:true});
 })();
 

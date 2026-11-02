@@ -144,7 +144,8 @@ target[m]=list;
 let calculated=[],k59Check=null,stockEdited=m==='Макет10'&&String(values.ZAP??'')!==String(existing.ZAP??'');
 if(m==='Макет10'&&window.SolinCardCalculations){
  const org=db()?.lesnichestvo?.find(x=>String(x.POS)===String(r.POS)&&String(x.LESN)===String(r.LESN));
- const audit=window.SolinCardCalculations.corrections(r,window.SOLIN_REFS?.tables,org);
+ const quarter=window.SolinAddressContext?.resolveQuarter(r,db()?.quarters?.[String(r.KV)]);
+  const audit=window.SolinCardCalculations.corrections(r,window.SOLIN_REFS?.tables,org,quarter);
  calculated=audit.issues;k59Check=audit.stockPerHectare;
  for(const issue of calculated){
   if(issue.field==='ZAP'&&Number.isInteger(issue.index))r._children?.Макет10?.[issue.index]&&(r._children.Макет10[issue.index].ZAP=Number(issue.expected));
