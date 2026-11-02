@@ -69,7 +69,26 @@ function editQuarter(k,index=0){const q=D.quarters[k],rows=q.quarterRows?.length
   for(const input of document.querySelectorAll('#modalBody [data-qfield]'))
    input.value=selected[input.dataset.qfield]??'';
   updateZoneHint();
- };document.querySelector('#saveQuarter').onclick=()=>{const before=clone(q),next={...selected};for(const el of document.querySelectorAll('[data-qfield]'))next[el.dataset.qfield]=el.value.trim()||null;if(q.quarterRows?.length)q.quarterRows[index]=next;else q.meta=next;try{checkpoint('Корректировка квартала '+k+' KGLF '+selected.KGLF);closeModal();openQuarter(k)}catch(e){D.quarters[k]=before;toast('Не сохранено: '+e.message)}};}
+ };document.querySelector('#saveQuarter').onclick=()=>{const before=clone(q),next={...selected};for(const el of document.querySelectorAll('[data-qfield]'))next[el.dataset.qfield]=el.value.trim()||null;if(q.quarterRows?.length)q.quarterRows[index]=next;else q.meta=next;
+ // An explicitly edited quarter zone must follow through to its existing
+ // stands ONLY when their old KlxrVD matched the source quarter's old Klxr.
+ // Do not overwrite a different manual stand zone or another category row.
+ const movedZone=String(selected.Klxr??'')!==String(next.Klxr??'')&&
+  next.Klxr!==null&&next.Klxr!==undefined&&String(next.Klxr).trim()!=='';
+ let inheritedCount=0;
+ if(movedZone)for(const stand of q.compartments||[]){
+  if(String(stand.POS??'')!==String(selected.POS??'')||
+    String(stand.LESN??'')!==String(selected.LESN??'')||
+    String(stand.KGLF??'')!==String(selected.KGLF??'')||
+    String(stand.KlxrVD??'')!==String(selected.Klxr??'')||
+    String(stand.Fzona??'')!==String(selected.Fzona??''))continue;
+  stand.KlxrVD=next.Klxr;inheritedCount++;
+ }
+ try{checkpoint('Корректировка квартала '+k+' KGLF '+selected.KGLF);
+  closeModal();openQuarter(k);
+  if(inheritedCount)toast('Зона Klxr обновлена у '+inheritedCount+' выделов; пересохраните макет 10 для расчёта запаса');
+ }catch(e){D.quarters[k]=before;toast('Не сохранено: '+e.message)}};}
+window.solinEditQuarter=editQuarter;
 window.renderFriendlyRefs=auditedRefs;
 function setup(){const menu=document.querySelector('#menuScreen .workspace');for(const [label,fn]of [['Фильтрация данных',filter],['Каталог 554 форм и 1420 кнопок',audit],['Лесовладелец и лесничество',()=>openModal('Адрес текущей базы','<pre>'+h(JSON.stringify(D.lesnichestvo,null,2))+'</pre>')],['Журнал изменений',()=>openModal('Журнал', '<pre>'+h(JSON.stringify(JSON.parse(localStorage.getItem(KEY)||'{}').history||[],null,2))+'</pre>')]]){const b=document.createElement('button');b.className='menuRow';b.textContent=label+' ›';b.onclick=fn;menu.append(b);}
  const oldRender=window.renderComp;window.renderComp=function(){oldRender();const bar=document.querySelector('#wfCardActions');if(bar){for(const [label,fn]of [['Фото',solinOpenPhoto],['GPS',solinSaveGPS]]){const x=document.createElement('button');x.textContent=label;x.onclick=fn;bar.append(x);}}};
