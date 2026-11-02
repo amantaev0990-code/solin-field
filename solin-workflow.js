@@ -174,9 +174,18 @@ document.querySelector('#wfSaveBase').onclick=()=>{
  const failed=(window.solinCore?.validateRow('ВыделВ',fields,r)||[]).filter(msg=>{const field=msg.split(':')[0];return String(fields[field]??'')!==String(r[field]??'')});if(failed.length){notify(failed.join('; '));return;}const before=JSON.stringify(r);Object.assign(r,fields,{PLV:p});try{saveAll(r);}catch(e){Object.assign(r,JSON.parse(before));notify(e.message);return;}
  closeModal();if(typeof renderComp==='function')renderComp();if(typeof refresh==='function')refresh();notify('Поля выдела сохранены');
 };}
-function exitCard(){const r=record();if(!r)return;const m=rowsOf(r,'Макет10')[0];
-if(m?.ZAP!==null&&m?.ZAP!==undefined&&m?.ZAP!==''){r.STUR1=m.ZAP;try{saveAll(r);}catch(e){notify('Не сохранилось: '+e.message);return;}}
-if(typeof show==='function')show('quartersScreen');}
+function exitCard(){const r=record();if(!r)return;
+ // Макет10ЗАП: aggregate the eligible main-species rows, never copy the
+ // first arbitrary Maket10.ZAP into STUR1 when leaving the card.
+ const stock=window.SolinCardCalculations?.standStock(r);
+ if(stock?.status==='complete'&&(Number(r.STUR1)!==stock.expectedPerHa||Number(r.STUR)!==stock.expectedTotal)){
+  const original1=r.STUR1,original=r.STUR;
+  r.STUR1=stock.expectedPerHa;r.STUR=stock.expectedTotal;
+  try{saveAll(r);}catch(e){r.STUR1=original1;r.STUR=original;notify('Не сохранилось: '+e.message);return;}
+  notify('Пересчитано по макету 10: запас на гектар '+original1+' → '+r.STUR1+
+   ', запас выдела '+original+' → '+r.STUR);
+ }
+ if(typeof show==='function')show('quartersScreen');}
 function checkData(r,modal){if(!r)return;const msgs=[];
 const area=Number(r.PLV);if(!(area>0))msgs.push({status:'bad',message:'Площадь PLV не задана или не положительна'});
 if(r.KU===null||r.KU===undefined||r.KU==='')msgs.push({status:'bad',message:'Не указана категория угодий KU'});
