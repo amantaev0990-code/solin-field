@@ -90,9 +90,10 @@ if(oldBar)oldBar.style.display='none';
 const content=document.querySelector('#humanContent');
 if(content&&!content.querySelector('#wfCardActions')){
 const bar=document.createElement('div');bar.id='wfCardActions';bar.className='wf-toolbar';
-bar.innerHTML='<button class="wf-primary" id="wfEditBase">✎ Редактировать выдел</button><button id="wfCardCheck">✓ Контроль</button><button id="wfCardPrint">⎙ Печать КТ</button><button id="wfCardExit">↩ Выход</button>';
+bar.innerHTML='<button class="wf-primary" id="wfEditBase">✎ Редактировать выдел</button><button id="wfCardCheck">✓ Контроль</button><button id="wfCardRelations">Связи полей</button><button id="wfCardPrint">⎙ Печать КТ</button><button id="wfCardExit">↩ Выход</button>';
 content.prepend(bar);
 bar.querySelector('#wfEditBase').onclick=editBase;bar.querySelector('#wfCardCheck').onclick=()=>SolinControlUI.open({records:[record()],caption:'Карточка · квартал '+record().KV+' · выдел '+record().VD});
+bar.querySelector('#wfCardRelations').onclick=()=>window.SolinDependencyAudit?.open([record()],{caption:'Выдел '+record().KV+'/'+record().VD});
 bar.querySelector('#wfCardPrint').onclick=printCard;bar.querySelector('#wfCardExit').onclick=exitCard;
 }}
 function showWholeCard(){const r=record();if(!r)return;document.querySelector('#childContent').innerHTML='<div class="wf-maket-view"><h3>Краткая карточка таксации · КТ</h3><p class="wf-muted">Аналог сводного просмотра ВыделКрат. Данные отображаются без расчёта исходных Access-отчётов.</p>'+CORE.map(m=>'<div class="wf-summary-row"><b>'+m.replace('Макет','')+' · '+h(window.SolinHuman?.formName(m)||NAMES[m])+'</b><span>'+h(maketSummary(r,m))+'</span><button data-cardmak="'+m+'">Открыть →</button></div>').join('')+'</div>';
@@ -298,15 +299,24 @@ const win=window.open('','_blank');if(!win){notify('Разреши открыт�
 win.document.write('<!doctype html><html lang="ru"><meta charset="utf-8"><title>Таксационная карточка</title><style>body{font:14px Arial;padding:20px;color:#17251d}table{border-collapse:collapse;width:100%;margin-bottom:10px}th,td{border:1px solid #b7c9ba;padding:6px;text-align:left}th{width:44%;background:#eef5ec}h2{border-bottom:1px solid #b4cab5;padding:8px 0}h3{font-size:14px}@media print{button{display:none}}</style><button onclick="print()">Печать</button>'+html+'<p><small>Предварительная мобильная карточка, не официальный отчёт Access.</small></p></html>');
 win.document.close();}
 function quarterToolbar(k){const box=document.querySelector('#quarters');if(!box||!db()?.quarters?.[k])return;const old=box.querySelector('#wfQuarterToolbar');old?.remove();const q=db().quarters[k],bar=document.createElement('div');bar.id='wfQuarterToolbar';bar.className='wf-toolbar';
-bar.innerHTML='<button id="wfQuarterControl">✓ Контроль квартала</button><button id="wfQuarterSummary">▤ Такс. описание</button><button id="wfQuarterExport">⇩ Сохранить JSON квартала</button>';
+bar.innerHTML='<button id="wfQuarterControl">✓ Контроль квартала</button><button id="wfQuarterRelations">Связи полей</button><button id="wfQuarterSummary">▤ Такс. описание</button><button id="wfQuarterExport">⇩ Сохранить JSON квартала</button>';
 box.querySelector('.screenHead')?.after(bar);
 bar.querySelector('#wfQuarterControl').onclick=()=>{if(window.SolinControlUI)return SolinControlUI.open({records:q.compartments||[],caption:'Квартал '+k});let issues=0;const entries=[];for(const r of q.compartments||[]){const list=checkData(r,false);issues+=list.length;if(list.length)entries.push(r.VD+': '+list.length+' замечаний');}
 openModal('Квартал '+k+' · контроль','<div class="wf-form-note">Предварительная проверка без выполнения контролей Access.</div><p>Выделов: '+q.compartments.length+'</p><p>Замечаний: <b>'+issues+'</b></p>'+entries.map(x=>'<p>'+h(x)+'</p>').join('')+'<button class="primary" onclick="closeModal()">Закрыть</button>');};
+bar.querySelector('#wfQuarterRelations').onclick=()=>window.SolinDependencyAudit?.open(q.compartments||[],{caption:'Квартал '+k});
 bar.querySelector('#wfQuarterSummary').onclick=()=>{const area=q.compartments.reduce((s,r)=>s+(Number(r.PLV)||0),0);openModal('Таксационное описание · квартал '+k,'<h3>Квартал '+h(k)+'</h3><p>Выделов: '+q.compartments.length+'</p><p>Площадь: '+area.toLocaleString('ru-RU')+' га</p><div class="wf-form-note">Это сводка из мобильных данных, а не официальный выходной документ SOLI-N.</div><button class="primary" onclick="closeModal()">Закрыть</button>');};
 bar.querySelector('#wfQuarterExport').onclick=()=>download('solin-quarter-'+k+'.json',{format:'SOLIN-Field-Quarter-v1',quarter:k,records:q.compartments});}
 function download(name,payload){const a=document.createElement('a');const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);}
 function setup(){
-
+ const menu=document.querySelector('#menuScreen .workspace');
+ if(menu&&!menu.querySelector('#wfForestDependencyAudit')){
+  const action=document.createElement('button');action.id='wfForestDependencyAudit';
+  action.className='menuRow';action.textContent='Проверить связи полей всего лесничества ›';
+  action.onclick=()=>window.SolinDependencyAudit?.open(
+   Object.values(db()?.quarters||{}).flatMap(q=>q.compartments||[]),
+   {caption:'Лесничество '+(db()?.lesnichestvo?.[0]?.NOS||'')});
+  menu.querySelector('h2')?.after(action);
+ }
  const prev=window.renderComp;
  if(typeof prev==='function')window.renderComp=function(){if(record())localPatch(record());prev();currentMaket='Макет10';cardToolbar();openMaket(currentMaket);};
  const oldQuarter=window.openQuarter;
