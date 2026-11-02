@@ -162,7 +162,10 @@ async function reopen(p,info){
   document.querySelector('#newKV').value='1';
   document.querySelector('#newKGLF').value='1';
   document.querySelector('#newKpz').value='2';
-  document.querySelector('#newKlxr').value='8';
+  document.querySelector('#newKpz').dispatchEvent(new Event('input',{bubbles:true}));
+  const allowed=[...document.querySelector('#newKlxr').options].filter(x=>x.value).map(x=>Number(x.value));
+  if(allowed.join(',')!=='3,4,7')throw Error('New quarter shows incorrect normative zone codes: '+allowed);
+  document.querySelector('#newKlxr').value='4';
   createQuarter();
   if(Number(D.quarters['1']?.meta?.GodT)!==Number(D.lesnichestvo[0].GodT))throw Error('Quarter year not inherited');
   openCompForm('1');
@@ -172,16 +175,16 @@ async function reopen(p,info){
   document.querySelector('#newPOR').value='В';
   createComp();
   let r=D.quarters['1'].compartments[0];
-  if(!r||Number(r.KlxrVD)!==8||Number(r.KGLF)!==1||Number(r.POS)!==723||Number(r.LESN)!==4)
+  if(!r||Number(r.KlxrVD)!==4||Number(r.KGLF)!==1||Number(r.POS)!==723||Number(r.LESN)!==4)
    throw Error('New stand lost quarter/forest inherited address '+JSON.stringify(r));
   r._children.Макет10=[{IAR:1,POR:'В',ZAP:40}];
   delete r.KlxrVD;await SolinWorkspace.persist();
   await SolinWorkspace.activate(forest.id);
   r=D.quarters['1'].compartments[0];
-  if(Number(r.KlxrVD)!==8||Number(r._children.Макет10[0].POS)!==723)
+  if(Number(r.KlxrVD)!==4||Number(r._children.Макет10[0].POS)!==723)
    throw Error('Existing 723/4/1/1 code restore failed');
   const stored=(await SolinWorkspace.list()).find(f=>f.id===forest.id);
-  if(Number(stored?.quarters?.['1']?.compartments?.[0]?.KlxrVD)!==8)
+  if(Number(stored?.quarters?.['1']?.compartments?.[0]?.KlxrVD)!==4)
    throw Error('Inherited stand zone was not persisted to IndexedDB');
   r.KlxrVD=9;await SolinWorkspace.persist();await SolinWorkspace.activate(forest.id);
   if(Number(D.quarters['1'].compartments[0].KlxrVD)!==9)
@@ -192,7 +195,7 @@ async function reopen(p,info){
   return {KTO:D.lesnichestvo[0].KTO,zone:stored.quarters['1'].compartments[0].KlxrVD};
  });
  assert.equal(forestCodes.KTO,350000000);
- assert.equal(Number(forestCodes.zone),8);
+ assert.equal(Number(forestCodes.zone),4);
  console.log('PASS real 723/4/1/1 UI create: KTO, quarter year, KlxrVD, children, old-record repair and ambiguity');
  // The preceding unavailable-source case intentionally cleared Szap in memory.
  // Reload the actual reference data before auditing the real Karaganda table.
@@ -218,7 +221,9 @@ async function reopen(p,info){
  await p.locator('#wf-k59-open-quarter').click();
  assert.match(await p.locator('#modalTitle').innerText(),/Корректировка квартала 1/);
  assert.equal(await p.locator('#modalBody [data-qfield="Klxr"]').inputValue(),'8');
- assert.match(await p.locator('#modalBody .wf-form-note').last().innerText(),/ВНИМАНИЕ: зона 8 отсутствует в Szap/);
+ assert.match(await p.locator('#modalBody .wf-form-note').last().innerText(),/3, 4, 7/);
+ const actualOptions=await p.locator('#modalBody [data-qfield="Klxr"] option').evaluateAll(xs=>xs.filter(x=>x.value&&!x.disabled).map(x=>x.value));
+ assert.deepEqual(actualOptions,['3','4','7'],'Quarter edit must offer ONLY KTO/Kpz valid zones');
  const qZoneControl=p.locator('#modalBody [data-qfield="Klxr"]');
  if(await qZoneControl.evaluate(el=>el.tagName)==='SELECT')await qZoneControl.selectOption('4');
  else await qZoneControl.fill('4');
