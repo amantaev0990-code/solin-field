@@ -250,7 +250,7 @@ function recalculateEditedField(el){
  if(!(scope==='base'&&baseFields.has(field)||scope==='Макет10'&&standFields.has(field)))return;
  // Keep malformed numeric input and its error visible instead of overwriting it.
  if(el.getAttribute('aria-invalid')==='true')return;
- const check=calc.corrections(session.draft,window.SOLIN_REFS?.tables,linkedOrg());
+ const check=calc.corrections(session.draft,window.SOLIN_REFS?.tables,linkedOrg(),session.quarter);
  const changed=[];
  for(const issue of check.issues){
    if(!['M3B','STUR1','STUR','ZAP'].includes(issue.field))continue;
