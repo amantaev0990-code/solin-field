@@ -25,6 +25,17 @@ const existing={...missing,KlxrVD:6},old=JSON.stringify(existing);
 assert.equal(A.resolveQuarter(existing,q),null,'Conflicting explicit zone is not silently overwritten');
 assert.equal(Object.keys(A.enrichStand(existing,q,owner).values).length,0);
 assert.equal(JSON.stringify(existing),old);
+const zoneCascade={compartments:[
+ {POS:723,LESN:4,KV:1,KGLF:1,KlxrVD:8},
+ {POS:723,LESN:4,KV:1,KGLF:1,KlxrVD:7},
+ {POS:723,LESN:4,KV:1,KGLF:2,KlxrVD:8}
+]};
+const sourceZone={POS:723,LESN:4,KV:1,KGLF:1,Klxr:8};
+assert.equal(A.cascadeQuarterZone(zoneCascade,sourceZone,{...sourceZone,Klxr:'4'}),1,
+ 'Only stands with original quarter code should inherit explicit update');
+assert.equal(zoneCascade.compartments[0].KlxrVD,'4');
+assert.equal(zoneCascade.compartments[1].KlxrVD,7,'Manual override preserved');
+assert.equal(zoneCascade.compartments[2].KlxrVD,8,'Different KGLF preserved');
 const noZone={quarterRows:[{...q.quarterRows[0],Klxr:null}]};
 const noZoneStand={...missing,KlxrVD:null};
 assert.equal(A.enrichStand(noZoneStand,noZone,owner).values.KlxrVD,undefined,'Missing source: do not guess zone');

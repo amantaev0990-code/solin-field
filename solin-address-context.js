@@ -57,10 +57,26 @@ function enrichMakets(stand){
  }
  return added;
 }
+// Explicit quarter-zone edit: cascade the OLD source zone only to stands
+// whose full forestry/category/zone address matches the original quarter.
+// Never silently overwrite a differently configured stand.
+function cascadeQuarterZone(quarter,oldRow,newRow){
+ const oldZone=oldRow?.Klxr,newZone=newRow?.Klxr;
+ if(!filled(oldZone)||!filled(newZone)||same(oldZone,newZone))return 0;
+ let changed=0;
+ for(const stand of quarter?.compartments||[]){
+  if(!['POS','LESN','KV','KGLF'].every(k=>
+    !filled(oldRow[k])||same(stand[k],oldRow[k])))continue;
+  if(!same(stand.KlxrVD,oldZone))continue;
+  if(filled(oldRow.Fzona)&&!same(stand.Fzona,oldRow.Fzona))continue;
+  stand.KlxrVD=newZone;changed++;
+ }
+ return changed;
+}
 function originalKTO(pos,lesn){
  const rows=(window.SOLIN_FOREST_CATALOG?.rows||[]).filter(r=>
   same(r[0],pos)&&same(r[1],lesn)&&Number.isFinite(Number(r[4]))&&Number(r[4])>0);
  return rows.length===1?Number(rows[0][4]):null;
 }
-window.SolinAddressContext={quarterRows,resolveQuarter,inheritedStand,enrichStand,enrichMakets,originalKTO,uniqueQuarterZone};
+window.SolinAddressContext={quarterRows,resolveQuarter,inheritedStand,enrichStand,enrichMakets,originalKTO,uniqueQuarterZone,cascadeQuarterZone};
 })();

@@ -1,0 +1,38 @@
+/* Read-only regression against actual Szap + Slxr physical tables from Solim.mdb.
+ * Reproduces user report: KTO 350000000 and quarter LXZ 8 => no original stock norm. */
+'use strict';
+const fs=require('node:fs'),zlib=require('node:zlib'),vm=require('node:vm'),assert=require('node:assert/strict');
+const data=JSON.parse(zlib.gunzipSync(fs.readFileSync('refs-audit.json.gz')).toString());
+const tables=data.tables||data;
+const ctx={window:{}};vm.runInNewContext(fs.readFileSync('solin-card-calculations.js','utf8'),ctx);
+const calc=ctx.window.SolinCardCalculations;
+const q={Kpz:2,Klxr:8,GodT:2026};
+const r={POS:723,LESN:4,KV:1,KGLF:1,VD:1,KU:2,PLV:1,KlxrVD:8,M3Pr:'В',M3B:'3',STUR1:154,STUR:154,GodT1:2015,
+ _children:{Макет10:[{POS:723,LESN:4,KV:1,KGLF:1,VD:1,IAR:1,KOEF:10,POR:'В',PH:6,POL:0.6,LET:5,PROI:7,ZAP:170}]}};
+const owner={KTO:350000000};
+const all=calc.stockZoneOptions(tables,350000000,null);
+assert.deepEqual([...all.availableZones],[3,4,7,10],'Read original Karaganda Obl normative-zone coverage');
+const kpz2=calc.stockZoneOptions(tables,350000000,2);
+assert.deepEqual(Array.from(kpz2.zoneOptions,x=>x.value).sort((a,b)=>a-b),[3,4,7]);
+const kpz3=calc.stockZoneOptions(tables,350000000,3);
+assert.deepEqual(Array.from(kpz3.zoneOptions,x=>x.value),[10]);
+assert.equal(tables.Szap.filter(x=>Number(x.Obl)===350000000&&Number(x.LXZ)===8).length,0);
+let res=calc.stockPerHectare(r,tables,owner,q);
+assert.equal(res.status,'unsupported-zone');
+assert.match(res.reason,/LXZ 8/);
+assert.match(res.reason,/350000000/);
+assert.match(res.reason,/3, 4, 7, 10/);
+assert.deepEqual(Array.from(res.zoneOptions,x=>x.value).sort((a,b)=>a-b),[3,4,7]);
+const snap=JSON.stringify(r),updated=calc.corrections(r,tables,owner,q);
+assert.equal(updated.issues.some(x=>x.field==='ZAP'),false,'No fake normative correction');
+assert.equal(updated.stockPerHectare.status,'unsupported-zone');
+assert.equal(JSON.stringify(r),snap,'No mutation before explicit user save');
+const zone4={...r,KlxrVD:4};
+let corrected=calc.stockPerHectare(zone4,tables,owner,{...q,Klxr:4});
+assert.equal(corrected.status,'complete','Actual original Karaganda Szap row for species В and LXZ4');
+assert.equal(typeof corrected.expected,'number');
+assert.equal(corrected.expected>0,true);
+const msg=fs.readFileSync('solin-workflow.js','utf8');
+assert.match(msg,/wf-k59-open-quarter/);
+assert.match(msg,/Доступные|Варианты из Szap/);
+console.log('K59_PHYSICAL_SOURCE_OK KTO=350000000, LXZ=8 missing, source choices 3/4/7 for Kpz2, 10 for Kpz3, verified LXZ4 alternative, no arbitrary stock correction');

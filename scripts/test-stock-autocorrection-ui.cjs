@@ -194,6 +194,61 @@ async function reopen(p,info){
  assert.equal(forestCodes.KTO,350000000);
  assert.equal(Number(forestCodes.zone),8);
  console.log('PASS real 723/4/1/1 UI create: KTO, quarter year, KlxrVD, children, old-record repair and ambiguity');
+ // The preceding unavailable-source case intentionally cleared Szap in memory.
+ // Reload the actual reference data before auditing the real Karaganda table.
+ await boot(p);
+ await p.evaluate(()=>SolinWorkspace.activate('723::4'));
+ // Screenshot regression: original Szap has NO Obl=350000000/LXZ=8,
+ // despite this zone being listed for Kpz 2 in the general Slxr catalog.
+ await p.evaluate(()=>{
+  const q=D.quarters['1'],r=q.compartments[0];
+  q.meta.Kpz=2;q.meta.Klxr=8;r.KlxrVD=8;r.M3Pr='В';r.M3B='3';r.KU=2;r.PLV=1;
+  r.STUR1=154;r.STUR=154;r.GodT1=2015;
+  r._children.Макет10=[{POS:723,LESN:4,KV:1,KGLF:1,VD:1,IAR:1,KOEF:10,POR:'В',PH:6,POL:0.6,LET:5,PROI:7,ZAP:154}];
+  current=r;renderComp();show('card');solinWorkflow.editMaket('Макет10',0);
+ });
+ await p.locator('#wf_ZAP').fill('170');await p.locator('#wfSaveMaket').click();
+ const screenshotWarning=await p.locator('#modalBody').innerText();
+ assert.match(screenshotWarning,/LXZ 8/);
+ assert.match(screenshotWarning,/350000000/);
+ assert.match(screenshotWarning,/3.*4.*7/s);
+ assert.match(screenshotWarning,/не подтверждён по К59/i);
+ assert.equal(await p.evaluate(()=>current._children.Макет10[0].ZAP),170);
+ assert.equal(await p.evaluate(()=>current.STUR1),170);
+ await p.locator('#wf-k59-open-quarter').click();
+ assert.match(await p.locator('#modalTitle').innerText(),/Корректировка квартала 1/);
+ assert.equal(await p.locator('#modalBody [data-qfield="Klxr"]').inputValue(),'8');
+ assert.match(await p.locator('#modalBody .wf-form-note').last().innerText(),/ВНИМАНИЕ: зона 8 отсутствует в Szap/);
+ const qZoneControl=p.locator('#modalBody [data-qfield="Klxr"]');
+ if(await qZoneControl.evaluate(el=>el.tagName)==='SELECT')await qZoneControl.selectOption('4');
+ else await qZoneControl.fill('4');
+ await p.locator('#saveQuarter').click();
+ await p.waitForFunction(()=>document.querySelector('#modal')?.classList.contains('hidden'));
+ const zoneFixed=await p.evaluate(()=>{
+  const q=D.quarters['1'],r=q.compartments[0];
+  if(String(q.meta.Klxr)!=='4'||String(r.KlxrVD)!=='4')throw Error('Quarter Klxr did not cascade to actual 723/4 stand');
+  const org=D.lesnichestvo[0];
+  const norm=SolinCardCalculations.stockPerHectare(r,SOLIN_REFS.tables,org,q.meta);
+  if(norm.status!=='complete')throw Error('Quarter correction did not unlock original K59: '+JSON.stringify(norm));
+  current=r;renderComp();show('card');solinWorkflow.editMaket('Макет10',0);
+  return norm.expected;
+ });
+ await p.locator('#wf_ZAP').fill('170');await p.locator('#wfSaveMaket').click();
+ assert.equal(await p.evaluate(()=>current._children.Макет10[0].ZAP),zoneFixed,
+  'After user chooses a supported quarter zone, original K59 must auto-correct ZAP');
+ assert.match(await p.locator('#modalTitle').innerText(),/К59: нормативный запас автоматически исправлен/);
+ console.log('PASS screenshot 723/4/1/1 end-to-end: LXZ8 unsupported -> quarter Klxr4 -> stand KlxrVD4 -> normative ZAP correction');
+ await p.evaluate(async()=>{closeModal();await SolinWorkspace.persist()});
+ await boot(p);
+ const persisted=await p.evaluate(async()=>{
+  await SolinWorkspace.activate('723::4');
+  const q=D.quarters['1'],r=q.compartments[0];
+  return {quarter:q.meta.Klxr,stand:r.KlxrVD,zap:r._children.Макет10[0].ZAP};
+ });
+ assert.equal(String(persisted.quarter),'4');
+ assert.equal(String(persisted.stand),'4');
+ assert.equal(Number(persisted.zap),zoneFixed);
+ console.log('PASS final iPhone-style reload: saved quarter zone, inherited stand zone and K59-corrected ZAP persist');
  await desktop.close();
  const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
  const m=await mobile.newPage();m.on('pageerror',e=>errors.push(e.message));

@@ -36,7 +36,20 @@ const read=()=>{try{return JSON.parse(localStorage.getItem(WORK_KEY)||'{}')}catc
 const store=(r,patch)=>{const data=read(),key=rowKey(r);data[key]={...data[key],...patch,updatedAt:new Date().toISOString()};const previous=localStorage.getItem(WORK_KEY);try{localStorage.setItem(WORK_KEY,JSON.stringify(data));window.solinCore?.checkpoint('Сохранение '+key)}catch(e){if(previous===null)localStorage.removeItem(WORK_KEY);else localStorage.setItem(WORK_KEY,previous);throw e;}};
 const notify=m=>(typeof toast==='function'?toast(m):alert(m));
 const fmt=v=>v==null||v===''?'—':String(v);
-function localPatch(r){const data=read()[rowKey(r)];if(!data)return;Object.assign(r,data.base||{});r._children=r._children||{};for(const [m,rows] of Object.entries(data.makets||{}))r._children[m]=rows.map(v=>({...v}));}
+function localPatch(r){
+ const data=read()[rowKey(r)];if(!data)return;
+ // WORK_KEY is a legacy supplementary cache, not the authoritative workspace.
+ // Previously Object.assign overwrote a NEW quarter-linked KlxrVD with stale
+ // values whenever renderComp reopened the stand; old makets also replaced
+ // the freshly saved source. Recover *missing* fields/rows only.
+ const empty=v=>v===undefined||v===null||String(v)==='';
+ for(const [key,value] of Object.entries(data.base||{}))
+  if(empty(r[key])&&!empty(value))r[key]=value;
+ r._children=r._children||{};
+ for(const [m,rows] of Object.entries(data.makets||{}))
+  if(!r._children[m]?.length&&Array.isArray(rows)&&rows.length)
+   r._children[m]=rows.map(v=>({...v}));
+}
 function apply(){const database=db();if(!database?.quarters)return;for(const q of Object.values(database.quarters))for(const r of q.compartments||[])localPatch(r);}
 let currentMaket='Макет10',activeMakEdit=null;
 function findLookups(field,form){
@@ -172,8 +185,34 @@ if(m==='Макет10'&&(calculated.length||stockEdited)){
  const fields=calculated.map(x=>'<tr><td>'+h(x.label)+'</td><td>'+h(x.previous)+'</td><td><b>'+h(x.expected)+'</b></td><td>'+h(x.reason)+'</td></tr>').join('');
  const table=calculated.length?
    '<div style="overflow-x:auto"><table class="wf-calc-warning"><thead><tr><th>Показатель</th><th>Было</th><th>Стало</th><th>Основание</th></tr></thead><tbody>'+fields+'</tbody></table></div>':'';
- openModal(heading,explanation+table+
+ const zones=k59Check?.zoneOptions||[];
+ const zoneInfo=k59Check?.status==='unsupported-zone'?
+   '<section class="wf-form-note" style="margin:12px 0"><strong>Варианты из Szap'+
+   (k59Check.kpz==null?'':'+Slxr для Kpz '+h(k59Check.kpz))+':</strong> '+
+   (zones.length?zones.map(z=>'<span style="display:block">'+h(z.value)+' — '+h(z.name)+'</span>').join(''):
+     h((k59Check.availableZones||[]).join(', ')||'нет однозначного варианта'))+
+   '<p>Это <b>варианты для проверки</b>, а не автоматически выбранная зона. Для квартала '+h(r.KV)+
+   ' уточните код Klxr. Правильную зону нельзя определить только по KTO.</p></section>':'';
+ const quarterLink=k59Check?.status==='unsupported-zone'?
+    '<button type="button" id="wf-k59-open-quarter" class="secondary">Открыть квартал '+h(r.KV)+'</button>':'';
+ openModal(heading,explanation+zoneInfo+table+quarterLink+
   '<button type="button" class="primary" onclick="closeModal()">Понятно</button>');
+ const link=document.getElementById('wf-k59-open-quarter');
+ if(link)link.onclick=()=>{
+  closeModal();
+  if(typeof show==='function')show('quartersScreen');
+  const q=db()?.quarters?.[String(r.KV)];
+  const rows=q?.quarterRows?.length?q.quarterRows:[q?.meta||{}];
+  const index=rows.findIndex(row=>
+   String(row.POS??r.POS)===String(r.POS)&&String(row.LESN??r.LESN)===String(r.LESN)&&
+   String(row.KGLF??'')===String(r.KGLF??'')&&
+   (!r.Fzona||String(row.Fzona??'')===String(r.Fzona??''))&&
+   (!r.KlxrVD||String(row.Klxr??'')===String(r.KlxrVD??'')));
+  // Open the exact original quarter form, not a new secondary modal.
+  if(index>=0&&typeof window.solinEditQuarter==='function')
+   window.solinEditQuarter(String(r.KV),index);
+  else if(typeof openQuarter==='function')openQuarter(String(r.KV),r.KGLF);
+ };
 }
 
 };}
