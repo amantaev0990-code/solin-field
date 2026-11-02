@@ -34,6 +34,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Stage existing SOLI-N Field web assets
         run: npm run build
+      - name: Verify Android staged assets and blank MDB only
+        run: node scripts/test-android-assets.cjs
       - name: Create native Android project
         run: npx cap add android
       - name: Register offline MDB writer
