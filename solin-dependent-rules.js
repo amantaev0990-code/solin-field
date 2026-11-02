@@ -129,11 +129,11 @@ function options(form,field,row,card,org,refs=ref()){
    reason:'Slxr.Kpz='+code(row.Kpz)+' ∩ Szap.Obl='+obl+' (LXZ): '+(items.map(x=>x.value).join(', ')||'совпадений нет'),
    items,dependencies:['Kpz','KTO'],region:obl};
  }
- if(form==='Макет16'&&field==='Por16'&&refs.SDP){
+ if(form==='Макет16'&&field==='Por16'){
   // Original RowSource reads Maket10Выд.POR for this same stand.
   const stems=card?._children?.['Макет10']||[],used=new Set(stems.map(r=>code(r.POR)).filter(Boolean));
   if(!used.size)return {status:'waiting',reason:'Сначала укажите состав древостоя в макете 10',items:[]};
-  return {status:'complete',reason:'Породы макета 16 берутся из древостоя этого выдела',items:[...used].map(k=>({value:k,label:refs.SDP.find(r=>same(r.KPC,k))?.NDP||k}))};
+  return {status:'complete',reason:'Породы макета 16 берутся из древостоя этого выдела',items:[...used].map(k=>({value:k,label:refs.SDP?.find(r=>same(r.KPC,k))?.NDP||k}))};
  }
  if(form==='Макет12'&&['SV','SB'].includes(field)){
   if(!refs?.SSP?.length)
