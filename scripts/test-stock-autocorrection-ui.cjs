@@ -216,9 +216,26 @@ async function reopen(p,info){
  assert.equal(await p.evaluate(()=>current._children.Макет10[0].ZAP),170);
  assert.equal(await p.evaluate(()=>current.STUR1),170);
  await p.locator('#wf-k59-open-quarter').click();
- await p.waitForFunction(()=>document.querySelector('#quartersScreen')?.classList.contains('active'));
- const quarterZoneHint=await p.evaluate(()=>{window.openQuarter('1');return !!document.querySelector('#wfQuarterToolbar')});
- console.log('PASS real screenshot 723/4/1/1: LXZ8 rejected, Szap+Slxr zone 3/4/7 explained, quarter navigation works');
+ assert.match(await p.locator('#modalTitle').innerText(),/Корректировка квартала 1/);
+ assert.equal(await p.locator('#modalBody [data-qfield="Klxr"]').inputValue(),'8');
+ assert.match(await p.locator('#modalBody .wf-form-note').last().innerText(),/ВНИМАНИЕ: зона 8 отсутствует в Szap/);
+ await p.locator('#modalBody [data-qfield="Klxr"]').fill('4');
+ await p.locator('#saveQuarter').click();
+ await p.waitForFunction(()=>document.querySelector('#modal')?.classList.contains('hidden'));
+ const zoneFixed=await p.evaluate(()=>{
+  const q=D.quarters['1'],r=q.compartments[0];
+  if(String(q.meta.Klxr)!=='4'||String(r.KlxrVD)!=='4')throw Error('Quarter Klxr did not cascade to actual 723/4 stand');
+  const org=D.lesnichestvo[0];
+  const norm=SolinCardCalculations.stockPerHectare(r,SOLIN_REFS.tables,org,q.meta);
+  if(norm.status!=='complete')throw Error('Quarter correction did not unlock original K59: '+JSON.stringify(norm));
+  current=r;renderComp();show('card');solinWorkflow.editMaket('Макет10',0);
+  return norm.expected;
+ });
+ await p.locator('#wf_ZAP').fill('170');await p.locator('#wfSaveMaket').click();
+ assert.equal(await p.evaluate(()=>current._children.Макет10[0].ZAP),zoneFixed,
+  'After user chooses a supported quarter zone, original K59 must auto-correct ZAP');
+ assert.match(await p.locator('#modalTitle').innerText(),/К59: нормативный запас автоматически исправлен/);
+ console.log('PASS screenshot 723/4/1/1 end-to-end: LXZ8 unsupported -> quarter Klxr4 -> stand KlxrVD4 -> normative ZAP correction');
  await desktop.close();
  const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
  const m=await mobile.newPage();m.on('pageerror',e=>errors.push(e.message));
