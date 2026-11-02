@@ -313,7 +313,16 @@ async function reopen(p,info){
  });
  assert.equal(await p.locator('#wfCardRelations').count(),1,
   'Card must offer an explicit dependency scan action');
- await p.locator('#wfCardRelations').click();
+ console.log('DEPENDENCY_BUTTON_VISIBILITY',JSON.stringify(await p.evaluate(()=>{
+  const btn=document.querySelector('#wfCardRelations'),card=document.querySelector('#card');
+  const stat=el=>({display:getComputedStyle(el).display,visibility:getComputedStyle(el).visibility,
+   width:el.getBoundingClientRect().width,height:el.getBoundingClientRect().height,
+   classes:el.className});
+  return {btn:stat(btn),parents:[btn.parentElement,btn.parentElement.parentElement,
+   btn.parentElement.parentElement.parentElement,card].map(stat),
+   active:[...document.querySelectorAll('.screen.active')].map(x=>x.id)};
+ })));
+ await p.locator('#wfCardRelations').click({timeout:1500});
  await p.locator('#wfSaveDependencyAudit').waitFor();
  assert.match(await p.locator('#solin-dependency-scan').innerText(),/Проверено выделов: 1/);
  assert.match(await p.locator('#solin-dependency-scan').innerText(),/исходные карточки и MDB не менялись/i);
