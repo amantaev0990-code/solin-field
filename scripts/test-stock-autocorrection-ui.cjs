@@ -324,6 +324,10 @@ async function reopen(p,info){
   p.locator('#wfSaveDependencyAudit').click()
  ]);
  assert.equal(auditDownload.suggestedFilename(),'solin-dependent-audit.json');
+ const [csvDownload]=await Promise.all([
+  p.waitForEvent('download'),p.locator('#wfSaveDependencyCsv').click()
+ ]);
+ assert.equal(csvDownload.suggestedFilename(),'solin-dependent-audit.csv');
  assert.equal(await p.evaluate(()=>JSON.stringify(D.quarters)),originalWorkspace,
   'Running the full source dependency audit cannot modify the saved forest');
  await p.locator('#wfCloseDependencyAudit').click();
