@@ -203,6 +203,26 @@ async function reopen(p,info){
  assert.equal(forestCodes.KTO,350000000);
  assert.equal(Number(forestCodes.zone),4);
  console.log('PASS real 723/4/1/1 UI create: KTO, quarter year, KlxrVD, children, old-record repair and ambiguity');
+ // New Quarter must expose Fzona and Raion as original quarter fields, and
+ // SFZ candidates must follow KGLF instead of showing every functional zone.
+ await p.evaluate(()=>openQuarterForm());
+ const newQuarterContext=await p.evaluate(()=>{
+  const cat=document.querySelector('#newKGLF');
+  const valid54=[...cat.options].some(o=>o.value==='54'&&!o.disabled);
+  if(valid54){cat.value='54';cat.dispatchEvent(new Event('change',{bubbles:true}));}
+  return {hasFzona:!!document.querySelector('#newFzona'),
+   hasRaion:!!document.querySelector('#newRaion'),
+   options:[...document.querySelector('#solin-new-fzona-options').options].map(o=>o.value),
+   value:document.querySelector('#newFzona').value,
+   districtHint:document.querySelector('#newRaionHint').textContent,valid54};
+ });
+ assert(newQuarterContext.hasFzona&&newQuarterContext.hasRaion,
+  'Original quarter data must be editable at quarter creation too');
+ assert.equal(newQuarterContext.value,'','Partial SFZ context must not force a zone');
+ if(newQuarterContext.valid54)assert.deepEqual(newQuarterContext.options,['1']);
+ assert.match(newQuarterContext.districtHint,/Кл_Рай/);
+ await p.evaluate(()=>closeModal());
+ console.log('PASS New Quarter Fzona/Raion fields and KGLF-filtered SFZ suggestions with no guessed values');
  // The preceding unavailable-source case intentionally cleared Szap in memory.
  // Reload the actual reference data before auditing the real Karaganda table.
  await boot(p);
