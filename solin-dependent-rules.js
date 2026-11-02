@@ -370,7 +370,7 @@ function applySelect(select,result,opts={}){
  }
  const has=old&&seen.has(old);
  if(old&&!has){
-  const saved=new Option('Сохранённый, сейчас недопустимый: '+old,old);
+  const saved=new Option((status==='partial'||status==='ambiguous'? 'Сохранённый, не подтверждённый: ':'Сохранённый, сейчас недопустимый: ')+old,old);
   saved.disabled=true;options.push(saved);
  }
  const signature=status+'|'+options.map(o=>o.value+'='+o.textContent).join(';');
@@ -381,7 +381,7 @@ function applySelect(select,result,opts={}){
  input.value=old;
  input.disabled=!ready;
  input.dataset.dependentStatus=status;
- input.dataset.dependentAllowed=old&&!has?'false':'true';
+ input.dataset.dependentAllowed=old&&!has?(status==='partial'||status==='ambiguous'?'unknown':'false'):'true';
  input.title=result.reason||'';
  return input;
 }
