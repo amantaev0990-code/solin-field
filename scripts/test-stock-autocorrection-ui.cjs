@@ -305,6 +305,27 @@ async function reopen(p,info){
  assert.equal(String(persisted.stand),'4');
  assert.equal(Number(persisted.zap),zoneFixed);
  console.log('PASS final iPhone-style reload: saved quarter zone, inherited stand zone and K59-corrected ZAP persist');
+ // Large-scope audit: scan a real saved forest stand from the browser and
+ // verify downloadable complete JSON and absence of silent data mutation.
+ const originalWorkspace=await p.evaluate(()=>JSON.stringify(D.quarters));
+ await p.evaluate(()=>{
+  current=D.quarters['1'].compartments[0];show('card');renderComp();
+ });
+ assert.equal(await p.locator('#wfCardRelations').count(),1,
+  'Card must offer an explicit dependency scan action');
+ await p.locator('#wfCardRelations').click();
+ await p.locator('#wfSaveDependencyAudit').waitFor();
+ assert.match(await p.locator('#solin-dependency-scan').innerText(),/Проверено выделов: 1/);
+ assert.match(await p.locator('#solin-dependency-scan').innerText(),/исходные карточки и MDB не менялись/i);
+ const [auditDownload]=await Promise.all([
+  p.waitForEvent('download'),
+  p.locator('#wfSaveDependencyAudit').click()
+ ]);
+ assert.equal(auditDownload.suggestedFilename(),'solin-dependent-audit.json');
+ assert.equal(await p.evaluate(()=>JSON.stringify(D.quarters)),originalWorkspace,
+  'Running the full source dependency audit cannot modify the saved forest');
+ await p.locator('#wfCloseDependencyAudit').click();
+ console.log('PASS Chrome dependency audit dialog: card scope, complete downloadable JSON, no database edits');
  await desktop.close();
  const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
  const m=await mobile.newPage();m.on('pageerror',e=>errors.push(e.message));
