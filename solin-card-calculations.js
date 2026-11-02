@@ -116,8 +116,37 @@ function stockPerHectare(record,refs,org,quarterRow=null){
  const cul=(([2,4,7].includes(category)&&['С','СО'].includes(specie))||
    (n(row.IAR)===5&&['С','СО'].includes(specie)))?'К':
    n(record.POS)===1424&&specie==='Л'?'З':'.';
- const rows=refs.Szap.filter(r=>same(r.Obl,region)&&same(r.p1,row.POR)&&same(r.LXZ,zone)&&same(r.KUL,cul));
- if(rows.length!==1)return status('К59: таблица Szap не имеет единственной строки для KTO, POR, LXZ и KUL','ambiguous');
+ // Diagnose the *actual* failed Access join, never label a zero match
+ // "ambiguous" and never silently map a zone to a neighbouring norm.
+ const regionRows=refs.Szap.filter(r=>same(r.Obl,region));
+ const availableZones=[...new Set(regionRows.map(r=>n(r.LXZ)).filter(x=>x!==null))].sort((x,y)=>x-y);
+ const zoneRows=regionRows.filter(r=>same(r.LXZ,zone));
+ const kPz=n(quarterRow?.Kpz);
+ const slxr=(refs.Slxr||[]).filter(r=>n(r.Klxz)!==null&&n(r.Klxz)>0);
+ const zoneOptions=slxr.filter(r=>availableZones.some(z=>same(r.Klxz,z))&&
+   (kPz===null||same(r.Kpz,kPz))).map(r=>({value:n(r.Klxz),name:String(r.Nlxr??'')}));
+ const zoneDetail='KTO '+region+', LXZ '+zone+', POR '+specie+', KUL '+cul+
+   (kPz===null?'':', Kpz '+kPz);
+ if(!regionRows.length)return status('К59: для KTO '+region+' в исходной Szap вообще нет таблиц запаса','unavailable');
+ if(!zoneRows.length)return {status:'unsupported-zone',reason:
+   'К59: для '+zoneDetail+' нет нормативной строки, потому что зона LXZ '+zone+
+   ' не представлена в Szap этой области. Доступные зоны: '+availableZones.join(', ')+
+   '. Проверьте Квартал.Klxr и природную зону Kpz; исходный ZAP не подтверждён.',
+   region,zone,species:specie,kpz:kPz,availableZones,zoneOptions};
+ const speciesRows=zoneRows.filter(r=>same(r.p1,row.POR));
+ if(!speciesRows.length)return {status:'unavailable',reason:
+   'К59: зона LXZ '+zone+' есть в Szap для KTO '+region+
+   ', но нет породы POR '+specie+'. Проверяйте шифр породы; ZAP не подтверждён.',
+   region,zone,species:specie,availableZones,zoneOptions};
+ const rows=speciesRows.filter(r=>same(r.KUL,cul));
+ if(!rows.length)return {status:'unavailable',reason:
+   'К59: для '+zoneDetail+' отсутствует KUL '+cul+
+   '. Доступны KUL: '+[...new Set(speciesRows.map(r=>String(r.KUL)))].join(', ')+
+   '. Нельзя заменять группу культур наугад.',
+   region,zone,species:specie,availableZones,zoneOptions};
+ if(rows.length!==1)return {status:'ambiguous',reason:
+   'К59: в исходной Szap найдено '+rows.length+' строк для '+zoneDetail+
+   ', автоматический норматив неоднозначен.',region,zone,species:specie,availableZones,zoneOptions};
  const v=n(rows[0]['v'+height]),pol=n(row.POL);
  if(v===null||v<=0)return status('К59: нет нормативного запаса для этой высоты','ambiguous');
  const standard=k59Round(v*pol,0);
