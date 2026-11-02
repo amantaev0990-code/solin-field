@@ -33,10 +33,10 @@ function csv(report){
  const quote=value=>{
   let v=String(value??'');
   // Excel formula injection can begin with =,+,-,@ or leading control space.
-  if(/^[\\s]*[=+@-]/.test(v))v="'"+v;
+  if(/^[\s]*[=+@-]/.test(v))v="'"+v;
   return '"'+v.replace(/"/g,'""')+'"';
  };
- return '\\ufeff'+cells.map(row=>row.map(quote).join(';')).join('\\r\\n')+'\\r\\n';
+ return '\ufeff'+cells.map(row=>row.map(quote).join(';')).join('\r\n')+'\r\n';
 }
 function open(records,opts={}){
  if(!window.SolinDependentRules?.validateTransition){
