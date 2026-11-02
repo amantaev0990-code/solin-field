@@ -87,6 +87,13 @@ function originalForestKTO(record){
 // K59, constrained to one main-species Maket 10 row, with an exact
 // (KTO, POR, KlxrVD, KUL) lookup in original Szap. The physical Szap
 // table has 2389 unique keys. No approximate height extrapolation.
+function stockZoneOptions(refs,region,kpz=null){
+ const regionRows=(refs?.Szap||[]).filter(r=>same(r.Obl,region));
+ const availableZones=[...new Set(regionRows.map(r=>n(r.LXZ)).filter(x=>x!==null))].sort((x,y)=>x-y);
+ const zoneOptions=(refs?.Slxr||[]).filter(r=>availableZones.some(z=>same(r.Klxz,z))&&
+   (kpz===null||kpz===undefined||same(r.Kpz,kpz))).map(r=>({value:n(r.Klxz),name:String(r.Nlxr??'')}));
+ return {regionRows,availableZones,zoneOptions};
+}
 function stockPerHectare(record,refs,org,quarterRow=null){
  if(!refs?.Szap?.length)return status('Таблица запасов Szap недоступна');
  const category=n(record?.KU),area=n(record?.PLV),original=originalForestKTO(record);
@@ -118,13 +125,9 @@ function stockPerHectare(record,refs,org,quarterRow=null){
    n(record.POS)===1424&&specie==='Л'?'З':'.';
  // Diagnose the *actual* failed Access join, never label a zero match
  // "ambiguous" and never silently map a zone to a neighbouring norm.
- const regionRows=refs.Szap.filter(r=>same(r.Obl,region));
- const availableZones=[...new Set(regionRows.map(r=>n(r.LXZ)).filter(x=>x!==null))].sort((x,y)=>x-y);
- const zoneRows=regionRows.filter(r=>same(r.LXZ,zone));
  const kPz=n(quarterRow?.Kpz);
- const slxr=(refs.Slxr||[]).filter(r=>n(r.Klxz)!==null&&n(r.Klxz)>0);
- const zoneOptions=slxr.filter(r=>availableZones.some(z=>same(r.Klxz,z))&&
-   (kPz===null||same(r.Kpz,kPz))).map(r=>({value:n(r.Klxz),name:String(r.Nlxr??'')}));
+ const {regionRows,availableZones,zoneOptions}=stockZoneOptions(refs,region,kPz);
+ const zoneRows=regionRows.filter(r=>same(r.LXZ,zone));
  const zoneDetail='KTO '+region+', LXZ '+zone+', POR '+specie+', KUL '+cul+
    (kPz===null?'':', Kpz '+kPz);
  if(!regionRows.length)return status('К59: для KTO '+region+' в исходной Szap вообще нет таблиц запаса','unavailable');
@@ -212,5 +215,5 @@ function corrections(record,refs,org,quarterRow=null){
  }else unknown.push({field:'STUR',...stock});
  return {issues,unknown,bonitet:b,standStock:stock,stockPerHectare:k59};
 }
-window.SolinCardCalculations={bonitet,standStock,stockPerHectare,corrections,safeRoundHalf,accessRound,k59Round};
+window.SolinCardCalculations={bonitet,standStock,stockPerHectare,stockZoneOptions,corrections,safeRoundHalf,accessRound,k59Round};
 })();
