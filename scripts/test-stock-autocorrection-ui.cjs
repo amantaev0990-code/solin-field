@@ -153,6 +153,9 @@ async function reopen(p,info){
  });
  assert.equal(repair.code,150000000);
  console.log('PASS new 3-select forest KTO and existing saved forest KTO repair');
+ // Earlier case intentionally removed Szap; reload the actual sources before
+ // testing regional dropdown filters, otherwise no normative values exist.
+ await boot(p);
  // Reproduce the user's address 723/4/1/1 with standard New quarter/New stand
  // screens. "8" is a test-selected quarter zone, NOT a guessed 723 norm.
  const forestCodes=await p.evaluate(async()=>{
