@@ -20,7 +20,7 @@ function open(records,opts={}){
  if(!window.SolinDependentRules?.validateTransition){
   window.toast?.('Модуль проверки зависимостей не загружен');return;
  }
- if(typeof openModal!=='function)return;
+ if(typeof openModal!=='function')return;
  const collection=Array.isArray(records)?records:[];
  openModal('Проверка взаимосвязей SOLI-N','<div id="solin-dependency-scan">'+
   '<p>Проверяется: '+html(opts.caption||'текущие выделы')+'</p>'+
