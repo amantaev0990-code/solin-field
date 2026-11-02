@@ -45,6 +45,15 @@
 @media(max-width:350px){.ce-assist-row-grid{grid-template-columns:1fr}.ce-assist-head strong{font-size:14px}}
 @media print{.ce-assist-overlay,.ce-assist-shortcuts{display:none!important}}
 /* Compact mobile SOLI-N: original controls, order and shared draft. */
+.ce-assist-progress{display:flex;flex-direction:column;gap:7px;margin-bottom:16px;color:#40556a;font:13px Arial}
+.ce-assist-progress progress{width:100%;height:6px;accent-color:#3b5f80}
+.ce-assist-sequence-nav{position:sticky;bottom:-14px;display:flex;gap:10px;justify-content:space-between;padding:12px 0;background:#f3f6f8;border-top:1px solid #c3cfd9;margin-top:14px;z-index:1}
+.ce-assist-sequence-nav button,.ce-assist-complete button{min-height:46px;padding:10px 16px;border:1px solid #97a9bb;border-radius:6px;font:bold 15px Arial;background:#edf2f7;color:#29465f;cursor:pointer}
+.ce-assist-sequence-nav button:last-child,.ce-assist-complete button:first-of-type{background:#3b5f80;color:#fff;border-color:#365570}
+.ce-assist-sequence-nav button:disabled{opacity:.45;cursor:default}
+.ce-assist-complete{display:flex;flex-direction:column;gap:12px;line-height:1.5}
+.ce-assist-complete>b{font-size:20px;color:#29465f}
+.ce-assist-complete p{margin:0 0 8px;color:#40556a}
 .ce-mobile-tabs{display:none}
 @media(max-width:700px){
  .ce-modal .modalHead,.ce-modal .dt-toolbar{background:#dce5ee;border-color:#9cabb9}
