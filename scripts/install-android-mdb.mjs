@@ -16,6 +16,15 @@ if(!main.includes('registerPlugin(SolinMdbPlugin.class)')){
  fs.writeFileSync(activity,main);
 }
 fs.copyFileSync(path.join(root,'native/android/SolinMdbPlugin.java'),plugin);
+// Install a native Android/JUnit test in the generated Capacitor project.
+// Tests exercise the same private Jackcess writer invoked by the plugin,
+// using the verified blank transfer template shipped in APK assets.
+const testSource=path.join(root,'native/android/SolinMdbInstrumentedTest.java');
+const testDest=path.join(app,'src/androidTest/java/kz/solin/field/SolinMdbInstrumentedTest.java');
+if(fs.existsSync(testSource)){
+ fs.mkdirSync(path.dirname(testDest),{recursive:true});
+ fs.copyFileSync(testSource,testDest);
+}
 let build=fs.readFileSync(gradle,'utf8');
 const dep="implementation 'com.healthmarketscience.jackcess:jackcess:4.0.12'";
 if(!build.includes(dep)){
@@ -24,4 +33,13 @@ if(!build.includes(dep)){
  build=build.slice(0,pos+14)+'\n    '+dep+build.slice(pos+14);
  fs.writeFileSync(gradle,build);
 }
-console.log('Native Android MDB plugin registered; Jackcess dependency present.');
+const junitDep="androidTestImplementation 'androidx.test.ext:junit:1.2.1'";
+const runnerDep="androidTestImplementation 'androidx.test:runner:1.6.2'";
+for(const [marker,dep] of [['androidx.test.ext:junit',junitDep],['androidx.test:runner',runnerDep]]){
+ if(build.includes(marker))continue;
+ const start=build.indexOf('dependencies {');
+ if(start<0)throw Error('Android dependencies block missing');
+ build=build.slice(0,start+14)+'\n    '+dep+build.slice(start+14);
+}
+fs.writeFileSync(gradle,build);
+console.log('Native Android MDB plugin and on-emulator roundtrip checks registered.');
