@@ -280,24 +280,22 @@ function recalculateEditedField(el){
      if(output)output.textContent=description(isTree?'Макет10':'ВыделВ',issue.field,corrected);
    }
  }
- if(!changed.length)return;
+ const notice=document.getElementById('ce-calc-notice');
+ if(!changed.length){
+   session.calcNotices=[];
+   if(notice)notice.hidden=true;
+   return;
+ }
  session.dirty=true;
  const status=document.getElementById('ce-status');
  if(status)status.textContent='Пересчитано · не сохранено';
- session.calcNotices??=[];
- session.calcShown??=new Set();
- const fresh=changed.filter(item=>{
-   if(session.calcShown.has(item.field))return false;
-   session.calcShown.add(item.field);return true;
- });
- if(!fresh.length)return;
- session.calcNotices.push(...fresh);
- const notice=document.getElementById('ce-calc-notice');
+ // Display latest correction rather than stale first-edit values.
+ session.calcNotices=changed;
  if(!notice)return;
  notice.hidden=false;
  notice.innerHTML='<div class="ce-calc-heading"><strong>Проверка расчётов SOLI-N · исправлено в черновике</strong>'+
    '<button type="button" data-ce-calc-close aria-label="Скрыть таблицу расчётов">×</button></div>'+
-   '<p>Первоначальное значение не совпало с расчётом. Правильное значение уже подставлено в карточку, но <b>запись ещё не сохранена</b>.</p>'+
+   '<p>Производные показатели пересчитаны по данным карточки. К59 — справочный ориентир: введённый ZAP по нему не заменяется. <b>Запись ещё не сохранена</b>.</p>'+
    '<div class="ce-calc-table-wrap"><table><thead><tr><th>Поле</th><th>Введено впервые</th><th>Расчётное</th><th>Основание</th></tr></thead><tbody>'+
    session.calcNotices.map(item=>'<tr><td>'+h(item.label)+'</td><td>'+h(item.previous)+'</td><td><b>'+h(item.expected)+'</b></td><td>'+h(item.reason)+'</td></tr>').join('')+
    '</tbody></table></div>';
@@ -536,6 +534,9 @@ function onKey(e){if(!session)return;if(e.key==='Escape'){e.preventDefault();can
 }
 function save(e){e?.preventDefault();if(!session||session.pendingRecovery)return false;const s=session;
  try{validate()}catch(err){error(err.message,err.el,err);return;}
+ // Recalculate before Save even when the last field never emitted change.
+ const trigger=document.querySelector('#ce-form [data-ce-scope="base"][data-ce-field="PLV"]');
+ if(trigger)recalculateEditedField(trigger);
  const before=clone(s.record),beforeQuarter=clone(s.quarterTarget),oldWork=localStorage.getItem('solin_field_audited_work_v1'),oldCheckpoint=localStorage.getItem('solin_field_checkpoint_v2');
  try{Object.assign(s.record,clone(s.draft));for(const rows of Object.values(s.record._children||{}))for(const row of rows)for(const k of keys)row[k]=s.record[k]??null;
  Object.assign(s.quarterTarget,clone(s.quarter));
