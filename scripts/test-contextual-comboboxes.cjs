@@ -37,7 +37,7 @@ for(const [form,field] of [['Макет17','P17'],['Макет19','ZP']]){
  const result=engine.options(form,field,{},null,{KTO:350000000},tables);
  assert.equal(result.status,'partial','Unfinished DKP2>70… cannot be authoritative');
  assert(result.items.length>0);
- assert(result.items.every(o=>tables.SDP.some(r=>String(r.KPC)===o.value&&
+ assert(result.items.every(o=>tables.SDP.some(r=>String(r.KPC).trim()===o.value&&
     (Number(r.DKP2)===0||Number(r.DKP2)>70))),
   'May only offer entries satisfying the archived necessary condition');
  const projected={_children:{[form]:[{[field]:result.items[0].value}]}};
