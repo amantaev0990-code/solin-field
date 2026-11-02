@@ -39,7 +39,9 @@ async function fixture(p){
   const estimate=SolinCardCalculations.stockPerHectare(r,refs,org);
   if(estimate.status!=='complete'||estimate.expected!==35)throw Error('K59 test fixture invalid: '+JSON.stringify(estimate));
   current=r;renderComp();show('card');
-  return {forestId:forest.id,address:{POS:r.POS,LESN:r.LESN,KV:r.KV,KGLF:r.KGLF,VD:r.VD}};
+  return {forestId:forest.id,address:{POS:r.POS,LESN:r.LESN,KV:r.KV,KGLF:r.KGLF,VD:r.VD},
+   norms:{height7:SolinCardCalculations.k59Round(Number(real.v7)*0.6),
+    half:SolinCardCalculations.k59Round(Number(real.v7)*0.5)}};
  });
  await p.locator('#wfEditBase').click();await p.locator('#ce-form').waitFor();
  return info;
@@ -81,22 +83,22 @@ async function reopen(p,info){
  console.log('PASS original Szap correction for repeated 30 → 40 → 50 inputs');
  await field(p,'Макет10','PH').fill('7');
  await field(p,'Макет10','PH').press('Tab');
- assert.equal(await val(p,'Макет10','ZAP'),48);
- assert.equal(await val(p,'base','STUR'),96);
+ assert.equal(await val(p,'Макет10','ZAP'),info.norms.height7);
+ assert.equal(await val(p,'base','STUR'),info.norms.height7*2);
  await field(p,'Макет10','POL').fill('0,5');
  await field(p,'Макет10','POL').press('Tab');
- assert.equal(await val(p,'Макет10','ZAP'),40);
- assert.equal(await val(p,'base','STUR'),80);
+ assert.equal(await val(p,'Макет10','ZAP'),info.norms.half);
+ assert.equal(await val(p,'base','STUR'),info.norms.half*2);
  await field(p,'base','PLV').fill('3');
  await field(p,'base','PLV').press('Tab');
- assert.equal(await val(p,'base','STUR1'),40);
- assert.equal(await val(p,'base','STUR'),120);
+ assert.equal(await val(p,'base','STUR1'),info.norms.half);
+ assert.equal(await val(p,'base','STUR'),info.norms.half*3);
  console.log('PASS height, fullness and area recompute ZAP/STUR in original order');
  await p.locator('#ce-save').click();await p.waitForFunction(()=>!document.querySelector('#ce-form'));
- assert.equal(Number(await p.evaluate(()=>current._children.Макет10[0].ZAP)),40);
+ assert.equal(Number(await p.evaluate(()=>current._children.Макет10[0].ZAP)),info.norms.half);
  await reopen(p,info);
- assert.equal(await val(p,'Макет10','ZAP'),40);
- assert.equal(await val(p,'base','STUR'),120);
+ assert.equal(await val(p,'Макет10','ZAP'),info.norms.half);
+ assert.equal(await val(p,'base','STUR'),info.norms.half*3);
  console.log('PASS save + reload persisted corrected stock');
  await p.locator('#ce-cancel').click();
  await p.evaluate(()=>{
@@ -104,8 +106,8 @@ async function reopen(p,info){
   current._children.Макет10.push({...base,ZAP:10});
   current.STUR=0;current.STUR1=0;solinWorkflow.exitCard();
  });
- assert.equal(await p.evaluate(()=>current.STUR1),50);
- assert.equal(await p.evaluate(()=>current.STUR),150);
+ assert.equal(await p.evaluate(()=>current.STUR1),info.norms.half+10);
+ assert.equal(await p.evaluate(()=>current.STUR),(info.norms.half+10)*3);
  console.log('PASS alternate exit aggregates Maket10 ZAP and recalculates STUR');
  // Deliberately make the normative source unavailable. The entered ZAP must
  // never be presented as independently verified merely because STUR follows it.
