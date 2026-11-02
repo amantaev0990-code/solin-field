@@ -14,13 +14,24 @@ const server=http.createServer((req,res)=>{const rel=decodeURIComponent(req.url.
   await page.goto(process.env.TARGET_URL||'http://127.0.0.1:'+port+'/');
   await page.waitForFunction(()=>window.SolinWorkspace&&window.SOLIN_REFS&&window.SolinCardAssist);
   await page.evaluate(()=>SolinWorkspace.ready);
-  // The new-quarter native dropdowns must show original shifr alongside names.
+  // All quarter lists share the original source engine; child Klxr must
+  // remain empty until Kpz is selected, never display all Slxr codes.
   await page.evaluate(()=>openQuarterForm());
-  for(const id of ['newKGLF','newKpz','newKlxr']){
-    const options=await page.locator('#'+id).evaluate(el=>el.tagName==='SELECT'?[...el.options].filter(o=>o.value).map(o=>[o.value,o.textContent]):[]);
-    assert(options.length>0,id+' must have original reference codes');
-    assert(options.every(([code,label])=>label.startsWith(code+' — ')||label===code),id+' hides source shifr');
+  for(const id of ['newKGLF','newKpz']){
+    const list=await page.locator('#'+id).evaluate(el=>el.tagName==='SELECT'?[...el.options].filter(o=>o.value).map(o=>[o.value,o.textContent]):[]);
+    if(list.length)assert(list.every(([code,label])=>label.startsWith(code+' — ')||label===code),
+     id+' hides the original source code');
   }
+  assert.equal(await page.locator('#newKlxr option').evaluateAll(xs=>xs.filter(o=>o.value&&!o.disabled).length),0,
+   'No natural-zone context: do not show every forest zone');
+  const expected=await page.evaluate(()=>{
+   const el=document.querySelector('#newKpz');el.value='2';
+   el.dispatchEvent(new Event('change',{bubbles:true}));
+   return (SolinDependentRules.options('Квартал','Klxr',{Kpz:2},null,D.lesnichestvo?.[0]).items||[])
+    .map(x=>String(x.value));
+  });
+  const allowed=await page.locator('#newKlxr option').evaluateAll(xs=>xs.filter(o=>o.value&&!o.disabled).map(o=>o.value));
+  assert.deepEqual(allowed,expected,'Quarter zones must be filtered by KTO and Kpz');
   await page.evaluate(()=>closeModal());
   await page.evaluate(async()=>{const f=(await SolinWorkspace.list())[0];await SolinWorkspace.activate(f.id);current=Object.values(D.quarters).flatMap(q=>q.compartments).find(r=>r._children?.Макет10?.length)||Object.values(D.quarters).flatMap(q=>q.compartments)[0];renderComp();show('card');});
   await page.locator('#wfEditBase').click();
