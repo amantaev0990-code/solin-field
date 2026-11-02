@@ -6,6 +6,7 @@ on:
       - 'solin-card-editor.js'
       - 'solin-workflow.js'
       - 'scripts/test-cross-editor-dependencies.cjs'
+      - 'scripts/test-whole-card-dependencies.cjs'
       - 'scripts/test-contextual-comboboxes.cjs'
       - 'scripts/test-dependent-field-rules.cjs'
       - 'scripts/test-category-layer-dependencies.cjs'
@@ -36,6 +37,7 @@ jobs:
           node --check solin-dependent-rules.js
           node --check scripts/test-cross-editor-dependencies.cjs
           node --check scripts/test-contextual-comboboxes.cjs
+          node --check scripts/test-whole-card-dependencies.cjs
           node --check solin-card-editor.js
           node --check solin-address-context.js
           node --check solin-workspace.js
@@ -50,6 +52,7 @@ jobs:
           node scripts/test-cross-editor-dependencies.cjs
           node scripts/test-dependent-field-rules.cjs
           node scripts/test-contextual-comboboxes.cjs
+          node scripts/test-whole-card-dependencies.cjs
           node scripts/test-category-layer-dependencies.cjs
           node scripts/test-card-calculations.cjs
           node scripts/test-szap-region-zones.cjs
