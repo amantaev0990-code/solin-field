@@ -239,6 +239,14 @@ async function reopen(p,info){
   return norm.expected;
  });
  await p.locator('#wf_ZAP').fill('170');await p.locator('#wfSaveMaket').click();
+ console.log('K59_QUARTER_CASCADE_SIM',JSON.stringify(await p.evaluate(()=>{
+  const q=D.quarters['1'],r=q.compartments[0];
+  const simulated={compartments:[{...r}]};
+  const count=window.SolinAddressContext?.cascadeQuarterZone(simulated,{...q.meta,Klxr:8},q.meta);
+  return {count,newZone:simulated.compartments[0].KlxrVD,
+   editorHasCascade:String(window.solinEditQuarter||'').includes('cascadeQuarterZone'),
+   oldZone:r.KlxrVD,quarterZone:q.meta.Klxr};
+ })));
  const afterZone=await p.evaluate(()=>{
   const r=current,org=D.lesnichestvo[0],q=D.quarters['1'].meta;
   const audit=SolinCardCalculations.corrections(r,SOLIN_REFS.tables,org,q);
