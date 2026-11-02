@@ -16,6 +16,28 @@ function scan(records,org,refs){
   affected:results.filter(r=>r.errors.length||r.warnings.length).length,
   results:results.filter(r=>r.errors.length||r.warnings.length)};
 }
+// CSV is a tabular complement to the lossless JSON audit. Semicolon and
+// UTF-8 BOM keep Russian field names usable in standard Excel settings.
+// Escape potential spreadsheet formulas in *all* user-derived cells.
+function csv(report){
+ const cells=[['Лесничество/квартал/выдел','Статус','Форма','Поле',
+  'Номер строки','Код','Причина']];
+ for(const r of report?.results||[]){
+  for(const [type,records] of [['Ошибка',r.errors||[]],['Не подтверждено',r.warnings||[]]]){
+   for(const issue of records){
+    cells.push([r.address,type,issue.form,issue.field,
+     Number.isInteger(issue.index)?issue.index+1:'',issue.value,issue.reason]);
+   }
+  }
+ }
+ const quote=value=>{
+  let v=String(value??'');
+  // Excel formula injection can begin with =,+,-,@ or leading control space.
+  if(/^[\s]*[=+@-]/.test(v))v="'"+v;
+  return '"'+v.replace(/"/g,'""')+'"';
+ };
+ return '\ufeff'+cells.map(row=>row.map(quote).join(';')).join('\r\n')+'\r\n';
+}
 function open(records,opts={}){
  if(!window.SolinDependentRules?.validateTransition){
   window.toast?.('Модуль проверки зависимостей не загружен');return;
@@ -61,7 +83,8 @@ function open(records,opts={}){
      '<p>По реализованным правилам несоответствий не найдено.</p>')+
    (details.length>120?'<p>Показаны первые 120 из '+details.length+
       ' выделов с замечаниями. В JSON-отчёте содержатся все.</p>':'')+
-   '<div class="formActions"><button type="button" id="wfSaveDependencyAudit">Скачать полный JSON-отчёт</button>'+
+   '<div class="formActions"><button type="button" id="wfSaveDependencyAudit">Скачать JSON</button>'+
+   '<button type="button" id="wfSaveDependencyCsv">Скачать таблицу CSV</button>'+
    '<button type="button" class="primary" id="wfCloseDependencyAudit">Закрыть</button></div>';
   host.querySelector('#wfSaveDependencyAudit').onclick=()=>{
    const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'});
@@ -69,9 +92,15 @@ function open(records,opts={}){
    a.href=url;a.download='solin-dependent-audit.json';document.body.append(a);a.click();a.remove();
    setTimeout(()=>URL.revokeObjectURL(url),5000);
   };
+  host.querySelector('#wfSaveDependencyCsv').onclick=()=>{
+   const blob=new Blob([csv(report)],{type:'text/csv;charset=utf-8'});
+   const url=URL.createObjectURL(blob),a=document.createElement('a');
+   a.href=url;a.download='solin-dependent-audit.csv';document.body.append(a);a.click();a.remove();
+   setTimeout(()=>URL.revokeObjectURL(url),5000);
+  };
   host.querySelector('#wfCloseDependencyAudit').onclick=()=>window.closeModal?.();
  };
  step();
 }
-window.SolinDependencyAudit={checkOne,scan,open};
+window.SolinDependencyAudit={checkOne,scan,csv,open};
 })();

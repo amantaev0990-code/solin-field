@@ -24,11 +24,18 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      # The setup action default includes the removed SDK package `tools`.
+      # Android command-line tools are installed by the action itself; only
+      # request the still supported platform-tools package here.
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - name: Install Capacitor dependencies
         run: npm install --no-audit --no-fund
       - name: Stage existing SOLI-N Field web assets
         run: npm run build
+      - name: Verify Android staged assets and blank MDB only
+        run: node scripts/test-android-assets.cjs
       - name: Create native Android project
         run: npx cap add android
       - name: Register offline MDB writer

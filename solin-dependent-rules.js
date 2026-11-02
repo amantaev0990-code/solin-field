@@ -87,7 +87,9 @@ function options(form,field,row,card,org,refs=ref()){
   const r=forestTypes(card,org,refs);
   return {status:r.status,reason:r.reason,items:r.items};
  }
- if(form==='ВыделВ'&&field==='M3Pr'&&refs?.SDP_Tip){
+ if(form==='ВыделВ'&&field==='M3Pr'){
+  if(!refs?.SDP_Tip?.length)
+   return {status:'unavailable',reason:'Исходный список пород SDP_Tip отсутствует — выбор не подтверждён',items:[]};
   // Original ВыделВ main-species RowSource explicitly excludes "КУСТ".
   return {status:'complete',reason:'Оригинальный список главной породы исключает КУСТ',
    items:refs.SDP_Tip.filter(r=>filled(r.KPC)&&code(r.KPC)!=='КУСТ')
@@ -110,7 +112,7 @@ function options(form,field,row,card,org,refs=ref()){
  }
  if(form==='Квартал'&&field==='Klxr'){
   if(!filled(row?.Kpz))return {status:'waiting',reason:'Сначала укажите природную зону Kpz квартала',items:[]};
-  if(!Array.isArray(refs.Slxr)||!Array.isArray(refs.Szap)||!refs.Szap.length)
+  if(!Array.isArray(refs.Slxr)||!refs.Slxr.length||!Array.isArray(refs.Szap)||!refs.Szap.length)
    return {status:'unavailable',reason:'Требуются исходные таблицы Slxr и Szap; общий список не является допустимым',items:[]};
   const obl=kto(org);
   if(!obl)return {status:'unavailable',reason:'Сначала определите код области KTO лесничества',items:[]};
@@ -127,24 +129,30 @@ function options(form,field,row,card,org,refs=ref()){
    reason:'Slxr.Kpz='+code(row.Kpz)+' ∩ Szap.Obl='+obl+' (LXZ): '+(items.map(x=>x.value).join(', ')||'совпадений нет'),
    items,dependencies:['Kpz','KTO'],region:obl};
  }
- if(form==='Макет16'&&field==='Por16'&&refs.SDP){
+ if(form==='Макет16'&&field==='Por16'){
   // Original RowSource reads Maket10Выд.POR for this same stand.
   const stems=card?._children?.['Макет10']||[],used=new Set(stems.map(r=>code(r.POR)).filter(Boolean));
   if(!used.size)return {status:'waiting',reason:'Сначала укажите состав древостоя в макете 10',items:[]};
-  return {status:'complete',reason:'Породы макета 16 берутся из древостоя этого выдела',items:[...used].map(k=>({value:k,label:refs.SDP.find(r=>same(r.KPC,k))?.NDP||k}))};
+  return {status:'complete',reason:'Породы макета 16 берутся из древостоя этого выдела',items:[...used].map(k=>({value:k,label:refs.SDP?.find(r=>same(r.KPC,k))?.NDP||k}))};
  }
- if(form==='Макет12'&&['SV','SB'].includes(field)&&refs.SSP){
+ if(form==='Макет12'&&['SV','SB'].includes(field)){
+  if(!refs?.SSP?.length)
+   return {status:'unavailable',reason:'Нет исходного SSP для проверки степени повреждения',items:[]};
   const level=field==='SV'&&same(row.KTP,84)?1:0;
   return {status:'complete',reason:field==='SV'?'Степень повреждения зависит от типа повреждения (84 / другое)':'Вторая степень по группе K84=0',
    items:refs.SSP.filter(r=>filled(r.KSP)&&(field==='SV'?same(r.KSP,0)||num(r.K84)===level:num(r.K84)===0))
     .map(r=>({value:String(r.KSP),label:String(r.NSP||'')}))};
  }
- if(form==='Макет12'&&['VV','VB'].includes(field)&&refs.SBR){
+ if(form==='Макет12'&&['VV','VB'].includes(field)){
+  if(!refs?.SBR?.length)
+   return {status:'unavailable',reason:'Нет исходного SBR; выбор вредителя и болезни не подтверждён',items:[]};
   const exclude=field==='VV'?row.VB:row.VV;
   // Access also filters by computed Признак; its origin is not proven here.
   return {status:'partial',reason:'Виды не должны повторяться. Признак вредителя требует проверки исходного Access.',items:refs.SBR.filter(r=>filled(r.KB)&&(!filled(exclude)||!same(r.KB,exclude))).map(r=>({value:String(r.KB),label:String(r.NB||'')}))};
  }
- if(form==='ВыделВ'&&['M2PM1','M22','M23'].includes(field)&&refs.SLM){
+ if(form==='ВыделВ'&&['M2PM1','M22','M23'].includes(field)){
+  if(!refs?.SLM?.length)
+   return {status:'unavailable',reason:'Нет оригинального SLM для выбора хозяйственных мероприятий',items:[]};
   const prev=field==='M22'?[row.M2PM1]:field==='M23'?[row.M2PM1,row.M22]:[];
   const previousReady=field==='M2PM1'||(field==='M22'?filled(row.M2PM1)&&code(row.M2PM1)!=='0':filled(row.M22)&&code(row.M22)!=='0');
   const items=refs.SLM.filter(r=>filled(r.KM)&&(same(r.KM,0)||(
@@ -154,21 +162,27 @@ function options(form,field,row,card,org,refs=ref()){
   ))).map(r=>({value:String(r.KM),label:String(r.NMR||'')}));
   return {status:'complete',reason:'Последовательность мероприятий по SLM.PM2R',items};
  }
- if(form==='ВыделВ'&&/^PRP[123]$/.test(field)&&refs.SDP_Tip){
+ if(form==='ВыделВ'&&/^PRP[123]$/.test(field)){
+  if(!refs?.SDP_Tip?.length)
+   return {status:'unavailable',reason:'Нет оригинальной SDP_Tip для пород подроста',items:[]};
   const i=Number(field.slice(-1));
   const already=i===1?[]:i===2?[row.PRP1]:[row.PRP1,row.PRP2];
   const ready=i===1||(filled(row['PRP'+(i-1)])&&code(row['PRP'+(i-1)])!=='0');
   const rows=distinctOptions(refs.SDP_Tip,'KPC',r=>num(r.DKP2)!==null&&num(r.DKP2)<700000,already);
   return {status:'complete',reason:'Породы подроста без повторений (SDP_Tip.DKP2)',items:ready?rows.map(r=>({value:String(r.KPC),label:String(r.NDP||'')})):[]};
  }
- if(form==='ВыделВ'&&/^PLP[123]$/.test(field)&&refs.SDP){
+ if(form==='ВыделВ'&&/^PLP[123]$/.test(field)){
+  if(!refs?.SDP?.length)
+   return {status:'unavailable',reason:'Нет оригинальной SDP для пород подлеска',items:[]};
   const i=Number(field.slice(-1));
   const already=i===1?[]:i===2?[row.PLP1]:[row.PLP1,row.PLP2];
   const ready=i===1||(filled(row['PLP'+(i-1)])&&code(row['PLP'+(i-1)])!=='0');
   const rows=distinctOptions(refs.SDP,'KPC',r=>num(r.DKP2)!==null&&(num(r.DKP2)>700000||num(r.DKP2)===0),already);
   return {status:'complete',reason:'Породы подлеска без повторений (SDP.DKP2)',items:ready?rows.map(r=>({value:String(r.KPC),label:String(r.NDP||'')})):[]};
  }
- if(form==='Макет23'&&/^K[1-8]$/.test(field)&&refs.SOV){
+ if(form==='Макет23'&&/^K[1-8]$/.test(field)){
+  if(!refs?.SOV?.length)
+   return {status:'unavailable',reason:'Нет оригинального SOV для особенностей выдела',items:[]};
   const i=Number(field.slice(1)),previous=Array.from({length:i-1},(_,j)=>row['K'+(j+1)]);
   const ready=i===1||(filled(previous.at(-1))&&code(previous.at(-1))!=='0');
   const rows=refs.SOV.filter(r=>filled(r.KOV)&&(i===1?num(r.KOV)!==135&&[0,1].includes(num(r.Priz)):num(r.Priz)===0))
