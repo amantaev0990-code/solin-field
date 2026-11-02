@@ -181,6 +181,35 @@ function options(form,field,row,card,org,refs=ref()){
 // Shared UI adapter for every form: never display the unrestricted SolinHuman
 // lookup after a verified Access RowSource has reduced the permitted choices.
 // Existing imported codes remain visible but are not advertised as permitted.
+// This audit is shared by the full editor and individual Maket editors.
+// Only newly edited tree composition should be checked against related makets;
+// unchanged imported records remain intact.
+function treeDependencies(card,refs=ref()){
+ const issues=[],rows=card?._children?.['Макет10']||[];
+ const layers=allowedLayers(card,refs);
+ if(layers.status==='complete')for(let i=0;i<rows.length;i++){
+  const value=rows[i]?.IAR;
+  if(!filled(value)||code(value)==='0')continue;
+  if(currentIsAllowed(value,layers)===false)issues.push({
+   form:'Макет10',field:'IAR',index:i,value:code(value),
+   reason:'Ярус '+code(value)+' не разрешён для категории угодий '+code(card?.KU)+
+     ' по SKU.P10 → SIAR.Ia → PIAP.KIAR'
+  });
+ }
+ const material=card?._children?.['Макет16']||[];
+ if(material.length){
+  const allowed=options('Макет16','Por16',{},card,null,refs);
+  for(let i=0;i<material.length;i++){
+   const value=material[i]?.Por16;
+   if(!filled(value)||code(value)==='0')continue;
+   if(allowed?.status==='waiting'||currentIsAllowed(value,allowed)===false)issues.push({
+    form:'Макет16',field:'Por16',index:i,value:code(value),
+    reason:'Порода '+code(value)+' из макета 16 отсутствует в составе макета 10 текущего выдела'
+   });
+  }
+ }
+ return issues;
+}
 function applySelect(select,result,opts={}){
  if(!select||!result)return null;
  const old=String(opts.current??select.value??'');
@@ -228,5 +257,5 @@ function currentIsAllowed(value,result){
  if(code(value)==='0' && !result.items.some(r=>same(r.value,0)))return null;
  return result.items.some(r=>same(r.value,value));
 }
-window.SolinDependentRules={forestTypes,options,currentIsAllowed,applySelect,kto,region,speciesGroup,suggestedOrigin,landCategory,allowedLayers};
+window.SolinDependentRules={forestTypes,options,currentIsAllowed,applySelect,treeDependencies,kto,region,speciesGroup,suggestedOrigin,landCategory,allowedLayers};
 })();

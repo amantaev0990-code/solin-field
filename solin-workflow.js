@@ -163,6 +163,17 @@ const dependent=window.SolinDependentRules,referenceTables=window.SOLIN_REFS?.ta
 const list=[...rowsOf(r,m)],base={...existing,...values};
 for(const k of KEY_FIELDS)base[k]=r[k]??null;
 if(index>=list.length)list.push(base);else list[index]=base;
+// A Maket10 edit may invalidate species in Maket16 or permitted strata.
+// Check BEFORE mutating the saved record; the full card can edit linked
+// Makets atomically where an individual popup cannot.
+if(m==='Макет10'&&window.SolinDependentRules?.treeDependencies){
+ const projected={...r,_children:{...r._children,[m]:list}};
+ const conflict=window.SolinDependentRules.treeDependencies(projected,referenceTables)[0];
+ if(conflict){
+  notify('Не сохранено: '+conflict.reason+'. Измените связанные макеты через «Изменить карточку».');
+  return;
+ }
+}
 target[m]=list;
 let calculated=[],k59Check=null,stockEdited=m==='Макет10'&&String(values.ZAP??'')!==String(existing.ZAP??'');
 if(m==='Макет10'&&window.SolinCardCalculations){

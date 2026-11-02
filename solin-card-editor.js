@@ -305,11 +305,13 @@ function linkedIssues(){
   if(engine.currentIsAllowed(base.M3Pr,speciesChoice)===false)
    return {message:'Выберите допустимую главную породу из оригинального справочника.',form:'ВыделВ',scope:'base',field:'M3Pr'};
  }
+ // Validate the FIRST codes in each linked chain too, not only their
+ // dependent second/third choices.
  const affected={
   M3TLU:['M3Pr','M3TLU','KlxrVD','NE2A'],
-  M22:['M2PM1','M22'],M23:['M2PM1','M22','M23'],
-  PRP2:['PRP1','PRP2'],PRP3:['PRP1','PRP2','PRP3'],
-  PLP2:['PLP1','PLP2'],PLP3:['PLP1','PLP2','PLP3']
+  M2PM1:['M2PM1'],M22:['M2PM1','M22'],M23:['M2PM1','M22','M23'],
+  PRP1:['PRP1'],PRP2:['PRP1','PRP2'],PRP3:['PRP1','PRP2','PRP3'],
+  PLP1:['PLP1'],PLP2:['PLP1','PLP2'],PLP3:['PLP1','PLP2','PLP3']
  };
  for(const [field,deps] of Object.entries(affected)){
   if(!changed(base,before,deps)&&!session.isNew)continue;
@@ -325,6 +327,14 @@ function linkedIssues(){
   const result=engine.options('Квартал','Klxr',session.quarter,base,linkedOrg());
   if(engine.currentIsAllowed(session.quarter.Klxr,result)===false)
    return {message:'Лесохозяйственная зона квартала не соответствует выбранной природной зоне.',form:'Квартал',scope:'quarter',field:'Klxr'};
+ }
+ // Reuse the same audited tree/stock composition checks as the
+ // standalone editor, but allow the full card to fix both Makets together.
+ if((session.isNew||changed(base,before,['KU'])||
+     session.changedMakets.has('Макет10'))&&engine.treeDependencies){
+  const issue=engine.treeDependencies(base,window.SOLIN_REFS?.tables)[0];
+  if(issue)return {message:issue.reason,form:issue.form,scope:issue.form,
+    field:issue.field,index:issue.index};
  }
  // Category KU determines permitted Maket 10 strata via SKU.P10 → SIAR.Ia.
  // Validate only when KU was changed or the Maket 10 itself was edited,

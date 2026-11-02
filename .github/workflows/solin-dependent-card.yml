@@ -5,6 +5,7 @@ on:
       - 'solin-dependent-rules.js'
       - 'solin-card-editor.js'
       - 'solin-workflow.js'
+      - 'scripts/test-cross-editor-dependencies.cjs'
       - 'scripts/test-contextual-comboboxes.cjs'
       - 'scripts/test-dependent-field-rules.cjs'
       - 'scripts/test-category-layer-dependencies.cjs'
@@ -33,6 +34,7 @@ jobs:
       - name: Syntax and schema safety
         run: |
           node --check solin-dependent-rules.js
+          node --check scripts/test-cross-editor-dependencies.cjs
           node --check scripts/test-contextual-comboboxes.cjs
           node --check solin-card-editor.js
           node --check solin-address-context.js
@@ -45,6 +47,7 @@ jobs:
           node --check scripts/test-stock-autocorrection-ui.cjs
       - name: Regression — forest type, species, zone, region and Access combo rules
         run: |
+          node scripts/test-cross-editor-dependencies.cjs
           node scripts/test-dependent-field-rules.cjs
           node scripts/test-contextual-comboboxes.cjs
           node scripts/test-category-layer-dependencies.cjs

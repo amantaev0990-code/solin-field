@@ -259,6 +259,20 @@ async function reopen(p,info){
  const species16=await p.locator('#wf_Por16 option').evaluateAll(xs=>xs.filter(x=>x.value&&!x.disabled).map(x=>x.value));
  assert.deepEqual(species16,['В'],'Maket16 must offer only species present in this stand Maket10');
  console.log('PASS Maket16.Por16 choices follow this stand Maket10 species');
+ // Editing a Maket10 species in the narrow standalone popup must not
+ // silently orphan the linked Maket16 species. Full-card edit remains the
+ // path for a simultaneous change of both original Access forms.
+ await p.evaluate(()=>{closeModal();solinWorkflow.editMaket('Макет10',0)});
+ const maket10Species=p.locator('#wf_POR');
+ if(await maket10Species.evaluate(el=>el.tagName)==='SELECT'){
+  const present=await maket10Species.evaluate(el=>[...el.options].some(o=>o.value==='Б'&&!o.disabled));
+  if(present)await maket10Species.selectOption('Б');
+  else await maket10Species.evaluate(el=>{el.add(new Option('Берёза','Б'));el.value='Б'});
+ }else await maket10Species.fill('Б');
+ await p.locator('#wfSaveMaket').click();
+ assert.equal(await p.evaluate(()=>current._children.Макет10[0].POR),'В',
+  'Standalone tree species change must be refused while Maket16 still refers to В');
+ console.log('PASS standalone Maket10 Save cannot orphan Maket16 species');
  await p.evaluate(()=>{
   closeModal();current._children.Макет12=[{KTP:84,SV:null}];
   solinWorkflow.editMaket('Макет12',0);
