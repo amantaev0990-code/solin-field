@@ -38,7 +38,7 @@ for(const f of ['M2PM1','PRP1','PLP1'])
  assert(new RegExp(f+':\\[').test(source),'Full card must validate first choice '+f);
 assert(source.includes('engine.treeDependencies(base,'),'Full card must use shared cross-Maket audit');
 const workflow=fs.readFileSync('solin-workflow.js','utf8');
-const cross=workflow.indexOf('window.SolinDependentRules.treeDependencies(projected');
+const cross=workflow.indexOf('window.SolinDependentRules?.validateTransition?.(');
 const write=workflow.indexOf('target[m]=list;');
 assert(cross>0&&cross<write,'Standalone editor must reject violations BEFORE record mutation');
 console.log('CROSS_MAKET_DEPENDENCY_OK IAR by SKU, Maket16 species, atomic full-card fixes, first base codes, pre-save guard');
