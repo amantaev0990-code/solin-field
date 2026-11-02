@@ -141,10 +141,11 @@ const list=[...rowsOf(r,m)],base={...existing,...values};
 for(const k of KEY_FIELDS)base[k]=r[k]??null;
 if(index>=list.length)list.push(base);else list[index]=base;
 target[m]=list;
-let calculated=[];
+let calculated=[],k59Check=null,stockEdited=m==='Макет10'&&String(values.ZAP??'')!==String(existing.ZAP??'');
 if(m==='Макет10'&&window.SolinCardCalculations){
  const org=db()?.lesnichestvo?.find(x=>String(x.POS)===String(r.POS)&&String(x.LESN)===String(r.LESN));
- calculated=window.SolinCardCalculations.corrections(r,window.SOLIN_REFS?.tables,org).issues;
+ const audit=window.SolinCardCalculations.corrections(r,window.SOLIN_REFS?.tables,org);
+ calculated=audit.issues;k59Check=audit.stockPerHectare;
  for(const issue of calculated){
   if(issue.field==='ZAP'&&Number.isInteger(issue.index))r._children?.Макет10?.[issue.index]&&(r._children.Макет10[issue.index].ZAP=Number(issue.expected));
   else r[issue.field]=issue.field==='M3B'?String(issue.expected):Number(issue.expected);
@@ -152,11 +153,26 @@ if(m==='Макет10'&&window.SolinCardCalculations){
 }
 try{saveAll(r);}catch(e){Object.assign(r,JSON.parse(before));notify('Не удалось сохранить: '+e.message);return;}
 closeModal();openMaket(m);notify('Сохранено: '+m);
-if(calculated.length){
- const rows=calculated.map(x=>'<tr><td>'+h(x.label)+'</td><td>'+h(x.previous)+'</td><td><b>'+h(x.expected)+'</b></td><td>'+h(x.reason)+'</td></tr>').join('');
- openModal('Проверка расчётов SOLI-N','<p>Обнаружены неверные исходные значения. Расчётные значения подставлены и сохранены вместе с макетом 10.</p>'+
- '<div style="overflow-x:auto"><table class="wf-calc-warning"><thead><tr><th>Показатель</th><th>Введено впервые</th><th>Исправлено</th><th>Основание</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
- '<button type="button" class="primary" onclick="closeModal()">Понятно</button>');
+if(m==='Макет10'&&(calculated.length||stockEdited)){
+ const k59Verified=k59Check?.status==='complete';
+ const normativeFix=calculated.some(x=>x.field==='ZAP');
+ const dependent=calculated.filter(x=>x.field==='STUR1'||x.field==='STUR');
+ const previous=calculated.filter(x=>x.field!=='ZAP'&&x.field!=='STUR1'&&x.field!=='STUR');
+ const reason=h(k59Check?.reason||'Нет однозначного результата нормативного расчёта');
+ const heading=normativeFix?'К59: нормативный запас автоматически исправлен':
+   k59Verified?'К59: введённый запас проверен по нормативу':'Запас НЕ проверен по нормативу К59';
+ const explanation=normativeFix?
+   '<p>Значение ZAP заменено по таблице SOLI-N Szap/SzapCK. Итоги STUR1 и STUR пересчитаны из <b>нормативного</b> запаса.</p>':
+   k59Verified?
+     '<p>К59 подтвердил запас в макете 10. Пересчитаны зависимые итоги.</p>':
+     '<p><b>Внимание: введённый запас ZAP не подтверждён по К59.</b> Причина: '+reason+'.</p>'+
+     '<p>'+(dependent.length?'STUR1 и STUR пересчитаны из <b>введённого</b> ZAP. Это арифметический пересчёт, а не исправление запаса по нормативу.':
+        'Значение ZAP сохранено как введённое без нормативного подтверждения.')+'</p>';
+ const fields=calculated.map(x=>'<tr><td>'+h(x.label)+'</td><td>'+h(x.previous)+'</td><td><b>'+h(x.expected)+'</b></td><td>'+h(x.reason)+'</td></tr>').join('');
+ const table=calculated.length?
+   '<div style="overflow-x:auto"><table class="wf-calc-warning"><thead><tr><th>Показатель</th><th>Было</th><th>Стало</th><th>Основание</th></tr></thead><tbody>'+fields+'</tbody></table></div>':'';
+ openModal(heading,explanation+table+
+  '<button type="button" class="primary" onclick="closeModal()">Понятно</button>');
 }
 
 };}
