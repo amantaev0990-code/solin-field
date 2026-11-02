@@ -94,6 +94,13 @@ function options(form,field,row,card,org,refs=ref()){
     .map(r=>({value:String(r.KPC),label:String(r.NDP||'')}))};
  }
  if(!refs)return {status:'unavailable',reason:'Справочники ещё не загружены',items:[]};
+ if(form==='Квартал'&&field==='Kpz'){
+  if(!Array.isArray(refs.Spzon)||!refs.Spzon.length)
+   return {status:'unavailable',reason:'Нет исходной таблицы природных зон Spzon',items:[]};
+  const items=refs.Spzon.filter(r=>filled(r.Kpz)).map(r=>
+   ({value:code(r.Kpz),label:String(r.Npz??'')}));
+  return {status:'complete',reason:'Природные зоны из исходного Spzon.Kpz',items};
+ }
  if(form==='Квартал'&&field==='KGLF'){
   if(!Array.isArray(refs.Sples)||!refs.Sples.length)
    return {status:'unavailable',reason:'Исходный справочник Sples недоступен; категории ГЛФ нельзя фильтровать наугад',items:[]};
