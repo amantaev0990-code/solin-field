@@ -31,7 +31,10 @@ function editQuarter(k,index=0){const q=D.quarters[k],rows=q.quarterRows?.length
 // Shared Access RowSource picker: Kpz + original KTO/Szap region.
  // Unlike a datalist, it cannot show the unrestricted Slxr table.
  let zoneInput=document.querySelector('#modalBody [data-qfield="Klxr"]');
- const kpzInput=document.querySelector('#modalBody [data-qfield="Kpz"]');
+ let kpzInput=document.querySelector('#modalBody [data-qfield="Kpz"]');
+ const natural=window.SolinDependentRules?.options('Квартал','Kpz',selected,null,D.lesnichestvo?.[0]);
+ if(natural?.status==='complete')
+  kpzInput=window.SolinDependentRules.applySelect(kpzInput,natural,{current:kpzInput?.value})||kpzInput;
  const zoneHint=document.createElement('p');
  zoneHint.className='wf-form-note';zoneHint.setAttribute('aria-live','polite');
  zoneInput?.parentElement?.insertAdjacentElement('afterend',zoneHint);
