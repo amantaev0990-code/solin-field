@@ -219,7 +219,9 @@ async function reopen(p,info){
  assert.match(await p.locator('#modalTitle').innerText(),/Корректировка квартала 1/);
  assert.equal(await p.locator('#modalBody [data-qfield="Klxr"]').inputValue(),'8');
  assert.match(await p.locator('#modalBody .wf-form-note').last().innerText(),/ВНИМАНИЕ: зона 8 отсутствует в Szap/);
- await p.locator('#modalBody [data-qfield="Klxr"]').fill('4');
+ const qZoneControl=p.locator('#modalBody [data-qfield="Klxr"]');
+ if(await qZoneControl.evaluate(el=>el.tagName)==='SELECT')await qZoneControl.selectOption('4');
+ else await qZoneControl.fill('4');
  await p.locator('#saveQuarter').click();
  await p.waitForFunction(()=>document.querySelector('#modal')?.classList.contains('hidden'));
  const zoneFixed=await p.evaluate(()=>{
