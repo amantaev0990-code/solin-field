@@ -280,25 +280,33 @@ function recalculateEditedField(el){
      if(output)output.textContent=description(isTree?'Макет10':'ВыделВ',issue.field,corrected);
    }
  }
- if(!changed.length)return;
+ if(!changed.length){
+  // K59 needs authoritative source lookups; do not imply correction if unavailable.
+  if(scope==='Макет10'&&standFields.has(field)&&check.stockPerHectare?.status!=='complete'){
+   const root=document.getElementById('ce-calc-notice');
+   if(root){root.hidden=false;root.innerHTML='<strong>Запас пока не исправлен</strong><p>'+h(check.stockPerHectare.reason||'Нет данных исходной шкалы К59')+'. Введённое значение осталось в черновике.</p>';}
+  }
+  return;
+ }
  session.dirty=true;
  const status=document.getElementById('ce-status');
  if(status)status.textContent='Пересчитано · не сохранено';
  session.calcNotices??=[];
- session.calcShown??=new Set();
- const fresh=changed.filter(item=>{
-   if(session.calcShown.has(item.field))return false;
-   session.calcShown.add(item.field);return true;
- });
- if(!fresh.length)return;
- session.calcNotices.push(...fresh);
+ // Keep the latest before/after values per field AND Maket10 row.
+ // A field-only Set previously suppressed subsequent corrections.
+ for(const item of changed){
+  const key=item.field+':'+(item.scope||'base')+':'+(item.index??'');
+  const index=session.calcNotices.findIndex(x=>x.field+':'+(x.scope||'base')+':'+(x.index??'')===key);
+  if(index<0)session.calcNotices.push(item);
+  else session.calcNotices[index]=item;
+ }
  const notice=document.getElementById('ce-calc-notice');
  if(!notice)return;
  notice.hidden=false;
  notice.innerHTML='<div class="ce-calc-heading"><strong>Проверка расчётов SOLI-N · исправлено в черновике</strong>'+
    '<button type="button" data-ce-calc-close aria-label="Скрыть таблицу расчётов">×</button></div>'+
    '<p>Первоначальное значение не совпало с расчётом. Правильное значение уже подставлено в карточку, но <b>запись ещё не сохранена</b>.</p>'+
-   '<div class="ce-calc-table-wrap"><table><thead><tr><th>Поле</th><th>Введено впервые</th><th>Расчётное</th><th>Основание</th></tr></thead><tbody>'+
+   '<div class="ce-calc-table-wrap"><table><thead><tr><th>Поле</th><th>До исправления</th><th>Расчётное</th><th>Основание</th></tr></thead><tbody>'+
    session.calcNotices.map(item=>'<tr><td>'+h(item.label)+'</td><td>'+h(item.previous)+'</td><td><b>'+h(item.expected)+'</b></td><td>'+h(item.reason)+'</td></tr>').join('')+
    '</tbody></table></div>';
  notice.scrollIntoView({block:'nearest',behavior:'smooth'});
@@ -535,7 +543,18 @@ function onKey(e){if(!session)return;if(e.key==='Escape'){e.preventDefault();can
  if(e.key==='Tab'){const visible=[...document.querySelectorAll('.ce-modal button,.ce-modal input,.ce-modal select,.ce-modal summary,[role="dialog"] [tabindex="0"]')].filter(el=>el.getClientRects().length&&!el.disabled&&!el.closest('[inert]')),first=visible[0],last=visible.at(-1);if(e.shiftKey&&document.activeElement===first){last?.focus();e.preventDefault();}else if(!e.shiftKey&&document.activeElement===last){first?.focus();e.preventDefault();}}
 }
 function save(e){e?.preventDefault();if(!session||session.pendingRecovery)return false;const s=session;
- try{validate()}catch(err){error(err.message,err.el,err);return;}
+ try{validate();
+ // Direct Save/quick-entry can submit before the last change event.
+ // Recalculate only cards whose stock-related fields actually changed.
+ const stockFields=['PLV','KU','M3Pr','M3B','STUR','STUR1'];
+ const changedStock=stockFields.some(k=>!same(s.draft[k],s.original[k]))||
+   JSON.stringify(s.draft._children?.Макет10||[])!==JSON.stringify(s.original._children?.Макет10||[]);
+ if(changedStock){
+  const el=document.querySelector('#ce-form [data-ce-scope="base"][data-ce-field="PLV"]');
+  if(el)recalculateEditedField(el);
+  validate();
+ }
+ }catch(err){error(err.message,err.el,err);return;}
  const before=clone(s.record),beforeQuarter=clone(s.quarterTarget),oldWork=localStorage.getItem('solin_field_audited_work_v1'),oldCheckpoint=localStorage.getItem('solin_field_checkpoint_v2');
  try{Object.assign(s.record,clone(s.draft));for(const rows of Object.values(s.record._children||{}))for(const row of rows)for(const k of keys)row[k]=s.record[k]??null;
  Object.assign(s.quarterTarget,clone(s.quarter));
@@ -546,7 +565,8 @@ function save(e){e?.preventDefault();if(!session||session.pendingRecovery)return
  if(s.isNew)D.quarters[s.record.KV].compartments=D.quarters[s.record.KV].compartments.filter(r=>r!==s.record);
  try{for(const [key,value]of[['solin_field_audited_work_v1',oldWork],['solin_field_checkpoint_v2',oldCheckpoint]])if(value===null)localStorage.removeItem(key);else localStorage.setItem(key,value);}catch(_){}
  error('Не удалось сохранить карточку: '+err.message);return;}
- discardRecovery(s);current=s.record;close();renderComp();refresh();toast('Карточка сохранена');return true;
+ const recap=(s.calcNotices||[]).map(i=>i.field+' '+i.previous+' → '+i.expected).join('; ');
+ discardRecovery(s);current=s.record;close();renderComp();refresh();toast('Карточка сохранена'+(recap?' · исправлено: '+recap:''));return true;
 }
 function click(e){const b=e.target.closest('button');if(!b)return;
  if(b.dataset.ceZoom){setZoom(b.dataset.ceZoom);return;}
