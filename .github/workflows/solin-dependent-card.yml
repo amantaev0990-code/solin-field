@@ -54,6 +54,8 @@ jobs:
           node --check scripts/test-szap-region-zones.cjs
           node --check solin-workflow.js
           node --check scripts/test-stock-autocorrection-ui.cjs
+      - name: Inspect archived Access RowSource reference columns
+        run: node scripts/probe-unresolved-access-sources.cjs
       - name: Regression — forest type, species, zone, region and Access combo rules
         run: |
           node scripts/test-cross-editor-dependencies.cjs
