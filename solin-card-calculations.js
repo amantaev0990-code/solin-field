@@ -76,14 +76,27 @@ function standStock(record){
  return {status:'complete',reason:'Макет10ЗАП · ΣZAP главной породы '+perHa+' м³/га × '+area+' га',
    expectedPerHa:perHa,expectedTotal:total,area};
 }
+// The original forest registry contains the KTO of each district. Older
+// Field-created forests omitted it despite having an exact POS/LESN match.
+function originalForestKTO(record){
+ const rows=(window.SOLIN_FOREST_CATALOG?.rows||[]).filter(row=>
+   same(row[0],record?.POS)&&same(row[1],record?.LESN)&&
+   n(row[4])!==null&&n(row[4])>0);
+ return rows.length===1?n(rows[0][4]):null;
+}
 // K59, constrained to one main-species Maket 10 row, with an exact
 // (KTO, POR, KlxrVD, KUL) lookup in original Szap. The physical Szap
 // table has 2389 unique keys. No approximate height extrapolation.
 function stockPerHectare(record,refs,org){
  if(!refs?.Szap?.length)return status('Таблица запасов Szap недоступна');
- const category=n(record?.KU),area=n(record?.PLV),region=n(org?.KTO),zone=n(record?.KlxrVD);
- if(category===null||area===null||area<=0||region===null||zone===null)
-  return status('К59: не указаны категория, площадь, лесохозяйственная зона или KTO','waiting');
+ const category=n(record?.KU),area=n(record?.PLV),original=originalForestKTO(record);
+ const direct=n(org?.KTO),region=direct!==null&&direct>0?direct:original,zone=n(record?.KlxrVD);
+ const missing=[];
+ if(category===null)missing.push('KU (категория угодий)');
+ if(area===null||area<=0)missing.push('PLV (площадь)');
+ if(zone===null||zone<=0)missing.push('KlxrVD (хозяйственная секция)');
+ if(region===null)missing.push('KTO (код области лесничества)');
+ if(missing.length)return status('К59: отсутствует '+missing.join('; ')+'. Адрес '+[record?.POS,record?.LESN,record?.KV,record?.VD].join('/') ,'waiting');
  if(category>=11)return status('К59 проверяет KU10 меньше 11','not-applicable');
  const all=record?._children?.['Макет10']||[];
  const selected=all.map((row,index)=>({row,index})).filter(({row})=>
