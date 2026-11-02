@@ -194,6 +194,27 @@ async function reopen(p,info){
  assert.equal(forestCodes.KTO,350000000);
  assert.equal(Number(forestCodes.zone),8);
  console.log('PASS real 723/4/1/1 UI create: KTO, quarter year, KlxrVD, children, old-record repair and ambiguity');
+ // Screenshot regression: original Szap has NO Obl=350000000/LXZ=8,
+ // despite this zone being listed for Kpz 2 in the general Slxr catalog.
+ await p.evaluate(()=>{
+  const q=D.quarters['1'],r=q.compartments[0];
+  q.meta.Kpz=2;q.meta.Klxr=8;r.KlxrVD=8;r.M3Pr='В';r.M3B='3';r.KU=2;r.PLV=1;
+  r.STUR1=154;r.STUR=154;r.GodT1=2015;
+  r._children.Макет10=[{POS:723,LESN:4,KV:1,KGLF:1,VD:1,IAR:1,KOEF:10,POR:'В',PH:6,POL:0.6,LET:5,PROI:7,ZAP:154}];
+  current=r;renderComp();show('card');solinWorkflow.editMaket('Макет10',0);
+ });
+ await p.locator('#wf_ZAP').fill('170');await p.locator('#wfSaveMaket').click();
+ const screenshotWarning=await p.locator('#modalBody').innerText();
+ assert.match(screenshotWarning,/LXZ 8/);
+ assert.match(screenshotWarning,/350000000/);
+ assert.match(screenshotWarning,/3.*4.*7/s);
+ assert.match(screenshotWarning,/не подтверждён по К59/i);
+ assert.equal(await p.evaluate(()=>current._children.Макет10[0].ZAP),170);
+ assert.equal(await p.evaluate(()=>current.STUR1),170);
+ await p.locator('#wf-k59-open-quarter').click();
+ await p.waitForFunction(()=>document.querySelector('#quartersScreen')?.classList.contains('active'));
+ const quarterZoneHint=await p.evaluate(()=>{window.openQuarter('1');return !!document.querySelector('#wfQuarterToolbar')});
+ console.log('PASS real screenshot 723/4/1/1: LXZ8 rejected, Szap+Slxr zone 3/4/7 explained, quarter navigation works');
  await desktop.close();
  const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
  const m=await mobile.newPage();m.on('pageerror',e=>errors.push(e.message));
