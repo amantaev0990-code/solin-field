@@ -39,6 +39,7 @@ async function repairAddressCodes(forest){
   }
   if(!q.quarterRows?.length)q.meta=rows[0];
   for(const stand of q.compartments||[]){
+   if(missing(stand.KV)){stand.KV=Number(kv);count++;}
    const inherited=ctx.enrichStand(stand,q,org);
    count+=Object.keys(inherited.values).length;
    count+=ctx.enrichMakets(stand);
