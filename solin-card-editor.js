@@ -259,7 +259,7 @@ function recalculateEditedField(el){
  const check=calc.corrections(session.draft,window.SOLIN_REFS?.tables,linkedOrg());
  const changed=[];
  for(const issue of check.issues){
-   if(!['M3B','STUR1','STUR','ZAP'].includes(issue.field))continue;
+   if(!['M3B','STUR1','STUR'].includes(issue.field))continue;
    const isTree=issue.field==='ZAP'&&Number.isInteger(issue.index);
    const prior=isTree?session.draft._children?.Макет10?.[issue.index]?.ZAP:session.draft[issue.field];
    const corrected=issue.field==='M3B'?String(issue.expected):Number(issue.expected);
@@ -281,24 +281,32 @@ function recalculateEditedField(el){
    }
  }
  const notice=document.getElementById('ce-calc-notice');
- if(!changed.length){
+ if(!changed.length&&!check.advisories?.length){
    session.calcNotices=[];
    if(notice)notice.hidden=true;
    return;
  }
- session.dirty=true;
- const status=document.getElementById('ce-status');
- if(status)status.textContent='Пересчитано · не сохранено';
+ if(changed.length){
+   session.dirty=true;
+   const status=document.getElementById('ce-status');
+   if(status)status.textContent='Пересчитано · не сохранено';
+ }
  // Display latest correction rather than stale first-edit values.
  session.calcNotices=changed;
  if(!notice)return;
  notice.hidden=false;
- notice.innerHTML='<div class="ce-calc-heading"><strong>Проверка расчётов SOLI-N · исправлено в черновике</strong>'+
+ notice.innerHTML='<div class="ce-calc-heading"><strong>'+
+   (changed.length?'Проверка расчётов SOLI-N · исправлено в черновике':'К59 · справочная оценка запаса')+'</strong>'+
    '<button type="button" data-ce-calc-close aria-label="Скрыть таблицу расчётов">×</button></div>'+
-   '<p>Производные показатели пересчитаны по данным карточки. К59 — справочный ориентир: введённый ZAP по нему не заменяется. <b>Запись ещё не сохранена</b>.</p>'+
-   '<div class="ce-calc-table-wrap"><table><thead><tr><th>Поле</th><th>Введено впервые</th><th>Расчётное</th><th>Основание</th></tr></thead><tbody>'+
+   (changed.length?'<p>Производные показатели пересчитаны по данным карточки. <b>Запись ещё не сохранена</b>.</p>':'')+
+   (changed.length?'<div class="ce-calc-table-wrap"><table><thead><tr><th>Поле</th><th>До пересчёта</th><th>Расчётное</th><th>Основание</th></tr></thead><tbody>':'')+
    session.calcNotices.map(item=>'<tr><td>'+h(item.label)+'</td><td>'+h(item.previous)+'</td><td><b>'+h(item.expected)+'</b></td><td>'+h(item.reason)+'</td></tr>').join('')+
-   '</tbody></table></div>';
+   (changed.length?'</tbody></table></div>':'')+
+   (check.advisories?.length?
+    '<p><b>К59 — только нормативная оценка.</b> Введённый запас ZAP не изменён. Оценка не является исправлением.</p>'+
+    '<div class="ce-calc-table-wrap"><table><thead><tr><th>Показатель</th><th>Введённый ZAP</th><th>Норматив К59</th><th>Основание</th></tr></thead><tbody>'+
+    check.advisories.map(item=>'<tr><td>'+h(item.label)+'</td><td>'+h(item.entered)+'</td><td>'+h(item.estimated)+'</td><td>'+h(item.reason)+'</td></tr>').join('')+
+    '</tbody></table></div>':'');
  notice.scrollIntoView({block:'nearest',behavior:'smooth'});
 }
 function linkedIssues(){
