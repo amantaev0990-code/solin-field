@@ -299,6 +299,14 @@ function linkedIssues(){
  const engine=window.SolinDependentRules;
  if(!engine||!session)return null;
  const base=session.draft,before=session.original;
+ const audit=engine.validateTransition?.(before,base,linkedOrg(),window.SOLIN_REFS?.tables,
+   {isNew:!!session.isNew});
+ if(audit?.errors.length){
+  const issue=audit.errors[0];
+  return {message:issue.reason,form:issue.form,
+   scope:issue.form==='ВыделВ'?'base':issue.form,
+   field:issue.field,index:issue.index};
+ }
  const changed=(row,prior,names)=>names.some(k=>String(row?.[k]??'')!==String(prior?.[k]??''));
  if(changed(base,before,['M3Pr'])||session.isNew){
   const speciesChoice=engine.options('ВыделВ','M3Pr',base,base,linkedOrg());
