@@ -227,7 +227,20 @@ async function reopen(p,info){
   return {quarter:q.meta,rows:q.quarterRows,stand:q.compartments[0],
    input:Object.fromEntries([...document.querySelectorAll('#modalBody [data-qfield]')].filter(el=>['KGLF','Klxr','Kpz','Fzona'].includes(el.dataset.qfield)).map(el=>[el.dataset.qfield,el.value]))};
  })).slice(0,2500));
+ await p.evaluate(()=>{
+  const A=window.SolinAddressContext,old=A.cascadeQuarterZone;
+  A.cascadeQuarterZone=function(q,a,b){
+   const n=old(q,a,b);window.__lastK59Cascade={old:a,newer:b,count:n,
+    standZone:q.compartments?.[0]?.KlxrVD};
+   return n;
+  };
+  window.__qSaveHandler=String(document.querySelector('#saveQuarter')?.onclick||'').slice(-1800);
+ });
  await p.locator('#saveQuarter').click();
+ console.log('K59_QUARTER_REAL_SAVE',JSON.stringify(await p.evaluate(()=>({
+  cascade:window.__lastK59Cascade,saveHandler:window.__qSaveHandler,
+  actualStand:D.quarters['1'].compartments[0]?.KlxrVD
+ }))).slice(0,3300));
  await p.waitForFunction(()=>document.querySelector('#modal')?.classList.contains('hidden'));
  const zoneFixed=await p.evaluate(()=>{
   const q=D.quarters['1'],r=q.compartments[0];
