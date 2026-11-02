@@ -146,8 +146,9 @@ if(m==='Макет10'&&window.SolinCardCalculations){
  const org=db()?.lesnichestvo?.find(x=>String(x.POS)===String(r.POS)&&String(x.LESN)===String(r.LESN));
  calculated=window.SolinCardCalculations.corrections(r,window.SOLIN_REFS?.tables,org).issues;
  for(const issue of calculated){
-  if(issue.field==='ZAP'&&Number.isInteger(issue.index))r._children?.Макет10?.[issue.index]&&(r._children.Макет10[issue.index].ZAP=Number(issue.expected));
-  else r[issue.field]=issue.field==='M3B'?String(issue.expected):Number(issue.expected);
+  // K59 is a diagnostic SELECT, never a correction of measured Maket10.ZAP.
+  if(!['M3B','STUR1','STUR'].includes(issue.field))continue;
+  r[issue.field]=issue.field==='M3B'?String(issue.expected):Number(issue.expected);
  }
 }
 try{saveAll(r);}catch(e){Object.assign(r,JSON.parse(before));notify('Не удалось сохранить: '+e.message);return;}
@@ -174,8 +175,13 @@ document.querySelector('#wfSaveBase').onclick=()=>{
  const failed=(window.solinCore?.validateRow('ВыделВ',fields,r)||[]).filter(msg=>{const field=msg.split(':')[0];return String(fields[field]??'')!==String(r[field]??'')});if(failed.length){notify(failed.join('; '));return;}const before=JSON.stringify(r);Object.assign(r,fields,{PLV:p});try{saveAll(r);}catch(e){Object.assign(r,JSON.parse(before));notify(e.message);return;}
  closeModal();if(typeof renderComp==='function')renderComp();if(typeof refresh==='function')refresh();notify('Поля выдела сохранены');
 };}
-function exitCard(){const r=record();if(!r)return;const m=rowsOf(r,'Макет10')[0];
-if(m?.ZAP!==null&&m?.ZAP!==undefined&&m?.ZAP!==''){r.STUR1=m.ZAP;try{saveAll(r);}catch(e){notify('Не сохранилось: '+e.message);return;}}
+function exitCard(){const r=record();if(!r)return;
+const stock=window.SolinCardCalculations?.standStock(r);
+if(stock?.status==='complete'&&(Number(r.STUR1)!==stock.expectedPerHa||Number(r.STUR)!==stock.expectedTotal)){
+ const old1=r.STUR1,old=r.STUR;
+ r.STUR1=stock.expectedPerHa;r.STUR=stock.expectedTotal;
+ try{saveAll(r);}catch(e){r.STUR1=old1;r.STUR=old;notify('Не сохранилось: '+e.message);return;}
+}
 if(typeof show==='function')show('quartersScreen');}
 function checkData(r,modal){if(!r)return;const msgs=[];
 const area=Number(r.PLV);if(!(area>0))msgs.push({status:'bad',message:'Площадь PLV не задана или не положительна'});
