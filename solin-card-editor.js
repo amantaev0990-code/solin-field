@@ -17,13 +17,7 @@ const extras=[11,12,13,14,15,16,17,19,20,21,23,25,27,28];
 // Repeated quarter rows may differ in хозяйственная секция and functional zone.
 function quarterForRecord(record){
  const q=D.quarters?.[String(record.KV)];
- if(!q)return null;
- const rows=q.quarterRows?.length?q.quarterRows:[q.meta||{}];
- const candidates=rows.filter(row=>['POS','LESN','KV','KGLF'].every(k=>
-   row[k]==null ? rows.length===1 : same(row[k],record[k])));
- const detailed=candidates.filter(row=>
-   same(row.Klxr,record.KlxrVD)&&same(row.Fzona,record.Fzona));
- return detailed.length===1?detailed[0]:candidates.length===1?candidates[0]:null;
+ return window.SolinAddressContext?.resolveQuarter(record,q)||null;
 }
 const numeric=new Set(['PLV','GodT','CkKr','VNUM','M2Pr','M3G','M3KP','M3KPC','M4ZO','M4ZL','M4SS','AKL','AGR','AGR1','STUR','STUR1','PRkol','PRH','PRA','PRK1','PRK2','PRK3','KOEF','LET','PH','PD2','KT','POL','SPS','ZAP','RAS','Koef16','Voz16','H16','Ur16','Sbor','VZ','SHR','PRT','SHT','KLD','PR','PL','PL15','PTR1','PTR2','PTR3','PTR4','ZPR','STUR1','KOL','AV','ZO','LIK','DEL','PLP','MTC','G15','GZ']);
 numeric.add('VD');
@@ -532,7 +526,7 @@ function showChecks(group=''){
  SolinControlUI.mount(host,{records:[r],database,draft:true,caption:'Квартал '+r.KV+' · выдел '+r.VD,group,onNavigate:issue=>{if(session===currentSession)focusControlIssue(issue);}});
 }
 function preview(print){const popup=window.open('','_blank');if(!popup)return toast('Разрешите открытие окна карточки');const paper=document.querySelector('.dt-board').cloneNode(true);paper.querySelectorAll('#ce-extra,#ce-action-panel,.ce-other').forEach(e=>e.remove());for(const el of paper.querySelectorAll('input,select')){const span=document.createElement('output');span.textContent=el.tagName==='SELECT'?el.selectedOptions[0]?.textContent||'':el.value;el.replaceWith(span);}paper.querySelectorAll('button').forEach(b=>b.disabled=true);paper.style.transform='none';const css=new URL('solin-card-editor.css?v=20261023-6',location.href).href;popup.document.write('<!doctype html><html lang="ru"><meta charset="utf-8"><title>Карточка таксации — КТ</title><link rel="stylesheet" href="'+h(css)+'"><style>body{margin:8px;background:#eee}.ce-print{display:block;position:static}.ce-print .dt-board{position:relative}.print-action{margin-bottom:8px}</style><button class="print-action" onclick="print()">Печать</button><div class="ce-modal ce-print">'+paper.outerHTML+'</div><p style="font:11px Arial">Предварительный просмотр карточки. Официальное таксационное описание формируется в настольной SOLI-N.</p></html>');popup.document.close();if(print)popup.addEventListener('load',()=>popup.print(),{once:true});}
-function newCard(e){const previous=session.draft,kv=previous.KV;if(!save(e))return;const q=D.quarters[kv],org=D.lesnichestvo?.[0]||{},r=Object.fromEntries((D.transfSchema['Выдел']||[]).map(f=>[f,null]));for(const f of numeric)if(f in r)r[f]=0;for(const f of ['CR','OZU','ErV','ErCt','M2PM1','M22','M23','PLG'])r[f]=0;Object.assign(r,{POS:previous.POS??org.POS,LESN:previous.LESN??org.LESN,KV:kv,KGLF:previous.KGLF,VD:Math.max(0,...q.compartments.filter(x=>same(x.POS,previous.POS)&&same(x.LESN,previous.LESN)&&same(x.KGLF,previous.KGLF)).map(x=>Number(x.VD)||0))+1,PLV:1,KU:null,Fzona:previous.Fzona,KlxrVD:previous.KlxrVD,_children:{},_local:true});open(r,{isNew:true});}
+function newCard(e){const previous=session.draft,kv=previous.KV;if(!save(e))return;const q=D.quarters[kv],org=D.lesnichestvo?.[0]||{},r=Object.fromEntries((D.transfSchema['Выдел']||[]).map(f=>[f,null]));for(const f of numeric)if(f in r)r[f]=0;for(const f of ['CR','OZU','ErV','ErCt','M2PM1','M22','M23','PLG'])r[f]=0;Object.assign(r,{POS:previous.POS??org.POS,LESN:previous.LESN??org.LESN,KV:kv,KGLF:previous.KGLF,VD:Math.max(0,...q.compartments.filter(x=>same(x.POS,previous.POS)&&same(x.LESN,previous.LESN)&&same(x.KGLF,previous.KGLF)).map(x=>Number(x.VD)||0))+1,PLV:1,KU:null,Fzona:previous.Fzona,KlxrVD:previous.KlxrVD,_children:{},_local:true});window.SolinAddressContext?.enrichStand(r,q,org);open(r,{isNew:true});}
 function updateBadges(form){const n=session.draft._children[form]?.length||0;document.querySelectorAll('[data-ce-badge="'+form+'"]').forEach(b=>b.textContent=n||'');}
 function validate(){
  const linkIssue=linkedIssues();if(linkIssue)throw linkIssue;
@@ -622,6 +616,10 @@ function open(record,options={}){if(!record)return;
  if(!quarter)return toast('Строка квартала не найдена или неоднозначна по адресу, секции и функциональной зоне. Изменения не выполнялись.');
  previousFocus=document.activeElement;previousOverflow=document.body.style.overflow;
  session={record,original:clone(record),draft:clone(record),quarterTarget:quarter,originalQuarter:clone(quarter),quarter:clone(quarter),dirty:false,changedMakets:new Set(),closeButton:document.querySelector('#modal .close').onclick};
+ // The actual quarter is the source of KlxrVD/Fzona. Restore only missing
+ // fields in the draft; conflicting explicit values are never rewritten.
+ const inherited=window.SolinAddressContext?.enrichStand(session.draft,q,D.lesnichestvo?.[0]);
+ if(inherited&&Object.keys(inherited.values).length)session.dirty=true;
  session.isNew=!!options.isNew;
  if(session.isNew&&session.draft.PLV==null)session.draft.PLV=1;
  session.draft._children??={};
