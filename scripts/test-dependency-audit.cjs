@@ -28,6 +28,35 @@ assert.equal(JSON.stringify([ok,bad]),before,'Scan must NEVER write workspace or
 const limited=ctx.window.SolinDependencyAudit.scan([ok],org,{...refs,STL:[]});
 assert(limited.warnings>0,'Incomplete source must be labelled unverified, not verified');
 assert.equal(limited.errors,0);
+// Missing reference tables are "not verified", NEVER fabricated invalid
+// codes, and an unrelated missing name table cannot disable a real
+// Maket10 -> Maket16 composition relationship.
+const absent=ctx.window.SolinDependencyAudit.scan([ok],org,{
+ ...refs,SDP_Tip:[],SLM:[],SSP:[],SBR:[],SOV:[]});
+assert.equal(absent.errors,0,'Missing lookup rows must not fabricate errors');
+assert(absent.results[0].warnings.some(x=>x.field==='M3Pr'),
+ 'Unavailable main-species dictionary must be explicitly marked');
+assert(absent.results[0].warnings.some(x=>x.field==='M2PM1'),
+ 'Unavailable measures table must be explicitly marked');
+const linked={...ok,_children:{...ok._children,Макет16:[{Por16:'Б'}]}};
+const stillLinked=ctx.window.SolinDependencyAudit.scan([linked],org,{
+ ...refs,SDP:[]});
+assert(stillLinked.results[0].errors.some(x=>x.field==='Por16'),
+ 'Maket16 must use actual Maket10 composition even if SDP labels unavailable');
+// Excel-safe, Russian-language, semicolon separated report including
+// literal BOM/CRLF and all issues (not only first 120 shown in UI).
+const injected={...report,results:[{
+ address:'=1+1',errors:[{form:'Макет12',field:'SV',value:'=2+2',
+   reason:'=HYPERLINK("https://example.test")',index:0}],warnings:[]
+}]};
+const csv=ctx.window.SolinDependencyAudit.csv(injected);
+assert(csv.startsWith('\uFEFF'),'CSV must have real UTF-8 BOM for Russian Excel');
+assert(csv.includes('\r\n'),'Excel CSV must use CRLF');
+assert(csv.includes('"\'=1+1"'),'Address must not execute Excel formulas');
+assert(csv.includes('"\'=2+2"'),'Code must not execute Excel formulas');
+assert(csv.includes('"\'=HYPERLINK(""https://example.test"")"'),
+ 'Description must escape quotes and never execute Excel formulas');
+assert.equal(JSON.stringify([ok,bad]),before,'CSV export must not mutate the forest');
 const workflow=fs.readFileSync('solin-workflow.js','utf8');
 for(const id of ['wfCardRelations','wfQuarterRelations','wfForestDependencyAudit'])
  assert(workflow.includes(id),'Missing scope entry point '+id);
