@@ -276,6 +276,8 @@ const MAKET_CHAIN={
  'Макет10':{IAR:['IAR','KU']},
  'Макет12':{SV:['KTP','SV'],SB:['SB'],VV:['VV','VB'],VB:['VV','VB']},
  'Макет16':{Por16:['Por16','Макет10']},
+ 'Макет17':{P17:['P17']},
+ 'Макет19':{ZP:['ZP']},
  'Макет23':Object.fromEntries(Array.from({length:8},(_,i)=>[
   'K'+(i+1),Array.from({length:i+1},(_,j)=>'K'+(j+1))
  ]))
