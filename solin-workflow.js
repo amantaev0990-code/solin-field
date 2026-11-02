@@ -188,7 +188,17 @@ if(m==='Макет10'&&(calculated.length||stockEdited)){
  if(link)link.onclick=()=>{
   closeModal();
   if(typeof show==='function')show('quartersScreen');
-  if(typeof openQuarter==='function')openQuarter(String(r.KV),r.KGLF);
+  const q=db()?.quarters?.[String(r.KV)];
+  const rows=q?.quarterRows?.length?q.quarterRows:[q?.meta||{}];
+  const index=rows.findIndex(row=>
+   String(row.POS??r.POS)===String(r.POS)&&String(row.LESN??r.LESN)===String(r.LESN)&&
+   String(row.KGLF??'')===String(r.KGLF??'')&&
+   (!r.Fzona||String(row.Fzona??'')===String(r.Fzona??''))&&
+   (!r.KlxrVD||String(row.Klxr??'')===String(r.KlxrVD??'')));
+  // Open the exact original quarter form, not a new secondary modal.
+  if(index>=0&&typeof window.solinEditQuarter==='function')
+   window.solinEditQuarter(String(r.KV),index);
+  else if(typeof openQuarter==='function')openQuarter(String(r.KV),r.KGLF);
  };
 }
 
