@@ -33,6 +33,10 @@ async function repairAddressCodes(forest){
   if(!q||typeof q!=='object')continue;
   const rows=q.quarterRows?.length?q.quarterRows:[q.meta||{}];
   for(const row of rows){
+   if(missing(row.Klxr)){
+    const unique=ctx.uniqueQuarterZone(row);
+    if(unique!==null){row.Klxr=unique;count++;}
+   }
    for(const [k,value] of Object.entries({POS:org.POS,LESN:org.LESN,KV:Number(kv)})){
     if(missing(row[k])&&!missing(value)){row[k]=value;count++;}
    }
