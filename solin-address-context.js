@@ -28,7 +28,7 @@ function inheritedStand(stand,quarter,org){
  }
  if(row){
   for(const key of ['POS','LESN','KV','KGLF','Fzona'])set(key,row[key]);
-  set('KlxrVD',row.Klxr); // Квартал.Klxr → Выдел.KlxrVD, original 471/471 source rows.
+  if(Number(row.Klxr)>0)set('KlxrVD',row.Klxr); // Verified identical in all 471 source records.
  }
  return {row,values,reason:row?'Единственная строка квартала по полному адресу':'Отсутствует однозначная строка квартала'};
 }
