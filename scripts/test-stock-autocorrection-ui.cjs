@@ -249,6 +249,31 @@ async function reopen(p,info){
   'After user chooses a supported quarter zone, original K59 must auto-correct ZAP');
  assert.match(await p.locator('#modalTitle').innerText(),/К59: нормативный запас автоматически исправлен/);
  console.log('PASS screenshot 723/4/1/1 end-to-end: LXZ8 unsupported -> quarter Klxr4 -> stand KlxrVD4 -> normative ZAP correction');
+ // General dependency regression: individual Maket dialogs use the SAME
+ // source-filtered engine, not just Maket10 IAR / quarter Klxr.
+ await p.evaluate(()=>{
+  closeModal();current._children.Макет16=[{Por16:'В'}];
+  solinWorkflow.editMaket('Макет16',0);
+ });
+ assert.equal(await p.locator('#wf_Por16').evaluate(el=>el.tagName),'SELECT');
+ const species16=await p.locator('#wf_Por16 option').evaluateAll(xs=>xs.filter(x=>x.value&&!x.disabled).map(x=>x.value));
+ assert.deepEqual(species16,['В'],'Maket16 must offer only species present in this stand Maket10');
+ console.log('PASS Maket16.Por16 choices follow this stand Maket10 species');
+ await p.evaluate(()=>{
+  closeModal();current._children.Макет12=[{KTP:84,SV:null}];
+  solinWorkflow.editMaket('Макет12',0);
+ });
+ const damage=await p.evaluate(()=>{
+  const expected=SolinDependentRules.options('Макет12','SV',{KTP:84},current,D.lesnichestvo[0]);
+  const el=document.querySelector('#wf_SV');
+  return {status:expected?.status,expected:expected?.items?.map(x=>x.value),
+   tag:el?.tagName,actual:[...(el?.options||[])].filter(x=>x.value&&!x.disabled).map(x=>x.value)};
+ });
+ if(damage.status==='complete'){
+  assert.equal(damage.tag,'SELECT');
+  assert.deepEqual(damage.actual,damage.expected,'Maket12 degrees depend on KTP=84 / SSP.K84');
+ }
+ console.log('PASS Maket12.SV source-filtered by damage type KTP');
  await p.evaluate(async()=>{closeModal();await SolinWorkspace.persist()});
  await boot(p);
  const persisted=await p.evaluate(async()=>{
