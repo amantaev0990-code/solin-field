@@ -32,6 +32,16 @@ function inheritedStand(stand,quarter,org){
  }
  return {row,values,reason:row?'Единственная строка квартала по полному адресу':'Отсутствует однозначная строка квартала'};
 }
+// Access RowSource for Квартал.Klxr uses Slxr.Kpz. Auto-fill only when
+// that original reference returns a single nonzero zoning code.
+function uniqueQuarterZone(row,refs=window.SOLIN_REFS?.tables){
+ if(!filled(row?.Kpz)||!Array.isArray(refs?.Slxr))
+  return null;
+ const options=[...new Set(refs.Slxr.filter(r=>
+   same(r.Kpz,row.Kpz)&&filled(r.Klxz)&&Number(r.Klxz)>0)
+    .map(r=>String(r.Klxz).trim()))];
+ return options.length===1?options[0]:null;
+}
 function enrichStand(stand,quarter,org){
  const ctx=inheritedStand(stand,quarter,org);
  for(const [key,value] of Object.entries(ctx.values))stand[key]=value;
@@ -52,5 +62,5 @@ function originalKTO(pos,lesn){
   same(r[0],pos)&&same(r[1],lesn)&&Number.isFinite(Number(r[4]))&&Number(r[4])>0);
  return rows.length===1?Number(rows[0][4]):null;
 }
-window.SolinAddressContext={quarterRows,resolveQuarter,inheritedStand,enrichStand,enrichMakets,originalKTO};
+window.SolinAddressContext={quarterRows,resolveQuarter,inheritedStand,enrichStand,enrichMakets,originalKTO,uniqueQuarterZone};
 })();
