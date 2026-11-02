@@ -21,19 +21,28 @@ const p16=engine.options('Макет16','Por16',{},trees,{KTO:350000000},tables)
 assert.equal(p16.status,'complete');
 assert.deepEqual(Array.from(p16.items,x=>x.value),['В','Б']);
 assert.equal(engine.currentIsAllowed('С',p16),false);
-const category=engine.allowedLayers({KU:2},tables);
+// SKU/SIAR/PIAP may be unavailable in compact refs-audit; test its exact
+// Access group join with a transparent independent fixture.
+const layerRefs={...tables,
+ SKU:[{KU:2,NKU:'Лесные культуры',P10:5,GrMak:3,KLF:11}],
+ SIAR:[{Ia:5,KIAR:1,NIAR:'Ярус 1'},{Ia:5,KIAR:8,NIAR:'Ярус 8'},{Ia:1,KIAR:4,NIAR:'Другая группа'}],
+ PIAP:[{KIAR:1},{KIAR:8},{KIAR:4}]};
+const category=engine.allowedLayers({KU:2},layerRefs);
 assert.equal(category.status,'complete');
-assert.equal(category.items.length>0,true);
-const p12=engine.options('Макет12','SV',{KTP:84},trees,{KTO:350000000},tables);
-assert(p12.items.every(x=>x.value==='0'||tables.SSP.some(r=>String(r.KSP)===x.value&&Number(r.K84)===1)),
+assert.deepEqual(Array.from(category.items,x=>x.value),['1','8']);
+const supplemental={...tables,
+ SSP:tables.SSP?.length?tables.SSP:[{KSP:0,NSP:'Нет',K84:0},{KSP:1,NSP:'Степень 1',K84:1},{KSP:2,NSP:'Степень 2',K84:0}],
+ SLM:tables.SLM?.length?tables.SLM:[{KM:0,NMR:'Нет',PM2R:0},{KM:5,NMR:'Мероприятие 5',PM2R:1},{KM:7,NMR:'Мероприятие 7',PM2R:2}]};
+const p12=engine.options('Макет12','SV',{KTP:84},trees,{KTO:350000000},supplemental);
+assert(p12.items.every(x=>x.value==='0'||supplemental.SSP.some(r=>String(r.KSP)===x.value&&Number(r.K84)===1)),
  'Access KTP=84 must restrict Maket12 SV degrees');
-const plain=engine.options('Макет12','SV',{KTP:1},trees,{KTO:350000000},tables);
-assert(plain.items.every(x=>x.value==='0'||tables.SSP.some(r=>String(r.KSP)===x.value&&Number(r.K84)===0)));
-const changed=engine.options('ВыделВ','M2PM1',{M2PM1:null},{},{KTO:350000000},tables);
-const advanced=engine.options('ВыделВ','M23',{M2PM1:5,M22:7},{},{KTO:350000000},tables);
+const plain=engine.options('Макет12','SV',{KTP:1},trees,{KTO:350000000},supplemental);
+assert(plain.items.every(x=>x.value==='0'||supplemental.SSP.some(r=>String(r.KSP)===x.value&&Number(r.K84)===0)));
+const changed=engine.options('ВыделВ','M2PM1',{M2PM1:null},{},{KTO:350000000},supplemental);
+const advanced=engine.options('ВыделВ','M23',{M2PM1:5,M22:7},{},{KTO:350000000},supplemental);
 assert(changed&&advanced);
 assert(!advanced.items.some(x=>x.value==='5'||x.value==='7'),'Later interventions cannot repeat former codes');
-const main=engine.options('ВыделВ','M3Pr',{},null,{KTO:350000000},tables);
+const main=engine.options('ВыделВ','M3Pr',{},null,{KTO:350000000},{...supplemental,SDP_Tip:supplemental.SDP_Tip?.length?supplemental.SDP_Tip:[{KPC:'В',NDP:'Вяз'},{KPC:'КУСТ',NDP:'Кустарники'}]});
 assert.equal(main.items.some(x=>x.value==='КУСТ'),false);
 for(const [name,needle] of [
  ['solin-workflow.js','rules.applySelect(el,result'],
