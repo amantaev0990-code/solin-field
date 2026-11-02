@@ -19,6 +19,15 @@ fs.copyFileSync(path.join(root,'native/android/SolinMdbPlugin.java'),plugin);
 // Install a native Android/JUnit test in the generated Capacitor project.
 // Tests exercise the same private Jackcess writer invoked by the plugin,
 // using the verified blank transfer template shipped in APK assets.
+// Capacitor CLI generates a sample test with hard-coded
+// "com.getcapacitor.app". It is unrelated to SOLI-N and fails under our
+// real applicationId kz.solin.field; remove only this known template test.
+const placeholderTest=path.join(app,'src/androidTest/java/com/getcapacitor/myapp/ExampleInstrumentedTest.java');
+if(fs.existsSync(placeholderTest)){
+ const contents=fs.readFileSync(placeholderTest,'utf8');
+ if(contents.includes('com.getcapacitor.app')&&contents.includes('ExampleInstrumentedTest'))
+  fs.rmSync(placeholderTest);
+}
 const testSource=path.join(root,'native/android/SolinMdbInstrumentedTest.java');
 const testDest=path.join(app,'src/androidTest/java/kz/solin/field/SolinMdbInstrumentedTest.java');
 if(fs.existsSync(testSource)){
