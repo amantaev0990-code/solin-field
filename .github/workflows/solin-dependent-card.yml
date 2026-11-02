@@ -37,7 +37,7 @@ jobs:
           node --check solin-card-calculations.js
           node --check solin-workflow.js
           node --check scripts/test-stock-autocorrection-ui.cjs
-      - name: Inspect physical Szap keys for K59
+      - name: Inspect original Szap and Slxr zoning tables for K59
         run: node scripts/inspect-k59-key.cjs
       - name: Regression — forest type, species, zone, region and Access combo rules
         run: |
