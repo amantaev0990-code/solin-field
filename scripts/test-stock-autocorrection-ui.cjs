@@ -128,7 +128,7 @@ async function reopen(p,info){
  assert.match(await p.locator('#modalBody').innerText(),/не проверен по нормативу К59/i);
  assert.match(await p.locator('#modalBody').innerText(),/арифметический пересчёт, а не исправление запаса/i);
  assert.doesNotMatch(await p.locator('#modalBody').innerText(),/Обнаружены неверные исходные значения/i);
- console.log('PASS screenshot's alternate Maket10 editor: no false original correction');
+ console.log('PASS alternate Maket10 editor: no false original correction');
  await desktop.close();
  const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
  const m=await mobile.newPage();m.on('pageerror',e=>errors.push(e.message));
