@@ -27,8 +27,9 @@ function open(records,opts={}){
   '<p data-scan-status role="status">Подготовка проверки…</p></div>');
  const host=document.getElementById('solin-dependency-scan'),status=host?.querySelector('[data-scan-status]');
  if(!host)return;
- const batchSize=40,details=[],references=window.SOLIN_REFS?.tables,forests=window.D?.lesnichestvo||[];
- const orgFor=r=>forests.find(o=>String(o.POS)===String(r.POS)&&String(o.LESN)===String(r.LESN))||forests[0]||{};
+ const database=typeof D!=='undefined'?D:window.D;
+ const batchSize=40,details=[],references=window.SOLIN_REFS?.tables,forests=database?.lesnichestvo||[];
+ const orgFor=r=>forests.find(o=>String(o.POS)===String(r.POS)&&String(o.LESN)===String(r.LESN))||{};
  let cursor=0,errors=0,warnings=0,affected=0;
  const step=()=>{
   if(!host.isConnected)return;
