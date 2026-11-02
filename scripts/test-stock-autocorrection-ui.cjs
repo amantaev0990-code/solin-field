@@ -222,6 +222,11 @@ async function reopen(p,info){
  const qZoneControl=p.locator('#modalBody [data-qfield="Klxr"]');
  if(await qZoneControl.evaluate(el=>el.tagName)==='SELECT')await qZoneControl.selectOption('4');
  else await qZoneControl.fill('4');
+ console.log('K59_QUARTER_PRE_SAVE',JSON.stringify(await p.evaluate(()=>{
+  const q=D.quarters['1'];
+  return {quarter:q.meta,rows:q.quarterRows,stand:q.compartments[0],
+   input:Object.fromEntries([...document.querySelectorAll('#modalBody [data-qfield]')].filter(el=>['KGLF','Klxr','Kpz','Fzona'].includes(el.dataset.qfield)).map(el=>[el.dataset.qfield,el.value]))};
+ })).slice(0,2500));
  await p.locator('#saveQuarter').click();
  await p.waitForFunction(()=>document.querySelector('#modal')?.classList.contains('hidden'));
  const zoneFixed=await p.evaluate(()=>{
