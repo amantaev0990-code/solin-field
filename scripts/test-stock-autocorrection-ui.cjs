@@ -29,7 +29,9 @@ async function fixture(p){
   if(!r)throw Error('Single-row stand not found for browser fixture');
   const org=D.lesnichestvo.find(x=>String(x.POS)===String(r.POS)&&String(x.LESN)===String(r.LESN));
   if(!org)throw Error('KTO owner record not found');
-  org.KTO=150000000;
+  // Reproduce forests created by the previous three-select flow: missing KTO.
+  delete org.KTO;
+  if(!window.SOLIN_FOREST_CATALOG?.rows?.some(x=>x[0]===213&&x[1]===2&&x[4]===150000000))throw Error('Original owner catalogue is unavailable');
   Object.assign(r,{KU:2,PLV:2,M3Pr:'В',M3B:'3',KlxrVD:8,GodT1:2015,STUR1:99,STUR:198});
   r._children.Макет10=[{...r._children.Макет10[0],POS:r.POS,LESN:r.LESN,KV:r.KV,KGLF:r.KGLF,VD:r.VD,
    IAR:1,POR:'В',KOEF:10,PH:6,POL:0.6,LET:5,PROI:7,ZAP:99}];
@@ -37,7 +39,10 @@ async function fixture(p){
   const real=refs.Szap?.find(x=>Number(x.Obl)===150000000&&x.p1==='В'&&Number(x.LXZ)===8&&x.KUL==='.');
   if(!real||Number(real.v6)!==59)throw Error('Expected original Solim.mdb Szap v6=59 not found');
   const estimate=SolinCardCalculations.stockPerHectare(r,refs,org);
-  if(estimate.status!=='complete'||estimate.expected!==35)throw Error('K59 test fixture invalid: '+JSON.stringify(estimate));
+  if(estimate.status!=='complete'||estimate.expected!==35)throw Error('K59 did not recover real forest KTO: '+JSON.stringify(estimate));
+  const bad={...r,KlxrVD:null};
+  const missing=SolinCardCalculations.stockPerHectare(bad,refs,org);
+  if(missing.status!=='waiting'||!missing.reason.includes('KlxrVD')||missing.reason.includes('KTO ('))throw Error('Missing input diagnostics are not specific: '+JSON.stringify(missing));
   current=r;renderComp();show('card');
   return {forestId:forest.id,address:{POS:r.POS,LESN:r.LESN,KV:r.KV,KGLF:r.KGLF,VD:r.VD},
    norms:{height7:SolinCardCalculations.k59Round(Number(real.v7)*0.6),
@@ -131,6 +136,23 @@ async function reopen(p,info){
  assert.match(await p.locator('#modalBody').innerText(),/арифметический пересчёт, а не исправление запаса/i);
  assert.doesNotMatch(await p.locator('#modalBody').innerText(),/Обнаружены неверные исходные значения/i);
  console.log('PASS alternate Maket10 editor: no false original correction');
+ // Test the actual 3-select forest creation path and recovery of a saved
+ // pre-fix forest which had no KTO. Never touch the user's own device.
+ const repair=await p.evaluate(async()=>{
+  const selected=window.SOLIN_FOREST_CATALOG.rows.find(x=>x[0]===213&&x[1]===1);
+  if(!selected||selected[4]!==150000000)throw Error('Missing original 213/1 registry KTO');
+  const forest=await SolinWorkspace.create({regionCode:200,ownerCode:213,districtCode:1});
+  if(D.lesnichestvo[0].KTO!==selected[4])throw Error('New forest did not carry catalog KTO');
+  delete D.lesnichestvo[0].KTO;
+  await SolinWorkspace.persist();
+  await SolinWorkspace.activate(forest.id);
+  const code=D.lesnichestvo[0].KTO;
+  const saved=(await SolinWorkspace.list()).find(x=>x.id===forest.id)?.org?.KTO;
+  if(code!==selected[4]||saved!==selected[4])throw Error('Old forest KTO repair failed');
+  return {code,saved};
+ });
+ assert.equal(repair.code,150000000);
+ console.log('PASS new 3-select forest KTO and existing saved forest KTO repair');
  await desktop.close();
  const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
  const m=await mobile.newPage();m.on('pageerror',e=>errors.push(e.message));
