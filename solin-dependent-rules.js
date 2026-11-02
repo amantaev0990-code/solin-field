@@ -258,6 +258,13 @@ function validateTransition(before,after,org,refs=ref(),opts={}){
  const beforeChildren=before?._children||{},children=after._children||{};
  const maket10Changed=JSON.stringify(beforeChildren.Макет10||[])!==
    JSON.stringify(children.Макет10||[]);
+ // Stock ZAP, height and density changes do not change the pool of
+ // available Por16 species. Only the actual composition should retrigger
+ // a previously imported Maket16 species value.
+ const speciesSignature=rows=>[...new Set((rows||[]).map(r=>code(r.POR)).filter(Boolean))]
+   .sort().join('|');
+ const maket10SpeciesChanged=speciesSignature(beforeChildren.Макет10)!==
+   speciesSignature(children.Макет10);
  const kuChanged=baseDirty(['KU']);
  for(const [form,fields] of Object.entries(MAKET_CHAIN)){
   const rows=children[form]||[],oldRows=beforeChildren[form]||[];
@@ -265,7 +272,7 @@ function validateTransition(before,after,org,refs=ref(),opts={}){
    for(const [field,deps] of Object.entries(fields)){
     const row=rows[i],prior=oldRows[i];
     const upstream=form==='Макет10'&&kuChanged||
-      form==='Макет16'&&maket10Changed;
+      form==='Макет16'&&maket10SpeciesChanged;
     inspect(form,field,row,i,upstream||changedRow(prior,row,deps));
    }
   }
