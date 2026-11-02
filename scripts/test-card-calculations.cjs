@@ -74,7 +74,8 @@ assert.equal(calc.standStock(diff).status,'waiting','A child from a different fo
 const editor=fs.readFileSync('solin-card-editor.js','utf8');
 assert.match(editor,/function recalculateEditedField\(el\)/);
 assert.match(editor,/recalculateEditedField\(e\.target\)/);
-assert.match(editor,/Введено впервые/);
+assert.match(editor,/До пересчёта/);
+assert.match(editor,/К59 — только нормативная оценка/);
 assert.match(editor,/Пересчитано · не сохранено/);
 assert.match(editor,/session\.calcNotices=changed/,'Notice must reflect latest correction');
 assert.match(editor,/if\(trigger\)recalculateEditedField\(trigger\)/,'Save must recalculate draft');
