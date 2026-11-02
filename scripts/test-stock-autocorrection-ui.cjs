@@ -203,6 +203,26 @@ async function reopen(p,info){
  assert.equal(forestCodes.KTO,350000000);
  assert.equal(Number(forestCodes.zone),4);
  console.log('PASS real 723/4/1/1 UI create: KTO, quarter year, KlxrVD, children, old-record repair and ambiguity');
+ // New Quarter must expose Fzona and Raion as original quarter fields, and
+ // SFZ candidates must follow KGLF instead of showing every functional zone.
+ await p.evaluate(()=>openQuarterForm());
+ const newQuarterContext=await p.evaluate(()=>{
+  const cat=document.querySelector('#newKGLF');
+  const valid54=[...cat.options].some(o=>o.value==='54'&&!o.disabled);
+  if(valid54){cat.value='54';cat.dispatchEvent(new Event('change',{bubbles:true}));}
+  return {hasFzona:!!document.querySelector('#newFzona'),
+   hasRaion:!!document.querySelector('#newRaion'),
+   options:[...document.querySelector('#solin-new-fzona-options').options].map(o=>o.value),
+   value:document.querySelector('#newFzona').value,
+   districtHint:document.querySelector('#newRaionHint').textContent,valid54};
+ });
+ assert(newQuarterContext.hasFzona&&newQuarterContext.hasRaion,
+  'Original quarter data must be editable at quarter creation too');
+ assert.equal(newQuarterContext.value,'','Partial SFZ context must not force a zone');
+ if(newQuarterContext.valid54)assert.deepEqual(newQuarterContext.options,['1']);
+ assert.match(newQuarterContext.districtHint,/Кл_Рай/);
+ await p.evaluate(()=>closeModal());
+ console.log('PASS New Quarter Fzona/Raion fields and KGLF-filtered SFZ suggestions with no guessed values');
  // The preceding unavailable-source case intentionally cleared Szap in memory.
  // Reload the actual reference data before auditing the real Karaganda table.
  await boot(p);
@@ -294,6 +314,24 @@ async function reopen(p,info){
   assert.deepEqual(damage.actual,damage.expected,'Maket12 degrees depend on KTP=84 / SSP.K84');
  }
  console.log('PASS Maket12.SV source-filtered by damage type KTP');
+ // The formerly unfiltered Makets 17 and 19 must now use the same partial
+ // Access RowSource. Their truncated >70… predicate cannot be called valid.
+ for(const [m,field] of [['Макет17','P17'],['Макет19','ZP']]){
+  const check=await p.evaluate(([m,field])=>{
+   closeModal();current._children[m]=[{[field]:'В'}];
+   solinWorkflow.editMaket(m,0);
+   const control=document.getElementById('wf_'+field);
+   const result=SolinDependentRules.options(m,field,{[field]:'В'},current,D.lesnichestvo?.[0]);
+   return {control:control?.tagName,status:result?.status,
+    actual:control?[...control.options].filter(x=>x.value&&!x.disabled).map(x=>x.value):[],
+    expected:(result?.items||[]).map(x=>x.value),reason:control?.title};
+  },[m,field]);
+  assert.equal(check.control,'SELECT',m+'.'+field+' must be filtered');
+  assert.equal(check.status,'partial','Truncated original SQL must be shown as incomplete');
+  assert.deepEqual(check.actual,check.expected,'Only source-dependent options may appear for '+m);
+  assert.match(check.reason,/конец порога не сохранился/);
+ }
+ console.log('PASS Maket17.P17 and Maket19.ZP use source-backed partial selector, no false validation');
  await p.evaluate(async()=>{closeModal();await SolinWorkspace.persist()});
  await boot(p);
  const persisted=await p.evaluate(async()=>{

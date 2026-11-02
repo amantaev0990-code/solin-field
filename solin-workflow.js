@@ -154,7 +154,8 @@ const dependent=window.SolinDependentRules,referenceTables=window.SOLIN_REFS?.ta
    const list=dependent.options(m,field,candidate,r,db()?.lesnichestvo?.[0],referenceTables);
    const good=dependent.currentIsAllowed(candidate[field],list);
    const touched=index>=rowsOf(r,m).length||String(candidate[field]??'')!==String(existing[field]??'');
-   if(touched&&good===false&&String(candidate[field]??'').trim()!=='0'){
+   if(touched&&good===false&&['complete','empty'].includes(list?.status)&&
+      String(candidate[field]??'').trim()!=='0'){
     notify('Недопустимое сочетание в поле «'+(window.SolinHuman?.label(m,field)||field)+'». Выберите значение из справочника для этой карточки.');
     return;
    }

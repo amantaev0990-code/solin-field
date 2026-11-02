@@ -1,0 +1,86 @@
+name: SOLI-N Android MDB — actual device-emulator roundtrip
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'native/android/SolinMdbPlugin.java'
+      - 'native/android/SolinMdbInstrumentedTest.java'
+      - 'scripts/install-android-mdb.mjs'
+      - '.github/workflows/solin-android-native-tests.yml'
+permissions:
+  contents: read
+jobs:
+  mdb-on-android-emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Prepare and verify APK assets
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+          node scripts/test-android-assets.cjs
+          npx cap add android
+          node scripts/install-android-mdb.mjs
+          npx cap sync android
+      - name: Compile native app + instrumented test APK before emulator starts
+        run: cd android && ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Preload Android unified test platform dependencies while network is available
+        run: |
+          cd android
+          ./gradlew --no-daemon :app:dependencies --configuration _internal-unified-test-platform-android-test-plugin-host-additional-test-output
+      - name: Download all Android UTP binary dependencies before emulator starts
+        run: |
+          cd android
+          cat > prefetch-instrumentation.gradle <<'GROOVY'
+          gradle.projectsEvaluated {
+            def app = gradle.rootProject.project(':app')
+            app.tasks.register('prefetchInstrumentation') {
+              doLast {
+                def configs = app.configurations.findAll { c ->
+                  c.canBeResolved && c.name.startsWith('_internal-unified-test-platform')
+                }
+                if (configs.isEmpty()) throw new GradleException('Android instrumentation configurations are missing')
+                configs.each { c ->
+                  println('Downloading '+c.name+' with '+c.resolve().size()+' runtime artifacts')
+                }
+              }
+            }
+          }
+          GROOVY
+          ./gradlew --no-daemon --init-script prefetch-instrumentation.gradle :app:prefetchInstrumentation
+      - name: Grant /dev/kvm to Linux runner
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Android 35 on-emulator MDB write / reopen and rejection tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_2
+          disable-animations: true
+          emulator-boot-timeout: 600
+          script: cd android && ./gradlew --no-daemon :app:connectedDebugAndroidTest
+      - name: Preserve Android instrumentation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: solin-native-mdb-test-reports
+          path: |
+            android/app/build/reports/androidTests/
+            android/app/build/outputs/androidTest-results/
+          if-no-files-found: ignore
+          retention-days: 7

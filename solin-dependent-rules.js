@@ -110,6 +110,28 @@ function options(form,field,row,card,org,refs=ref()){
    .map(r=>({value:code(r.KOD),label:String(r.T1??'')}));
   return {status:'complete',reason:'Оригинальная строка выбора: Sples.PR > 0',items};
  }
+ // Original Квартал.Fzona RowSource starts with SFZ.KLF joined to
+ // Forms!Квартал!KGLF. The exported WHERE is truncated, so these are
+ // *source-associated candidates*, not a complete claim of Access parity.
+ if(form==='Квартал'&&field==='Fzona'){
+  if(!filled(row?.KGLF))return {status:'waiting',reason:'Сначала выберите КГЛФ квартала',items:[]};
+  if(!refs?.SFZ?.length)return {status:'unavailable',reason:'Исходный справочник SFZ не загружен',items:[]};
+  const matches=refs.SFZ.filter(r=>num(r.KLF)>0&&same(r.KLF,row.KGLF)&&num(r.KFZ)>0);
+  if(!matches.length)return {status:'unavailable',
+   reason:'Для КГЛФ '+code(row.KGLF)+' справочник SFZ не содержит однозначной связки KLF. Условие Access WHERE не восстановлено; не подставляем функциональную зону.',
+   items:[]};
+  const unique=new Map();
+  for(const entry of matches)if(!unique.has(code(entry.KFZ)))
+   unique.set(code(entry.KFZ),{value:code(entry.KFZ),label:String(entry.NFZK||entry.NFZ||'')});
+  return {status:'partial',reason:'Подтверждена связь SFZ.KLF='+code(row.KGLF)+
+   ' с KFZ. Оставшаяся часть Access WHERE не восстановлена — варианты требуют сверки.',
+   items:[...unique.values()]};
+ }
+ // Кл_Рай отсутствует в сохранённом нормативном пакете. Не показываем
+ // произвольные районы другой области и не выдаём чужие коды за верные.
+ if(form==='Квартал'&&field==='Raion'){
+  return {status:'unavailable',reason:'Исходная таблица «Кл_Рай» и полный фильтр ТЕОб не сохранены. Район нельзя подтвердить без первоисточника.',items:[]};
+ }
  if(form==='Квартал'&&field==='Klxr'){
   if(!filled(row?.Kpz))return {status:'waiting',reason:'Сначала укажите природную зону Kpz квартала',items:[]};
   if(!Array.isArray(refs.Slxr)||!refs.Slxr.length||!Array.isArray(refs.Szap)||!refs.Szap.length)
@@ -128,6 +150,22 @@ function options(form,field,row,card,org,refs=ref()){
   return {status:items.length?'complete':'empty',
    reason:'Slxr.Kpz='+code(row.Kpz)+' ∩ Szap.Obl='+obl+' (LXZ): '+(items.map(x=>x.value).join(', ')||'совпадений нет'),
    items,dependencies:['Kpz','KTO'],region:obl};
+ }
+ // In Access, Макет17.P17 and Макет19.ZP share SDP RowSources:
+ // "DKP2 = 0 Or DKP2 > 70..." (truncated archive). Only the
+ // indisputable broad prerequisite >70 is used. This is NOT the final
+ // threshold (which may have more digits) and must never be accepted
+ // automatically as proof that a code is allowed in the original form.
+ if((form==='Макет17'&&field==='P17')||(form==='Макет19'&&field==='ZP')){
+  if(!refs?.SDP?.length)return {status:'unavailable',
+   reason:'Нет исходного справочника SDP для породы макета',items:[]};
+  const subset=refs.SDP.filter(r=>code(r.KPC)!==''&&
+   (num(r.DKP2)===0||num(r.DKP2)>70));
+  const byCode=new Map();
+  for(const r of subset)if(!byCode.has(code(r.KPC)))
+   byCode.set(code(r.KPC),{value:code(r.KPC),label:String(r.NDP||'')});
+  return {status:'partial',items:[...byCode.values()],
+   reason:'Оригинальный SQL: SDP.DKP2 = 0 OR SDP.DKP2 > 70…; конец порога не сохранился. Список предварительный, соответствие настольному SOLI-N не подтверждено.'};
  }
  if(form==='Макет16'&&field==='Por16'){
   // Original RowSource reads Maket10Выд.POR for this same stand.
@@ -238,6 +276,8 @@ const MAKET_CHAIN={
  'Макет10':{IAR:['IAR','KU']},
  'Макет12':{SV:['KTP','SV'],SB:['SB'],VV:['VV','VB'],VB:['VV','VB']},
  'Макет16':{Por16:['Por16','Макет10']},
+ 'Макет17':{P17:['P17']},
+ 'Макет19':{ZP:['ZP']},
  'Макет23':Object.fromEntries(Array.from({length:8},(_,i)=>[
   'K'+(i+1),Array.from({length:i+1},(_,j)=>'K'+(j+1))
  ]))
@@ -330,7 +370,7 @@ function applySelect(select,result,opts={}){
  }
  const has=old&&seen.has(old);
  if(old&&!has){
-  const saved=new Option('Сохранённый, сейчас недопустимый: '+old,old);
+  const saved=new Option((status==='partial'||status==='ambiguous'? 'Сохранённый, не подтверждённый: ':'Сохранённый, сейчас недопустимый: ')+old,old);
   saved.disabled=true;options.push(saved);
  }
  const signature=status+'|'+options.map(o=>o.value+'='+o.textContent).join(';');
@@ -341,7 +381,7 @@ function applySelect(select,result,opts={}){
  input.value=old;
  input.disabled=!ready;
  input.dataset.dependentStatus=status;
- input.dataset.dependentAllowed=old&&!has?'false':'true';
+ input.dataset.dependentAllowed=old&&!has?(status==='partial'||status==='ambiguous'?'unknown':'false'):'true';
  input.title=result.reason||'';
  return input;
 }
