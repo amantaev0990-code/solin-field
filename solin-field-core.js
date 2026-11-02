@@ -28,12 +28,47 @@ async function loadRefs(){try{const res=await fetch('./refs-audit.json.gz');if(!
 function auditedRefs(q=''){if(!window.SOLIN_REFS)return refs(q);const box=document.querySelector('#friendlyRefs');box.innerHTML='<p>153 исходные таблицы S* и вычисленный SDP_Tip · 24 946 строк. Динамические ограничения списков Access здесь не исполняются.</p>';for(const [name,table]of Object.entries(SOLIN_REFS.tables).sort(([a],[b])=>a.localeCompare(b))){const rows=q?table.filter(r=>(name+' '+Object.values(r).join(' ')).toLowerCase().includes(q.toLowerCase())):table;if(!rows.length)continue;const details=document.createElement('details');details.className='refCard';details.innerHTML='<summary>'+h(refNames[name]||name)+' · '+rows.length+'</summary>';let count=0,host;function more(){const slice=rows.slice(count,count+100);count+=slice.length;host.insertAdjacentHTML('beforeend',slice.map(r=>'<div class="wf-check">'+Object.entries(r).filter(([,v])=>v!=null&&v!=='').map(([k,v])=>'<span>'+h(k)+': <b>'+h(v)+'</b></span>').join(' · ')+'</div>').join(''));details.querySelector('.refMore')?.remove();if(count<rows.length){const b=document.createElement('button');b.className='refMore';b.textContent='Ещё 100';b.onclick=more;details.append(b);}}details.ontoggle=()=>{if(details.open&&!host){host=document.createElement('div');details.append(host);more();}};box.append(details);}}
 function formulas(){openModal('611 исходных выражений Access','<p>Сохранённые определения из аудита. Выполнение в контексте Access ещё не воспроизведено.</p><input id="formulaQuery" placeholder="Форма или выражение"><div id="formulaRows"></div>');const draw=q=>{document.querySelector('#formulaRows').innerHTML=SOLIN_AUDIT.formulas.filter(x=>(x.form+' '+x.name+' '+x.expression).toLowerCase().includes(q.toLowerCase())).map(x=>'<div class="wf-check"><b>'+h(x.form+' / '+x.name)+'</b><pre style="white-space:pre-wrap">'+h(x.expression)+'</pre></div>').join('')};document.querySelector('#formulaQuery').oninput=e=>draw(e.target.value);draw('ВыделВ');}
 function editQuarter(k,index=0){const q=D.quarters[k],rows=q.quarterRows?.length?q.quarterRows:[q.meta||{}];let selected=rows[index];const fields=D.transfSchema['Квартал'].filter(f=>!['POS','LESN','KV','KGLF'].includes(f));openModal('Корректировка квартала '+k,'<p>Адрес POS / LESN / KV / KGLF сохраняется. Выберите запись категории ГЛФ.</p><select id="quarterCategory">'+rows.map((r,i)=>'<option value="'+i+'" '+(i===index?'selected':'')+'>KGLF '+h(r.KGLF)+'</option>').join('')+'</select>'+fields.map(f=>'<label class="wf-field">'+h(D.fieldLabels[f]||f)+'<input data-qfield="'+f+'" value="'+h(selected[f]??'')+'"></label>').join('')+'<button id="saveQuarter">Сохранить</button>');// Never recreate the modal from an iOS native select change event.
+// Give a source-backed zoning assistant instead of allowing an unsupported
+// Szap LXZ to go unnoticed. This never rewrites the user's explicit choice.
+ const zoneInput=document.querySelector('#modalBody [data-qfield="Klxr"]');
+ const kpzInput=document.querySelector('#modalBody [data-qfield="Kpz"]');
+ const zoneHint=document.createElement('p');
+ zoneHint.className='wf-form-note';
+ zoneHint.setAttribute('aria-live','polite');
+ if(zoneInput){
+  zoneInput.parentElement?.insertAdjacentElement('afterend',zoneHint);
+  zoneInput.setAttribute('list','solin-quarter-zone-options');
+ }
+ const zoneList=document.createElement('datalist');zoneList.id='solin-quarter-zone-options';
+ document.querySelector('#modalBody')?.append(zoneList);
+ const updateZoneHint=()=>{
+  if(!zoneInput)return;
+  const forest=D.lesnichestvo?.[0]||{};
+  const region=Number(forest.KTO)||window.SolinAddressContext?.originalKTO(forest.POS,forest.LESN);
+  const kpz=kpzInput?.value.trim()||null;
+  const calc=window.SolinCardCalculations;
+  if(!region||!calc?.stockZoneOptions){zoneHint.textContent='Для подсказки зоны нужны исходные KTO и таблица Szap';return;}
+  const result=calc.stockZoneOptions(window.SOLIN_REFS?.tables,region,kpz);
+  const allowed=result.zoneOptions;
+  zoneList.replaceChildren(...allowed.map(z=>new Option(z.value+' — '+z.name,String(z.value))));
+  const zone=zoneInput.value.trim();
+  const exists=result.availableZones.some(v=>String(v)===zone);
+  zoneHint.textContent='Szap, KTO '+region+(kpz?' · природная зона Kpz '+kpz:'')+
+   ': '+(allowed.length?allowed.map(z=>z.value+' — '+z.name).join('; '):
+     result.availableZones.join(', '))+
+   (zone&&!exists?' · ВНИМАНИЕ: зона '+zone+' отсутствует в Szap этой области. Уточните Klxr по лесоустроительным данным.':'')+
+   '. Варианты нормативных зон не означают, что можно автоматически менять существующую зону.';
+ };
+ zoneInput?.addEventListener('input',updateZoneHint);
+ kpzInput?.addEventListener('input',updateZoneHint);
+ updateZoneHint();
  document.querySelector('#quarterCategory').onchange=e=>{
   const nextIndex=Number(e.target.value);
   if(!rows[nextIndex])return;
   index=nextIndex;selected=rows[index];
   for(const input of document.querySelectorAll('#modalBody [data-qfield]'))
    input.value=selected[input.dataset.qfield]??'';
+  updateZoneHint();
  };document.querySelector('#saveQuarter').onclick=()=>{const before=clone(q),next={...selected};for(const el of document.querySelectorAll('[data-qfield]'))next[el.dataset.qfield]=el.value.trim()||null;if(q.quarterRows?.length)q.quarterRows[index]=next;else q.meta=next;try{checkpoint('Корректировка квартала '+k+' KGLF '+selected.KGLF);closeModal();openQuarter(k)}catch(e){D.quarters[k]=before;toast('Не сохранено: '+e.message)}};}
 window.renderFriendlyRefs=auditedRefs;
 function setup(){const menu=document.querySelector('#menuScreen .workspace');for(const [label,fn]of [['Фильтрация данных',filter],['Каталог 554 форм и 1420 кнопок',audit],['Лесовладелец и лесничество',()=>openModal('Адрес текущей базы','<pre>'+h(JSON.stringify(D.lesnichestvo,null,2))+'</pre>')],['Журнал изменений',()=>openModal('Журнал', '<pre>'+h(JSON.stringify(JSON.parse(localStorage.getItem(KEY)||'{}').history||[],null,2))+'</pre>')]]){const b=document.createElement('button');b.className='menuRow';b.textContent=label+' ›';b.onclick=fn;menu.append(b);}
