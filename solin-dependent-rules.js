@@ -94,6 +94,13 @@ function options(form,field,row,card,org,refs=ref()){
     .map(r=>({value:String(r.KPC),label:String(r.NDP||'')}))};
  }
  if(!refs)return {status:'unavailable',reason:'Справочники ещё не загружены',items:[]};
+ if(form==='Квартал'&&field==='KGLF'){
+  if(!Array.isArray(refs.Sples)||!refs.Sples.length)
+   return {status:'unavailable',reason:'Исходный справочник Sples недоступен; категории ГЛФ нельзя фильтровать наугад',items:[]};
+  const items=refs.Sples.filter(r=>filled(r.KOD)&&num(r.PR)>0)
+   .map(r=>({value:code(r.KOD),label:String(r.T1??'')}));
+  return {status:'complete',reason:'Оригинальная строка выбора: Sples.PR > 0',items};
+ }
  if(form==='Квартал'&&field==='Klxr'){
   if(!filled(row?.Kpz))return {status:'waiting',reason:'Сначала укажите природную зону Kpz квартала',items:[]};
   if(!Array.isArray(refs.Slxr)||!Array.isArray(refs.Szap)||!refs.Szap.length)
