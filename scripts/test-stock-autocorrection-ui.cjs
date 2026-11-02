@@ -153,6 +153,9 @@ async function reopen(p,info){
  });
  assert.equal(repair.code,150000000);
  console.log('PASS new 3-select forest KTO and existing saved forest KTO repair');
+ // Earlier case intentionally removed Szap; reload the actual sources before
+ // testing regional dropdown filters, otherwise no normative values exist.
+ await boot(p);
  // Reproduce the user's address 723/4/1/1 with standard New quarter/New stand
  // screens. "8" is a test-selected quarter zone, NOT a guessed 723 norm.
  const forestCodes=await p.evaluate(async()=>{
@@ -160,9 +163,15 @@ async function reopen(p,info){
   if(Number(D.lesnichestvo?.[0]?.KTO)!==350000000)throw Error('Original 723/4 KTO was lost');
   openQuarterForm();
   document.querySelector('#newKV').value='1';
-  document.querySelector('#newKGLF').value='1';
+  const glf=document.querySelector('#newKGLF');
+  const glfCode=glf.tagName==='SELECT'?[...glf.options].find(x=>x.value&&!x.disabled)?.value:'1';
+  if(!glfCode)throw Error('No original Sples.PR>0 forest category for new quarter');
+  glf.value=glfCode;
   document.querySelector('#newKpz').value='2';
-  document.querySelector('#newKlxr').value='8';
+  document.querySelector('#newKpz').dispatchEvent(new Event('input',{bubbles:true}));
+  const allowed=[...document.querySelector('#newKlxr').options].filter(x=>x.value).map(x=>Number(x.value));
+  if(allowed.join(',')!=='3,4,7')throw Error('New quarter shows incorrect normative zone codes: '+allowed);
+  document.querySelector('#newKlxr').value='4';
   createQuarter();
   if(Number(D.quarters['1']?.meta?.GodT)!==Number(D.lesnichestvo[0].GodT))throw Error('Quarter year not inherited');
   openCompForm('1');
@@ -172,27 +181,27 @@ async function reopen(p,info){
   document.querySelector('#newPOR').value='В';
   createComp();
   let r=D.quarters['1'].compartments[0];
-  if(!r||Number(r.KlxrVD)!==8||Number(r.KGLF)!==1||Number(r.POS)!==723||Number(r.LESN)!==4)
+  if(!r||Number(r.KlxrVD)!==4||String(r.KGLF)!==String(D.quarters['1'].meta.KGLF)||Number(r.POS)!==723||Number(r.LESN)!==4)
    throw Error('New stand lost quarter/forest inherited address '+JSON.stringify(r));
   r._children.Макет10=[{IAR:1,POR:'В',ZAP:40}];
   delete r.KlxrVD;await SolinWorkspace.persist();
   await SolinWorkspace.activate(forest.id);
   r=D.quarters['1'].compartments[0];
-  if(Number(r.KlxrVD)!==8||Number(r._children.Макет10[0].POS)!==723)
+  if(Number(r.KlxrVD)!==4||Number(r._children.Макет10[0].POS)!==723)
    throw Error('Existing 723/4/1/1 code restore failed');
   const stored=(await SolinWorkspace.list()).find(f=>f.id===forest.id);
-  if(Number(stored?.quarters?.['1']?.compartments?.[0]?.KlxrVD)!==8)
+  if(Number(stored?.quarters?.['1']?.compartments?.[0]?.KlxrVD)!==4)
    throw Error('Inherited stand zone was not persisted to IndexedDB');
   r.KlxrVD=9;await SolinWorkspace.persist();await SolinWorkspace.activate(forest.id);
   if(Number(D.quarters['1'].compartments[0].KlxrVD)!==9)
    throw Error('Explicit zone was silently overwritten');
-  const multi={quarterRows:[{POS:723,LESN:4,KV:1,KGLF:1,Klxr:7},{POS:723,LESN:4,KV:1,KGLF:1,Klxr:8}]};
-  if(window.SolinAddressContext.resolveQuarter({POS:723,LESN:4,KV:1,KGLF:1,VD:1},multi)!==null)
+  const multi={quarterRows:[{POS:723,LESN:4,KV:1,KGLF:r.KGLF,Klxr:7},{POS:723,LESN:4,KV:1,KGLF:r.KGLF,Klxr:8}]};
+  if(window.SolinAddressContext.resolveQuarter({POS:723,LESN:4,KV:1,KGLF:r.KGLF,VD:1},multi)!==null)
    throw Error('Ambiguous quarter rows must not be guessed');
   return {KTO:D.lesnichestvo[0].KTO,zone:stored.quarters['1'].compartments[0].KlxrVD};
  });
  assert.equal(forestCodes.KTO,350000000);
- assert.equal(Number(forestCodes.zone),8);
+ assert.equal(Number(forestCodes.zone),4);
  console.log('PASS real 723/4/1/1 UI create: KTO, quarter year, KlxrVD, children, old-record repair and ambiguity');
  // The preceding unavailable-source case intentionally cleared Szap in memory.
  // Reload the actual reference data before auditing the real Karaganda table.
@@ -204,7 +213,7 @@ async function reopen(p,info){
   const q=D.quarters['1'],r=q.compartments[0];
   q.meta.Kpz=2;q.meta.Klxr=8;r.KlxrVD=8;r.M3Pr='В';r.M3B='3';r.KU=2;r.PLV=1;
   r.STUR1=154;r.STUR=154;r.GodT1=2015;
-  r._children.Макет10=[{POS:723,LESN:4,KV:1,KGLF:1,VD:1,IAR:1,KOEF:10,POR:'В',PH:6,POL:0.6,LET:5,PROI:7,ZAP:154}];
+  r._children.Макет10=[{POS:723,LESN:4,KV:1,KGLF:r.KGLF,VD:1,IAR:1,KOEF:10,POR:'В',PH:6,POL:0.6,LET:5,PROI:7,ZAP:154}];
   current=r;renderComp();show('card');solinWorkflow.editMaket('Макет10',0);
  });
  await p.locator('#wf_ZAP').fill('170');await p.locator('#wfSaveMaket').click();
@@ -218,7 +227,9 @@ async function reopen(p,info){
  await p.locator('#wf-k59-open-quarter').click();
  assert.match(await p.locator('#modalTitle').innerText(),/Корректировка квартала 1/);
  assert.equal(await p.locator('#modalBody [data-qfield="Klxr"]').inputValue(),'8');
- assert.match(await p.locator('#modalBody .wf-form-note').last().innerText(),/ВНИМАНИЕ: зона 8 отсутствует в Szap/);
+ assert.match(await p.locator('#modalBody .wf-form-note').last().innerText(),/3, 4, 7/);
+ const actualOptions=await p.locator('#modalBody [data-qfield="Klxr"] option').evaluateAll(xs=>xs.filter(x=>x.value&&!x.disabled).map(x=>x.value));
+ assert.deepEqual(actualOptions,['3','4','7'],'Quarter edit must offer ONLY KTO/Kpz valid zones');
  const qZoneControl=p.locator('#modalBody [data-qfield="Klxr"]');
  if(await qZoneControl.evaluate(el=>el.tagName)==='SELECT')await qZoneControl.selectOption('4');
  else await qZoneControl.fill('4');
@@ -238,6 +249,31 @@ async function reopen(p,info){
   'After user chooses a supported quarter zone, original K59 must auto-correct ZAP');
  assert.match(await p.locator('#modalTitle').innerText(),/К59: нормативный запас автоматически исправлен/);
  console.log('PASS screenshot 723/4/1/1 end-to-end: LXZ8 unsupported -> quarter Klxr4 -> stand KlxrVD4 -> normative ZAP correction');
+ // General dependency regression: individual Maket dialogs use the SAME
+ // source-filtered engine, not just Maket10 IAR / quarter Klxr.
+ await p.evaluate(()=>{
+  closeModal();current._children.Макет16=[{Por16:'В'}];
+  solinWorkflow.editMaket('Макет16',0);
+ });
+ assert.equal(await p.locator('#wf_Por16').evaluate(el=>el.tagName),'SELECT');
+ const species16=await p.locator('#wf_Por16 option').evaluateAll(xs=>xs.filter(x=>x.value&&!x.disabled).map(x=>x.value));
+ assert.deepEqual(species16,['В'],'Maket16 must offer only species present in this stand Maket10');
+ console.log('PASS Maket16.Por16 choices follow this stand Maket10 species');
+ await p.evaluate(()=>{
+  closeModal();current._children.Макет12=[{KTP:84,SV:null}];
+  solinWorkflow.editMaket('Макет12',0);
+ });
+ const damage=await p.evaluate(()=>{
+  const expected=SolinDependentRules.options('Макет12','SV',{KTP:84},current,D.lesnichestvo[0]);
+  const el=document.querySelector('#wf_SV');
+  return {status:expected?.status,expected:expected?.items?.map(x=>x.value),
+   tag:el?.tagName,actual:[...(el?.options||[])].filter(x=>x.value&&!x.disabled).map(x=>x.value)};
+ });
+ if(damage.status==='complete'){
+  assert.equal(damage.tag,'SELECT');
+  assert.deepEqual(damage.actual,damage.expected,'Maket12 degrees depend on KTP=84 / SSP.K84');
+ }
+ console.log('PASS Maket12.SV source-filtered by damage type KTP');
  await p.evaluate(async()=>{closeModal();await SolinWorkspace.persist()});
  await boot(p);
  const persisted=await p.evaluate(async()=>{
