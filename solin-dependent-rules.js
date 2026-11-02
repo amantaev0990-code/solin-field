@@ -159,7 +159,7 @@ function options(form,field,row,card,org,refs=ref()){
  if((form==='Макет17'&&field==='P17')||(form==='Макет19'&&field==='ZP')){
   if(!refs?.SDP?.length)return {status:'unavailable',
    reason:'Нет исходного справочника SDP для породы макета',items:[]};
-  const subset=refs.SDP.filter(r=>filled(r.KPC)&&
+  const subset=refs.SDP.filter(r=>code(r.KPC)!==''&&
    (num(r.DKP2)===0||num(r.DKP2)>70));
   const byCode=new Map();
   for(const r of subset)if(!byCode.has(code(r.KPC)))
