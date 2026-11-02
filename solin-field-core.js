@@ -70,20 +70,10 @@ function editQuarter(k,index=0){const q=D.quarters[k],rows=q.quarterRows?.length
    input.value=selected[input.dataset.qfield]??'';
   updateZoneHint();
  };document.querySelector('#saveQuarter').onclick=()=>{const before=clone(q),next={...selected};for(const el of document.querySelectorAll('[data-qfield]'))next[el.dataset.qfield]=el.value.trim()||null;if(q.quarterRows?.length)q.quarterRows[index]=next;else q.meta=next;
- // An explicitly edited quarter zone must follow through to its existing
- // stands ONLY when their old KlxrVD matched the source quarter's old Klxr.
- // Do not overwrite a different manual stand zone or another category row.
- const movedZone=String(selected.Klxr??'')!==String(next.Klxr??'')&&
-  next.Klxr!==null&&next.Klxr!==undefined&&String(next.Klxr).trim()!=='';
- let inheritedCount=0;
- if(movedZone)for(const stand of q.compartments||[]){
-  if(String(stand.POS??'')!==String(selected.POS??'')||
-    String(stand.LESN??'')!==String(selected.LESN??'')||
-    String(stand.KGLF??'')!==String(selected.KGLF??'')||
-    String(stand.KlxrVD??'')!==String(selected.Klxr??'')||
-    String(stand.Fzona??'')!==String(selected.Fzona??''))continue;
-  stand.KlxrVD=next.Klxr;inheritedCount++;
- }
+ // Match against an immutable BEFORE snapshot of the selected quarter row.
+ // Other explicit stand zones and all other quarter categories remain unchanged.
+ const oldRow=before.quarterRows?.length?before.quarterRows[index]:before.meta;
+ const inheritedCount=window.SolinAddressContext?.cascadeQuarterZone(q,oldRow,next)||0;
  try{checkpoint('Корректировка квартала '+k+' KGLF '+selected.KGLF);
   closeModal();openQuarter(k);
   if(inheritedCount)toast('Зона Klxr обновлена у '+inheritedCount+' выделов; пересохраните макет 10 для расчёта запаса');
