@@ -47,6 +47,8 @@ jobs:
           node-version: '22'
       - name: Install browser driver
         run: npm install --no-save --no-package-lock playwright-core
+      - name: Inspect original stock lookup keys
+        run: node scripts/inspect-stock-keys.cjs
       - name: Real Chrome correction checks — desktop and mobile
         env:
           PLAYWRIGHT_PATH: playwright-core
