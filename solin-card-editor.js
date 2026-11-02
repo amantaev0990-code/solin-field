@@ -185,6 +185,7 @@ function linkedOptions(el){
 }
 function refreshLinked(){
  if(!session||!window.SolinDependentRules)return;
+ const engine=window.SolinDependentRules;
  const guide=document.getElementById('ce-category-guidance');
  if(guide){
   const info=window.SolinDependentRules.allowedLayers(session.draft,window.SOLIN_REFS?.tables);
@@ -211,10 +212,7 @@ function refreshLinked(){
   }
   el.dataset.linkedStatus=result.status;
   el.dataset.linkedCount=String(list.length);
-  if(result.status==='waiting')el.title='Сначала выберите главную породу';
-  if(old!==current && current && el.value!==current){
-   el.title='Исходный код сохранён, проверьте его по справочнику';
-  }
+  if(result.status==='waiting')el.title=result.reason||'Сначала заполните исходные поля';
  }
 }
 // Local draft-only correction: do not persist a replacement without Save.
