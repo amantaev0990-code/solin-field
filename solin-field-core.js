@@ -56,6 +56,34 @@ function editQuarter(k,index=0){const q=D.quarters[k],rows=q.quarterRows?.length
   if(e.target===kpzInput||e.target===zoneInput)updateZoneHint();
  });
  updateZoneHint();
+ // SFZ.KLF is visible in the archived Access source, but the original
+ // WHERE tail is incomplete. Offer only linked SFZ candidates in a
+ // datalist while retaining manual edit; never claim normative validation.
+ const functionInput=document.querySelector('#modalBody [data-qfield="Fzona"]');
+ const districtInput=document.querySelector('#modalBody [data-qfield="Raion"]');
+ const functionHint=document.createElement('p'),districtHint=document.createElement('p');
+ functionHint.className='wf-form-note';districtHint.className='wf-form-note';
+ functionInput?.parentElement?.append(functionHint);
+ districtInput?.parentElement?.append(districtHint);
+ const functionList=document.createElement('datalist');
+ functionList.id='solin-quarter-functional-source';
+ if(functionInput){functionInput.setAttribute('list',functionList.id);document.querySelector('#modalBody')?.append(functionList);}
+ const refreshIncompleteRows=()=>{
+  const rules=window.SolinDependentRules;
+  const forest=D.lesnichestvo?.[0]||{};
+  if(functionInput){
+   const result=rules?.options('Квартал','Fzona',selected,null,forest);
+   functionList.replaceChildren(...(result?.items||[]).map(x=>new Option(
+    x.value+' — '+x.label,x.value)));
+   functionHint.textContent=(result?.reason||'Неизвестна связь функциональных зон')+
+    '. Полный SQL Access пока отсутствует; ручное значение не изменяется.';
+  }
+  if(districtInput){
+   const result=rules?.options('Квартал','Raion',selected,null,forest);
+   districtHint.textContent=result?.reason||'Нет подтверждённого исходного справочника районов';
+  }
+ };
+ refreshIncompleteRows();
  document.querySelector('#quarterCategory').onchange=e=>{
   const nextIndex=Number(e.target.value);
   if(!rows[nextIndex])return;
@@ -63,6 +91,7 @@ function editQuarter(k,index=0){const q=D.quarters[k],rows=q.quarterRows?.length
   for(const input of document.querySelectorAll('#modalBody [data-qfield]'))
    input.value=selected[input.dataset.qfield]??'';
   updateZoneHint();
+  refreshIncompleteRows();
  };document.querySelector('#saveQuarter').onclick=()=>{const before=clone(q),next={...selected};for(const el of document.querySelectorAll('[data-qfield]'))next[el.dataset.qfield]=el.value.trim()||null;const zoning=window.SolinDependentRules?.options('Квартал','Klxr',next,null,D.lesnichestvo?.[0]);
  const zoningChanged=String(next.Kpz??'')!==String(selected.Kpz??'')||
   String(next.Klxr??'')!==String(selected.Klxr??'');
