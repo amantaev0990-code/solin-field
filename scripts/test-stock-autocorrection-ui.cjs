@@ -194,6 +194,10 @@ async function reopen(p,info){
  assert.equal(forestCodes.KTO,350000000);
  assert.equal(Number(forestCodes.zone),8);
  console.log('PASS real 723/4/1/1 UI create: KTO, quarter year, KlxrVD, children, old-record repair and ambiguity');
+ // The preceding unavailable-source case intentionally cleared Szap in memory.
+ // Reload the actual reference data before auditing the real Karaganda table.
+ await boot(p);
+ await p.evaluate(()=>SolinWorkspace.activate('723::4'));
  // Screenshot regression: original Szap has NO Obl=350000000/LXZ=8,
  // despite this zone being listed for Kpz 2 in the general Slxr catalog.
  await p.evaluate(()=>{
