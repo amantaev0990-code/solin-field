@@ -117,19 +117,29 @@ const fields=(db()?.transfSchema?.[m]||[]).filter(n=>!KEY_FIELDS.includes(n)),ex
 if(typeof openModal!=='function')return;
 openModal((index===rowsOf(r,m).length?'Новая запись · ':'Изменение · ')+(window.SolinHuman?.formName(m)||NAMES[m]),
 '<div class="wf-form-note">Данные сохраняются только в SOLI-N Field. Оригинальные базы SOLI-N не изменяются.</div><div class="formGrid wf-formgrid">'+humanInputs(fields,existing,'wf',m)+'</div><div class="formActions"><button class="secondary" onclick="closeModal()">Отмена</button><button class="primary" id="wfSaveMaket">Сохранить</button></div>');
-if(m==='Макет10'&&window.SolinDependentRules){
- const element=document.getElementById('wf_IAR');
- const result=window.SolinDependentRules.allowedLayers(r,window.SOLIN_REFS?.tables);
- if(element&&element.tagName==='SELECT'&&result.status==='complete'){
-  const raw=existing.IAR==null?'':String(existing.IAR);
-  const options=[new Option('— Не указано —',''),
-   ...result.items.map(x=>new Option(x.value+' — '+x.label,x.value))];
-  if(raw&&!options.some(x=>x.value===raw))
-   options.push(new Option('Сохранённый ярус: '+raw+' (проверьте категорию)',raw));
-  element.replaceChildren(...options);
-  element.value=raw;
-  element.title=result.reason;
- }
+// One Access RowSource engine for ALL individual Maket editors.
+const rules=window.SolinDependentRules,modalBody=document.querySelector('#modalBody');
+if(rules){
+ const collect=()=>({...existing,...Object.fromEntries(fields.map(field=>{
+  const el=document.getElementById('wf_'+field);
+  return [field,el?(el.value===''?null:el.value):existing[field]];
+ }))});
+ const filterAll=()=>{
+  const values=collect();
+  for(const field of fields){
+   const el=document.getElementById('wf_'+field);
+   if(!el)continue;
+   const result=rules.options(m,field,values,r,db()?.lesnichestvo?.[0]);
+   if(result)rules.applySelect(el,result,{current:values[field]});
+  }
+ };
+ filterAll();
+ modalBody.addEventListener('input',e=>{
+  if(e.target?.matches?.('[data-wffield]'))filterAll();
+ });
+ modalBody.addEventListener('change',e=>{
+  if(e.target?.matches?.('[data-wffield]'))filterAll();
+ });
 }
 document.querySelector('#wfSaveMaket').onclick=()=>{const container=document.querySelector('#modalBody');let values;try{values=bindInputs(container,fields,'wf',existing);}catch(e){notify(e.message);return;}
 const dependent=window.SolinDependentRules,referenceTables=window.SOLIN_REFS?.tables;
