@@ -192,7 +192,7 @@ async function reopen(p,info){
   return {KTO:D.lesnichestvo[0].KTO,zone:stored.quarters['1'].compartments[0].KlxrVD};
  });
  assert.equal(forestCodes.KTO,350000000);
- assert.equal(forestCodes.zone,8);
+ assert.equal(Number(forestCodes.zone),8);
  console.log('PASS real 723/4/1/1 UI create: KTO, quarter year, KlxrVD, children, old-record repair and ambiguity');
  await desktop.close();
  const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
