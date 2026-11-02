@@ -222,25 +222,7 @@ async function reopen(p,info){
  const qZoneControl=p.locator('#modalBody [data-qfield="Klxr"]');
  if(await qZoneControl.evaluate(el=>el.tagName)==='SELECT')await qZoneControl.selectOption('4');
  else await qZoneControl.fill('4');
- console.log('K59_QUARTER_PRE_SAVE',JSON.stringify(await p.evaluate(()=>{
-  const q=D.quarters['1'];
-  return {quarter:q.meta,rows:q.quarterRows,stand:q.compartments[0],
-   input:Object.fromEntries([...document.querySelectorAll('#modalBody [data-qfield]')].filter(el=>['KGLF','Klxr','Kpz','Fzona'].includes(el.dataset.qfield)).map(el=>[el.dataset.qfield,el.value]))};
- })).slice(0,2500));
- await p.evaluate(()=>{
-  const A=window.SolinAddressContext,old=A.cascadeQuarterZone;
-  A.cascadeQuarterZone=function(q,a,b){
-   const n=old(q,a,b);window.__lastK59Cascade={old:a,newer:b,count:n,
-    standZone:q.compartments?.[0]?.KlxrVD};
-   return n;
-  };
-  window.__qSaveHandler=String(document.querySelector('#saveQuarter')?.onclick||'').slice(-1800);
- });
  await p.locator('#saveQuarter').click();
- console.log('K59_QUARTER_REAL_SAVE',JSON.stringify(await p.evaluate(()=>({
-  cascade:window.__lastK59Cascade,saveHandler:window.__qSaveHandler,
-  actualStand:D.quarters['1'].compartments[0]?.KlxrVD
- }))).slice(0,3300));
  await p.waitForFunction(()=>document.querySelector('#modal')?.classList.contains('hidden'));
  const zoneFixed=await p.evaluate(()=>{
   const q=D.quarters['1'],r=q.compartments[0];
@@ -252,26 +234,21 @@ async function reopen(p,info){
   return norm.expected;
  });
  await p.locator('#wf_ZAP').fill('170');await p.locator('#wfSaveMaket').click();
- console.log('K59_QUARTER_CASCADE_SIM',JSON.stringify(await p.evaluate(()=>{
-  const q=D.quarters['1'],r=q.compartments[0];
-  const simulated={compartments:[{...r}]};
-  const count=window.SolinAddressContext?.cascadeQuarterZone(simulated,{...q.meta,Klxr:8},q.meta);
-  return {count,newZone:simulated.compartments[0].KlxrVD,
-   editorHasCascade:String(window.solinEditQuarter||'').includes('cascadeQuarterZone'),
-   oldZone:r.KlxrVD,quarterZone:q.meta.Klxr};
- })));
- const afterZone=await p.evaluate(()=>{
-  const r=current,org=D.lesnichestvo[0],q=D.quarters['1'].meta;
-  const audit=SolinCardCalculations.corrections(r,SOLIN_REFS.tables,org,q);
-  return {stock:r._children.Макет10[0].ZAP,KlxrVD:r.KlxrVD,qKlxr:q.Klxr,M3B:r.M3B,
-   ku:r.KU,tag:r.M3Pr,children:r._children.Макет10,
-   norm:audit.stockPerHectare,issues:audit.issues,modalTitle:document.querySelector('#modalTitle')?.textContent};
- });
- console.log('K59_SCREENSHOT_POST_ZONE',JSON.stringify(afterZone));
  assert.equal(await p.evaluate(()=>current._children.Макет10[0].ZAP),zoneFixed,
   'After user chooses a supported quarter zone, original K59 must auto-correct ZAP');
  assert.match(await p.locator('#modalTitle').innerText(),/К59: нормативный запас автоматически исправлен/);
  console.log('PASS screenshot 723/4/1/1 end-to-end: LXZ8 unsupported -> quarter Klxr4 -> stand KlxrVD4 -> normative ZAP correction');
+ await p.evaluate(async()=>{closeModal();await SolinWorkspace.persist()});
+ await boot(p);
+ const persisted=await p.evaluate(async()=>{
+  await SolinWorkspace.activate('723::4');
+  const q=D.quarters['1'],r=q.compartments[0];
+  return {quarter:q.meta.Klxr,stand:r.KlxrVD,zap:r._children.Макет10[0].ZAP};
+ });
+ assert.equal(String(persisted.quarter),'4');
+ assert.equal(String(persisted.stand),'4');
+ assert.equal(Number(persisted.zap),zoneFixed);
+ console.log('PASS final iPhone-style reload: saved quarter zone, inherited stand zone and K59-corrected ZAP persist');
  await desktop.close();
  const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
  const m=await mobile.newPage();m.on('pageerror',e=>errors.push(e.message));
