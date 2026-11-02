@@ -21,6 +21,12 @@ function copy(from,to,level=0){
   const relative=path.relative(root,p).split(path.sep).join('/');
   const safeBlank=relative==='vendor/solin-empty-transfer-v20261028-27.mdb';
   if(!ent.isFile()||(!safeBlank&&(forbidden.test(ent.name)||!extensions.has(path.extname(ent.name).toLowerCase()))))continue;
+  // Android's asset merger collapses compressed .gz names into the same
+  // logical resource as the uncompressed file. A paired copy causes
+  // "Duplicate resources" in Gradle (especially the bundled .NET WASM
+  // _framework files). Native Capacitor uses the original uncompressed
+  // resource; keep standalone .gz only when no original exists.
+  if(ent.name.endsWith('.gz')&&fs.existsSync(p.slice(0,-3)))continue;
   fs.mkdirSync(path.dirname(dest),{recursive:true});
   fs.copyFileSync(p,dest);count++;
  }
