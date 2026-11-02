@@ -66,10 +66,10 @@ public class SolinMdbInstrumentedTest {
       address(OWNER,FOREST,1,24)));
     tables.put("Выдел",new JSONArray().put(
       address(crossOwner?OWNER+1:OWNER,FOREST,1,24)
-        .put("VD",1).put("KU",2).put("PLV",1.5)));
+        .put("VD","001").put("KU",2).put("PLV",1.5)));
     tables.put("Макет10",new JSONArray().put(
       address(OWNER,FOREST,1,24)
-        .put("VD",1).put("IAR",1).put("POR","В").put("ZAP",40)));
+        .put("VD","001").put("IAR",1).put("POR","В").put("ZAP",40)));
     return new JSONObject().put("schema",schema).put("tables",tables);
   }
 
@@ -100,7 +100,8 @@ public class SolinMdbInstrumentedTest {
         Row stand=db.getTable("Выдел").iterator().next();
         assertEquals(OWNER,((Number)stand.get("POS")).intValue());
         assertEquals(FOREST,((Number)stand.get("LESN")).intValue());
-        assertEquals(1,((Number)stand.get("VD")).intValue());
+        assertEquals("001",String.valueOf(stand.get("VD")));
+        assertEquals("001",String.valueOf(db.getTable("Макет10").iterator().next().get("VD")));
         assertEquals(1.5,((Number)stand.get("PLV")).doubleValue(),0.001);
         Row tree=db.getTable("Макет10").iterator().next();
         assertEquals("В",tree.get("POR"));
