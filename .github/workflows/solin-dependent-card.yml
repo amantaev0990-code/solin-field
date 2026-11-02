@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - 'solin-dependent-rules.js'
+      - 'solin-usability.js'
       - 'solin-card-editor.js'
       - 'solin-workflow.js'
       - 'scripts/test-cross-editor-dependencies.cjs'
@@ -43,6 +44,7 @@ jobs:
           node --check scripts/test-whole-card-dependencies.cjs
           node --check scripts/test-dependency-audit.cjs
           node --check solin-dependency-audit.js
+          node --check solin-usability.js
           node --check solin-card-editor.js
           node --check solin-address-context.js
           node --check solin-workspace.js
