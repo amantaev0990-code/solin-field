@@ -163,7 +163,10 @@ async function reopen(p,info){
   if(Number(D.lesnichestvo?.[0]?.KTO)!==350000000)throw Error('Original 723/4 KTO was lost');
   openQuarterForm();
   document.querySelector('#newKV').value='1';
-  document.querySelector('#newKGLF').value='1';
+  const glf=document.querySelector('#newKGLF');
+  const glfCode=glf.tagName==='SELECT'?[...glf.options].find(x=>x.value&&!x.disabled)?.value:'1';
+  if(!glfCode)throw Error('No original Sples.PR>0 forest category for new quarter');
+  glf.value=glfCode;
   document.querySelector('#newKpz').value='2';
   document.querySelector('#newKpz').dispatchEvent(new Event('input',{bubbles:true}));
   const allowed=[...document.querySelector('#newKlxr').options].filter(x=>x.value).map(x=>Number(x.value));
@@ -178,7 +181,7 @@ async function reopen(p,info){
   document.querySelector('#newPOR').value='В';
   createComp();
   let r=D.quarters['1'].compartments[0];
-  if(!r||Number(r.KlxrVD)!==4||Number(r.KGLF)!==1||Number(r.POS)!==723||Number(r.LESN)!==4)
+  if(!r||Number(r.KlxrVD)!==4||String(r.KGLF)!==String(D.quarters['1'].meta.KGLF)||Number(r.POS)!==723||Number(r.LESN)!==4)
    throw Error('New stand lost quarter/forest inherited address '+JSON.stringify(r));
   r._children.Макет10=[{IAR:1,POR:'В',ZAP:40}];
   delete r.KlxrVD;await SolinWorkspace.persist();
@@ -192,8 +195,8 @@ async function reopen(p,info){
   r.KlxrVD=9;await SolinWorkspace.persist();await SolinWorkspace.activate(forest.id);
   if(Number(D.quarters['1'].compartments[0].KlxrVD)!==9)
    throw Error('Explicit zone was silently overwritten');
-  const multi={quarterRows:[{POS:723,LESN:4,KV:1,KGLF:1,Klxr:7},{POS:723,LESN:4,KV:1,KGLF:1,Klxr:8}]};
-  if(window.SolinAddressContext.resolveQuarter({POS:723,LESN:4,KV:1,KGLF:1,VD:1},multi)!==null)
+  const multi={quarterRows:[{POS:723,LESN:4,KV:1,KGLF:r.KGLF,Klxr:7},{POS:723,LESN:4,KV:1,KGLF:r.KGLF,Klxr:8}]};
+  if(window.SolinAddressContext.resolveQuarter({POS:723,LESN:4,KV:1,KGLF:r.KGLF,VD:1},multi)!==null)
    throw Error('Ambiguous quarter rows must not be guessed');
   return {KTO:D.lesnichestvo[0].KTO,zone:stored.quarters['1'].compartments[0].KlxrVD};
  });
@@ -210,7 +213,7 @@ async function reopen(p,info){
   const q=D.quarters['1'],r=q.compartments[0];
   q.meta.Kpz=2;q.meta.Klxr=8;r.KlxrVD=8;r.M3Pr='В';r.M3B='3';r.KU=2;r.PLV=1;
   r.STUR1=154;r.STUR=154;r.GodT1=2015;
-  r._children.Макет10=[{POS:723,LESN:4,KV:1,KGLF:1,VD:1,IAR:1,KOEF:10,POR:'В',PH:6,POL:0.6,LET:5,PROI:7,ZAP:154}];
+  r._children.Макет10=[{POS:723,LESN:4,KV:1,KGLF:r.KGLF,VD:1,IAR:1,KOEF:10,POR:'В',PH:6,POL:0.6,LET:5,PROI:7,ZAP:154}];
   current=r;renderComp();show('card');solinWorkflow.editMaket('Макет10',0);
  });
  await p.locator('#wf_ZAP').fill('170');await p.locator('#wfSaveMaket').click();
