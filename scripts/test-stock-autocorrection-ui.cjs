@@ -273,6 +273,12 @@ async function reopen(p,info){
  assert.equal(await p.evaluate(()=>current._children.Макет10[0].POR),'В',
   'Standalone tree species change must be refused while Maket16 still refers to В');
  console.log('PASS standalone Maket10 Save cannot orphan Maket16 species');
+ // The DELETE path must also preserve linked species, not just Edit/Save.
+ await p.evaluate(()=>{closeModal();solinWorkflow.openMaket('Макет10')});
+ await p.locator('#childContent [data-del="0"]').click();
+ assert.equal(await p.evaluate(()=>current._children.Макет10.length),1,
+  'Deleting final source Maket10 row must not orphan Maket16');
+ console.log('PASS Maket10 Delete is blocked when Maket16 depends on the only species');
  await p.evaluate(()=>{
   closeModal();current._children.Макет12=[{KTP:84,SV:null}];
   solinWorkflow.editMaket('Макет12',0);
