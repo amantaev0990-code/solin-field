@@ -90,9 +90,10 @@ if(oldBar)oldBar.style.display='none';
 const content=document.querySelector('#humanContent');
 if(content&&!content.querySelector('#wfCardActions')){
 const bar=document.createElement('div');bar.id='wfCardActions';bar.className='wf-toolbar';
-bar.innerHTML='<button class="wf-primary" id="wfEditBase">✎ Редактировать выдел</button><button id="wfCardCheck">✓ Контроль</button><button id="wfCardPrint">⎙ Печать КТ</button><button id="wfCardExit">↩ Выход</button>';
+bar.innerHTML='<button class="wf-primary" id="wfEditBase">✎ Редактировать выдел</button><button id="wfCardCheck">✓ Контроль</button><button id="wfCardRelations">Связи полей</button><button id="wfCardPrint">⎙ Печать КТ</button><button id="wfCardExit">↩ Выход</button>';
 content.prepend(bar);
 bar.querySelector('#wfEditBase').onclick=editBase;bar.querySelector('#wfCardCheck').onclick=()=>SolinControlUI.open({records:[record()],caption:'Карточка · квартал '+record().KV+' · выдел '+record().VD});
+bar.querySelector('#wfCardRelations').onclick=()=>window.SolinDependencyAudit?.open([record()],{caption:'Выдел '+record().KV+'/'+record().VD});
 bar.querySelector('#wfCardPrint').onclick=printCard;bar.querySelector('#wfCardExit').onclick=exitCard;
 }}
 function showWholeCard(){const r=record();if(!r)return;document.querySelector('#childContent').innerHTML='<div class="wf-maket-view"><h3>Краткая карточка таксации · КТ</h3><p class="wf-muted">Аналог сводного просмотра ВыделКрат. Данные отображаются без расчёта исходных Access-отчётов.</p>'+CORE.map(m=>'<div class="wf-summary-row"><b>'+m.replace('Макет','')+' · '+h(window.SolinHuman?.formName(m)||NAMES[m])+'</b><span>'+h(maketSummary(r,m))+'</span><button data-cardmak="'+m+'">Открыть →</button></div>').join('')+'</div>';
@@ -163,16 +164,16 @@ const dependent=window.SolinDependentRules,referenceTables=window.SOLIN_REFS?.ta
 const list=[...rowsOf(r,m)],base={...existing,...values};
 for(const k of KEY_FIELDS)base[k]=r[k]??null;
 if(index>=list.length)list.push(base);else list[index]=base;
-// A Maket10 edit may invalidate species in Maket16 or permitted strata.
-// Check BEFORE mutating the saved record; the full card can edit linked
-// Makets atomically where an individual popup cannot.
-if(m==='Макет10'&&window.SolinDependentRules?.treeDependencies){
- const projected={...r,_children:{...r._children,[m]:list}};
- const conflict=window.SolinDependentRules.treeDependencies(projected,referenceTables)[0];
- if(conflict){
-  notify('Не сохранено: '+conflict.reason+'. Измените связанные макеты через «Изменить карточку».');
-  return;
- }
+// One source-backed audit for ALL Maket edits, including changed parent
+// choices, Maket 10→16 and Maket 12/23. Do not mutate the record before
+// an invalid new dependency is rejected.
+const projected={...r,_children:{...r._children,[m]:list}};
+const audited=window.SolinDependentRules?.validateTransition?.(
+ r,projected,db()?.lesnichestvo?.[0],referenceTables);
+if(audited?.errors.length){
+ notify('Не сохранено: '+audited.errors[0].reason+
+  '. Измените связанные поля через «Изменить карточку».');
+ return;
 }
 target[m]=list;
 let calculated=[],k59Check=null,stockEdited=m==='Макет10'&&String(values.ZAP??'')!==String(existing.ZAP??'');
@@ -239,16 +240,32 @@ if(m==='Макет10'&&(calculated.length||stockEdited)){
 };}
 function saveAll(r){const makets={};for(const m of CORE){const list=rowsOf(r,m);makets[m]=list.map(row=>({...row}));}store(r,{makets,base:Object.fromEntries(EDIT_FIELDS.map(k=>[k,r[k]??null]))});}
 function deleteMaket(m,index){const r=record();if(!r)return;
-if(!confirm('Удалить только эту запись '+m+' №'+(index+1)+' из локальной мобильной копии?'))return;
-const before=JSON.stringify(r);r._children[m]=rowsOf(r,m).filter((_,i)=>i!==index);
-try{saveAll(r);openMaket(m);notify('Запись удалена локально');}catch(e){Object.assign(r,JSON.parse(before));notify(e.message);}}
+ const list=rowsOf(r,m).filter((_,i)=>i!==index);
+ const projected={...r,_children:{...r._children,[m]:list}};
+ const org=db()?.lesnichestvo?.[0];
+ const result=window.SolinDependentRules?.validateTransition?.(
+  r,projected,org,window.SOLIN_REFS?.tables);
+ if(result?.errors.length){
+  notify('Удаление остановлено: '+result.errors[0].reason+
+   '. Сначала согласуйте связанные макеты в «Изменить карточку».');
+  return;
+ }
+ if(!confirm('Удалить только эту запись '+m+' №'+(index+1)+' из локальной мобильной копии?'))return;
+ const before=JSON.stringify(r);r._children[m]=list;
+ try{saveAll(r);openMaket(m);notify('Запись удалена локально');}
+ catch(e){Object.assign(r,JSON.parse(before));notify(e.message);}
+}
 function editBase(){const r=record();if(!r)return;
 if(window.SolinCardEditor)return window.SolinCardEditor.open(r);
 openModal('Выдел '+r.VD+' · квартал '+r.KV,'<div class="wf-form-note">Редактирование основной таблицы «Выдел»; состав макетов редактируется в отдельных разделах.</div><div class="formGrid wf-formgrid">'+humanInputs(EDIT_FIELDS,r,'wfb','ВыделВ')+'</div><div class="formActions"><button class="secondary" onclick="closeModal()">Отмена</button><button class="primary" id="wfSaveBase">Сохранить выдел</button></div>');
 document.querySelector('#wfSaveBase').onclick=()=>{
  let fields;try{fields=bindInputs(document.querySelector('#modalBody'),EDIT_FIELDS,'wfb',r);}catch(e){notify(e.message);return;}
  const p=Number(String(fields.PLV).replace(',','.'));if(!Number.isFinite(p)||p<=0){notify('Площадь выдела должна быть положительной');return;}
- const failed=(window.solinCore?.validateRow('ВыделВ',fields,r)||[]).filter(msg=>{const field=msg.split(':')[0];return String(fields[field]??'')!==String(r[field]??'')});if(failed.length){notify(failed.join('; '));return;}const before=JSON.stringify(r);Object.assign(r,fields,{PLV:p});try{saveAll(r);}catch(e){Object.assign(r,JSON.parse(before));notify(e.message);return;}
+ const failed=(window.solinCore?.validateRow('ВыделВ',fields,r)||[]).filter(msg=>{const field=msg.split(':')[0];return String(fields[field]??'')!==String(r[field]??'')});if(failed.length){notify(failed.join('; '));return;}const transition=window.SolinDependentRules?.validateTransition?.(
+ r,{...r,...fields,PLV:p},db()?.lesnichestvo?.[0],window.SOLIN_REFS?.tables);
+ if(transition?.errors.length){notify('Проверьте зависимые поля: '+transition.errors[0].reason);return;}
+ const before=JSON.stringify(r);Object.assign(r,fields,{PLV:p});
+ try{saveAll(r);}catch(e){Object.assign(r,JSON.parse(before));notify(e.message);return;}
  closeModal();if(typeof renderComp==='function')renderComp();if(typeof refresh==='function')refresh();notify('Поля выдела сохранены');
 };}
 function exitCard(){const r=record();if(!r)return;
@@ -282,15 +299,24 @@ const win=window.open('','_blank');if(!win){notify('Разреши открыт�
 win.document.write('<!doctype html><html lang="ru"><meta charset="utf-8"><title>Таксационная карточка</title><style>body{font:14px Arial;padding:20px;color:#17251d}table{border-collapse:collapse;width:100%;margin-bottom:10px}th,td{border:1px solid #b7c9ba;padding:6px;text-align:left}th{width:44%;background:#eef5ec}h2{border-bottom:1px solid #b4cab5;padding:8px 0}h3{font-size:14px}@media print{button{display:none}}</style><button onclick="print()">Печать</button>'+html+'<p><small>Предварительная мобильная карточка, не официальный отчёт Access.</small></p></html>');
 win.document.close();}
 function quarterToolbar(k){const box=document.querySelector('#quarters');if(!box||!db()?.quarters?.[k])return;const old=box.querySelector('#wfQuarterToolbar');old?.remove();const q=db().quarters[k],bar=document.createElement('div');bar.id='wfQuarterToolbar';bar.className='wf-toolbar';
-bar.innerHTML='<button id="wfQuarterControl">✓ Контроль квартала</button><button id="wfQuarterSummary">▤ Такс. описание</button><button id="wfQuarterExport">⇩ Сохранить JSON квартала</button>';
+bar.innerHTML='<button id="wfQuarterControl">✓ Контроль квартала</button><button id="wfQuarterRelations">Связи полей</button><button id="wfQuarterSummary">▤ Такс. описание</button><button id="wfQuarterExport">⇩ Сохранить JSON квартала</button>';
 box.querySelector('.screenHead')?.after(bar);
 bar.querySelector('#wfQuarterControl').onclick=()=>{if(window.SolinControlUI)return SolinControlUI.open({records:q.compartments||[],caption:'Квартал '+k});let issues=0;const entries=[];for(const r of q.compartments||[]){const list=checkData(r,false);issues+=list.length;if(list.length)entries.push(r.VD+': '+list.length+' замечаний');}
 openModal('Квартал '+k+' · контроль','<div class="wf-form-note">Предварительная проверка без выполнения контролей Access.</div><p>Выделов: '+q.compartments.length+'</p><p>Замечаний: <b>'+issues+'</b></p>'+entries.map(x=>'<p>'+h(x)+'</p>').join('')+'<button class="primary" onclick="closeModal()">Закрыть</button>');};
+bar.querySelector('#wfQuarterRelations').onclick=()=>window.SolinDependencyAudit?.open(q.compartments||[],{caption:'Квартал '+k});
 bar.querySelector('#wfQuarterSummary').onclick=()=>{const area=q.compartments.reduce((s,r)=>s+(Number(r.PLV)||0),0);openModal('Таксационное описание · квартал '+k,'<h3>Квартал '+h(k)+'</h3><p>Выделов: '+q.compartments.length+'</p><p>Площадь: '+area.toLocaleString('ru-RU')+' га</p><div class="wf-form-note">Это сводка из мобильных данных, а не официальный выходной документ SOLI-N.</div><button class="primary" onclick="closeModal()">Закрыть</button>');};
 bar.querySelector('#wfQuarterExport').onclick=()=>download('solin-quarter-'+k+'.json',{format:'SOLIN-Field-Quarter-v1',quarter:k,records:q.compartments});}
 function download(name,payload){const a=document.createElement('a');const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);}
 function setup(){
-
+ const menu=document.querySelector('#menuScreen .workspace');
+ if(menu&&!menu.querySelector('#wfForestDependencyAudit')){
+  const action=document.createElement('button');action.id='wfForestDependencyAudit';
+  action.className='menuRow';action.textContent='Проверить связи полей всего лесничества ›';
+  action.onclick=()=>window.SolinDependencyAudit?.open(
+   Object.values(db()?.quarters||{}).flatMap(q=>q.compartments||[]),
+   {caption:'Лесничество '+(db()?.lesnichestvo?.[0]?.NOS||'')});
+  menu.querySelector('h2')?.after(action);
+ }
  const prev=window.renderComp;
  if(typeof prev==='function')window.renderComp=function(){if(record())localPatch(record());prev();currentMaket='Макет10';cardToolbar();openMaket(currentMaket);};
  const oldQuarter=window.openQuarter;
