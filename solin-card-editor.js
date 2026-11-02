@@ -33,6 +33,79 @@ const h=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt
 const clone=v=>JSON.parse(JSON.stringify(v));
 const same=(a,b)=>String(a??'')===String(b??'');
 let session=null,previousFocus=null,previousOverflow='';
+const DRAFT_PREFIX='solin_field_card_draft_v1:';
+let draftTimer;
+function recoveryKey(s){return DRAFT_PREFIX+JSON.stringify([s.original.POS,s.original.LESN,s.original.KV,s.original.KGLF,s.isNew?'new':s.original.VD,s.originalQuarter.Klxr,s.originalQuarter.Fzona]);}
+function readRecovery(s){try{const item=JSON.parse(localStorage.getItem(s.recoveryKey));return item?.version===1&&item.draft&&item.original&&item.quarter?item:null;}catch(_){return null;}}
+function draftStatus(text){const el=document.getElementById('ce-status');if(el)el.textContent=text;}
+function draftCopy(item){const url=URL.createObjectURL(new Blob([JSON.stringify(item,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='Черновик_кв'+item.original.KV+'_выд'+item.draft.VD+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function renderDraftResume(){
+ const home=document.querySelector('#homeScreen .home-actions');if(!home)return;
+ let box=document.getElementById('ce-home-drafts');if(!box){box=document.createElement('section');box.id='ce-home-drafts';box.className='ce-home-drafts';home.after(box);}
+ const entries=[];try{for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(!key.startsWith(DRAFT_PREFIX))continue;const item=JSON.parse(localStorage.getItem(key));if(item?.version===1&&item.original&&item.draft)entries.push(item);}}catch(_){}
+ entries.sort((a,b)=>b.updatedAt-a.updatedAt);box.hidden=!entries.length;
+ box.innerHTML=entries.length?'<b>Продолжить незаконченный ввод</b>'+entries.slice(0,3).map((item,i)=>'<div class="ce-home-draft"><button type="button" data-ce-resume="'+i+'"><strong>Квартал '+h(item.draft.KV)+' · '+(item.isNew?'новый выдел ':'выдел ')+h(item.draft.VD)+'</strong><span>'+h(item.forestName||'Лесничество '+item.original.LESN)+'</span></button><button type="button" data-ce-copy="'+i+'" aria-label="Скачать копию черновика выдела '+h(item.draft.VD)+'">↓</button></div>').join(''):'';
+ box.onclick=async e=>{
+  const copy=e.target.closest('[data-ce-copy]');if(copy){draftCopy(entries[Number(copy.dataset.ceCopy)]);return;}
+  const button=e.target.closest('[data-ce-resume]');if(!button)return;const item=entries[Number(button.dataset.ceResume)];button.disabled=true;
+  try{
+   await SolinWorkspace.ready;const id=String(item.original.POS)+'::'+String(item.original.LESN);
+   if(!(await SolinWorkspace.list()).some(f=>f.id===id))throw Error('Лесничество этого черновика не найдено. Можно скачать его копию.');
+   await SolinWorkspace.activate(id);
+   const record=item.isNew?clone(item.original):D.quarters[item.original.KV]?.compartments.find(r=>keys.every(k=>same(r[k],item.original[k])));
+   if(!record)throw Error('Выдел этого черновика не найден. Можно скачать его копию.');
+   if(item.isNew)show('quartersScreen');else{current=record;renderComp();show('card');}
+   open(record,{isNew:!!item.isNew});
+  }catch(err){toast(err.message);}finally{button.disabled=false;}
+ };
+}
+function writeRecovery(){
+ clearTimeout(draftTimer);
+ const s=session;if(!s?.dirty||s.pendingRecovery)return;
+ try{
+  const existing=readRecovery(s);
+  if(existing&&existing.revision!==s.recoveryRevision&&existing.owner!==s.recoveryOwner){
+   draftStatus('Черновик открыт в другой вкладке. Не закрывайте эту карточку.');return;
+  }
+  const baselines={};for(const [form,rows]of Object.entries(s.draft._children||{}))baselines[form]=rows.map(row=>s.baselines.get(row)??null);
+  const invalidInputs=[...document.querySelectorAll('#ce-form [data-ce-field][aria-invalid="true"]')].map(el=>({scope:el.dataset.ceScope,field:el.dataset.ceField,index:el.dataset.ceRow,value:el.value}));
+  const item={version:1,owner:s.recoveryOwner,revision:Date.now()+':'+Math.random(),updatedAt:Date.now(),forestName:linkedOrg()?.NOS,isNew:s.isNew,original:s.original,originalQuarter:s.originalQuarter,draft:s.draft,quarter:s.quarter,changedMakets:[...s.changedMakets],entryTouched:[...(s.entryTouched||[])],baselines,invalidInputs};
+  localStorage.setItem(s.recoveryKey,JSON.stringify(item));s.recoveryRevision=item.revision;
+  draftStatus('Черновик на устройстве · ещё не сохранён в карточку');
+  renderDraftResume();
+ }catch(_){draftStatus('Не удалось записать черновик. Сохраните карточку перед закрытием.');}
+}
+function scheduleDraft(){clearTimeout(draftTimer);draftTimer=setTimeout(writeRecovery,250);}
+function discardRecovery(s){
+ clearTimeout(draftTimer);
+ try{const item=readRecovery(s);if(item&&item.revision===s.recoveryRevision)localStorage.removeItem(s.recoveryKey);}catch(_){}
+ renderDraftResume();
+}
+function recoveryPrompt(s,item){
+ s.pendingRecovery=item;s.recoveryRevision=item.revision;
+ const stale=JSON.stringify(item.original)!==JSON.stringify(s.original)||JSON.stringify(item.originalQuarter)!==JSON.stringify(s.originalQuarter);
+ const box=document.createElement('section');box.className='ce-recovery';box.setAttribute('role','status');
+ box.innerHTML='<div><b>Есть незаконченный ввод</b><p>'+h(stale?'Сохранённая карточка изменилась после создания черновика. Скачайте его копию перед началом новой работы.':'Продолжите с того места, где остановились. Сохранённая карточка пока не изменена.')+'</p></div><div class="ce-recovery-actions">'+(!stale?'<button type="button" data-ce-recover>Продолжить черновик</button>':'')+'<button type="button" data-ce-draft-copy>Скачать копию</button><button type="button" data-ce-draft-discard>Начать заново</button></div>';
+ const form=document.getElementById('ce-form');form.querySelector('.dt-toolbar').inert=true;form.querySelector('.dt-viewport').inert=true;
+ form.querySelector('.ce-area-help').after(box);
+ box.addEventListener('click',e=>{
+  if(e.target.closest('[data-ce-draft-copy]')){
+   draftCopy(item);return;
+  }
+  if(e.target.closest('[data-ce-draft-discard]')){
+   discardRecovery(s);s.pendingRecovery=null;box.remove();form.querySelector('.dt-toolbar').inert=false;form.querySelector('.dt-viewport').inert=false;return;
+  }
+  if(!stale&&e.target.closest('[data-ce-recover]')){
+   const record=s.record,isNew=s.isNew;cleanup();open(record,{isNew,recovery:item});
+  }
+ });
+}
+if(typeof document!=='undefined'){
+ window.addEventListener('pagehide',writeRecovery);
+ document.addEventListener('visibilitychange',()=>{if(document.hidden)writeRecovery();});
+ window.addEventListener('storage',renderDraftResume);
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',renderDraftResume,{once:true});else renderDraftResume();
+}
 const title=(form,f)=>aliases[f]||SolinHuman.label(form,f);
 const DESKTOP_WIDTH=1200,DESKTOP_HEIGHT=704;
 const desktopLabels={IAR:'Ярус',KOEF:'Коэфф.',POR:'Порода',LET:'А, лет',PH:'Н, м',PD2:'Д, см',KT:'Класс',PROI:'Происхождение',POL:'Полнота',SPS:'Сумма',ZAP:'Запас'};
@@ -343,7 +416,7 @@ function capture(el){if(!el.matches('[data-ce-field]'))return;
   }
  }
  const output=document.querySelector('[data-ce-display-for="'+el.id+'"]');if(output)output.textContent=description(el.dataset.ceForm,field,target[field]);
- session.dirty=true;document.querySelector('#ce-status').textContent='Изменено';
+ session.dirty=true;scheduleDraft();document.querySelector('#ce-status').textContent='Изменено';
  refreshLinked();
 }
 // Observed Access OnExit messages: informative cross-field checks, not Save rules.
@@ -449,19 +522,19 @@ function validate(){
  for(const [index,row]of(session.draft._children.Макет10||[]).entries())if(!session.baselines.has(row)&&(!row.POR||!row.IAR))throw {message:'Укажите породу и ярус в новой строке макета 10.',form:'Макет10',scope:'Макет10',field:row.POR?'IAR':'POR',index};
  for(const form of session.changedMakets)for(const row of session.draft._children[form]||[])check(form,row,session.baselines.get(row));
 }
-function cleanup(){if(!session)return;const s=session;session=null;const modal=document.querySelector('#modal');modal.classList.remove('ce-modal');modal.removeAttribute('role');modal.removeAttribute('aria-modal');modal.removeAttribute('aria-labelledby');
+function cleanup(){if(!session)return;clearTimeout(draftTimer);const s=session;session=null;const modal=document.querySelector('#modal');modal.classList.remove('ce-modal');modal.removeAttribute('role');modal.removeAttribute('aria-modal');modal.removeAttribute('aria-labelledby');
  document.body.style.overflow=previousOverflow;document.removeEventListener('keydown',onKey);window.removeEventListener('beforeunload',onUnload);
  modal.querySelector('.close').onclick=s.closeButton;
  document.querySelector('#ce-form')?.remove();previousFocus?.focus();
 }
 function close(){cleanup();closeModal();}
-function cancel(){if(session?.dirty&&!confirm('Закрыть карточку без сохранения изменений?'))return;close();}
-function onUnload(e){if(session?.dirty){e.preventDefault();e.returnValue='';}}
+function cancel(){if(session?.dirty&&!confirm('Закрыть карточку без сохранения изменений?'))return;if(session&&!session.pendingRecovery)discardRecovery(session);close();}
+function onUnload(e){writeRecovery();if(session?.dirty){e.preventDefault();e.returnValue='';}}
 function onKey(e){if(!session)return;if(e.key==='Escape'){e.preventDefault();cancel();return;}
  if(e.key==='Enter'&&e.target.matches('[data-ce-field]')&&e.target.tagName!=='SELECT'){e.preventDefault();const fields=[...document.querySelectorAll('#ce-form [data-ce-field]')].filter(el=>el.getClientRects().length&&!el.disabled&&!el.readOnly);const next=fields[fields.indexOf(e.target)+1];next?.focus();next?.select?.();return;}
- if(e.key==='Tab'){const visible=[...document.querySelectorAll('.ce-modal button,.ce-modal input,.ce-modal select,.ce-modal summary,[role="dialog"] [tabindex="0"]')].filter(el=>el.getClientRects().length&&!el.disabled),first=visible[0],last=visible.at(-1);if(e.shiftKey&&document.activeElement===first){last?.focus();e.preventDefault();}else if(!e.shiftKey&&document.activeElement===last){first?.focus();e.preventDefault();}}
+ if(e.key==='Tab'){const visible=[...document.querySelectorAll('.ce-modal button,.ce-modal input,.ce-modal select,.ce-modal summary,[role="dialog"] [tabindex="0"]')].filter(el=>el.getClientRects().length&&!el.disabled&&!el.closest('[inert]')),first=visible[0],last=visible.at(-1);if(e.shiftKey&&document.activeElement===first){last?.focus();e.preventDefault();}else if(!e.shiftKey&&document.activeElement===last){first?.focus();e.preventDefault();}}
 }
-function save(e){e?.preventDefault();if(!session)return false;const s=session;
+function save(e){e?.preventDefault();if(!session||session.pendingRecovery)return false;const s=session;
  try{validate()}catch(err){error(err.message,err.el,err);return;}
  const before=clone(s.record),beforeQuarter=clone(s.quarterTarget),oldWork=localStorage.getItem('solin_field_audited_work_v1'),oldCheckpoint=localStorage.getItem('solin_field_checkpoint_v2');
  try{Object.assign(s.record,clone(s.draft));for(const rows of Object.values(s.record._children||{}))for(const row of rows)for(const k of keys)row[k]=s.record[k]??null;
@@ -473,7 +546,7 @@ function save(e){e?.preventDefault();if(!session)return false;const s=session;
  if(s.isNew)D.quarters[s.record.KV].compartments=D.quarters[s.record.KV].compartments.filter(r=>r!==s.record);
  try{for(const [key,value]of[['solin_field_audited_work_v1',oldWork],['solin_field_checkpoint_v2',oldCheckpoint]])if(value===null)localStorage.removeItem(key);else localStorage.setItem(key,value);}catch(_){}
  error('Не удалось сохранить карточку: '+err.message);return;}
- current=s.record;close();renderComp();refresh();toast('Карточка сохранена');return true;
+ discardRecovery(s);current=s.record;close();renderComp();refresh();toast('Карточка сохранена');return true;
 }
 function click(e){const b=e.target.closest('button');if(!b)return;
  if(b.dataset.ceZoom){setZoom(b.dataset.ceZoom);return;}
@@ -500,7 +573,7 @@ function click(e){const b=e.target.closest('button');if(!b)return;
  if(b.dataset.ceDelete&&!session.draft._children[form]?.length)return;
  if(b.dataset.ceAdd){(session.draft._children[form]??=[]).push(newTableRow(form));}
  else{if(!confirm('Удалить запись '+(Number(b.dataset.ceIndex)+1)+' макета '+form.replace('Макет','')+'? Изменения применятся после сохранения карточки.'))return;session.draft._children[form].splice(Number(b.dataset.ceIndex),1);}
- session.changedMakets.add(form);session.dirty=true;document.querySelector('#ce-status').textContent='Есть несохранённые изменения';rerenderTable(form);updateBadges(form);
+ session.changedMakets.add(form);session.dirty=true;scheduleDraft();document.querySelector('#ce-status').textContent='Есть несохранённые изменения';rerenderTable(form);updateBadges(form);
  if(b.dataset.ceAdd)document.getElementById('ce-table-'+form).querySelector('tbody tr:last-child input,tbody tr:last-child select')?.focus();
 }
 function selectRecord(form,value){const rows=session.draft._children[form]||[],table=document.getElementById('ce-table-'+form);let selected=session.selected?.[form]||0;selected=value==='first'?0:value==='last'?rows.length-1:value==='next'?selected+1:value==='previous'?selected-1:Number(value);selected=Math.max(0,Math.min(Math.max(0,rows.length-1),selected));(session.selected??={})[form]=selected;table.querySelectorAll('tbody tr').forEach((tr,i)=>{tr.classList.toggle('dt-selected',i===selected);tr.querySelector('th').textContent=i===selected?'►':'';});table.querySelector('[data-ce-delete]').dataset.ceIndex=selected;table.querySelector('[data-ce-count]').textContent=rows.length?(selected+1)+' из '+rows.length:'Новая';}
@@ -517,7 +590,11 @@ function open(record,options={}){if(!record)return;
  session.isNew=!!options.isNew;
  if(session.isNew&&session.draft.PLV==null)session.draft.PLV=1;
  session.draft._children??={};
- session.baselines=new WeakMap();for(const [form,children]of Object.entries(session.draft._children))children.forEach((row,i)=>session.baselines.set(row,session.original._children[form][i]));
+ session.recoveryKey=recoveryKey(session);session.recoveryOwner=Date.now()+':'+Math.random();
+ const recovery=options.recovery;
+ if(recovery){session.draft=clone(recovery.draft);session.quarter=clone(recovery.quarter);session.changedMakets=new Set(recovery.changedMakets||[]);session.entryTouched=new Set(recovery.entryTouched||[]);session.dirty=true;session.recoveryRevision=recovery.revision;}
+ session.baselines=new WeakMap();for(const [form,children]of Object.entries(session.draft._children))children.forEach((row,i)=>session.baselines.set(row,session.original._children?.[form]?.[i]));
+ if(recovery){session.baselines=new WeakMap();for(const [form,rows]of Object.entries(session.draft._children))rows.forEach((row,i)=>{const before=recovery.baselines?.[form]?.[i];if(before)session.baselines.set(row,before);});}
  if(session.quarter.GodT==null)session.quarter.GodT=D.lesnichestvo?.[0]?.GodT??null;
  openModal('Карточка таксации',markup());const modal=document.querySelector('#modal');modal.classList.add('ce-modal');modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');modal.setAttribute('aria-labelledby','modalTitle');document.body.style.overflow='hidden';session.supportGrid=document.querySelector('.ce-other .ce-grid');setZoom('actual');
  modal.querySelector('.close').onclick=cancel;
@@ -545,6 +622,10 @@ function open(record,options={}){if(!record)return;
  refreshLinked();
  form.addEventListener('click',click);form.addEventListener('submit',save);document.querySelector('#ce-cancel').onclick=cancel;
  document.addEventListener('keydown',onKey);window.addEventListener('beforeunload',onUnload);modal.querySelector('.modalCard').scrollTop=0;modal.querySelector('.close').focus();if(options.focus)focusControlIssue(options.focus);
+ if(recovery){
+  for(const raw of recovery.invalidInputs||[]){const el=[...form.querySelectorAll('[data-ce-field]')].find(el=>el.dataset.ceScope===raw.scope&&el.dataset.ceField===raw.field&&el.dataset.ceRow===raw.index);if(el){el.value=raw.value;capture(el);}}
+  refreshEntryChecks();writeRecovery();
+ }else{const pending=readRecovery(session);if(pending)recoveryPrompt(session,pending);}
 }
 window.addEventListener('solin-refs-ready',()=>{if(session)refreshLinked()});
 window.SolinCardEditor={open,resolveQuarter:quarterForRecord,refreshDependencies:refreshLinked};
