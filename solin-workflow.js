@@ -172,8 +172,24 @@ if(m==='Макет10'&&(calculated.length||stockEdited)){
  const fields=calculated.map(x=>'<tr><td>'+h(x.label)+'</td><td>'+h(x.previous)+'</td><td><b>'+h(x.expected)+'</b></td><td>'+h(x.reason)+'</td></tr>').join('');
  const table=calculated.length?
    '<div style="overflow-x:auto"><table class="wf-calc-warning"><thead><tr><th>Показатель</th><th>Было</th><th>Стало</th><th>Основание</th></tr></thead><tbody>'+fields+'</tbody></table></div>':'';
- openModal(heading,explanation+table+
+ const zones=k59Check?.zoneOptions||[];
+ const zoneInfo=k59Check?.status==='unsupported-zone'?
+   '<section class="wf-form-note" style="margin:12px 0"><strong>Варианты из Szap'+
+   (k59Check.kpz==null?'':'+Slxr для Kpz '+h(k59Check.kpz))+':</strong> '+
+   (zones.length?zones.map(z=>'<span style="display:block">'+h(z.value)+' — '+h(z.name)+'</span>').join(''):
+     h((k59Check.availableZones||[]).join(', ')||'нет однозначного варианта'))+
+   '<p>Это <b>варианты для проверки</b>, а не автоматически выбранная зона. Для квартала '+h(r.KV)+
+   ' уточните код Klxr. Правильную зону нельзя определить только по KTO.</p></section>':'';
+ const quarterLink=k59Check?.status==='unsupported-zone'?
+    '<button type="button" id="wf-k59-open-quarter" class="secondary">Открыть квартал '+h(r.KV)+'</button>':'';
+ openModal(heading,explanation+zoneInfo+table+quarterLink+
   '<button type="button" class="primary" onclick="closeModal()">Понятно</button>');
+ const link=document.getElementById('wf-k59-open-quarter');
+ if(link)link.onclick=()=>{
+  closeModal();
+  if(typeof show==='function')show('quartersScreen');
+  if(typeof openQuarter==='function')openQuarter(String(r.KV),r.KGLF);
+ };
 }
 
 };}
