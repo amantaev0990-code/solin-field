@@ -69,11 +69,11 @@ async function reopen(p,info){
  assert.equal(await val(p,'Макет10','ZAP'),35,'K59 must automatically correct ZAP on exit');
  assert.equal(await val(p,'base','STUR1'),35);
  assert.equal(await val(p,'base','STUR'),70);
- assert.match(await p.locator('#ce-calc-notice').innerText(),/50[\\s\\S]*35/);
+ assert.match(await p.locator('#ce-calc-notice').innerText(),/50.*35/s);
  console.log('PASS desktop typing, blur, K59 auto-correct and before/after');
  await zap.fill('42');await zap.press('Tab');
  assert.equal(await val(p,'Макет10','ZAP'),35);
- assert.match(await p.locator('#ce-calc-notice').innerText(),/42[\\s\\S]*35/,'Repeat edit should replace stale message');
+ assert.match(await p.locator('#ce-calc-notice').innerText(),/42.*35/s,'Repeat edit should replace stale message');
  console.log('PASS repeat correction updates original and corrected values in notice');
  await field(p,'Макет10','PH').fill('7');
  await field(p,'Макет10','PH').press('Tab');
@@ -115,7 +115,7 @@ async function reopen(p,info){
  await m.locator('[data-ce-assist-apply]').click();
  assert.equal(await val(m,'Макет10','ZAP'),35);
  assert.equal(await val(m,'base','STUR'),70);
- assert.match(await m.locator('#ce-calc-notice').innerText(),/83[\\s\\S]*35/);
+ assert.match(await m.locator('#ce-calc-notice').innerText(),/83.*35/s);
  await m.locator('[data-ce-assist-done]').click();
  await m.locator('#ce-save').click();await m.waitForFunction(()=>!document.querySelector('#ce-form'));
  await reopen(m,mobileInfo);
