@@ -234,6 +234,14 @@ async function reopen(p,info){
   return norm.expected;
  });
  await p.locator('#wf_ZAP').fill('170');await p.locator('#wfSaveMaket').click();
+ const afterZone=await p.evaluate(()=>{
+  const r=current,org=D.lesnichestvo[0],q=D.quarters['1'].meta;
+  const audit=SolinCardCalculations.corrections(r,SOLIN_REFS.tables,org,q);
+  return {stock:r._children.Макет10[0].ZAP,KlxrVD:r.KlxrVD,qKlxr:q.Klxr,M3B:r.M3B,
+   ku:r.KU,tag:r.M3Pr,children:r._children.Макет10,
+   norm:audit.stockPerHectare,issues:audit.issues,modalTitle:document.querySelector('#modalTitle')?.textContent};
+ });
+ console.log('K59_SCREENSHOT_POST_ZONE',JSON.stringify(afterZone));
  assert.equal(await p.evaluate(()=>current._children.Макет10[0].ZAP),zoneFixed,
   'After user chooses a supported quarter zone, original K59 must auto-correct ZAP');
  assert.match(await p.locator('#modalTitle').innerText(),/К59: нормативный запас автоматически исправлен/);
