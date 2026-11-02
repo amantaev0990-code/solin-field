@@ -16,6 +16,12 @@ assert.equal(engine.options('Квартал','Klxr',{},null,{KTO:350000000},tabl
 assert.equal(engine.options('Квартал','Klxr',{Kpz:1},null,{KTO:350000000},tables).status,'empty');
 assert.equal(engine.currentIsAllowed('8',engine.options('Квартал','Klxr',{Kpz:2},null,{KTO:350000000},tables)),false);
 assert.equal(engine.currentIsAllowed('4',engine.options('Квартал','Klxr',{Kpz:2},null,{KTO:350000000},tables)),true);
+const qRefs={...tables,
+ Sples:[{KOD:1,T1:'Лесной фонд',PR:1},{KOD:2,T1:'Скрытая категория',PR:0}],
+ Spzon:[{Kpz:2,Npz:'Степная природная зона'},{Kpz:3,Npz:'Полупустынная'}]};
+assert.deepEqual(values('Квартал','KGLF',{},null,{KTO:350000000},qRefs),['1']);
+assert.deepEqual(values('Квартал','Kpz',{},null,{KTO:350000000},qRefs),['2','3']);
+assert.equal(engine.options('Квартал','KGLF',{},null,{KTO:350000000},{...tables,Sples:[]}).status,'unavailable');
 const trees={_children:{Макет10:[{POR:'В'},{POR:'Б'}]}};
 const p16=engine.options('Макет16','Por16',{},trees,{KTO:350000000},tables);
 assert.equal(p16.status,'complete');
