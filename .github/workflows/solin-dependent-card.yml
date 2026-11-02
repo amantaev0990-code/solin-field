@@ -12,6 +12,8 @@ on:
       - 'solin-workspace.js'
       - 'scripts/test-address-context.cjs'
       - 'solin-card-calculations.js'
+      - 'scripts/test-szap-region-zones.cjs'
+      - 'solin-field-core.js'
       - 'scripts/test-card-calculations.cjs'
       - 'scripts/test-stock-autocorrection-ui.cjs'
       - 'index.html'
@@ -35,15 +37,16 @@ jobs:
           node --check solin-workspace.js
           node --check app.js
           node --check solin-card-calculations.js
+          node --check solin-field-core.js
+          node --check scripts/test-szap-region-zones.cjs
           node --check solin-workflow.js
           node --check scripts/test-stock-autocorrection-ui.cjs
-      - name: Inspect original Szap and Slxr zoning tables for K59
-        run: node scripts/inspect-k59-key.cjs
       - name: Regression — forest type, species, zone, region and Access combo rules
         run: |
           node scripts/test-dependent-field-rules.cjs
           node scripts/test-category-layer-dependencies.cjs
           node scripts/test-card-calculations.cjs
+          node scripts/test-szap-region-zones.cjs
           node scripts/test-address-context.cjs
           node scripts/card-editor-quarter-test.cjs
 
