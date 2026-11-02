@@ -28,12 +28,21 @@ const k59Snapshot=JSON.stringify(k59Card);
 const original=calc.stockPerHectare(k59Card,stockRefs,{KTO:150000000});
 assert.equal(original.status,'complete');
 assert.equal(original.expected,35);
+assert.equal(calc.k59Round(29.5),30,'K59 explicitly rounds 0.5 upward');
+assert.equal(calc.accessRound(29.5),30,'Jet Round 29.5 = 30');
+assert.equal(calc.accessRound(30.5),30,'Jet Round 30.5 = 30');
+const midpoint={...k59Card,_children:{Макет10:[{...k59Card._children.Макет10[0],POL:0.5}]}};
+assert.equal(calc.stockPerHectare(midpoint,stockRefs,{KTO:150000000}).expected,30,
+ 'K59_1 rounds Szap.v6 * 0.5 = 29.5 up to 30');
 assert.equal(original.index,0);
 const cascaded=calc.corrections(k59Card,stockRefs,{KTO:150000000});
 assert.deepEqual(Array.from(cascaded.issues,x=>x.field),['ZAP','STUR1','STUR']);
 assert.deepEqual(Array.from(cascaded.issues,x=>x.expected),[35,35,70]);
 assert.equal(JSON.stringify(k59Card),k59Snapshot,'K59 corrections must not modify source data');
 assert.equal(calc.stockPerHectare(k59Card,stockRefs,null).status,'waiting');
+const height7={...k59Card,_children:{Макет10:[{...k59Card._children.Макет10[0],PH:6.5}]}};
+assert.equal(calc.stockPerHectare(height7,{Szap:[{...stockRefs.Szap[0],v7:80}],SzapCK:[]},{KTO:150000000}).expected,48,
+ 'K59_1 rounds a weighted 6.5m height up to 7m');
 assert.equal(calc.stockPerHectare({...k59Card,KU:21},stockRefs,{KTO:150000000}).status,'not-applicable');
 assert.equal(calc.stockPerHectare(k59Card,{Szap:[stockRefs.Szap[0],stockRefs.Szap[0]]},{KTO:150000000}).status,'ambiguous');
 assert.equal(calc.stockPerHectare({...k59Card,_children:{Макет10:[...k59Card._children.Макет10,{...k59Card._children.Макет10[0],PH:8}]}},stockRefs,{KTO:150000000}).status,'ambiguous');
@@ -51,13 +60,19 @@ assert.equal(calc.bonitet({...card,_children:{Макет10:[{...card._children.�
 assert.equal(calc.bonitet(card,null).status,'unavailable');
 const two={...card,_children:{Макет10:[{...card._children.Макет10[0],ZAP:40},{...card._children.Макет10[0],ZAP:10,PH:3}]}};
 assert.equal(calc.standStock(two).status,'ambiguous');
-assert.equal(calc.standStock({...card,PLV:0.0125}).status,'ambiguous'); // 0.5 tie
+assert.equal(calc.standStock({...card,PLV:0.0125}).expectedTotal,0); // Jet Round: 0.5 -> 0 (even)
+assert.equal(calc.standStock({...card,PLV:0.0375}).expectedTotal,2); // Jet Round: 1.5 -> 2 (even)
 const diff={...card,LESN:1};
 assert.equal(calc.standStock(diff).status,'waiting','A child from a different forestry must never contribute to the stock');
 const editor=fs.readFileSync('solin-card-editor.js','utf8');
 assert.match(editor,/function recalculateEditedField\(el\)/);
 assert.match(editor,/recalculateEditedField\(e\.target\)/);
-assert.match(editor,/Введено впервые/);
+assert.match(editor,/До исправления/);
+assert.match(editor,/session\.calcNotices\.findIndex/,'Repeated ZAP correction must update its notice');
+assert.match(editor,/if\(changedStock\)/,'Save must also recalculate changed stock');
+const workflow=fs.readFileSync('solin-workflow.js','utf8');
+assert.doesNotMatch(workflow,/r\.STUR1=m\.ZAP/,'Exit must not copy only the first row');
+assert.match(workflow,/SolinCardCalculations\?\.standStock\(r\)/);
 assert.match(editor,/Пересчитано · не сохранено/);
 assert.match(editor,/const changed=\(row,prior,names\)/);
 console.log('K58_AND_STOCK_OK: 43-row historical bonitet fixture, K59 table-backed ZAP and STUR previews, typed correction banner, no data mutation');

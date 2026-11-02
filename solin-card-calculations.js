@@ -20,6 +20,19 @@ function safeRoundHalf(numb,places=0){
  if(Math.abs(part-0.5)<0.0000001)return null;
  return Math.round(v)/10**places;
 }
+// Access/Jet Round(x, digits): midpoint goes to the nearest EVEN digit.
+function accessRound(value,places=0){
+ if(!Number.isFinite(value)||value<0)return null;
+ const factor=10**places,scaled=value*factor,lo=Math.floor(scaled),fraction=scaled-lo;
+ if(Math.abs(fraction-0.5)<1e-8)return (lo%2===0?lo:lo+1)/factor;
+ return Math.round(scaled)/factor;
+}
+// К59_1 uses Int() and an explicit <0.5 comparison: midpoint goes UP.
+function k59Round(value,places=0){
+ if(!Number.isFinite(value)||value<0)return null;
+ const factor=10**places,scaled=value*factor,lo=Math.floor(scaled);
+ return (lo+(scaled-lo>=0.5-1e-9?1:0))/factor;
+}
 function bonitet(record,refs){
  if(!refs?.SSHB?.length)return status('Нет оригинальной шкалы SSHB');
  const category=n(record?.KU);
@@ -58,8 +71,8 @@ function standStock(record){
  const grouped=eligible.map(x=>['IAR','KOEF','LET','PH','PD2','POL'].map(k=>String(x[k]??'')).join('|'));
  if(new Set(grouped).size>1)
   return status('Несколько групп Макет10ЗАП1; оригинальное UPDATE не имеет единственного результата','ambiguous');
- const perHa=eligible.reduce((s,x)=>s+n(x.ZAP),0),total=safeRoundHalf(perHa*area,0);
- if(total===null)return status('Общий запас попадает на неоднозначную границу Jet Round','ambiguous');
+ const perHa=eligible.reduce((s,x)=>s+n(x.ZAP),0),total=accessRound(perHa*area,0);
+ if(total===null)return status('Невозможно округлить общий запас Access Round','ambiguous');
  return {status:'complete',reason:'Макет10ЗАП · ΣZAP главной породы '+perHa+' м³/га × '+area+' га',
    expectedPerHa:perHa,expectedTotal:total,area};
 }
@@ -82,7 +95,7 @@ function stockPerHectare(record,refs,org){
  if(sameLayer.length!==1)return status('К59: несколько строк с одинаковым ярусом; необходимо суммирование по запросу','ambiguous');
  const weighted=n(row.KOEF)*n(row.PH)/10;
  if(!Number.isFinite(weighted)||weighted<=0)return status('К59: не указаны коэффициент состава или высота','waiting');
- const height=safeRoundHalf(weighted,0);
+ const height=k59Round(weighted,0);
  if(height===null||height<1||height>39)return status('К59: неоднозначная или недоступная высота в таблице Szap','ambiguous');
  const specie=String(row.POR).trim();
  const cul=(([2,4,7].includes(category)&&['С','СО'].includes(specie))||
@@ -92,13 +105,13 @@ function stockPerHectare(record,refs,org){
  if(rows.length!==1)return status('К59: таблица Szap не имеет единственной строки для KTO, POR, LXZ и KUL','ambiguous');
  const v=n(rows[0]['v'+height]),pol=n(row.POL);
  if(v===null||v<=0)return status('К59: нет нормативного запаса для этой высоты','ambiguous');
- const standard=safeRoundHalf(v*pol,0);
+ const standard=k59Round(v*pol,0);
  if(standard===null)return status('К59: расчёт попал на неоднозначное округление','ambiguous');
  let expected=standard,source='Szap, высота '+height+' м, полнота '+pol;
  const CK=(refs.SzapCK||[]).filter(r=>same(r.Obl,region)&&same(r.p1,row.POR)&&same(r.Boni,record.M3B));
  if(CK.length>1)return status('К59: несколько совпадающих таблиц SzapCK','ambiguous');
  if(CK.length){
-   const step=safeRoundHalf(weighted,1);
+   const step=k59Round(weighted,1);
    if(step===null)return status('К59: неоднозначное округление высоты в SzapCK','ambiguous');
    const col='v'+Math.round(step*10).toString().padStart(2,'0')+'c';
    const vck=n(CK[0][col]);
@@ -110,7 +123,7 @@ function stockPerHectare(record,refs,org){
        const species=(refs.SDP_Tip||refs.SDP||[]).find(r=>same(r.KPC,row.POR));
        const ndr=n(species?.NDR);
        if(ndr===null)return status('К59: группа NDR неизвестна для выбора нормы SzapCK','ambiguous');
-       expected=safeRoundHalf(vck*pol,ndr===4?1:0);
+       expected=k59Round(vck*pol,ndr===4?1:0);
        if(expected===null)return status('К59: неоднозначное округление SzapCK','ambiguous');
        source='SzapCK, высота '+step+' м, полнота '+pol+', год '+year;
      }
@@ -155,5 +168,5 @@ function corrections(record,refs,org){
  }else unknown.push({field:'STUR',...stock});
  return {issues,unknown,bonitet:b,standStock:stock,stockPerHectare:k59};
 }
-window.SolinCardCalculations={bonitet,standStock,stockPerHectare,corrections,safeRoundHalf};
+window.SolinCardCalculations={bonitet,standStock,stockPerHectare,corrections,safeRoundHalf,accessRound,k59Round};
 })();
