@@ -9,6 +9,9 @@ on:
       - 'scripts/test-category-layer-dependencies.cjs'
       - 'solin-card-calculations.js'
       - 'scripts/test-card-calculations.cjs'
+      - 'scripts/test-stock-autocorrection-ui.cjs'
+      - 'index.html'
+      - 'sw.js'
       - '.github/workflows/solin-dependent-card.yml'
   workflow_dispatch:
 jobs:
@@ -26,9 +29,26 @@ jobs:
           node --check solin-card-editor.js
           node --check solin-card-calculations.js
           node --check solin-workflow.js
+          node --check scripts/test-stock-autocorrection-ui.cjs
       - name: Regression — forest type, species, zone, region and Access combo rules
         run: |
           node scripts/test-dependent-field-rules.cjs
           node scripts/test-category-layer-dependencies.cjs
           node scripts/test-card-calculations.cjs
           node scripts/card-editor-quarter-test.cjs
+
+  stock-autocorrection-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install browser driver
+        run: npm install --no-save --no-package-lock playwright-core
+      - name: Real Chrome correction checks — desktop and mobile
+        env:
+          PLAYWRIGHT_PATH: playwright-core
+          BROWSER_CHANNEL: chrome
+        run: node scripts/test-stock-autocorrection-ui.cjs
