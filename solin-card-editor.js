@@ -199,37 +199,14 @@ function refreshLinked(){
  for(const el of document.querySelectorAll('#ce-form select[data-ce-field]')){
   const result=linkedOptions(el);
   if(!result)continue;
-  el.title=result.reason||'';
-  if(result.status==='unavailable'){
-   if(el.dataset.ceField==='M3TLU')el.disabled=true; // Never allow an unverified forest type.
-   continue;
-  }
-  if(el.dataset.ceField==='M3TLU')
-   el.disabled=['waiting','empty','ambiguous'].includes(result.status);
   const raw=linkedRow(el)[el.dataset.ceField];
   const current=raw==null?'':String(raw),list=result.items||[];
-  const old=el.value;
-  const options=[new Option('— Не указано —','')];
-  for(const opt of list){
-   if(!opt.value)continue;
-   options.push(new Option(opt.value+(opt.label?' — '+opt.label:''),opt.value));
-  }
-  // Imported Access TEXT codes can contain original leading/trailing spaces.
-  // Do not rewrite a value merely by rebuilding a dropdown.
-  if(current&&!options.some(o=>o.value===current)){
-   const match=list.find(x=>String(x.value).trim()===current.trim());
-   options.push(new Option('Сохранённый код: '+current+(match?.label?' — '+match.label:''),current));
-  }
-  const signature=options.map(o=>o.value+'|'+o.textContent).join('\u241e');
-  if(el.dataset.linkedSignature!==signature){
-   el.replaceChildren(...options);
-   el.dataset.linkedSignature=signature;
-  }
-  el.value=current;
-  const cell=el.closest('.dt-cell'),output=cell?.querySelector('output[data-ce-display-for]');
+  const output=el.closest('.dt-cell')?.querySelector('output[data-ce-display-for]');
+  engine.applySelect(el,result,{current});
   if(output&&el.dataset.ceField==='M3TLU'){
    const selected=list.find(o=>String(o.value).trim()===current.trim());
-   output.textContent=current?(selected?.label||'Проверьте соответствие породе и зоне'):(result.status==='waiting'?'Сначала порода':list.length+' допустимых типа леса');
+   output.textContent=current?(selected?.label||'Проверьте соответствие породе и зоне'):
+    (result.status==='waiting'?'Сначала выберите зависимые поля':list.length+' допустимых типа леса');
    output.title=result.reason;
   }
   el.dataset.linkedStatus=result.status;
