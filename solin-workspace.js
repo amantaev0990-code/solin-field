@@ -26,7 +26,18 @@ function legacyClear(){for(const key of ['solin_field_audited_work_v1','solin_us
 function checkpointFor(forest){return {format:'SOLIN-Field-Backup-v2',at:new Date().toISOString(),quarters:forest.quarters,lesnichestvo:[forest.org],source:forest.source,extraTables:forest.extraTables||{},history:forest.history||[]};}
 function clearMap(){if(typeof importedMapLayers!=='undefined'){for(const entry of importedMapLayers){for(const layer of [entry.layer,...(entry.geometryEntries||[]).map(g=>g.layer),...Object.values(entry.labelLayers||{})])if(layer?.removeFrom&&typeof fieldMap!=='undefined')fieldMap?.removeLayer(layer);}importedMapLayers.splice(0);}window.__solinMapRestored=false;window.__cmfSelectedLayer=null;window.closeCmfSheet?.();window.renderMapLayerList?.();}
 function heading(){const org=D.lesnichestvo?.[0]||{};document.querySelector('.forestTitle h2').textContent=org.NOS||'Лесничество';document.querySelector('.forestTitle p').textContent=org.NLX||'Лесовладелец не указан';const b=document.querySelector('.forestTitle .change');b.textContent='Сменить';b.onclick=home;b.style.display='inline-flex';document.querySelector('.brand p').textContent=opened?(org.NOS||'Полевые работы'):'Выбор рабочего лесничества';}
-async function activate(id){await window.__solinMapImportPromise?.catch(()=>{});await persist();const forest=(await list()).find(r=>r.id===id);if(!forest)throw Error('Лесничество не найдено');localStorage.setItem(CHECKPOINT,JSON.stringify(checkpointFor(forest)));legacyClear();clearMap();activeId=id;D.lesnichestvo=[copy(forest.org)];D.quarters=copy(forest.quarters);D._transferExtras=copy(forest.extraTables||{});D.source={...copy(forest.source||{}),forestDistrict:forest.org.NOS,year:forest.org.GodT};current=null;gps=null;opened=true;localStorage.setItem(ACTIVE,id);heading();refresh();show('quartersScreen');window.dispatchEvent(new Event('solin-forest-changed'));return forest;}
+async function activate(id){await window.__solinMapImportPromise?.catch(()=>{});await persist();const forest=(await list()).find(r=>r.id===id);if(!forest)throw Error('Лесничество не найдено');
+ // Earlier 3-select creation wrote POS/LESN but discarded the original KTO.
+ // Repair only genuinely missing KTO, and persist in the SAME forest record;
+ // existing quarters, plots and user edits remain untouched.
+ if(!Number.isFinite(Number(forest.org?.KTO))||Number(forest.org.KTO)<=0){
+  const recovered=originalForestKTO(forest.org?.POS,forest.org?.LESN);
+  if(recovered!==null){
+   forest.org.KTO=recovered;
+   await putMany([forest]);
+  }
+ }
+ localStorage.setItem(CHECKPOINT,JSON.stringify(checkpointFor(forest)));legacyClear();clearMap();activeId=id;D.lesnichestvo=[copy(forest.org)];D.quarters=copy(forest.quarters);D._transferExtras=copy(forest.extraTables||{});D.source={...copy(forest.source||{}),forestDistrict:forest.org.NOS,year:forest.org.GodT};current=null;gps=null;opened=true;localStorage.setItem(ACTIVE,id);heading();refresh();show('quartersScreen');window.dispatchEvent(new Event('solin-forest-changed'));return forest;}
 function showHome(){opened=false;show('homeScreen');heading();return renderHome();}
 async function home(){await persist();return showHome();}
 async function renderHome(){const forests=await list(),host=document.querySelector('#forestList');host.innerHTML=forests.length?'':'<p class="home-empty">Добавьте лесничество из Transfer или создайте новое.</p>';for(const f of forests){const qs=Object.values(f.quarters),rows=qs.flatMap(q=>q.compartments||[]),area=rows.reduce((n,r)=>n+(Number(r.PLV)||0),0);const b=document.createElement('button');b.className='forest-option';b.dataset.forest=f.id;b.innerHTML='<span class="forest-option-icon">♧</span><span><strong>'+html(f.org.NOS)+'</strong><small>'+html(f.org.NLX||'Лесовладелец не указан')+'</small><span class="forest-summary">'+qs.length+' кварталов · '+rows.length+' выделов · '+num(area)+' га</span></span><span class="forest-option-open">Открыть →</span>';b.onclick=()=>activate(f.id).catch(e=>toast(e.message));host.append(b);}document.querySelector('#forestListStatus').textContent=forests.length?'Сохранено на этом устройстве: '+forests.length:'Готово к началу работы';}
@@ -72,6 +83,14 @@ const SOLIN_OWNER_FORESTS={
 const matchCode=(a,b)=>String(a)===String(b);
 const REGION_BY_KTO={110000000:100,150000000:200,190000000:300,230000000:400,270000000:500,310000000:600,350000000:700,390000000:800,430000000:900,470000000:1000,510000000:1100,550000000:1200,590000000:1300,630000000:1400};
 const regionFromKTO=kto=>REGION_BY_KTO[Number(kto)]??null;
+// Restore the original forest registry's KTO only by an exact (POS, LESN) match.
+// Avoid guessing regions from names or POS prefixes.
+function originalForestKTO(pos,lesn){
+ const matches=(window.SOLIN_FOREST_CATALOG?.rows||[]).filter(row=>
+  String(row[0])===String(pos)&&String(row[1])===String(lesn)&&
+  Number.isFinite(Number(row[4]))&&Number(row[4])>0);
+ return matches.length===1?Number(matches[0][4]):null;
+}
 function forestRegionCode(f){
  const known=f?.source?.regionCode??f?.org?.regionCode;
  if(known!=null&&SOLIN_REGIONS.some(x=>matchCode(x.code,known)))return Number(known);
@@ -125,7 +144,8 @@ async function create(input){
  if(input.regionCode!=null){
   const selected=selectedFromCatalog(input,forests);
   region=selected.region;
-  prepared={POS:selected.owner.code,LESN:selected.district.code,NLX:selected.owner.name,NOS:selected.district.name,GodT:new Date().getFullYear()};
+  prepared={POS:selected.owner.code,LESN:selected.district.code,NLX:selected.owner.name,NOS:selected.district.name,
+   KTO:originalForestKTO(selected.owner.code,selected.district.code),GodT:new Date().getFullYear()};
  }
  const org={...prepared,NOS:String(prepared.NOS||'').trim(),NLX:String(prepared.NLX||'').trim(),GodT:Number(prepared.GodT||new Date().getFullYear())};
  if(!org.NOS||!org.NLX)throw Error('Укажите названия лесничества и лесовладельца');
