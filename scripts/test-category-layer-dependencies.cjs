@@ -37,7 +37,12 @@ assert.equal(rules.currentIsAllowed('3',rules.options('Макет10','IAR',{IAR:
 assert.equal(rules.currentIsAllowed('7',rules.options('Макет10','IAR',{IAR:7},{KU:21},null,refs)),true);
 assert.equal(rules.currentIsAllowed('1',rules.options('Макет10','IAR',{IAR:1},{KU:20},null,refs)),false);
 assert.equal(rules.allowedLayers({KU:999},refs).status,'unknown');
-assert.equal(rules.allowedLayers({KU:1},{SKU:refs.SKU,SIAR:refs.SIAR}).status,'unavailable');
+const withoutPiAP=rules.allowedLayers({KU:1},{SKU:refs.SKU,SIAR:refs.SIAR});
+assert.equal(withoutPiAP.status,'partial','Original SIAR layer codes remain selectable when PIAP is missing');
+assert.deepEqual(Array.from(withoutPiAP.items,x=>Number(x.value)),[1,2,7,8]);
+assert.match(withoutPiAP.reason,/PIAP/);
+assert.equal(rules.allowedLayers({KU:1},{SKU:refs.SKU}).status,'unavailable',
+ 'Without SIAR no layer candidate can be reconstructed');
 const noPIAP={...refs,PIAP:[{KIAR:1},{KIAR:7}]};
 assert.deepEqual(Array.from(rules.allowedLayers({KU:1},noPIAP).items,x=>Number(x.value)),[1,7]);
 const editor=fs.readFileSync('solin-card-editor.js','utf8');
