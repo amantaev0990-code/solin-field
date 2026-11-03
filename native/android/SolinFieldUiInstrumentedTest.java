@@ -104,7 +104,11 @@ public class SolinFieldUiInstrumentedTest {
        "const originalFields=document.querySelectorAll('#humanContent .humanField').length;"+
        "if(!originalFields)throw Error('Missing human tax card');"+
        "SolinCardEditor.open(current);"+
-       "return {forests:forests.length,fields:originalFields,maket10:!!document.getElementById('ce-section-10'),"+
+       "const ku=document.querySelector('.dt-board select[data-ce-scope=\\\"base\\\"][data-ce-field=\\\"KU\\\"]');"+
+       "if(!ku||ku.disabled||ku.options.length<2)throw Error('Android KU choices unavailable');"+
+       "ku.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,cancelable:true,pointerType:'touch'}));"+
+       "const keyboardField=document.activeElement?.id;"+
+       "return {keyboardField,kuChoices:ku.options.length,nativePicker:!!window.SolinAndroidSelects,forests:forests.length,fields:originalFields,maket10:!!document.getElementById('ce-section-10'),"+
        "modal:!document.getElementById('modal').classList.contains('hidden'),"+
        "title:document.querySelector('#modalTitle')?.textContent};"+
        "})().then(x=>window.__solinNativeParity=JSON.stringify(x)).catch(e=>window.__solinNativeParity=JSON.stringify({error:String(e.message||e)}));"+
@@ -124,6 +128,9 @@ public class SolinFieldUiInstrumentedTest {
       assertTrue("Android tax card fields missing",result.optInt("fields")>=1);
       assertTrue("Android classic Maket10 missing",result.optBoolean("maket10"));
       assertTrue("Android tax-card edit dialog missing",result.optBoolean("modal"));
+      assertTrue("Native Android selector helper missing",result.optBoolean("nativePicker"));
+      assertTrue("KU contains no selectable source-backed values",result.optInt("kuChoices")>=2);
+      assertEquals("Android taxonomy search must receive keyboard focus", "ce-assist-query",result.optString("keyboardField"));
     } finally {
       getInstrumentation().runOnMainSync(activity::finish);
     }
