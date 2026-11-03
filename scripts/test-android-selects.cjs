@@ -75,7 +75,23 @@ const server=http.createServer((req,res)=>{
   assert(await page.locator('#ce-assist-query').isVisible(),'Desktop-sized Android tablet must use searchable card assistant');
   assert.equal(await page.evaluate(()=>document.activeElement?.id),'ce-assist-query','Card assistant must focus Android keyboard');
   assert.equal(await page.locator('#solin-android-picker').count(),0,'No double modal in desktop card');
+  // A grey dependent input is not a valid selectable code. It must explain
+  // the actual prerequisite instead of offering unsafe options.
+  await page.evaluate(()=>{
+   document.querySelector('#ce-assist [data-ce-assist-close]')?.click();
+   const el=document.querySelector('#ce-form [data-ce-scope="base"][data-ce-field="KU"]');
+   el.disabled=true;
+   el.title='Требуется исходный справочник SKU (проверка)';
+   SolinCardAssist.openFieldPicker();
+  });
+  await page.locator('#ce-assist-options [data-ce-assist-pick]').filter({hasText:'KU'}).first().click();
+  assert.match(await page.locator('#ce-assist').innerText(),/Требуется исходный справочник SKU/,
+   'Disabled dependent field should explain missing source rather than let a code through');
+  assert.equal(await page.locator('#ce-assist-options [data-ce-assist-option]').count(),0,
+   'Disabled field must not offer invalid selectable values');
+  await page.locator('#ce-assist [data-ce-assist-close]').click();
+
   assert.deepEqual(errors,[],'No JS errors in Android-select interactions');
-  console.log('ANDROID_SELECTS_OK: 960px Android tablet shows maket tabs, keyboard focus for code and numeric fields, source-code preservation, draft safety and no double dialogs');
+  console.log('ANDROID_SELECTS_OK: 960px Android tablet shows maket tabs, keyboard focus for code and numeric fields, source-code preservation, draft safety with grey fields explicitly explained; no double dialogs');
  }finally{await browser?.close();await new Promise(done=>server.close(done));}
 })().catch(e=>{console.error(e);process.exitCode=1;});
