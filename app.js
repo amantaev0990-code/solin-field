@@ -1,3 +1,4 @@
+const SOLIN_DELETE_ICON='<svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v7m4-7v7"/></svg>';window.solinDeleteIcon=SOLIN_DELETE_ICON;
 let D=null,current=null,gps=null;const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const friendly={KU:'Категория угодий',PLV:'Площадь, га',KV:'Квартал',VD:'Выдел',KGLF:'Категория лесного фонда',Fzona:'Функциональная зона',OZU:'Особо защитный участок',M3Pr:'Преобладающая порода',M3B:'Класс бонитета',M3TL:'Тип леса',M3TLU:'Тип лесорастительных условий',M3G:'Группа возраста',M3KP:'Класс пожарной опасности',M2PM1:'Проектируемое мероприятие',M2Pr:'Интенсивность выборки, %',PRkol:'Количество подроста, тыс. шт./га',PRH:'Средняя высота подроста, м',PRA:'Возраст подроста',POR:'Порода',LET:'Возраст, лет',PH:'Высота, м',PD2:'Диаметр, см',POL:'Полнота',ZAP:'Запас, м³/га',IAR:'Ярус',KOEF:'Коэффициент состава',KT:'Класс товарности',PROI:'Происхождение',SPS:'Состояние',TB:'Тип болота',TR:'Тип растительности',MTC:'Мощность торфа, дм',ZP:'Порода зарастания',ZPR:'Зарастание, %'};
 const refNames={SKU:'Категории угодий',SDP:'Древесные и кустарниковые породы',SIAR:'Ярусы древостоя',SBon:'Классы бонитета',STB:'Типы болот',SLM:'Проектируемые мероприятия',SProi:'Происхождение насаждений',STPD:'Типы повреждений'};
@@ -13,7 +14,7 @@ function mergeLocal(){try{const L=JSON.parse(localStorage.getItem('solin_user_da
 async function boot(){try{const mf=await getJSON('./data-manifest.json');D=await getJSON('./data-meta.json');const chunks=await Promise.all(mf.quarterChunks.map(f=>getJSON('./'+f)));D.quarters=Object.assign({},...chunks);D.references=D.references||{};mergeLocal();refresh();renderFriendlyRefs();renderDb();window.dispatchEvent(new Event('solin-ready'))}catch(e){console.error(e);toast('Ошибка загрузки данных: '+e.message);document.querySelector('#quarters').innerHTML='<button class="widePrimary" onclick="boot()">Повторить загрузку</button>'}}
 function totals(){const qs=Object.values(D.quarters),comps=qs.flatMap(q=>q.compartments||[]);return{q:qs.length,v:comps.length,a:comps.reduce((s,r)=>s+(+r.PLV||0),0)}}
 function refresh(){const t=totals();$('#qcount').textContent=t.q;$('#vcount').textContent=t.v;$('#area').textContent=num(t.a);$('#rcount').textContent=D.stats?.referenceTables||132;$('#qheadCount').textContent='('+t.q+')';$('#vheadCount').textContent='('+t.v+')';renderQuarters();renderAllComps()}
-function renderQuarters(filter=''){const box=$('#quarters');box.innerHTML='';Object.keys(D.quarters).sort((a,b)=>+a-+b).filter(k=>!filter||k.includes(filter.trim())).forEach(k=>{const q=D.quarters[k],rs=q.compartments||[],a=rs.reduce((s,r)=>s+(+r.PLV||0),0);const b=document.createElement('button');b.className='quarterCard';b.innerHTML=`<span class="quarterNo">${esc(k)}</span><span class="quarterText"><b>Квартал ${esc(k)}</b><small>Выделов: ${rs.length}</small><small>Площадь: ${num(a)} га</small></span><span class="arrow">›</span>`;b.onclick=()=>openQuarter(k);box.appendChild(b)});if(!box.children.length)box.innerHTML='<div class="empty">Кварталы не найдены</div>'}
+function renderQuarters(filter=''){const box=$('#quarters');box.innerHTML='';Object.keys(D.quarters).sort((a,b)=>+a-+b).filter(k=>!filter||k.includes(filter.trim())).forEach(k=>{const q=D.quarters[k],rs=q.compartments||[],a=rs.reduce((sum,r)=>sum+(+r.PLV||0),0);const b=document.createElement('button');b.type='button';b.className='quarterCard';b.innerHTML=`<span class="quarterNo">${esc(k)}</span><span class="quarterText"><b>Квартал ${esc(k)}</b><small>Выделов: ${rs.length}</small><small>Площадь: ${num(a)} га</small></span><span class="arrow">›</span>`;b.onclick=()=>openQuarter(k);const entry=document.createElement('div');entry.className='record-entry';const remove=document.createElement('button');remove.type='button';remove.className='record-delete';remove.innerHTML=SOLIN_DELETE_ICON;remove.title='Удалить квартал '+k;remove.setAttribute('aria-label','Удалить квартал '+k);remove.onclick=()=>openDeleteQuarter(k);entry.append(b,remove);box.appendChild(entry)});if(!box.children.length)box.innerHTML='<div class="empty">Кварталы не найдены</div>'}
 // The desktop "Список кварталов" selects a row by KV + KGLF.
 // A quarter can span multiple KGLF rows; group at the user-interface layer only.
 function quarterCategories(q){
@@ -26,8 +27,9 @@ function openQuarter(k,selectedKGLF=null){
  const scoped=selected==null?q.compartments||[]:(q.compartments||[]).filter(r=>String(r.KGLF)===selected);
  const area=scoped.reduce((sum,r)=>sum+(Number(r.PLV)||0),0);
  const all=selected==null&&categories.length>1;
- box.innerHTML=`<div class="screenHead"><div><h2>Квартал ${esc(k)}</h2><p>${scoped.length} выделов · ${num(area,2)} га${selected==null?'':' · КГЛФ '+esc(selected)}</p></div><button class="iconbtn" id="qReturn" aria-label="Назад">‹</button></div><div id="qCategoryList"></div><div id="qActions"></div><div id="qComps"></div>`;
+ box.innerHTML=`<div class="screenHead"><div><h2>Квартал ${esc(k)}</h2><p>${scoped.length} выделов · ${num(area,2)} га${selected==null?'':' · КГЛФ '+esc(selected)}</p></div><div class="quarter-head-actions"><button type="button" class="record-delete quarter-head-delete" id="qDelete" title="Удалить квартал" aria-label="Удалить квартал ${esc(k)}">${SOLIN_DELETE_ICON}</button><button class="iconbtn" id="qReturn" aria-label="Назад">‹</button></div></div><div id="qCategoryList"></div><div id="qActions"></div><div id="qComps"></div>`;
  $('#qReturn').onclick=()=>selected!=null&&categories.length>1?openQuarter(k):renderQuarters();
+  $('#qDelete').onclick=()=>openDeleteQuarter(k);
  if(all){
   const menu=$('#qCategoryList');
   menu.innerHTML='<p class="quarterCategoryHint">В настольном SOLI-N один квартал отображается отдельно по категориям ГЛФ. Выберите строку:</p>';
@@ -45,12 +47,60 @@ function openQuarter(k,selectedKGLF=null){
  create.onclick=()=>openCompForm(k,selected);actions.appendChild(create);
  renderCompList($('#qComps'),scoped);
 }
-function renderCompList(box,rs){box.innerHTML='';[...rs].sort((a,b)=>+a.VD-+b.VD).forEach(r=>{const b=document.createElement('button');b.className='compCard';const cat=landName(r.KU)||'Категория не указана',sp=r.M3Pr?speciesName(r.M3Pr):'';b.innerHTML=`<span class="compNo">${esc(r.KV)}-${esc(r.VD)}</span><span class="compText"><b>Выдел ${esc(r.VD)}</b><small>${num(r.PLV)} га · ${esc(cat)}</small>${sp?`<small>Порода: ${esc(sp)}</small>`:''}</span><span class="arrow">›</span>`;b.onclick=()=>{current=r;renderComp();show('card')};box.appendChild(b)})}
+function renderCompList(box,rs){box.innerHTML='';[...rs].sort((a,b)=>+a.VD-+b.VD).forEach(r=>{const b=document.createElement('button');b.type='button';b.className='compCard';const cat=landName(r.KU)||'Категория не указана',sp=r.M3Pr?speciesName(r.M3Pr):'';b.innerHTML=`<span class="compNo">${esc(r.KV)}-${esc(r.VD)}</span><span class="compText"><b>Выдел ${esc(r.VD)}</b><small>${num(r.PLV)} га · ${esc(cat)}</small>${sp?`<small>Порода: ${esc(sp)}</small>`:''}</span><span class="arrow">›</span>`;b.onclick=()=>{current=r;renderComp();show('card')};const entry=document.createElement('div');entry.className='record-entry';const remove=document.createElement('button');remove.type='button';remove.className='record-delete';remove.innerHTML=SOLIN_DELETE_ICON;remove.title='Удалить выдел '+r.VD+' квартала '+r.KV;remove.setAttribute('aria-label',remove.title);remove.onclick=()=>openDeleteComp(r);entry.append(b,remove);box.appendChild(entry)})}
 function renderAllComps(filter=''){const box=$('#allComps');if(!box)return;let rs=Object.values(D?.quarters||{}).flatMap(q=>q.compartments||[]);filter=filter.trim().toLowerCase();if(filter)rs=rs.filter(r=>String(r.KV).includes(filter)||String(r.VD).includes(filter));renderCompList(box,rs)}
 function field(k,v){if(window.SolinHuman)return `<div class="humanField"><span>${esc(SolinHuman.label('ВыделВ',k))}</span><b>${esc(SolinHuman.value('ВыделВ',k,v,current))}</b></div>`;return `<div class="humanField"><span>${friendly[k]||k}</span><b>${esc(lookup(k,v))}</b></div>`}
 function section(title,keys,o){const a=keys.filter(k=>o[k]!==undefined&&o[k]!==null&&o[k]!=='');return a.length?`<div class="humanSection"><h3>${title}</h3><div class="humanGrid">${a.map(k=>field(k,o[k])).join('')}</div></div>`:''}
 function renderComp(){const r=current;$('#cardTitle').textContent=`Квартал ${r.KV} · Выдел ${r.VD}`;$('#cardSub').textContent=`${num(r.PLV)} га · ${landName(r.KU)||'категория не указана'}`;$('#humanContent').innerHTML=section('Основные сведения',['PLV','KU','KGLF','Fzona','OZU'],r)+section('Лесорастительные условия',['M3Pr','M3B','M3TL','M3TLU','M3G','M3KP'],r)+section('Проектируемые мероприятия',['M2PM1','M2Pr'],r)+section('Подрост',['PRkol','PRH','PRA'],r);const names=Object.keys(r._children||{});$('#childTabs').innerHTML=names.map((n,i)=>`<button class="chip ${i===0?'active':''}" onclick="renderChild('${n}',this)">${childNames[n]||n}</button>`).join('');$('#childContent').innerHTML='';if(names[0])renderChild(names[0],$('#childTabs button'))}
 function renderChild(n,btn){$$('.chip').forEach(x=>x.classList.remove('active'));btn?.classList.add('active');const rs=current._children?.[n]||[];$('#childContent').innerHTML=`<div class="humanSection"><h3>${childNames[n]||n}</h3>${rs.map(r=>`<div class="humanGrid">${Object.entries(r).filter(([k,v])=>!['POS','LESN','KV','KGLF','VD'].includes(k)&&v!==null&&v!=='').map(([k,v])=>field(k,v)).join('')}</div>`).join('')||'<div class="empty">Нет данных</div>'}</div>`}
+// Delete only from the active mobile working copy; the original imported MDB stays untouched.
+function openDeleteQuarter(k){
+ const q=D?.quarters?.[k],forestId=window.SolinWorkspace?.activeId;
+ if(!q||!forestId)return toast('Квартал не найден в активном лесничестве');
+ const stands=q.compartments?.length||0,categoryCount=new Set((q.quarterRows||[]).map(row=>String(row.KGLF??''))).size;
+ openModal('Удаление квартала · 1 из 2',
+  '<p>Удалить <b>квартал '+esc(k)+'</b> из мобильной рабочей базы?</p>'+
+  '<p>Вместе с ним будут удалены <b>'+stands+' выделов</b> со всеми карточками и макетами'+(categoryCount>1?' по всем '+categoryCount+' категориям ГЛФ':'')+'.</p>'+
+  '<div class="formActions"><button type="button" id="qDeleteCancel1">Отмена</button><button type="button" class="primary" id="qDeleteNext">Продолжить</button></div>');
+ $('#qDeleteCancel1').onclick=closeModal;
+ $('#qDeleteNext').onclick=()=>{
+  if(D?.quarters?.[k]!==q||window.SolinWorkspace?.activeId!==forestId){closeModal();return toast('Квартал изменился — откройте его заново');}
+  openModal('Удаление квартала · 2 из 2',
+   '<p><b>Внимание!</b> Квартал <b>'+esc(k)+'</b> и все его <b>'+stands+' выделов</b> будут удалены из мобильной базы.</p>'+
+   '<p class="import-warning">Отменить действие после удаления нельзя. Исходный импортированный MDB останется без изменений.</p>'+
+   '<div class="formActions"><button type="button" id="qDeleteCancel2">Отмена</button><button type="button" class="delete-final" id="qDeleteFinal">Удалить навсегда</button></div><p class="delete-error" id="qDeleteError" role="alert"></p>');
+  $('#qDeleteCancel2').onclick=closeModal;
+  $('#qDeleteFinal').onclick=async()=>{
+   const button=$('#qDeleteFinal');button.disabled=true;button.textContent='Удаление…';
+   try{if(D?.quarters?.[k]!==q)throw Error('Квартал изменился — повторите операцию');await window.SolinWorkspace.deleteQuarter(k,forestId);closeModal();current=null;refresh();show('quartersScreen');toast('Квартал '+k+' удалён');}
+   catch(e){const status=$('#qDeleteError');if(status)status.textContent='Не удалось удалить: '+e.message;button.disabled=false;button.textContent='Удалить навсегда';}
+  };
+ };
+}
+function openDeleteComp(r){
+ const k=String(r.KV),q=D?.quarters?.[k],forestId=window.SolinWorkspace?.activeId;
+ if(!q?.compartments?.includes(r)||!forestId)return toast('Выдел не найден в активном лесничестве');
+ const address='квартал '+esc(k)+' · выдел '+esc(r.VD)+(r.KGLF!=null&&r.KGLF!==''?' · КГЛФ '+esc(r.KGLF):'');
+ const wasQuarterOpen=!!document.querySelector('#qComps');
+ openModal('Удаление выдела · 1 из 2',
+  '<p>Удалить <b>'+address+'</b> из мобильной рабочей базы?</p>'+
+  '<p>Будет удалена только эта карточка со всеми её макетами. Остальные выделы и квартал сохранятся.</p>'+
+  '<div class="formActions"><button type="button" id="vDeleteCancel1">Отмена</button><button type="button" class="primary" id="vDeleteNext">Продолжить</button></div>');
+ $('#vDeleteCancel1').onclick=closeModal;
+ $('#vDeleteNext').onclick=()=>{
+  if(D?.quarters?.[k]!==q||!q.compartments.includes(r)||window.SolinWorkspace?.activeId!==forestId){closeModal();return toast('Выдел изменился — откройте его заново');}
+  openModal('Удаление выдела · 2 из 2',
+   '<p><b>Внимание!</b> '+address+' и все связанные с ним макеты будут удалены из мобильной базы.</p>'+
+   '<p class="import-warning">Отменить действие после удаления нельзя. Исходный импортированный MDB останется без изменений.</p>'+
+   '<div class="formActions"><button type="button" id="vDeleteCancel2">Отмена</button><button type="button" class="delete-final" id="vDeleteFinal">Удалить навсегда</button></div><p class="delete-error" id="vDeleteError" role="alert"></p>');
+  $('#vDeleteCancel2').onclick=closeModal;
+  $('#vDeleteFinal').onclick=async()=>{
+   const button=$('#vDeleteFinal');button.disabled=true;button.textContent='Удаление…';
+   try{if(D?.quarters?.[k]!==q||!q.compartments.includes(r))throw Error('Выдел изменился — повторите операцию');await window.SolinWorkspace.deleteStand(r,forestId);closeModal();if(current===r)current=null;refresh();if(wasQuarterOpen&&D.quarters[k])openQuarter(k);toast('Выдел '+r.VD+' удалён');}
+   catch(e){const status=$('#vDeleteError');if(status)status.textContent='Не удалось удалить: '+e.message;button.disabled=false;button.textContent='Удалить навсегда';}
+  };
+ };
+}
 function openQuarterForm(){const org=D.lesnichestvo?.[0]||{},source=D.source||{};
  openModal('Новый квартал',`<p class="quarter-address-info"><b>Лесовладелец:</b> ${esc(org.POS??'—')} · ${esc(org.NLX||'Не указан')}<br><b>Лесничество:</b> ${esc(org.LESN??'—')} · ${esc(org.NOS||'Не указано')}</p>
  <div class="formGrid">
