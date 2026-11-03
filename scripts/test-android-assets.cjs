@@ -21,6 +21,25 @@ const mdb=files.filter(p=>/\.(mdb|accdb)$/i.test(p));
 assert.deepEqual(mdb.map(p=>path.relative(root,p).replaceAll(path.sep,'/')),
  ['vendor/solin-empty-transfer-v20261028-27.mdb'],
  'Never include real forest databases in an APK');
+// Field-test guarantee: the APK must contain the same latest, audited source
+// files as the current web app, never the outdated prototype copied earlier.
+// build-mobile.mjs may adapt app.js/index.html but the functional modules
+// below must be copied byte-for-byte, including the current K58 workflow.
+const sourceRoot=path.resolve(__dirname,'..');
+for(const name of [
+ 'solin-workflow.js','solin-workflow.css','solin-card-calculations.js',
+ 'solin-card-editor.js','solin-species-entry.js','solin-species-entry.css',
+ 'solin-quarter-pickers.js','solin-workspace.js'
+]){
+ const source=path.join(sourceRoot,name),staged=path.join(root,name);
+ assert(fs.existsSync(source)&&fs.existsSync(staged),'APK is missing latest source module: '+name);
+ assert.equal(fs.readFileSync(staged,'utf8'),fs.readFileSync(source,'utf8'),
+  'Stale staged APK module: '+name);
+}
+const index=fs.readFileSync(path.join(root,'index.html'),'utf8');
+assert(index.includes('solin-workflow.js')&&index.includes('solin-card-calculations.js')&&
+ index.includes('solin-species-entry.js')&&index.includes('solin-card-editor.js'),
+ 'APK entry point must load the actual current calculation and entry modules');
 const plugin=path.join(__dirname,'../native/android/SolinMdbPlugin.java');
 assert(fs.existsSync(plugin),'Offline native MDB bridge missing');
-console.log('ANDROID_ASSET_STAGING_OK',files.length,'assets, no compressed/raw duplicate, only blank MDB template');
+console.log('ANDROID_ASSET_STAGING_OK',files.length,'assets, current K58/editor/field modules match source, no compressed/raw duplicate, only blank MDB template');
