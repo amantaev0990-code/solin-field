@@ -95,10 +95,12 @@
   state.popup.hidden=room<42;
  }
  function show(state){
-  hide();
+  // Replace candidates without collapsing modal scroll padding on every keystroke.
+  if(active?.popup){active.popup.remove();active.input.setAttribute('aria-expanded','false');active.popup=null;}
+  active=null;
   const q=state.input.value.includes(' — ')?state.select.value:state.input.value;
   const items=candidates(state.select,q);
-  if(!items.length){state.input.setAttribute('aria-expanded','false');return;}
+  if(!items.length){state.input.setAttribute('aria-expanded','false');document.getElementById('modal')?.classList.remove('solin-species-open');return;}
   const popup=document.createElement('div');
   popup.className='solin-species-results';popup.id=state.input.id+'-suggestions';popup.setAttribute('role','listbox');
   state.items=items;state.index=0;state.popup=popup;active=state;
