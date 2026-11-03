@@ -41,6 +41,16 @@ assert(index.includes('solin-workflow.js')&&index.includes('solin-card-calculati
  index.includes('solin-species-entry.js')&&index.includes('solin-card-editor.js')&&
  index.includes('solin-offline-imagery.js')&&index.includes('offlineImageryInput'),
  'APK entry point must load the actual current calculation and entry modules');
+// Critical: AAPT renames + decompresses assets ending in .gz, so the
+// native WebView received 404 for all original reference bundles. Verify
+// safe aliases exist with the ORIGINAL zipped bytes and unmodified hashes.
+const zlib=require('node:zlib');
+for(const file of ['refs-audit.json.gz','solin-control-norms.json.gz','solin-control-source-recovery.json.gz']){
+ const original=fs.readFileSync(path.join(sourceRoot,file));
+ const staged=fs.readFileSync(path.join(root,file.slice(0,-8)+'.packed.bin'));
+ assert.deepEqual(staged,original,'APK lost the original compressed reference bytes: '+file);
+ assert.doesNotThrow(()=>JSON.parse(zlib.gunzipSync(staged).toString('utf8')),'Cannot decode Android references: '+file);
+}
 const plugin=path.join(__dirname,'../native/android/SolinMdbPlugin.java');
 assert(fs.existsSync(plugin),'Offline native MDB bridge missing');
-console.log('ANDROID_ASSET_STAGING_OK',files.length,'assets, current K58/editor/field/offline-MBTiles modules match source, no compressed/raw duplicate, only blank MDB template');
+console.log('ANDROID_ASSET_STAGING_OK',files.length,'assets, native source reference bundles preserved in .packed.bin, current K58/editor/field modules match source, blank MDB only');
