@@ -35,7 +35,7 @@ const server=http.createServer((req,res)=>{
   assert(await page.locator('#newKU').isVisible(),'Native stand form KU select visible');
   const candidate=await page.locator('#newKU').evaluate(el=>[...el.options].find(x=>x.value&&!x.disabled)?.value);
   assert(candidate,'Source-backed KU code must be offered to Android user');
-  await page.locator('#newKU').click();
+  await page.locator('#newKU').dispatchEvent('pointerdown',{pointerType:'touch',isPrimary:true});
   assert(await page.locator('#sap-search').isVisible(),'Android opens custom searchable selector');
   assert.equal(await page.evaluate(()=>document.activeElement?.id),'sap-search','Picker should focus keyboard input');
   await page.locator('#sap-search').fill(candidate);
