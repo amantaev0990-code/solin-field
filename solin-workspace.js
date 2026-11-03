@@ -68,6 +68,28 @@ function snapshot(){return {id:activeId,org:copy(D.lesnichestvo[0]),quarters:cop
 async function persist(){if(!initialized||!activeId)return;const next=snapshot();tail=tail.catch(()=>{}).then(()=>putMany([next]));await tail;return next;}
 function legacyClear(){for(const key of ['solin_field_audited_work_v1','solin_user_data_v1','solin_field_overrides_v3'])localStorage.removeItem(key);}
 function checkpointFor(forest){return {format:'SOLIN-Field-Backup-v2',at:new Date().toISOString(),quarters:forest.quarters,lesnichestvo:[forest.org],source:forest.source,extraTables:forest.extraTables||{},history:forest.history||[]};}
+// Offline cross-device handoff. Use the same SOLIN-Field-Backup-v2
+// understood by SolinTransferReader on iOS, Android and GitHub Pages.
+function exportForest(){
+ if(!activeId||!D?.lesnichestvo?.[0])throw Error('Откройте лесничество для переноса');
+ const forest=snapshot();
+ if(forest.id!==activeId)throw Error('Активная база изменилась, повторите экспорт');
+ const backup=checkpointFor(forest),org=forest.org;
+ const json=JSON.stringify(backup,null,2);
+ const url=URL.createObjectURL(new Blob([json],{type:'application/json'}));
+ const link=document.createElement('a');
+ link.href=url;
+ link.download='SOLIN-Field-'+String(org.POS)+'-'+String(org.LESN)+'-'+String(org.GodT||'2026')+'.json';
+ document.body.append(link);
+ link.click();link.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),15000);
+ // The export contains the fresh in-memory data even if IndexedDB is still
+ // flushing writes; also persist for crash safety without blocking Safari's
+ // user-gesture-limited download.
+ void persist().catch(e=>toast('Копия создана, но сохранение на устройстве требует проверки: '+e.message));
+ return {filename:link.download,quarters:Object.keys(forest.quarters).length,
+  stands:Object.values(forest.quarters).reduce((n,q)=>n+(q.compartments?.length||0),0)};
+}
 function clearMap(){if(typeof importedMapLayers!=='undefined'){for(const entry of importedMapLayers){for(const layer of [entry.layer,...(entry.geometryEntries||[]).map(g=>g.layer),...Object.values(entry.labelLayers||{})])if(layer?.removeFrom&&typeof fieldMap!=='undefined')fieldMap?.removeLayer(layer);}importedMapLayers.splice(0);}window.__solinMapRestored=false;window.__cmfSelectedLayer=null;window.closeCmfSheet?.();window.renderMapLayerList?.();}
 function heading(){const org=D.lesnichestvo?.[0]||{};document.querySelector('.forestTitle h2').textContent=org.NOS||'Лесничество';document.querySelector('.forestTitle p').textContent=org.NLX||'Лесовладелец не указан';const b=document.querySelector('.forestTitle .change');b.textContent='Сменить';b.onclick=home;b.style.display='inline-flex';document.querySelector('.brand p').textContent=opened?(org.NOS||'Полевые работы'):'Выбор рабочего лесничества';}
 async function activate(id){await window.__solinMapImportPromise?.catch(()=>{});await persist();const forest=(await list()).find(r=>r.id===id);if(!forest)throw Error('Лесничество не найдено');
@@ -403,7 +425,17 @@ async function importFile(file){if(!file)return;openModal('Чтение Transfer
     }catch(error){console.warn('Не удалось сохранить исходный MDB для экспорта:',error);}
   }
   closeModal();toast('Загружено лесничеств: '+groups.length)}catch(e){document.querySelector('#transferError').textContent=e.message;b.disabled=false}};}catch(e){openModal('Не удалось загрузить Transfer','<p>'+html(e.message)+'</p><button onclick="closeModal()">Закрыть</button>')}}
-function bind(){document.querySelector('#newForestButton').onclick=newForest;// A real full-size file input sits over the visual Transfer button.
+function bind(){
+ const actions=document.querySelector('#menuScreen .workspace');
+ if(actions&&!document.getElementById('solin-forest-transfer')){
+  const transfer=document.createElement('button');
+  transfer.id='solin-forest-transfer';transfer.className='menuRow';transfer.type='button';
+  transfer.innerHTML='<span><b>Перенести лесничество на другое устройство</b><small>Скачать всю базу с кварталами, выделами и макетами в JSON</small></span><span>↓</span>';
+  transfer.onclick=()=>{try{exportForest();}catch(e){toast(e.message);}};
+  const before=actions.querySelector('#solin-mdb-export');
+  if(before)before.before(transfer);else actions.append(transfer);
+ }
+ document.querySelector('#newForestButton').onclick=newForest;// A real full-size file input sits over the visual Transfer button.
  // This avoids iOS/Safari rejecting a scripted click on a hidden input.
  const nativePicker=document.querySelector('#transferForestInput');
  // The native input is inside the styled label. The physical tap goes to the input,
@@ -426,7 +458,7 @@ async function init(){try{bind();let forests=await list();const recovery=JSON.pa
  try{forests=await restoreSourceFields(forests);}catch(e){if(window.SolinControlSourceRecovery)window.SolinControlSourceRecovery.lastError=e?.message||String(e);forests=await list();}
  activeId=null;initialized=true;const last=forests.find(r=>r.id===localStorage.getItem(ACTIVE))||forests[0];localStorage.setItem(CHECKPOINT,JSON.stringify(checkpointFor(last)));legacyClear();D.lesnichestvo=[copy(last.org)];D.quarters=copy(last.quarters);D._transferExtras=copy(last.extraTables||{});D.source=copy(last.source||{});activeId=last.id;refresh();await showHome();window.dispatchEvent(new Event('solin-workspaces-ready'));}catch(e){document.querySelector('#forestListStatus').textContent='Ошибка локального хранилища: '+e.message;throw e;}}
 let readyResolve,readyReject;const ready=new Promise((r,j)=>{readyResolve=r;readyReject=j});
-window.SolinWorkspace={list,activate,create,deleteForest,deleteQuarter,deleteStand,previewTransfer,importTransfer,persist,home,importFile,downloadSourceRecoveryBackup,repairAddressCodes,get activeId(){return activeId},ready};
+window.SolinWorkspace={list,activate,create,deleteForest,deleteQuarter,deleteStand,previewTransfer,importTransfer,persist,exportForest,home,importFile,downloadSourceRecoveryBackup,repairAddressCodes,get activeId(){return activeId},ready};
 window.addEventListener('solin-ready',()=>init().then(readyResolve,readyReject),{once:true});
 })();
 
