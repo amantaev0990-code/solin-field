@@ -103,6 +103,15 @@ const rs=rowsOf(r,m),fields=(db()?.transfSchema?.[m]||[]).filter(n=>!KEY_FIELDS.
 const wrap=document.querySelector('#childContent');if(!wrap)return;
 let html='<div class="wf-maket-view"><div class="wf-section-head"><div><div class="wf-eyebrow">'+rs.length+' записей</div><h3>'+h(window.SolinHuman?.formName(m)||NAMES[m])+'</h3></div><button class="wf-primary" id="wfAddRow">＋ Строка</button></div>';
 html+='<p class="wf-muted">Выберите запись для изменения или добавьте новую.</p>';
+if(m==='Макет10'&&window.SolinCardCalculations){
+ const b=window.SolinCardCalculations.bonitet(r,window.SOLIN_REFS?.tables);
+ html+='<div class="wf-bonitet-status" data-wf-bonitet-status="'+h(b.status)+'"><strong>'+
+  (b.status==='complete'?'Бонитет по К58: класс '+h(b.expected):'Бонитет не рассчитан по К58')+
+  '</strong><p>'+h(b.reason||'Проверяются исходные данные')+
+  (b.status==='complete'&&String(r.M3B??'0')!==String(b.expected)?
+    '. Для сохранения расчётного класса откройте строку Макета 10 и нажмите «Сохранить».':'')+
+  '</p></div>';
+}
 if(!rs.length)html+='<div class="wf-empty">Здесь пока нет записей. Добавьте первую.</div>';
 rs.forEach((row,i)=>{
  const renderValue=k=>row[k]!==null&&row[k]!==undefined&&row[k]!==''?'<div class="wf-kv"><span>'+h(window.SolinHuman?.label(m,k)||LABELS[k]||FORM_LABELS[k]||k)+'</span><b>'+h(window.SolinHuman?SolinHuman.value(m,k,row[k],row):findLookups(k,m)?.[String(row[k])]||fmt(row[k]))+'</b></div>':'';const values=fields.filter(k=>!window.SolinHuman?.isTechnical(m,k)).map(renderValue).filter(Boolean).join('');const raw=fields.filter(k=>window.SolinHuman?.isTechnical(m,k)).map(renderValue).filter(Boolean).join('');
@@ -119,7 +128,9 @@ if(typeof openModal!=='function')return;
 openModal((index===rowsOf(r,m).length?'Новая запись · ':'Изменение · ')+(window.SolinHuman?.formName(m)||NAMES[m]),
 '<div class="wf-form-note">Данные сохраняются только в SOLI-N Field. Оригинальные базы SOLI-N не изменяются.</div>'+
 (m==='Макет10'?'<div class="wf-form-note" id="wfM10LayerContext"><label class="wf-field"><span>Категория угодий выдела (KU)</span><select id="wfM10KU" aria-describedby="wfM10LayerHint"></select></label><p id="wfM10LayerHint" role="status" aria-live="polite">Проверяю допустимые ярусы по исходным SKU, SIAR и PIAP…</p><small>Категория относится ко всему выделу, а не только к строке древостоя. Если изменить её здесь, новое значение будет сохранено вместе с древостоем только после подтверждения.</small></div>':'')+
-'<div class="formGrid wf-formgrid">'+humanInputs(fields,existing,'wf',m)+'</div><div class="formActions"><button class="secondary" onclick="closeModal()">Отмена</button><button class="primary" id="wfSaveMaket">Сохранить</button></div>');
+'<div class="formGrid wf-formgrid">'+humanInputs(fields,existing,'wf',m)+'</div>'+
+(m==='Макет10'?'<div id="wfBonitetLive" class="wf-bonitet-status" role="status" aria-live="polite"></div>':'')+
+'<div class="formActions"><button class="secondary" onclick="closeModal()">Отмена</button><button class="primary" id="wfSaveMaket">Сохранить</button></div>');
 // One Access RowSource engine for ALL individual Maket editors.
 const rules=window.SolinDependentRules,modalBody=document.querySelector('#modalBody');
 const treeCategory=m==='Макет10'?document.getElementById('wfM10KU'):null;
@@ -193,6 +204,41 @@ if(rules){
   populateTreeCategory();filterAll();
  },{once:true});
 }
+// K58 preview follows age, height, species, origin, tier, fullness and category.
+// Never change actual card data until the Save button is pressed.
+if(m==='Макет10'){
+ const live=document.getElementById('wfBonitetLive');
+ const refreshBonitet=()=>{
+  if(!live?.isConnected)return;
+  const calc=window.SolinCardCalculations;
+  if(!calc){live.textContent='Расчёт бонитета пока недоступен';return;}
+  const selected=Object.fromEntries(fields.map(field=>{
+   const el=document.getElementById('wf_'+field),value=el?.value;
+   return [field,el?(value===''?null:value):existing[field]];
+  }));
+  const row={...existing,...selected};
+  if(row.PROI==null&&row.POR!=null){
+   const suggested=rules?.suggestedOrigin?.(row.POR,window.SOLIN_REFS?.tables);
+   if(suggested!=null)row.PROI=suggested;
+  }
+  for(const field of KEY_FIELDS)row[field]=r[field]??null;
+  const rows=[...rowsOf(r,'Макет10')];
+  if(index>=rows.length)rows.push(row);else rows[index]=row;
+  const prospective={...r,KU:treeCategory?treeCategory.value||r.KU:r.KU,
+   _children:{...r._children,Макет10:rows}};
+  const result=calc.bonitet(prospective,window.SOLIN_REFS?.tables);
+  live.dataset.status=result.status;
+  if(result.status==='complete')
+   live.innerHTML='<b>Расчётный бонитет: '+h(result.expected)+'</b><p>'+h(result.reason)+
+    '. Сохранится вместе со строкой Макета 10.</p>';
+  else live.innerHTML='<b>Бонитет пока не рассчитан</b><p>'+
+   h(result.reason||'Нет достаточных данных')+
+   '. Значение останется 0 или ранее сохранённым, пока расчёт не подтверждён.</p>';
+ };
+ modalBody.addEventListener('input',refreshBonitet);
+ modalBody.addEventListener('change',refreshBonitet);
+ refreshBonitet();
+}
 document.querySelector('#wfSaveMaket').onclick=()=>{const container=document.querySelector('#modalBody');let values;try{values=bindInputs(container,fields,'wf',existing);}catch(e){notify(e.message);return;}
 const dependent=window.SolinDependentRules,referenceTables=window.SOLIN_REFS?.tables;
  const desiredKU=treeCategory?treeCategory.value.trim():String(r.KU??'').trim();
@@ -263,7 +309,12 @@ if(m==='Макет10'&&window.SolinCardCalculations){
  }
 }
 try{saveAll(r);}catch(e){Object.assign(r,JSON.parse(before));notify('Не удалось сохранить: '+e.message);return;}
-closeModal();openMaket(m);notify('Сохранено: '+m);
+closeModal();
+// Maket10 calculations previously updated r.M3B but not the visible stand
+// summary, leaving «Не рассчитан» on screen despite a successful K58 update.
+if(m==='Макет10'&&typeof renderComp==='function')renderComp();
+else openMaket(m);
+notify('Сохранено: '+m);
 if(m==='Макет10'&&(calculated.length||stockEdited)){
  const k59Verified=k59Check?.status==='complete';
  const normativeFix=calculated.some(x=>x.field==='ZAP');
