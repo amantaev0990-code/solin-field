@@ -1,6 +1,6 @@
 /* Independent local workspaces. Original MDB inputs are read-only. */
 (()=>{'use strict';
-const REGISTRY='SOLIN_WORKSPACES_V1',CHECKPOINT='solin_field_checkpoint_v2',ACTIVE='solin_active_forest_v1';
+const REGISTRY='SOLIN_WORKSPACES_V1',CHECKPOINT='solin_field_checkpoint_v2',ACTIVE='solin_active_forest_v1',INITIALIZED='solin_workspaces_initialized_v1';
 const copy=x=>JSON.parse(JSON.stringify(x));
 const html=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const idOf=r=>String(r.POS)+'::'+String(r.LESN);
@@ -77,7 +77,78 @@ async function activate(id){await window.__solinMapImportPromise?.catch(()=>{});
  localStorage.setItem(CHECKPOINT,JSON.stringify(checkpointFor(forest)));legacyClear();clearMap();activeId=id;D.lesnichestvo=[copy(forest.org)];D.quarters=copy(forest.quarters);D._transferExtras=copy(forest.extraTables||{});D.source={...copy(forest.source||{}),forestDistrict:forest.org.NOS,year:forest.org.GodT};current=null;gps=null;opened=true;localStorage.setItem(ACTIVE,id);heading();refresh();show('quartersScreen');window.dispatchEvent(new Event('solin-forest-changed'));return forest;}
 function showHome(){opened=false;show('homeScreen');heading();return renderHome();}
 async function home(){await persist();return showHome();}
-async function renderHome(){const forests=await list(),host=document.querySelector('#forestList');host.innerHTML=forests.length?'':'<p class="home-empty">Добавьте лесничество из Transfer или создайте новое.</p>';for(const f of forests){const qs=Object.values(f.quarters),rows=qs.flatMap(q=>q.compartments||[]),area=rows.reduce((n,r)=>n+(Number(r.PLV)||0),0);const b=document.createElement('button');b.className='forest-option';b.dataset.forest=f.id;b.innerHTML='<span class="forest-option-icon">♧</span><span><strong>'+html(f.org.NOS)+'</strong><small>'+html(f.org.NLX||'Лесовладелец не указан')+'</small><span class="forest-summary">'+qs.length+' кварталов · '+rows.length+' выделов · '+num(area)+' га</span></span><span class="forest-option-open">Открыть →</span>';b.onclick=()=>activate(f.id).catch(e=>toast(e.message));host.append(b);}document.querySelector('#forestListStatus').textContent=forests.length?'Сохранено на этом устройстве: '+forests.length:'Готово к началу работы';}
+async function renderHome(){const forests=await list(),host=document.querySelector('#forestList');host.innerHTML=forests.length?'':'<p class="home-empty">Добавьте лесничество из Transfer или создайте новое.</p>';for(const f of forests){const qs=Object.values(f.quarters),rows=qs.flatMap(q=>q.compartments||[]),area=rows.reduce((n,r)=>n+(Number(r.PLV)||0),0);const b=document.createElement('button');b.className='forest-option';b.dataset.forest=f.id;b.innerHTML='<span class="forest-option-icon">♧</span><span><strong>'+html(f.org.NOS)+'</strong><small>'+html(f.org.NLX||'Лесовладелец не указан')+'</small><span class="forest-summary">'+qs.length+' кварталов · '+rows.length+' выделов · '+num(area)+' га</span></span><span class="forest-option-open">Открыть →</span>';b.onclick=()=>activate(f.id).catch(e=>toast(e.message));const entry=document.createElement('div');entry.className='forest-entry';const remove=document.createElement('button');remove.type='button';remove.className='forest-delete';remove.textContent='×';remove.title='Удалить лесничество';remove.setAttribute('aria-label','Удалить лесничество «'+f.org.NOS+'»');remove.onclick=()=>openDeleteForest(f.id).catch(e=>toast(e.message));entry.append(b,remove);host.append(entry);}document.querySelector('#forestListStatus').textContent=forests.length?'Сохранено на этом устройстве: '+forests.length:'Готово к началу работы';}
+
+ // Both confirmations must be completed before any stored data is changed.
+ async function openDeleteForest(id){
+  const forest=(await list()).find(f=>f.id===id);
+  if(!forest)return toast('Лесничество уже удалено');
+  const name=html(forest.org.NOS),qs=Object.values(forest.quarters||{}),stands=qs.reduce((n,q)=>n+(q.compartments?.length||0),0);
+  openModal('Удаление лесничества · 1 из 2',
+   '<p>Удалить лесничество <b>«'+name+'»</b> целиком?</p>'+
+   '<p>'+qs.length+' кварталов · '+stands+' выделов. Также будут удалены карточки, черновики и связанные сохранённые данные этого лесничества.</p>'+
+   '<div class="formActions"><button type="button" id="forestDeleteCancel1">Отмена</button><button type="button" class="primary" id="forestDeleteNext">Продолжить</button></div>');
+  document.querySelector('#forestDeleteCancel1').onclick=closeModal;
+  document.querySelector('#forestDeleteNext').onclick=()=>confirmDeleteForest(id).catch(e=>toast(e.message));
+ }
+ async function confirmDeleteForest(id){
+  const forest=(await list()).find(f=>f.id===id);
+  if(!forest){closeModal();return toast('Лесничество уже удалено');}
+  openModal('Окончательное подтверждение · 2 из 2',
+   '<p><b>Внимание!</b> Лесничество <b>«'+html(forest.org.NOS)+'»</b> и все его кварталы, выделы, карточки и черновики будут безвозвратно удалены с этого устройства.</p>'+
+   '<p class="import-warning">Отменить это действие после удаления невозможно.</p>'+
+   '<div class="formActions"><button type="button" id="forestDeleteCancel2">Отмена</button><button type="button" id="forestDeleteFinal">Удалить навсегда</button></div><p id="forestDeleteError" role="alert"></p>');
+  document.querySelector('#forestDeleteCancel2').onclick=closeModal;
+  document.querySelector('#forestDeleteFinal').onclick=async()=>{
+   const button=document.querySelector('#forestDeleteFinal');button.disabled=true;button.textContent='Удаление…';
+   try{await deleteForest(id);closeModal();await showHome();toast('Лесничество удалено');}
+   catch(e){const status=document.querySelector('#forestDeleteError');if(status)status.textContent='Не удалось удалить: '+e.message;button.disabled=false;button.textContent='Удалить навсегда';}
+  };
+ }
+ // Delete by full POS::LESN address; other forests retain their workspaces and drafts.
+ async function deleteForest(id){
+  await tail.catch(()=>{});
+  if(id===activeId)await persist();
+  const forest=(await list()).find(f=>f.id===id);
+  if(!forest)throw Error('Лесничество уже удалено');
+  const prefix=id+'::';
+  // The originally imported MDB copy is stored separately from the forest.
+  if(window.SolinOfflineMDB?.deleteStored)
+   await window.SolinOfflineMDB.deleteStored([forest.org.POS,forest.org.LESN,forest.org.GodT].join('::'));
+  const db=await openDB();
+  try{await new Promise((resolve,reject)=>{
+   const tx=db.transaction(['forests','source-recovery-backups'],'readwrite');
+   tx.objectStore('forests').delete(id);
+   const store=tx.objectStore('source-recovery-backups');
+   const cursor=store.openCursor(IDBKeyRange.bound(prefix,prefix+String.fromCharCode(65535)));
+   cursor.onsuccess=()=>{const row=cursor.result;if(row){row.delete();row.continue();}};
+   tx.oncomplete=resolve;
+   tx.onerror=()=>reject(tx.error||Error('Ошибка удаления IndexedDB'));
+   tx.onabort=()=>reject(tx.error||Error('Удаление отменено'));
+  });}finally{db.close();}
+  const draftPrefix='solin_field_card_draft_v1:';
+  for(let i=localStorage.length-1;i>=0;i--){
+   const key=localStorage.key(i);
+   if(!key?.startsWith(draftPrefix))continue;
+   try{const address=JSON.parse(key.slice(draftPrefix.length));
+    if(Array.isArray(address)&&idOf({POS:address[0],LESN:address[1]})===id)localStorage.removeItem(key);
+   }catch(_){}
+  }
+  try{const key='solin_field_audited_work_v1',edits=JSON.parse(localStorage.getItem(key)||'{}');
+   if(edits&&typeof edits==='object'){let changed=false;
+    for(const k of Object.keys(edits))if(k.startsWith(prefix)){delete edits[k];changed=true;}
+    if(changed)localStorage.setItem(key,JSON.stringify(edits));
+   }
+  }catch(_){}
+  localStorage.setItem(INITIALIZED,'1'); // do not recreate demo data if this was the last forest
+  if(id===activeId){
+   activeId=null;opened=false;current=null;gps=null;
+   localStorage.removeItem(ACTIVE);localStorage.removeItem(CHECKPOINT);legacyClear();
+   clearMap();D.lesnichestvo=[];D.quarters={};D._transferExtras={};D.source={};
+   refresh();heading();window.dispatchEvent(new Event('solin-forest-changed'));
+  }
+  return true;
+ }
 function codes(org){for(const [key,name]of [['POS','лесовладельца'],['LESN','лесничества']])if(!/^\d+$/.test(String(org[key]))||Number(org[key])<1||Number(org[key])>32767)throw Error('Номер '+name+' должен быть от 1 до 32767');org.POS=Number(org.POS);org.LESN=Number(org.LESN);return org;}
 // SOLI-N desktop hierarchy: область → лесовладелец → лесничество.
 // Names and identifiers below were transcribed from the user's three 10.31 screenshots.
@@ -280,11 +351,13 @@ function bind(){document.querySelector('#newForestButton').onclick=newForest;// 
  const prevBackup=window.solinCore.commitImport;window.solinCore.commitImport=function(x){if(x.lesnichestvo?.[0]&&idOf(x.lesnichestvo[0])!==activeId)throw Error('Эта копия относится к другому лесничеству. Загрузите её через главное окно');const result=prevBackup(x);persist().catch(e=>toast(e.message));return result;};
 }
 async function init(){try{bind();let forests=await list();const recovery=JSON.parse(localStorage.getItem(CHECKPOINT)||'null');if(recovery?.lesnichestvo?.[0]&&recovery.quarters){const org=recovery.lesnichestvo[0],id=idOf(org),stored=forests.find(f=>f.id===id);if(!stored||Date.parse(recovery.at||0)>Date.parse(stored.updatedAt||0)){await putMany([{id,org,quarters:recovery.quarters,extraTables:recovery.extraTables||{},source:recovery.source||{},history:recovery.history||[],updatedAt:recovery.at||new Date().toISOString()}]);forests=await list();}}
- if(!forests.length){activeId=idOf(D.lesnichestvo[0]);initialized=true;await persist();forests=await list();}
+ if(!forests.length&&!localStorage.getItem(INITIALIZED)){activeId=idOf(D.lesnichestvo[0]);initialized=true;await persist();forests=await list();}
+  localStorage.setItem(INITIALIZED,'1');
+  if(!forests.length){activeId=null;initialized=true;opened=false;localStorage.removeItem(ACTIVE);localStorage.removeItem(CHECKPOINT);legacyClear();D.lesnichestvo=[];D.quarters={};D._transferExtras={};D.source={};refresh();await showHome();window.dispatchEvent(new Event('solin-workspaces-ready'));return;}
  try{forests=await restoreSourceFields(forests);}catch(e){if(window.SolinControlSourceRecovery)window.SolinControlSourceRecovery.lastError=e?.message||String(e);forests=await list();}
  activeId=null;initialized=true;const last=forests.find(r=>r.id===localStorage.getItem(ACTIVE))||forests[0];localStorage.setItem(CHECKPOINT,JSON.stringify(checkpointFor(last)));legacyClear();D.lesnichestvo=[copy(last.org)];D.quarters=copy(last.quarters);D._transferExtras=copy(last.extraTables||{});D.source=copy(last.source||{});activeId=last.id;refresh();await showHome();window.dispatchEvent(new Event('solin-workspaces-ready'));}catch(e){document.querySelector('#forestListStatus').textContent='Ошибка локального хранилища: '+e.message;throw e;}}
 let readyResolve,readyReject;const ready=new Promise((r,j)=>{readyResolve=r;readyReject=j});
-window.SolinWorkspace={list,activate,create,previewTransfer,importTransfer,persist,home,importFile,downloadSourceRecoveryBackup,repairAddressCodes,get activeId(){return activeId},ready};
+window.SolinWorkspace={list,activate,create,deleteForest,previewTransfer,importTransfer,persist,home,importFile,downloadSourceRecoveryBackup,repairAddressCodes,get activeId(){return activeId},ready};
 window.addEventListener('solin-ready',()=>init().then(readyResolve,readyReject),{once:true});
 })();
 
