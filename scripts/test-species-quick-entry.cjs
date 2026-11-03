@@ -158,8 +158,30 @@ const server=http.createServer((req,res)=>{try{const file=path.resolve(root,'.'+
   });
   assert.equal(K58.status,'complete');assert.equal(K58.value,'4');
   assert.equal(K58.waiting,'waiting');
+  // Simplified Maket10 editor: live K58 while typing, then immediate visible
+  // top-card refresh. Previously the saved M3B could change while the summary
+  // continued showing «Не рассчитан».
+  await page.evaluate(({k,vd})=>{
+   const r=D.quarters[k].compartments.find(x=>Number(x.VD)===vd);
+   r.M3B=0;
+   current=r;
+   renderComp();
+   solinWorkflow.editMaket('Макет10',0);
+  },fixture);
+  await page.locator('#wfBonitetLive').waitFor();
+  assert.match(await page.locator('#wfBonitetLive').innerText(),/Расчётный бонитет: 4/);
+  assert.equal(await page.evaluate(({k,vd})=>D.quarters[k].compartments.find(x=>Number(x.VD)===vd).M3B,fixture),0,'Live K58 preview must NOT write card before Save');
+  await page.locator('#wf_LET').fill('');
+  assert.match(await page.locator('#wfBonitetLive').innerText(),/не хватает возраста/i);
+  await page.locator('#wf_LET').fill('5');
+  assert.match(await page.locator('#wfBonitetLive').innerText(),/Расчётный бонитет: 4/);
+  await page.locator('#wfSaveMaket').click();
+  await page.waitForFunction(({k,vd})=>String(D.quarters[k].compartments.find(x=>Number(x.VD)===vd).M3B)==='4',fixture);
+  assert.match(await page.locator('#humanContent').innerText(),/Класс IV/,'Summary should immediately display computed K58 class after saving simplified Maket10 editor');
+  assert.doesNotMatch(await page.locator('#humanContent').innerText(),/Не рассчитан/,'Stale initial bonitet must not remain visible after save');
+  assert.match(await page.locator('#childContent').innerText(),/Бонитет по К58: класс 4/,'Maket10 view must explain the result');
   assert.deepEqual(errors,[]);
-  console.log('SPECIES_QUICK_OK: iOS label click focuses keyboard, original native wheel not labelable; inline dropdown below field; Maket10 and K58');
+  console.log('SPECIES_QUICK_OK: iOS keyboard, live K58 preview while typing, simplified Maket10 save updates visible stand summary, native species and district selectors');
   await context.close();
  }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
 })().catch(error=>{console.error(error);process.exitCode=1;});
