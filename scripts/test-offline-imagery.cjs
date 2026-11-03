@@ -58,7 +58,7 @@ const server=http.createServer((req,res)=>{try{
   await page.evaluate(async id=>{await SolinWorkspace.activate(id);openMapScreen();},forest);
   await page.waitForFunction(()=>window.SolinOfflineImagery.active?.status==='ready');
   assert.equal(await page.evaluate(()=>SolinOfflineImagery.active.id),pack.id);
-  assert.equal(await page.evaluate(async id=>(await SolinOfflineImagery.readTile(id,0,0,0))?.size),pack.size);
+  assert.equal(await page.evaluate(async id=>(await SolinOfflineImagery.readTile(id,0,0,0))?.size,pack.id),pack.size);
   await page.evaluate(()=>setBaseMap('google'));
   assert.equal(await page.locator('#offlineBtn').evaluate(el=>el.classList.contains('active')),false);
   await page.locator('#offlineBtn').click();
