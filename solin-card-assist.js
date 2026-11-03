@@ -2,7 +2,9 @@
  * The original field controls and draft/save flow remain the only data source. */
 (()=>{'use strict';
  const h=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- const mobile=()=>window.Capacitor?.getPlatform?.()==='android'||window.matchMedia('(max-width:700px)').matches;
+ const nativeAndroid=()=>window.Capacitor?.getPlatform?.()==='android'&&window.Capacitor?.isNativePlatform?.();
+ const mobile=()=>nativeAndroid()||window.matchMedia('(max-width:700px)').matches;
+ if(nativeAndroid())document.documentElement.classList.add('solin-native-android');
  let state=null;
  function board(){return document.querySelector('.ce-modal #ce-form .dt-board');}
  function host(){return document.querySelector('.ce-modal .modalCard');}
@@ -96,7 +98,20 @@
     return;
   }
  }
- document.addEventListener('pointerdown',e=>{if(!mobile()||!board()||!e.target?.closest)return;const el=e.target.closest('.dt-board select[data-ce-field]');if(!el||el.disabled||el.readOnly||!host()||layer()?.hidden===false)return;e.preventDefault();e.stopPropagation();editField(el);},true);
+ document.addEventListener('pointerdown',e=>{
+  if(!mobile()||!board()||!e.target?.closest)return;
+  // iOS retains its proven species/search interaction unchanged.
+  // For native Android, give both selects AND cramped text/number cells
+  // the same full-size, keyboard-focused edit surface.
+  const selector=nativeAndroid()?'.dt-board [data-ce-field]':'.dt-board select[data-ce-field]';
+  const el=e.target.closest(selector);
+  if(!el||!host()||layer()?.hidden===false)return;
+  if(el.disabled||el.readOnly)return;
+  // Quick species text entry is already handled by SolinSpeciesEntry.
+  if(el.classList.contains('solin-species-native'))return;
+  e.preventDefault();e.stopPropagation();
+  editField(el);
+ },true);
  document.addEventListener('click',e=>{if(!document.querySelector('.ce-modal'))return;const lay=layer();if(lay&&!lay.hidden&&lay.contains(e.target)){overlayAction(e);return;}
   const shortcut=e.target.closest?.('[data-ce-assist-sequence],[data-ce-assist-find],[data-ce-assist-row],[data-ce-assist-makets]');if(shortcut&&mobile()){e.preventDefault();e.stopPropagation();if(shortcut.hasAttribute('data-ce-assist-sequence'))editSequence();else if(shortcut.hasAttribute('data-ce-assist-find'))editPicker();else if(shortcut.hasAttribute('data-ce-assist-makets'))editMaketPicker();else editSelectedRow();return;}
   const extra=e.target.closest?.('[data-ce-mobile-extra]');if(extra){
