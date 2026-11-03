@@ -48,6 +48,12 @@ const server=http.createServer((req,res)=>{try{
   });
   assert.equal(pack.forest,forest);assert.equal(pack.count,1);assert.equal(pack.status,'ready');
   assert.equal(await page.locator('#offlineBtn').isEnabled(),true);
+  // Verify Leaflet actually paints a locally stored raster tile, not just
+  // that the tile bytes exist somewhere in IndexedDB.
+  await page.evaluate(()=>fieldMap.setView([0,0],0));
+  await page.waitForFunction(()=>[...document.querySelectorAll('#fieldMap img.leaflet-tile')]
+    .some(img=>img.src.startsWith('blob:')&&img.complete&&img.naturalWidth>0));
+
   assert(await page.locator('#offlineBtn').evaluate(el=>el.classList.contains('active')),
    'Offline imagery should be selected automatically after download/import');
   // Do not allow one forest to see tiles saved under another owner's address.
