@@ -25,8 +25,9 @@ for(const rel of new Set(refs)){
  const original=path.join(root,rel),staged=path.join(out,rel);
  assert(fs.existsSync(original),'The web UI itself references a missing asset '+rel);
  assert(fs.existsSync(staged),'The APK is missing an essential PWA asset '+rel);
- assert.deepEqual(fs.readFileSync(staged),fs.readFileSync(original),
+ if(rel!=='app.js')assert.deepEqual(fs.readFileSync(staged),fs.readFileSync(original),
   'APK asset differs from its PWA counterpart: '+rel);
+ // app.js is checked exactly against the approved native-only SW adaptation above.
  verified++;
 }
 const required=[
