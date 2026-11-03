@@ -137,7 +137,7 @@ if(rules){
   const candidates=(references?.SKU||[]).filter(entry=>{
    if(entry.KU===null||entry.KU===undefined||String(entry.KU)==='')return false;
    const allowed=rules.allowedLayers({KU:entry.KU},references);
-   return allowed.status==='complete'&&allowed.items.length>0;
+   return ['complete','partial'].includes(allowed.status)&&allowed.items.length>0;
   });
   const choices=[new Option('— Укажите категорию угодий —','')];
   const seen=new Set();
@@ -153,7 +153,7 @@ if(rules){
   }
   treeCategory.replaceChildren(...choices);
   treeCategory.value=old;
-  treeCategory.disabled=!references?.SKU?.length||!references?.SIAR?.length||!references?.PIAP?.length;
+  treeCategory.disabled=!references?.SKU?.length||!references?.SIAR?.length;
  };
  const filterAll=()=>{
   const values=collect(),card=categoryCard();
@@ -168,13 +168,15 @@ if(rules){
    const hint=document.getElementById('wfM10LayerHint');
    if(hint){
     hint.dataset.status=result.status;
-    hint.textContent=result.status==='complete'&&result.items?.length?
-     'По категории «'+(result.categoryName||categoryCode())+'» разрешены только: '+
-       result.items.map(x=>x.value+' — '+x.label).join('; ')+'.':
-     result.status==='complete'?
-       'Для категории «'+(result.categoryName||categoryCode())+'» ярусы древостоя не предусмотрены. Проверьте категорию выдела.':
+    hint.textContent=['complete','partial'].includes(result.status)&&result.items?.length?
+     (result.status==='complete'?'Допустимые':'Предварительные')+
+       ' ярусы для категории «'+(result.categoryName||categoryCode())+'»: '+
+       result.items.map(x=>x.value+' — '+x.label).join('; ')+'. '+result.reason:
+     ['complete','partial'].includes(result.status)?
+       'Для категории «'+(result.categoryName||categoryCode())+
+       '» в SIAR нет подходящих ярусов. '+result.reason:
        (result.reason||'Не удалось определить допустимые ярусы')+
-       '. Категория должна быть установлена и оригинальные SKU, SIAR, PIAP — загружены.';
+       '. Для выбора требуются категория угодий и исходные SKU, SIAR.';
    }
   }
  };
@@ -199,10 +201,11 @@ const dependent=window.SolinDependentRules,referenceTables=window.SOLIN_REFS?.ta
  if(kuChanged){
   if(!desiredKU){notify('Категория угодий выдела не может быть очищена из этого окна.');return;}
   const categoryResult=dependent?.allowedLayers(workingCard,referenceTables);
-  if(categoryResult?.status!=='complete'||!categoryResult.items?.length){
+  if(!['complete','partial'].includes(categoryResult?.status)||!categoryResult.items?.length){
    notify('Не удалось подтвердить новую категорию угодий по SKU → SIAR → PIAP. '+(categoryResult?.reason||''));return;
   }
-  if(values.IAR!=null&&dependent.currentIsAllowed(values.IAR,categoryResult)!==true){
+  if(values.IAR!=null&&dependent.currentIsAllowed(values.IAR,categoryResult)===false&&
+     categoryResult.status==='complete'){
    notify('Укажите допустимый ярус для выбранной категории угодий.');return;
   }
  }
@@ -241,7 +244,10 @@ if(audited?.errors.length){
 if(kuChanged){
  const oldName=referenceTables?.SKU?.find(x=>String(x.KU)===String(r.KU))?.NKU||String(r.KU??'не указано');
  const newName=referenceTables?.SKU?.find(x=>String(x.KU)===desiredKU)?.NKU||desiredKU;
- if(!window.confirm('Изменить категорию угодий ВСЕГО выдела с «'+oldName+'» на «'+newName+'»? Изменение будет сохранено вместе с древостоем.'))return;
+ const unverified=dependent?.allowedLayers({KU:desiredKU},referenceTables)?.status==='partial';
+ if(!window.confirm('Изменить категорию угодий ВСЕГО выдела с «'+oldName+'» на «'+newName+'»? '+
+  (unverified?'Ярус выбран по SKU и SIAR, но таблица PIAP отсутствует — дополнительная проверка не выполнена. ':'')+
+  'Изменение будет сохранено вместе с древостоем.'))return;
  r.KU=Number(desiredKU);
 }
 target[m]=list;
