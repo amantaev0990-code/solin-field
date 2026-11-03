@@ -135,3 +135,16 @@
  .ce-modal .dt-board .dt-split output{flex:1 1 0;min-width:0}
  .ce-modal .dt-board .dt-header{flex:none}
 }
+
+/* Native Android tablets are typically wider than 700 CSS px. Previously
+ * their convenient card tabs and editable-field toolbar stayed hidden,
+ * despite the Android touch handler already being active. Scope the
+ * exception to native Android so desktop and iPhone layouts stay intact. */
+.solin-native-android .ce-modal .dt-toolbar{min-height:43px;height:auto;flex-wrap:wrap;align-content:center;gap:5px;padding:4px 6px}
+.solin-native-android .ce-modal .dt-toolbar .ce-assist-shortcuts{display:flex;flex:1 1 auto;gap:5px;align-items:center;min-width:250px;max-width:100%}
+.solin-native-android .ce-modal .dt-toolbar .ce-assist-shortcuts button{flex:1 1 auto;min-width:62px;min-height:34px;padding:5px 8px;font:13px Arial,sans-serif;border:1px solid #97a9bb;background:#edf2f7;color:#29465f;border-radius:4px;white-space:nowrap}
+.solin-native-android .ce-mobile-tabs{display:flex;flex:none;gap:4px;overflow-x:auto;padding:5px;background:#c7d4e1;border-bottom:1px solid #899dae;scrollbar-width:thin}
+.solin-native-android .ce-mobile-tabs button{flex:none;min-height:35px;padding:5px 10px;border:1px solid #8da0b3;background:#e7edf3;color:#273c51;border-radius:3px;font:13px Arial}
+.solin-native-android .ce-mobile-tabs button[aria-current=true]{background:#3b5f80;color:#fff}
+.solin-native-android .ce-assist-overlay{z-index:500}
+.solin-native-android .ce-assist-panel{width:min(620px,100%)}
