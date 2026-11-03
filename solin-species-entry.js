@@ -35,7 +35,11 @@
   const prefix=items.filter(x=>strip(x.code).startsWith(q)||strip(x.label).startsWith(q));
   return prefix.length===1?prefix[0]:null;
  }
- function hide(){if(active?.popup){active.popup.remove();active.input.setAttribute('aria-expanded','false');}active=null;}
+ function hide(){
+  if(active?.popup){active.popup.remove();active.input.setAttribute('aria-expanded','false');active.popup=null;}
+  document.getElementById('modal')?.classList.remove('solin-species-open');
+  active=null;
+ }
  function syncUI(state){
   if(document.activeElement===state.input)return;
   const found=entries(state.select).find(x=>String(x.code)===String(state.select.value));
@@ -52,14 +56,43 @@
   state.input.setCustomValidity('');
   state.input.removeAttribute('aria-invalid');
  }
+ // iPhone Safari shrinks visualViewport when the keyboard appears.
+ // Suggestions MUST remain below the entry field; never flip above it.
+ function visibleFrame(){
+  const v=window.visualViewport;
+  return {top:v?.offsetTop||0,left:v?.offsetLeft||0,
+   width:v?.width||innerWidth,height:v?.height||innerHeight};
+ }
+ function findScroller(input){
+  for(let p=input.parentElement;p;p=p.parentElement){
+   const style=window.getComputedStyle(p);
+   if(/auto|scroll/.test(style.overflowY)&&p.scrollHeight>p.clientHeight+2)return p;
+  }
+  return null;
+ }
+ function ensureRoom(state){
+  if(!state.popup||document.activeElement!==state.input)return;
+  const rect=state.input.getBoundingClientRect(),v=visibleFrame();
+  const available=v.top+v.height-rect.bottom-10;
+  if(available>=138)return;
+  const container=findScroller(state.input);
+  if(!container)return;
+  const before=container.scrollTop,delta=Math.min(230,Math.ceil(150-available));
+  container.scrollTop+=delta;
+  if(container.scrollTop!==before)requestAnimationFrame(()=>movePopup(state));
+ }
  function movePopup(state){
-  if(!state.popup)return;
-  const rect=state.input.getBoundingClientRect(),w=Math.max(220,Math.min(360,innerWidth-20));
-  state.popup.style.width=w+'px';
-  state.popup.style.left=Math.max(8,Math.min(rect.left,innerWidth-w-8))+'px';
-  state.popup.style.top=(rect.bottom+Math.min(312,innerHeight-rect.bottom-12)>innerHeight-2?
-    Math.max(8,rect.top-310):rect.bottom+3)+'px';
-  state.popup.style.maxHeight=Math.max(72,Math.min(300,innerHeight-30))+'px';
+  if(!state.popup||!state.input.isConnected){if(!state.input.isConnected)hide();return;}
+  const rect=state.input.getBoundingClientRect(),v=visibleFrame();
+  const width=Math.min(Math.max(rect.width,230),Math.max(160,v.width-16));
+  const left=Math.max(v.left+8,Math.min(rect.left,v.left+v.width-width-8));
+  const top=rect.bottom+3; // Always below the typing field.
+  const room=Math.max(0,v.top+v.height-top-8);
+  state.popup.style.width=width+'px';
+  state.popup.style.left=left+'px';
+  state.popup.style.top=top+'px';
+  state.popup.style.maxHeight=Math.min(280,room)+'px';
+  state.popup.hidden=room<42;
  }
  function show(state){
   hide();
@@ -71,7 +104,9 @@
   state.items=items;state.index=0;state.popup=popup;active=state;
   const format=item=>item.code+' — '+item.label;
   popup.innerHTML=items.map((item,i)=>'<button type="button" class="solin-species-option" role="option" data-species-index="'+i+'" aria-selected="'+(i===0?'true':'false')+'">'+h(format(item))+'</button>').join('');
-  document.body.append(popup);movePopup(state);
+  document.body.append(popup);
+  document.getElementById('modal')?.classList.add('solin-species-open');
+  movePopup(state);
   state.input.setAttribute('aria-expanded','true');
   popup.addEventListener('pointerdown',e=>e.preventDefault());
   popup.addEventListener('click',e=>{
@@ -96,6 +131,10 @@
    const found=entries(select).find(x=>x.code===select.value);
    if(found){input.value=found.code;input.select();}
    show(state);
+   requestAnimationFrame(()=>ensureRoom(state));
+   // iOS keyboard expansion is asynchronous and raises a visualViewport resize.
+   setTimeout(()=>{if(active===state){ensureRoom(state);movePopup(state);}},180);
+   setTimeout(()=>{if(active===state){ensureRoom(state);movePopup(state);}},400);
   });
   input.addEventListener('input',()=>{
    const query=input.value;
@@ -127,7 +166,9 @@
  }
  // Modal close, scrolling or resize should never leave a floating stale menu.
  document.addEventListener('scroll',()=>{if(active)movePopup(active);},true);
- window.addEventListener('resize',()=>{if(active)movePopup(active);});
+ window.addEventListener('resize',()=>{if(active){ensureRoom(active);movePopup(active);}});
+ window.visualViewport?.addEventListener('resize',()=>{if(active){ensureRoom(active);movePopup(active);}});
+ window.visualViewport?.addEventListener('scroll',()=>{if(active)movePopup(active);});
  document.addEventListener('pointerdown',e=>{if(active&&!active.popup.contains(e.target)&&e.target!==active.input)hide();},true);
  window.SolinSpeciesEntry={mount,mountAll};
 })();
