@@ -58,3 +58,19 @@
 .ce-home-draft span{font-size:12px;overflow-wrap:anywhere;color:#52695b}
 .ce-home-draft [data-ce-copy]{flex:0 0 44px;text-align:center;font-size:22px}
 @media(max-width:700px){.ce-recovery{flex-direction:column;align-items:stretch;margin:6px 8px;padding:12px;gap:10px;min-height:0;max-height:60dvh;flex-shrink:1;overflow:auto}.ce-recovery>div{flex:none}.ce-recovery-actions{flex-direction:column}.ce-recovery-actions button{width:100%}}
+
+/* Read-only Maket 5 breakdown stays outside the fixed Access 1200px canvas. */
+.ce-modal .ce-stock-audit{flex:0 0 auto;max-height:104px;overflow:auto;padding:7px 12px;margin:0;border-bottom:1px solid #aac2aa;background:#f1f7ef;color:#244329;font:12px/1.35 Arial,sans-serif}
+.ce-modal .ce-stock-audit p{margin:2px 0 5px}
+.ce-modal .ce-stock-audit[data-stock-status="ambiguous"],
+.ce-modal .ce-stock-audit[data-stock-status="waiting"]{background:#fff8e9;color:#544525}
+.dt-board #ce-section-5 .ce-stock-metric{flex:0 0 158px;display:flex;flex-direction:row;align-items:center;gap:3px;min-width:0}
+.dt-board #ce-section-5 .ce-stock-metric>span{white-space:normal;line-height:1.15;max-width:105px;font-size:10px}
+.dt-board #ce-section-5 .ce-stock-metric output{width:45px;max-width:45px;flex:0 0 45px;white-space:nowrap;min-height:22px;height:22px;padding:1px 3px;text-align:center;border:1px solid #b1b1ae}
+.dt-board .dt-quarter [data-dt-cell="Raion"]{flex:1 1 145px!important;min-width:120px}
+.dt-board .dt-quarter [data-dt-cell="Raion"]>.dt-input{width:100%}
+.dt-board .dt-quarter [data-dt-cell="Raion"] select{width:100%;min-width:0;opacity:1;position:static}
+.dt-board .dt-quarter .quarter-code-manual:not([hidden]),
+.dt-board .dt-category .quarter-code-manual:not([hidden]){position:absolute;z-index:4;top:100%;left:0;right:0;width:100%;min-width:120px;background:white;opacity:1}
+.dt-board .dt-category [data-quarter-picker="Fzona"]{position:static!important;width:100%!important;opacity:1!important;min-width:0!important;cursor:pointer}
+@media(max-width:620px){.ce-modal .ce-stock-audit{max-height:92px;padding:5px 8px;font-size:11px}}
