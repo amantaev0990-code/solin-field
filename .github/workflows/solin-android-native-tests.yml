@@ -7,6 +7,14 @@ on:
       - 'native/android/SolinMdbInstrumentedTest.java'
       - 'native/android/SolinFieldUiInstrumentedTest.java'
       - 'scripts/install-android-mdb.mjs'
+      - 'scripts/build-mobile.mjs'
+      - 'scripts/test-android-assets.cjs'
+      - 'solin-field-core.js'
+      - 'solin-card-assist.js'
+      - 'solin-android-selects.js'
+      - 'solin-native-control-engine.js'
+      - 'solin-control-source-recovery.js'
+      - 'index.html'
       - '.github/workflows/solin-android-native-tests.yml'
 permissions:
   contents: read
