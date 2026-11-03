@@ -28,6 +28,8 @@ vm.runInNewContext(fs.readFileSync('solin-quarter-pickers.js','utf8'),
 const api=window.SolinQuarterPickers;
 const a=api.candidates('Raion',{},user),b=api.candidates('Raion',{},shet);
 assert(a.items.some(x=>x.value==='156000000'&&x.label==='Хромтауский район'));
+assert(a.items.some(x=>x.value==='153400000'&&x.label==='Айтекебийский район'));
+assert(a.items.length>=13,'Offline directory includes all verified Aktobe districts and Shet');
 assert.equal(a.items.find(x=>x.value==='356400000')?.label,'Шетский район');
 assert(b.items.some(x=>x.value==='356400000'&&x.label.includes('Шетский')));
 assert.equal(api.candidates('Raion',{},another).items.length>=2,true);
