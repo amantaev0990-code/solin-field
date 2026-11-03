@@ -21,8 +21,8 @@
  // All verified/observed codes are available irrespective of category or area.
  // Administrative full Кл_Рай is not in the archived public reference package.
  const KNOWN_DISTRICTS=[
-  {value:'156000000',label:'Исходная база Transf_213_2_2026 (название района не восстановлено)'},
-  {value:'356400000',label:'Шетский район · оригинальная обложка SOLI-N (723 / 4)'}
+  {value:'156000000',label:'Хромтауский район'},
+  {value:'356400000',label:'Шетский район'}
  ];
  let persistedForests=[],listing=null;
  async function loadSavedDirectory(){
@@ -56,7 +56,7 @@
   if(field==='Raion'){
    for(const item of KNOWN_DISTRICTS)add(item.value,item.label);
    for(const r of all)if(numeric(r.Raion)&&Number(r.Raion)>0)
-    add(r.Raion,'Из сохранённой обложки квартала');
+    add(r.Raion,'Название района не установлено');
    for(const r of current)if(numeric(r.Raion)&&Number(r.Raion)>0)mine.add(clean(r.Raion));
    return {items:[...results.values()].sort((a,b)=>Number(a.value)-Number(b.value)),
     auto:null,reason:'Доступные известные коды районов всех сохранённых лесничеств. Полная Кл_Рай отсутствует — при отсутствии района используйте ручной ввод проверенного кода. Выбор не зависит от КГЛФ или области.'};
@@ -86,10 +86,24 @@
    manual.className='quarter-code-manual';manual.placeholder=field==='Raion'?'Код района (например, 356400000)':'Код функциональной зоны';
    manual.setAttribute('aria-label',field==='Raion'?'Ввести код административного района':'Ввести код функциональной зоны');
    manual.hidden=true;
+   // Region choice is human-readable; the stored KATO value is shown separately.
+   // A verified district name must never be confused with its MDB numeric code.
+   let codeBox=null,codeOutput=null;
+   if(field==='Raion'){
+     codeBox=document.createElement('div');codeBox.className='quarter-code-display';
+     const title=document.createElement('span');title.textContent='Код административного района';
+     codeOutput=document.createElement('input');codeOutput.type='text';codeOutput.readOnly=true;
+     codeOutput.tabIndex=-1;codeOutput.className='quarter-code-readonly';
+     codeOutput.setAttribute('aria-label','Код выбранного административного района');
+     codeOutput.placeholder='Не указан';
+     codeBox.append(title,codeOutput);
+   }
    input.replaceWith(select);
    select.insertAdjacentElement('afterend',manual);
+   if(codeBox)manual.insertAdjacentElement('afterend',codeBox);
    let hint=options.hint||null, lastItems=[];
    const value=()=>select.value===MANUAL?manual.value.trim():select.value;
+   const updateCode=()=>{if(codeOutput)codeOutput.value=value();};
    const sync=(opts={})=>{
      const row=typeof context==='function'?context():context;
      const org=options.org?.()||((typeof D!=='undefined'&&D?.lesnichestvo?.[0])||{});
@@ -98,7 +112,7 @@
      const seen=new Set(),items=[];
      for(const item of data.items){if(seen.has(item.value))continue;seen.add(item.value);items.push(item);}
      const entries=[new Option('— Не указано —','')];
-     for(const item of items)entries.push(new Option(item.value+(item.label?' — '+item.label:''),item.value));
+     for(const item of items)entries.push(new Option(field==='Raion'?(item.label||'Название района не установлено'):item.value+(item.label?' — '+item.label:''),item.value));
      entries.push(new Option('✎ Ввести код вручную',MANUAL));
      select.replaceChildren(...entries);
      lastItems=items;
@@ -110,12 +124,14 @@
      select.disabled=false;manual.disabled=false;
      manual.hidden=select.value!==MANUAL;
      if(hint)hint.textContent=data.reason;
+     updateCode();
      return data;
    };
    select.addEventListener('change',()=>{
      manual.hidden=select.disabled||select.value!==MANUAL;
      if(select.value===MANUAL&&!select.disabled)manual.focus();
      else manual.value='';
+     updateCode();
    });
    // Forward free-text edits to existing card form listeners. The select is
    // the canonical control, its value() resolves the manual code.
@@ -123,9 +139,9 @@
     if(typeof Event==='function'&&typeof select.dispatchEvent==='function')
      select.dispatchEvent(new Event(type,{bubbles:true}));
    };
-   manual.addEventListener('input',()=>forward('input'));
-   manual.addEventListener('change',()=>forward('change'));
-   const picker={select,manual,sync,value,get items(){return lastItems;}};
+   manual.addEventListener('input',()=>{updateCode();forward('input');});
+   manual.addEventListener('change',()=>{updateCode();forward('change');});
+   const picker={select,manual,sync,value,codeOutput,codeBox,get items(){return lastItems;}};
    select.__solinQuarterPicker=picker;
    sync({value:options.current??input.value??''});
    // If user opens the quarter before the offline reference bundle is ready,
