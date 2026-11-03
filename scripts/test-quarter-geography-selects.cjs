@@ -14,6 +14,7 @@ class Element{
  constructor(tag){this.tagName=tag.toUpperCase();this.attributes=[];this.dataset={};
   this.parentElement={};this.handlers={};this.value='';this.hidden=false;}
  setAttribute(name,value){this.attributes.push({name,value});if(name==='id')this.id=value;}
+ append(...nodes){this.children=nodes;for(const node of nodes)node.parentElement=this;}
  replaceWith(element){element.parentElement=this.parentElement;this.replacement=element;}
  insertAdjacentElement(_where,element){element.parentElement=this.parentElement;this.manual=element;}
  replaceChildren(...children){this.children=children;this.value='';}
@@ -26,7 +27,8 @@ vm.runInNewContext(fs.readFileSync('solin-quarter-pickers.js','utf8'),
  {window,D,document,Option});
 const api=window.SolinQuarterPickers;
 const a=api.candidates('Raion',{},user),b=api.candidates('Raion',{},shet);
-assert(a.items.some(x=>x.value==='156000000'));
+assert(a.items.some(x=>x.value==='156000000'&&x.label==='Хромтауский район'));
+assert.equal(a.items.find(x=>x.value==='356400000')?.label,'Шетский район');
 assert(b.items.some(x=>x.value==='356400000'&&x.label.includes('Шетский')));
 assert.equal(api.candidates('Raion',{},another).items.length>=2,true);
 const one=Array.from(api.candidates('Fzona',{},another).items,x=>x.value);
@@ -36,8 +38,16 @@ assert.deepEqual(one,['0','2','3','7']);
 const input=new Element('input'),district=api.mount(input,'Raion',()=>({}),{org:()=>user});
 assert.equal(district.select.tagName,'SELECT');
 assert.equal(district.value(),'','Never force default district for a new quarter');
+assert.equal(district.codeOutput.value,'','Empty selected district must leave KATO blank');
+assert.equal(district.select.children.find(x=>x.value==='156000000').textContent,'Хромтауский район','District options must not include numeric KATO');
+district.select.value='356400000';district.select.handlers.change();
+assert.equal(district.codeOutput.value,'356400000','Exact KATO must appear in separate field');
+district.sync({value:'156000000'});
+assert.equal(district.select.value,'156000000');
+assert.equal(district.codeOutput.value,'156000000');
 district.select.value='__solin_manual__';district.select.handlers.change();
-district.manual.value='158888888';assert.equal(api.value(district.select),'158888888');
+district.manual.value='158888888';district.manual.handlers.input();assert.equal(api.value(district.select),'158888888');
+assert.equal(district.codeOutput.value,'158888888','Manual code must also update separate KATO field');
 const fz=api.mount(new Element('input'),'Fzona',()=>({KGLF:null}),{org:()=>user});
 assert.equal(fz.select.disabled,false,'Function must be selectable before GLF');
 assert.equal(fz.value(),'');
@@ -46,4 +56,4 @@ fz.sync({value:'3'});assert.equal(fz.value(),'3');
 const editor=fs.readFileSync('solin-card-editor.js','utf8');
 assert(editor.includes("mount(fzonaControl,'Fzona'"));
 assert(editor.includes("mount(raionControl,'Raion'"));
-console.log('QUARTER_UNRESTRICTED_LISTS_OK: all SFZ, all known districts, zero, manual codes, quarter and card');
+console.log('QUARTER_UNRESTRICTED_LISTS_OK: named districts, separate live KATO code, all SFZ, manual fallback, quarter and card');
