@@ -117,33 +117,98 @@ function editMaket(m,index){const r=record();if(!r)return;
 const fields=(db()?.transfSchema?.[m]||[]).filter(n=>!KEY_FIELDS.includes(n)),existing=rowsOf(r,m)[index]||{};
 if(typeof openModal!=='function')return;
 openModal((index===rowsOf(r,m).length?'Новая запись · ':'Изменение · ')+(window.SolinHuman?.formName(m)||NAMES[m]),
-'<div class="wf-form-note">Данные сохраняются только в SOLI-N Field. Оригинальные базы SOLI-N не изменяются.</div><div class="formGrid wf-formgrid">'+humanInputs(fields,existing,'wf',m)+'</div><div class="formActions"><button class="secondary" onclick="closeModal()">Отмена</button><button class="primary" id="wfSaveMaket">Сохранить</button></div>');
+'<div class="wf-form-note">Данные сохраняются только в SOLI-N Field. Оригинальные базы SOLI-N не изменяются.</div>'+
+(m==='Макет10'?'<div class="wf-form-note" id="wfM10LayerContext"><label class="wf-field"><span>Категория угодий выдела (KU)</span><select id="wfM10KU" aria-describedby="wfM10LayerHint"></select></label><p id="wfM10LayerHint" role="status" aria-live="polite">Проверяю допустимые ярусы по исходным SKU, SIAR и PIAP…</p><small>Категория относится ко всему выделу, а не только к строке древостоя. Если изменить её здесь, новое значение будет сохранено вместе с древостоем только после подтверждения.</small></div>':'')+
+'<div class="formGrid wf-formgrid">'+humanInputs(fields,existing,'wf',m)+'</div><div class="formActions"><button class="secondary" onclick="closeModal()">Отмена</button><button class="primary" id="wfSaveMaket">Сохранить</button></div>');
 // One Access RowSource engine for ALL individual Maket editors.
 const rules=window.SolinDependentRules,modalBody=document.querySelector('#modalBody');
+const treeCategory=m==='Макет10'?document.getElementById('wfM10KU'):null;
+const categoryCode=()=>treeCategory?treeCategory.value:String(r.KU??'');
+const categoryCard=()=>treeCategory?{...r,KU:categoryCode()}:r;
 if(rules){
  const collect=()=>({...existing,...Object.fromEntries(fields.map(field=>{
   const el=document.getElementById('wf_'+field);
   return [field,el?(el.value===''?null:el.value):existing[field]];
  }))});
+ const populateTreeCategory=()=>{
+  if(!treeCategory)return;
+  const references=window.SOLIN_REFS?.tables;
+  const old=treeCategory.options.length?treeCategory.value:String(r.KU??'');
+  const candidates=(references?.SKU||[]).filter(entry=>{
+   if(entry.KU===null||entry.KU===undefined||String(entry.KU)==='')return false;
+   const allowed=rules.allowedLayers({KU:entry.KU},references);
+   return ['complete','partial'].includes(allowed.status)&&allowed.items.length>0;
+  });
+  const choices=[new Option('— Укажите категорию угодий —','')];
+  const seen=new Set();
+  for(const entry of candidates){
+   const value=String(entry.KU);
+   if(seen.has(value))continue;
+   seen.add(value);
+   choices.push(new Option(value+' — '+String(entry.NKU||''),value));
+  }
+  if(old&&!seen.has(old)){
+   const entry=(references?.SKU||[]).find(x=>String(x.KU)===old);
+   choices.push(new Option(old+' — '+String(entry?.NKU||'текущая категория')+' (для древостоя не подтверждена)',old));
+  }
+  treeCategory.replaceChildren(...choices);
+  treeCategory.value=old;
+  treeCategory.disabled=!references?.SKU?.length||!references?.SIAR?.length;
+ };
  const filterAll=()=>{
-  const values=collect();
+  const values=collect(),card=categoryCard();
   for(const field of fields){
    const el=document.getElementById('wf_'+field);
    if(!el)continue;
-   const result=rules.options(m,field,values,r,db()?.lesnichestvo?.[0]);
+   const result=rules.options(m,field,values,card,db()?.lesnichestvo?.[0]);
    if(result)rules.applySelect(el,result,{current:values[field]});
   }
+  if(treeCategory){
+   const result=rules.allowedLayers(card,window.SOLIN_REFS?.tables);
+   const hint=document.getElementById('wfM10LayerHint');
+   if(hint){
+    hint.dataset.status=result.status;
+    hint.textContent=['complete','partial'].includes(result.status)&&result.items?.length?
+     (result.status==='complete'?'Допустимые':'Предварительные')+
+       ' ярусы для категории «'+(result.categoryName||categoryCode())+'»: '+
+       result.items.map(x=>x.value+' — '+x.label).join('; ')+'. '+result.reason:
+     ['complete','partial'].includes(result.status)?
+       'Для категории «'+(result.categoryName||categoryCode())+
+       '» в SIAR нет подходящих ярусов. '+result.reason:
+       (result.reason||'Не удалось определить допустимые ярусы')+
+       '. Для выбора требуются категория угодий и исходные SKU, SIAR.';
+   }
+  }
  };
+ populateTreeCategory();
  filterAll();
  modalBody.addEventListener('input',e=>{
-  if(e.target?.matches?.('[data-wffield]'))filterAll();
+  if(e.target===treeCategory||e.target?.matches?.('[data-wffield]'))filterAll();
  });
  modalBody.addEventListener('change',e=>{
-  if(e.target?.matches?.('[data-wffield]'))filterAll();
+  if(e.target===treeCategory||e.target?.matches?.('[data-wffield]'))filterAll();
  });
+ if(treeCategory)window.addEventListener('solin-refs-ready',()=>{
+  if(!modalBody.isConnected||document.getElementById('wfM10KU')!==treeCategory)return;
+  populateTreeCategory();filterAll();
+ },{once:true});
 }
 document.querySelector('#wfSaveMaket').onclick=()=>{const container=document.querySelector('#modalBody');let values;try{values=bindInputs(container,fields,'wf',existing);}catch(e){notify(e.message);return;}
 const dependent=window.SolinDependentRules,referenceTables=window.SOLIN_REFS?.tables;
+ const desiredKU=treeCategory?treeCategory.value.trim():String(r.KU??'').trim();
+ const kuChanged=!!treeCategory&&desiredKU!==String(r.KU??'').trim();
+ const workingCard=kuChanged?{...r,KU:Number(desiredKU)}:r;
+ if(kuChanged){
+  if(!desiredKU){notify('Категория угодий выдела не может быть очищена из этого окна.');return;}
+  const categoryResult=dependent?.allowedLayers(workingCard,referenceTables);
+  if(!['complete','partial'].includes(categoryResult?.status)||!categoryResult.items?.length){
+   notify('Не удалось подтвердить новую категорию угодий по SKU → SIAR → PIAP. '+(categoryResult?.reason||''));return;
+  }
+  if(values.IAR!=null&&dependent.currentIsAllowed(values.IAR,categoryResult)===false&&
+     categoryResult.status==='complete'){
+   notify('Укажите допустимый ярус для выбранной категории угодий.');return;
+  }
+ }
  if(dependent&&m==='Макет10'&&values.POR!=null&&values.PROI==null){
   const origin=dependent.suggestedOrigin(values.POR,referenceTables);
   if(origin!==null)values.PROI=origin;
@@ -151,7 +216,7 @@ const dependent=window.SolinDependentRules,referenceTables=window.SOLIN_REFS?.ta
  if(dependent){
   const candidate={...existing,...values};
   for(const field of fields){
-   const list=dependent.options(m,field,candidate,r,db()?.lesnichestvo?.[0],referenceTables);
+   const list=dependent.options(m,field,candidate,workingCard,db()?.lesnichestvo?.[0],referenceTables);
    const good=dependent.currentIsAllowed(candidate[field],list);
    const touched=index>=rowsOf(r,m).length||String(candidate[field]??'')!==String(existing[field]??'');
    if(touched&&good===false&&['complete','empty'].includes(list?.status)&&
@@ -161,20 +226,29 @@ const dependent=window.SolinDependentRules,referenceTables=window.SOLIN_REFS?.ta
    }
   }
  }
- const before=JSON.stringify(r);const failures=window.solinCore?.validateRow(m,values,r)||[];if(failures.length){notify(failures.join("; "));return;}const target=(r._children=r._children||{});
+ const before=JSON.stringify(r);const failures=window.solinCore?.validateRow(m,values,workingCard)||[];if(failures.length){notify(failures.join("; "));return;}const target=(r._children=r._children||{});
 const list=[...rowsOf(r,m)],base={...existing,...values};
 for(const k of KEY_FIELDS)base[k]=r[k]??null;
 if(index>=list.length)list.push(base);else list[index]=base;
 // One source-backed audit for ALL Maket edits, including changed parent
 // choices, Maket 10→16 and Maket 12/23. Do not mutate the record before
 // an invalid new dependency is rejected.
-const projected={...r,_children:{...r._children,[m]:list}};
+const projected={...workingCard,_children:{...r._children,[m]:list}};
 const audited=window.SolinDependentRules?.validateTransition?.(
  r,projected,db()?.lesnichestvo?.[0],referenceTables);
 if(audited?.errors.length){
  notify('Не сохранено: '+audited.errors[0].reason+
   '. Измените связанные поля через «Изменить карточку».');
  return;
+}
+if(kuChanged){
+ const oldName=referenceTables?.SKU?.find(x=>String(x.KU)===String(r.KU))?.NKU||String(r.KU??'не указано');
+ const newName=referenceTables?.SKU?.find(x=>String(x.KU)===desiredKU)?.NKU||desiredKU;
+ const unverified=dependent?.allowedLayers({KU:desiredKU},referenceTables)?.status==='partial';
+ if(!window.confirm('Изменить категорию угодий ВСЕГО выдела с «'+oldName+'» на «'+newName+'»? '+
+  (unverified?'Ярус выбран по SKU и SIAR, но таблица PIAP отсутствует — дополнительная проверка не выполнена. ':'')+
+  'Изменение будет сохранено вместе с древостоем.'))return;
+ r.KU=Number(desiredKU);
 }
 target[m]=list;
 let calculated=[],k59Check=null,stockEdited=m==='Макет10'&&String(values.ZAP??'')!==String(existing.ZAP??'');

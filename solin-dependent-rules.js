@@ -61,13 +61,30 @@ function landCategory(card,refs=ref()){
 function allowedLayers(card,refs=ref()){
  const c=landCategory(card,refs);
  if(c.status!=='complete')return {...c,items:[]};
- if(!refs?.SIAR?.length||!refs?.PIAP?.length)
-  return {status:'unavailable',reason:'Не загружены исходные таблицы SIAR / PIAP',items:[]};
- const joined=new Set(refs.PIAP.filter(r=>filled(r.KIAR)).map(r=>code(r.KIAR)));
- const items=refs.SIAR.filter(r=>same(r.Ia,c.group)&&joined.has(code(r.KIAR))&&filled(r.NIAR))
-  .map(r=>({value:String(r.KIAR),label:String(r.NIAR)}));
- return {status:'complete',reason:'Группа P10='+c.group+' категории «'+c.name+'» → SIAR.Ia → PIAP.KIAR',
-  items,category:c.category,categoryName:c.name,group:c.group,notApplicable:c.group===0};
+ if(!refs?.SIAR?.length)
+  return {status:'unavailable',reason:'Не загружена исходная таблица SIAR для выбора яруса',items:[]};
+ // PIAP is used in the original Access INNER JOIN but is NOT present in
+ // the published refs-audit.json.gz. We can still show exact source SIAR
+ // candidates for SKU.P10, but cannot claim they passed the PIAP join.
+ // Avoid the previous error: no PIAP meant an unusable disabled IAR field.
+ const piapAvailable=Array.isArray(refs.PIAP)&&refs.PIAP.length>0;
+ const joined=piapAvailable?
+   new Set(refs.PIAP.filter(r=>filled(r.KIAR)).map(r=>code(r.KIAR))):null;
+ const byCode=new Map();
+ for(const entry of refs.SIAR){
+  const key=code(entry.KIAR);
+  if(!key||key==='0'||!same(entry.Ia,c.group)||!filled(entry.NIAR))continue;
+  if(joined&&!joined.has(key))continue;
+  if(!byCode.has(key))byCode.set(key,{value:key,label:String(entry.NIAR)});
+ }
+ const items=[...byCode.values()];
+ const status=piapAvailable?'complete':'partial';
+ const basis='Группа SKU.P10='+c.group+' категории «'+c.name+'» → SIAR.Ia';
+ return {status,reason:piapAvailable?
+   basis+' → подтверждено PIAP.KIAR':
+   basis+'. Дополнительная таблица PIAP отсутствует в опубликованных справочниках; варианты ярусов предварительные и не подтверждены полным JOIN Access.',
+  items,category:c.category,categoryName:c.name,group:c.group,
+  notApplicable:c.group===0,sourceJoinVerified:piapAvailable};
 }
 function suggestedOrigin(species,refs=ref()){
  const physical=(refs?.SDP||[]).find(r=>same(r.KPC,species));

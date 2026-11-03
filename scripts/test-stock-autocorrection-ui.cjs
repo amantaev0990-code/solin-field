@@ -370,6 +370,64 @@ async function reopen(p,info){
   'Running the full source dependency audit cannot modify the saved forest');
  await p.locator('#wfCloseDependencyAudit').click();
  console.log('PASS Chrome dependency audit dialog: card scope, complete downloadable JSON, no database edits');
+ // Regression for iPhone "Древостой": IAR is disabled when KU is missing,
+ // but the user must be able to set KU explicitly IN THIS SAME MODAL.
+ // Changing KU must be confirmed and saved atomically with Maket10.
+ await p.evaluate(()=>{
+  closeModal();
+  current=D.quarters['1'].compartments[0];
+  current.KU=null;current._children.Макет10[0].IAR=null;
+  solinWorkflow.editMaket('Макет10',0);
+ });
+ const missingLayer=await p.evaluate(()=>{
+  const el=document.getElementById('wf_IAR');
+  return {disabled:el.disabled,reason:document.getElementById('wfM10LayerHint').textContent,
+   category:document.getElementById('wfM10KU').value};
+ });
+ assert.equal(missingLayer.disabled,true);
+ assert.equal(missingLayer.category,'');
+ assert.match(missingLayer.reason,/категори/i,
+  'Disabled layer picker must explain exactly which upstream field is missing');
+ const sourceStatus=await p.evaluate(()=>{
+  const refs=SOLIN_REFS?.tables||{};
+  return {sku:refs.SKU?.length||0,siar:refs.SIAR?.length||0,piap:refs.PIAP?.length||0,
+   one:SolinDependentRules.allowedLayers({KU:1},refs)};
+ });
+ assert(sourceStatus.sku>0&&sourceStatus.siar>0,
+  'Must use the physical published SKU and SIAR, not synthetic dropdown choices');
+ assert.equal(sourceStatus.piap,0,'Reproduce missing PIAP on published iPhone refs-audit');
+ assert.equal(sourceStatus.one.status,'partial','Missing PIAP must preserve SIAR candidates but remain unverified');
+ const one=await p.locator('#wfM10KU').locator('option[value="1"]').count();
+ assert.equal(one,1,'Original SKU must offer source-backed stand categories');
+ await p.locator('#wfM10KU').selectOption('1');
+ assert.match(await p.locator('#wfM10LayerHint').innerText(),/PIAP/);
+ assert.equal(await p.locator('#wfM10LayerHint').getAttribute('data-status'),'partial');
+ assert.equal(await p.locator('#wf_IAR').isEnabled(),true,
+  'Choosing a KU with SIAR layers should immediately enable IAR');
+ assert.deepEqual(await p.locator('#wf_IAR option').evaluateAll(els=>
+  els.filter(x=>x.value&&!x.disabled).map(x=>x.value)),['1','2','7','8'],
+  'Original KU=1 → SIAR.Ia=1 → PIAP must offer only the four real IAR codes');
+ await p.locator('#wf_IAR').selectOption('1');
+ await p.locator('#modalBody .formActions .secondary').click();
+ assert.equal(await p.evaluate(()=>current.KU),null,
+  'Canceling the Maket10 dialog must not mutate parent KU');
+ assert.equal(await p.evaluate(()=>current._children.Макет10[0].IAR),null);
+ await p.evaluate(()=>solinWorkflow.editMaket('Макет10',0));
+ await p.locator('#wfM10KU').selectOption('1');
+ await p.locator('#wf_IAR').selectOption('1');
+ p.once('dialog',dialog=>dialog.accept());
+ await p.locator('#wfSaveMaket').click();
+ await p.waitForFunction(()=>current.KU===1&&current._children.Макет10[0].IAR===1);
+ await p.evaluate(()=>{closeModal();solinWorkflow.editMaket('Макет10',0)});
+ assert.equal(await p.locator('#wf_IAR').isEnabled(),true,
+  'Saved forest KU should keep IAR enabled despite missing PIAP');
+ assert.equal(await p.locator('#wf_IAR').inputValue(),'1');
+ await p.evaluate(()=>closeModal());
+ assert.equal(await p.evaluate(()=>current._children.Макет10[0].POR),'В',
+  'Updating category and IAR must not lose species');
+ assert.equal(await p.evaluate(()=>current._children.Макет10[0].KOEF),10,
+  'Updating category and IAR must not lose coefficients');
+ console.log('PASS Maket10 mobile layer edit: missing KU explained; choose source-backed category → original IAR options → atomic confirmed save');
  await desktop.close();
  const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
  const m=await mobile.newPage();m.on('pageerror',e=>errors.push(e.message));
@@ -389,6 +447,20 @@ async function reopen(p,info){
  assert.equal(await val(m,'Макет10','ZAP'),35);
  assert.equal(await val(m,'base','STUR'),70);
  console.log('PASS mobile quick entry, automatic correction, Save and reopen');
+ // The user's actual phone workflow: open "Древостой" from the simplified
+ // stand view. KU=2 is already present, but physical PIAP is absent.
+ await m.locator('#ce-cancel').click();
+ await m.evaluate(()=>solinWorkflow.openMaket('Макет10'));
+ await m.locator('#childContent [data-edit="0"]').click();
+ assert.equal(await m.locator('#wfM10KU').inputValue(),'2');
+ assert.equal(await m.locator('#wf_IAR').isEnabled(),true,
+  'iPhone Maket10 IAR must not stay disabled when SIAR group exists without PIAP');
+ assert.deepEqual(await m.locator('#wf_IAR option').evaluateAll(options=>
+   options.filter(x=>x.value&&!x.disabled).map(x=>x.value)),['1','2','3','4','5','7','8']);
+ assert.match(await m.locator('#wfM10LayerHint').innerText(),/PIAP/);
+ assert.equal(await m.evaluate(()=>Number(current.KU)),2,
+  'Opening a layer selector cannot silently rewrite category KU');
+ console.log('PASS iPhone simplified Древостой: existing KU=2, editable IAR choices from SIAR without missing PIAP');
  assert.deepEqual(errors,[]);console.log('STOCK_AUTO_CORRECTION_UI_OK');
  await mobile.close();
 }catch(e){console.error(e.stack||e);process.exitCode=1;}finally{await browser?.close();server.close();}})();
