@@ -23,6 +23,8 @@ on:
       - 'solin-card-editor.css'
       - 'scripts/test-maket5-stock-breakdown.cjs'
       - 'scripts/test-quarter-geography-selects.cjs'
+      - 'scripts/test-hierarchy-deletion-browser.cjs'
+      - 'solin-workspace.css'
       - 'scripts/test-szap-region-zones.cjs'
       - 'solin-field-core.js'
       - 'scripts/test-card-calculations.cjs'
@@ -52,6 +54,7 @@ jobs:
           node --check solin-card-editor.js
           node --check solin-address-context.js
           node --check solin-workspace.js
+          node --check scripts/test-hierarchy-deletion-browser.cjs
           node --check app.js
           node --check solin-card-calculations.js
           node --check solin-quarter-pickers.js
@@ -90,4 +93,6 @@ jobs:
         env:
           PLAYWRIGHT_PATH: playwright-core
           BROWSER_CHANNEL: chrome
-        run: node scripts/test-stock-autocorrection-ui.cjs
+        run: |
+          node scripts/test-stock-autocorrection-ui.cjs
+          node scripts/test-hierarchy-deletion-browser.cjs
