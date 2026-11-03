@@ -25,6 +25,21 @@ const server=http.createServer((req,res)=>{try{const file=path.resolve(root,'.'+
   });
   assert.equal(await page.locator('#newBon').count(),0,'Manual bonitet removed from new stand form');
   assert(await page.locator('#newPOR__quick').isVisible(),'Quick species search visible in create form');
+  // iPhone regression: label taps MUST target the text keyboard and NEVER
+  // invoke the original native iOS SELECT wheel (screenshot 2026-11-03).
+  const labelAudit=await page.evaluate(()=>{
+   const select=document.querySelector('#newPOR'),input=document.querySelector('#newPOR__quick');
+   const label=input.closest('label');
+   return {inputInLabel:!!label,selectInLabel:label?.contains(select),
+     labelTarget:label?.control?.id,selectPointer:getComputedStyle(select).pointerEvents};
+  });
+  assert.equal(labelAudit.inputInLabel,true);
+  assert.equal(labelAudit.selectInLabel,false,'Hidden original select must not be in typing label');
+  assert.equal(labelAudit.labelTarget,'newPOR__quick','Label must focus real keyboard input');
+  assert.equal(labelAudit.selectPointer,'none','Native wheel must not intercept taps');
+  await page.locator('#newPOR__quick').locator('xpath=..').locator('span').first().click();
+  assert.equal(await page.evaluate(()=>document.activeElement?.id),'newPOR__quick',
+   'Clicking the species label must focus text input rather than iOS select');
   await page.locator('#newPOR__quick').fill('В');
   const popupLayout=await page.evaluate(()=>{
    const input=document.querySelector('#newPOR__quick'),popup=document.querySelector('.solin-species-results');
@@ -144,7 +159,7 @@ const server=http.createServer((req,res)=>{try{const file=path.resolve(root,'.'+
   assert.equal(K58.status,'complete');assert.equal(K58.value,'4');
   assert.equal(K58.waiting,'waiting');
   assert.deepEqual(errors,[]);
-  console.log('SPECIES_QUICK_OK: iOS inline anchored dropdown remains below field through keyboard viewport resize and modal scroll; Maket10 board anchored; species codes and K58');
+  console.log('SPECIES_QUICK_OK: iOS label click focuses keyboard, original native wheel not labelable; inline dropdown below field; Maket10 and K58');
   await context.close();
  }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
 })().catch(error=>{console.error(error);process.exitCode=1;});
