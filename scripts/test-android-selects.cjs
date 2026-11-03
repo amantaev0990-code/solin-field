@@ -89,7 +89,7 @@ const server=http.createServer((req,res)=>{
    'Disabled dependent field should explain missing source rather than let a code through');
   assert.equal(await page.locator('#ce-assist-options [data-ce-assist-option]').count(),0,
    'Disabled field must not offer invalid selectable values');
-  await page.locator('#ce-assist [data-ce-assist-close]').click();
+  await page.locator('#ce-assist [data-ce-assist-close]').first().click();
 
   assert.deepEqual(errors,[],'No JS errors in Android-select interactions');
   console.log('ANDROID_SELECTS_OK: 960px Android tablet shows maket tabs, keyboard focus for code and numeric fields, source-code preservation, draft safety with grey fields explicitly explained; no double dialogs');
