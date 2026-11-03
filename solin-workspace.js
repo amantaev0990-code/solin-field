@@ -140,6 +140,7 @@ async function renderHome(){const forests=await list(),host=document.querySelect
     if(changed)localStorage.setItem(key,JSON.stringify(edits));
    }
   }catch(_){}
+  window.SolinCardEditor?.refreshDrafts?.();
   localStorage.setItem(INITIALIZED,'1'); // do not recreate demo data if this was the last forest
   if(id===activeId){
    activeId=null;opened=false;current=null;gps=null;
