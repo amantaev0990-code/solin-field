@@ -504,7 +504,7 @@ function error(message,el,location){const box=document.querySelector('#ce-error'
  if(el?.closest('.ce-other'))showSupport();
  const target=el?.isConnected?el:box;target.closest('details')?.setAttribute('open','');target.focus();target.scrollIntoView({block:'center',inline:'center'});
 }
-function rerenderTable(form){document.getElementById('ce-table-'+form).innerHTML=table(form);refreshLinked();}
+function rerenderTable(form){document.getElementById('ce-table-'+form).innerHTML=table(form);refreshLinked();window.SolinSpeciesEntry?.mountAll?.();}
 function showMain(jump){document.querySelector('#ce-main').hidden=false;document.querySelector('#ce-extra').hidden=true;
  document.querySelector('#ce-action-panel').hidden=true;
  document.querySelectorAll('[data-ce-extra]').forEach(b=>b.removeAttribute('aria-current'));
@@ -685,7 +685,7 @@ function open(record,options={}){if(!record)return;
   if(e.target.closest('[data-ce-calc-close]')){const notice=document.getElementById('ce-calc-notice');if(notice)notice.hidden=true;return;}
   const cell=e.target.closest('[data-ce-select]');if(cell)selectRecord(cell.dataset.ceSelectForm,Number(cell.dataset.ceSelect));
  });
- refreshLinked();refreshStockPanel();
+ refreshLinked();window.SolinSpeciesEntry?.mountAll?.();refreshStockPanel();
  form.addEventListener('click',click);form.addEventListener('submit',save);document.querySelector('#ce-cancel').onclick=cancel;
  document.addEventListener('keydown',onKey);window.addEventListener('beforeunload',onUnload);modal.querySelector('.modalCard').scrollTop=0;modal.querySelector('.close').focus();if(options.focus)focusControlIssue(options.focus);
  if(recovery){
@@ -693,6 +693,6 @@ function open(record,options={}){if(!record)return;
   refreshEntryChecks();writeRecovery();
  }else{const pending=readRecovery(session);if(pending)recoveryPrompt(session,pending);}
 }
-window.addEventListener('solin-refs-ready',()=>{if(session)refreshLinked()});
+window.addEventListener('solin-refs-ready',()=>{if(session){refreshLinked();window.SolinSpeciesEntry?.mountAll?.();}});
 window.SolinCardEditor={open,resolveQuarter:quarterForRecord,refreshDependencies:refreshLinked,refreshDrafts:renderDraftResume};
 })();
