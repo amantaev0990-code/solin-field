@@ -122,12 +122,12 @@
   return state;
  }
  function mountAll(root=document){
-  const selector='#newPOR, #ce-form select[data-ce-scope="base"][data-ce-field="M3Pr"], #ce-form select[data-ce-scope="Макет10"][data-ce-field="POR"]';
+  const selector='#newPOR, #modalBody select[data-wffield="POR"], #modalBody select[data-wffield="M3Pr"], #ce-form select[data-ce-scope="base"][data-ce-field="M3Pr"], #ce-form select[data-ce-scope="Макет10"][data-ce-field="POR"]';
   for(const sel of root.querySelectorAll(selector))mount(sel);
  }
  // Modal close, scrolling or resize should never leave a floating stale menu.
  document.addEventListener('scroll',()=>{if(active)movePopup(active);},true);
  window.addEventListener('resize',()=>{if(active)movePopup(active);});
  document.addEventListener('pointerdown',e=>{if(active&&!active.popup.contains(e.target)&&e.target!==active.input)hide();},true);
- window.SolinSpeciesEntry={mount,mountAll,resolve:query=>auto({options:[...document.querySelectorAll('#newPOR option')]},query)};
+ window.SolinSpeciesEntry={mount,mountAll};
 })();
