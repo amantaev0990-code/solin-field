@@ -2,7 +2,7 @@
  * The original field controls and draft/save flow remain the only data source. */
 (()=>{'use strict';
  const h=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- const mobile=()=>window.matchMedia('(max-width:700px)').matches;
+ const mobile=()=>window.Capacitor?.getPlatform?.()==='android'||window.matchMedia('(max-width:700px)').matches;
  let state=null;
  function board(){return document.querySelector('.ce-modal #ce-form .dt-board');}
  function host(){return document.querySelector('.ce-modal .modalCard');}
@@ -18,6 +18,11 @@
   const caption=locationName(el)+' · '+fieldLabel(el)+(sequence?' · '+(sequence.indexOf(el)+1)+'/'+sequence.length:'');
   if(list){mount(caption,'<p class="ce-assist-tip">Найдите значение по шифру или названию. Исходный код сохранится без изменения.</p><label class="ce-assist-searchlabel">Поиск по коду или названию<input id="ce-assist-query" type="search" autocomplete="off" placeholder="Например: 22 или пастбище"></label><div id="ce-assist-options" class="ce-assist-options" role="listbox"></div>',returnRow!=null);filterOptions('');}
   else{const val=el.value,mode=el.inputMode==='decimal'?'decimal':'text';mount(caption,'<p class="ce-assist-tip">Изменения остаются в черновике. Карточка запишется после «Сохранить».</p><label class="ce-assist-searchlabel">'+h(fieldLabel(el))+'<input id="ce-assist-value" type="text" inputmode="'+mode+'" enterkeyhint="next"'+(el.dataset.phantomZero==='1'?' data-phantom-zero="1" placeholder="0"':'')+' autocomplete="off" value="'+h(val)+'"></label><div class="ce-assist-error" id="ce-assist-error" role="alert"></div>'+(!sequence?'<div class="ce-assist-actions"><button type="button" data-ce-assist-apply>Применить</button></div>':''),!!returnRow);}
+  // Android tablets need the card search popup, regardless of viewport width.
+  // Focus from the active user gesture, not from a delayed timer, so the
+  // system keyboard reliably appears when a field is opened.
+  if(window.Capacitor?.getPlatform?.()==='android')
+   document.getElementById(list?'ce-assist-query':'ce-assist-value')?.focus({preventScroll:true});
   if(sequence){
    const index=sequence.indexOf(el),content=document.querySelector('#ce-assist .ce-assist-content');
    content.insertAdjacentHTML('afterbegin','<div class="ce-assist-progress"><span>Поле '+(index+1)+' из '+sequence.length+'</span><progress aria-label="Ход заполнения" max="'+sequence.length+'" value="'+(index+1)+'"></progress></div>');
