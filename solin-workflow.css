@@ -38,3 +38,10 @@
 @media(max-width:420px){.wf-toolbar button{font-size:12px;flex:1 1 calc(50% - 8px)}.wf-grid{grid-template-columns:1fr}.wf-maket-head{align-items:flex-start}.wf-section-head{align-items:flex-start}.wf-formgrid{grid-template-columns:1fr}.wf-makbtn{flex-basis:115px}}
 
 .wf-card-from-map{display:block;width:100%;margin:10px 0 5px;background:#287d4b!important;color:#fff!important;border:1px solid #5bbd78;border-radius:10px;padding:12px 10px;min-height:46px;font-weight:750}
+
+/* Visible K58 result during Maket10 data entry. Honest about missing inputs. */
+.wf-bonitet-status{margin:12px 0;padding:10px 13px;border:1px solid #c9ddc4;background:#f3f8f1;border-radius:11px;color:#264b34;font:14px/1.45 system-ui,Arial,sans-serif}
+.wf-bonitet-status strong,.wf-bonitet-status b{display:block;font-size:15px}
+.wf-bonitet-status p{margin:4px 0 0;font-size:13px;line-height:1.45;overflow-wrap:break-word}
+.wf-bonitet-status[data-status="waiting"],.wf-bonitet-status[data-status="ambiguous"],.wf-bonitet-status[data-status="unavailable"],.wf-bonitet-status[data-status="not-applicable"],
+.wf-bonitet-status[data-wf-bonitet-status="waiting"],.wf-bonitet-status[data-wf-bonitet-status="ambiguous"],.wf-bonitet-status[data-wf-bonitet-status="unavailable"],.wf-bonitet-status[data-wf-bonitet-status="not-applicable"]{background:#fff8ed;border-color:#e7d9b9;color:#64512e}
