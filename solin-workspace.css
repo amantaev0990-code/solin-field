@@ -48,3 +48,15 @@
 .formActions .delete-final:disabled{opacity:.5}
 .delete-error{color:#9b4334;font-size:13px;line-height:1.5}
 @media(max-width:480px){.record-entry>.quarterCard,.record-entry>.compCard{padding-right:54px}.record-delete{right:9px;width:36px;height:36px;min-width:36px}.quarter-head-delete{right:auto}}
+
+/* Administrative district: people pick a name, Transfer keeps its numeric KATO. */
+.quarter-code-display{display:flex;flex-direction:column;align-items:stretch;gap:5px;margin-top:8px;min-width:0;max-width:100%;font:inherit}
+.quarter-code-display>span{display:block;font-size:12px;line-height:1.3;color:#667c66}
+.quarter-code-display>.quarter-code-readonly{width:100%;min-width:0;min-height:42px;height:auto;padding:9px 11px;border:1px solid #d9e2d9;border-radius:9px;background:#f4f7f3;color:#3c5b43;font-size:16px;box-sizing:border-box;opacity:1;pointer-events:none}
+select[data-quarter-picker="Raion"]{font-size:16px!important}
+.dt-board .dt-quarter [data-dt-cell="Raion"]{flex:1 1 260px!important;min-width:216px}
+.dt-board .dt-quarter [data-dt-cell="Raion"] .ce-field{display:flex;flex-direction:row;align-items:center;gap:4px;min-width:0}
+.dt-board .dt-quarter [data-dt-cell="Raion"] select[data-quarter-picker="Raion"]{flex:1 1 auto;width:auto;min-width:0;font-size:13px!important}
+.dt-board .dt-quarter [data-dt-cell="Raion"] .quarter-code-display{display:block;flex:0 0 90px;width:90px;margin:0}
+.dt-board .dt-quarter [data-dt-cell="Raion"] .quarter-code-display>span{display:none}
+.dt-board .dt-quarter [data-dt-cell="Raion"] .quarter-code-readonly{display:block;width:90px;height:23px;min-height:23px;padding:1px 3px;border:1px solid #b1b1ae;border-radius:0;background:#e7e7e5;font:13px Arial,sans-serif}
