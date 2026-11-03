@@ -86,13 +86,16 @@
      else if(!opts.disableAuto&&data.auto&&seen.has(data.auto)){select.value=data.auto;manual.value='';}
      else if(items.length){select.value='';manual.value='';}
      else{select.value=MANUAL;manual.value='';}
-     manual.hidden=select.value!==MANUAL;
+     const waiting=field==='Fzona'&&!clean(row?.KGLF);
+     select.disabled=waiting;manual.disabled=waiting;
+     if(waiting){select.value='';manual.value='';}
+     manual.hidden=waiting||select.value!==MANUAL;
      if(hint)hint.textContent=data.reason;
      return data;
    };
    select.addEventListener('change',()=>{
-     manual.hidden=select.value!==MANUAL;
-     if(select.value===MANUAL)manual.focus();
+     manual.hidden=select.disabled||select.value!==MANUAL;
+     if(select.value===MANUAL&&!select.disabled)manual.focus();
      else manual.value='';
    });
    const picker={select,manual,sync,value,get items(){return lastItems;}};
