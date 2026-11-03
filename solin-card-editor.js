@@ -654,5 +654,5 @@ function open(record,options={}){if(!record)return;
  }else{const pending=readRecovery(session);if(pending)recoveryPrompt(session,pending);}
 }
 window.addEventListener('solin-refs-ready',()=>{if(session)refreshLinked()});
-window.SolinCardEditor={open,resolveQuarter:quarterForRecord,refreshDependencies:refreshLinked};
+window.SolinCardEditor={open,resolveQuarter:quarterForRecord,refreshDependencies:refreshLinked,refreshDrafts:renderDraftResume};
 })();
