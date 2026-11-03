@@ -29,7 +29,7 @@ const sourceRoot=path.resolve(__dirname,'..');
 for(const name of [
  'solin-workflow.js','solin-workflow.css','solin-card-calculations.js',
  'solin-card-editor.js','solin-species-entry.js','solin-species-entry.css',
- 'solin-quarter-pickers.js','solin-workspace.js'
+ 'solin-quarter-pickers.js','solin-workspace.js','solin-offline-imagery.js','map.js'
 ]){
  const source=path.join(sourceRoot,name),staged=path.join(root,name);
  assert(fs.existsSync(source)&&fs.existsSync(staged),'APK is missing latest source module: '+name);
@@ -38,8 +38,9 @@ for(const name of [
 }
 const index=fs.readFileSync(path.join(root,'index.html'),'utf8');
 assert(index.includes('solin-workflow.js')&&index.includes('solin-card-calculations.js')&&
- index.includes('solin-species-entry.js')&&index.includes('solin-card-editor.js'),
+ index.includes('solin-species-entry.js')&&index.includes('solin-card-editor.js')&&
+ index.includes('solin-offline-imagery.js')&&index.includes('offlineImageryInput'),
  'APK entry point must load the actual current calculation and entry modules');
 const plugin=path.join(__dirname,'../native/android/SolinMdbPlugin.java');
 assert(fs.existsSync(plugin),'Offline native MDB bridge missing');
-console.log('ANDROID_ASSET_STAGING_OK',files.length,'assets, current K58/editor/field modules match source, no compressed/raw duplicate, only blank MDB template');
+console.log('ANDROID_ASSET_STAGING_OK',files.length,'assets, current K58/editor/field/offline-MBTiles modules match source, no compressed/raw duplicate, only blank MDB template');
