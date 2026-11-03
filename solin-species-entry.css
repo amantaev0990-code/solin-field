@@ -9,3 +9,17 @@ select.solin-species-native{position:absolute!important;width:1px!important;heig
 .dt-board .ce-table td .solin-species-query{height:22px;min-height:22px;padding:0 3px!important;text-align:left!important;font:13px Arial,sans-serif}
 .dt-board .dt-split .ce-field:has(.solin-species-query){flex:0 0 104px;width:104px}
 @media(max-width:480px){.solin-species-results{max-width:calc(100vw - 16px)}}
+
+/* iOS Safari auto-zooms inputs below 16 CSS pixels; preserve user pinch-zoom
+   but do not zoom the page merely because the species field was focused. */
+#modal input.solin-species-query,#newPOR__quick{
+ font-size:16px!important;line-height:1.25!important;
+ -webkit-text-size-adjust:100%;text-size-adjust:100%;
+}
+#modal:not(.ce-modal).solin-species-open #modalBody{
+ padding-bottom:clamp(160px,29dvh,270px)!important;
+}
+#modal.ce-modal.solin-species-open .dt-viewport{padding-bottom:180px}
+.solin-species-results[hidden]{display:none!important}
+.solin-species-results{max-width:calc(100vw - 16px);box-sizing:border-box}
+.solin-species-option{font-size:16px;line-height:1.35;min-height:44px}
