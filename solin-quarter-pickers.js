@@ -20,8 +20,21 @@
  };
  // All verified/observed codes are available irrespective of category or area.
  // Administrative full Кл_Рай is not in the archived public reference package.
+ // Independent verified 2026 KATO district names. The full original Кл_Рай
+ // table is not available; expand only with source-confirmed administrative codes.
  const KNOWN_DISTRICTS=[
+  {value:'153200000',label:'Алгинский район'},
+  {value:'153400000',label:'Айтекебийский район'},
+  {value:'153600000',label:'Байганинский район'},
+  {value:'154000000',label:'Каргалинский район'},
+  {value:'154200000',label:'Хобдинский район'},
+  {value:'154600000',label:'Мартукский район'},
+  {value:'154800000',label:'Мугалжарский район'},
+  {value:'155200000',label:'Уилский район'},
+  {value:'155600000',label:'Темирский район'},
   {value:'156000000',label:'Хромтауский район'},
+  {value:'156400000',label:'Шалкарский район'},
+  {value:'156800000',label:'Иргизский район'},
   {value:'356400000',label:'Шетский район'}
  ];
  let persistedForests=[],listing=null;
@@ -59,7 +72,7 @@
     add(r.Raion,'Название района не установлено');
    for(const r of current)if(numeric(r.Raion)&&Number(r.Raion)>0)mine.add(clean(r.Raion));
    return {items:[...results.values()].sort((a,b)=>Number(a.value)-Number(b.value)),
-    auto:null,reason:'Доступные известные коды районов всех сохранённых лесничеств. Полная Кл_Рай отсутствует — при отсутствии района используйте ручной ввод проверенного кода. Выбор не зависит от КГЛФ или области.'};
+    auto:null,reason:'Подтверждённые названия районов КАТО Актюбинской области и Шетского района, а также коды сохранённых кварталов. Полная Кл_Рай отсутствует — неизвестный код можно ввести вручную. Выбор не зависит от КГЛФ.'};
   }
   if(field==='Fzona'){
    add('0','Без функциональной зоны · значение из исходной обложки');
