@@ -56,66 +56,90 @@
   state.input.setCustomValidity('');
   state.input.removeAttribute('aria-invalid');
  }
- // iPhone Safari shrinks visualViewport when the keyboard appears.
- // Suggestions MUST remain below the entry field; never flip above it.
- function visibleFrame(){
-  const v=window.visualViewport;
-  return {top:v?.offsetTop||0,left:v?.offsetLeft||0,
-   width:v?.width||innerWidth,height:v?.height||innerHeight};
+ // Keep suggestions in the SAME layout as the input. iOS Safari moves
+ // the visual viewport separately when the keyboard opens; a fixed overlay
+ // attached to document.body can jump above the field despite a correct top.
+ function visualBottom(){
+  const viewport=window.visualViewport;
+  return (viewport?.offsetTop||0)+(viewport?.height||innerHeight);
  }
  function findScroller(input){
-  for(let p=input.parentElement;p;p=p.parentElement){
-   const style=window.getComputedStyle(p);
-   if(/auto|scroll/.test(style.overflowY)&&p.scrollHeight>p.clientHeight+2)return p;
+  for(let parent=input.parentElement;parent;parent=parent.parentElement){
+   const style=window.getComputedStyle(parent);
+   if(/auto|scroll/.test(style.overflowY)&&parent.scrollHeight>parent.clientHeight+2)
+    return parent;
   }
   return null;
  }
  function ensureRoom(state){
-  if(!state.popup||document.activeElement!==state.input)return;
-  const rect=state.input.getBoundingClientRect(),v=visibleFrame();
-  const available=v.top+v.height-rect.bottom-10;
-  if(available>=138)return;
-  const container=findScroller(state.input);
-  if(!container)return;
-  const before=container.scrollTop,delta=Math.min(230,Math.ceil(150-available));
-  container.scrollTop+=delta;
-  if(container.scrollTop!==before)requestAnimationFrame(()=>movePopup(state));
+  if(!state.popup||state.mode!=='inline'||document.activeElement!==state.input)return;
+  const input=state.input.getBoundingClientRect(),available=visualBottom()-input.bottom-8;
+  // Scroll the form (never the page) to keep the beginning of the downward
+  // list visible. The list is a real sibling of the input and always follows it.
+  if(available>=140)return;
+  const scroller=findScroller(state.input);
+  if(!scroller)return;
+  scroller.scrollTop+=Math.min(210,Math.max(0,Math.ceil(155-available)));
  }
  function movePopup(state){
-  if(!state.popup||!state.input.isConnected){if(!state.input.isConnected)hide();return;}
-  const rect=state.input.getBoundingClientRect(),v=visibleFrame();
-  const width=Math.min(Math.max(rect.width,230),Math.max(160,v.width-16));
-  const left=Math.max(v.left+8,Math.min(rect.left,v.left+v.width-width-8));
-  const top=rect.bottom+3; // Always below the typing field.
-  const room=Math.max(0,v.top+v.height-top-8);
-  state.popup.style.width=width+'px';
+  if(!state.popup||!state.input.isConnected){
+   if(!state.input.isConnected)hide();
+   return;
+  }
+  // Normal field: NO positioning. Its list is in normal document flow.
+  if(state.mode!=='card')return;
+  // The classic Maket10 board is fixed-size and its table clips children.
+  // Anchor the list to the board (not to the visual viewport or body).
+  // It travels with the whole card when the user scrolls/pans/zooms.
+  const board=state.board,rect=board.getBoundingClientRect(),
+   field=state.input.getBoundingClientRect(),
+   scale=rect.width/(board.offsetWidth||1200)||1,
+   width=Math.max(180,Math.min(340,field.width/scale)),
+   left=Math.max(0,Math.min((field.left-rect.left)/scale,board.offsetWidth-width-4));
   state.popup.style.left=left+'px';
-  state.popup.style.top=top+'px';
-  state.popup.style.maxHeight=Math.min(280,room)+'px';
-  state.popup.hidden=room<42;
+  state.popup.style.top=(field.bottom-rect.top)/scale+3+'px';
+  state.popup.style.width=width+'px';
  }
  function show(state){
-  // Replace candidates without collapsing modal scroll padding on every keystroke.
-  if(active?.popup){active.popup.remove();active.input.setAttribute('aria-expanded','false');active.popup=null;}
-  active=null;
+  if(active&&active!==state)hide();
   const q=state.input.value.includes(' — ')?state.select.value:state.input.value;
   const items=candidates(state.select,q);
-  if(!items.length){state.input.setAttribute('aria-expanded','false');document.getElementById('modal')?.classList.remove('solin-species-open');return;}
-  const popup=document.createElement('div');
-  popup.className='solin-species-results';popup.id=state.input.id+'-suggestions';popup.setAttribute('role','listbox');
-  state.items=items;state.index=0;state.popup=popup;active=state;
-  const format=item=>item.code+' — '+item.label;
-  popup.innerHTML=items.map((item,i)=>'<button type="button" class="solin-species-option" role="option" data-species-index="'+i+'" aria-selected="'+(i===0?'true':'false')+'">'+h(format(item))+'</button>').join('');
-  document.body.append(popup);
+  if(!items.length){if(active===state)hide();return;}
+  // Reuse the SAME list element between keystrokes. Removing a large block
+  // and immediately re-inserting it makes iOS scroll the focused field.
+  let popup=state.popup;
+  if(!popup){
+   popup=document.createElement('div');
+   popup.className='solin-species-results';
+   popup.id=state.input.id+'-suggestions';
+   popup.setAttribute('role','listbox');
+   state.popup=popup;
+   const board=state.input.closest('.dt-board');
+   state.mode=board?'card':'inline';state.board=board;
+   if(board){
+    popup.classList.add('solin-species-results-card');
+    board.appendChild(popup);
+   }else{
+    popup.classList.add('solin-species-results-inline');
+    state.input.insertAdjacentElement('afterend',popup);
+   }
+   popup.addEventListener('pointerdown',e=>e.preventDefault());
+   popup.addEventListener('click',e=>{
+    const option=e.target.closest('[data-species-index]');
+    if(!option||!state.items)return;
+    const item=state.items[Number(option.dataset.speciesIndex)];
+    if(!item)return;
+    commit(state,item,true);hide();state.input.focus();state.input.select();
+   });
+  }
+  state.items=items;
+  state.index=0;
+  active=state;
+  popup.innerHTML=items.map((item,i)=>'<div class="solin-species-option" role="option" tabindex="-1" data-species-index="'+i+'" aria-selected="'+(i===0?'true':'false')+'">'+
+   h(item.code+' — '+item.label)+'</div>').join('');
+  state.input.setAttribute('aria-expanded','true');
   document.getElementById('modal')?.classList.add('solin-species-open');
   movePopup(state);
-  state.input.setAttribute('aria-expanded','true');
-  popup.addEventListener('pointerdown',e=>e.preventDefault());
-  popup.addEventListener('click',e=>{
-   const button=e.target.closest('[data-species-index]');if(!button)return;
-   const item=state.items[Number(button.dataset.speciesIndex)];
-   commit(state,item,true);hide();state.input.focus();state.input.select();
-  });
  }
  function mount(select){
   if(!select||select.tagName!=='SELECT'||!select.isConnected)return null;
@@ -133,10 +157,10 @@
    const found=entries(select).find(x=>x.code===select.value);
    if(found){input.value=found.code;input.select();}
    show(state);
-   requestAnimationFrame(()=>ensureRoom(state));
-   // iOS keyboard expansion is asynchronous and raises a visualViewport resize.
-   setTimeout(()=>{if(active===state){ensureRoom(state);movePopup(state);}},180);
-   setTimeout(()=>{if(active===state){ensureRoom(state);movePopup(state);}},400);
+   requestAnimationFrame(()=>{if(active===state)ensureRoom(state);});
+   // Keyboard appearance can change the visible area after focus. The list
+   // stays below by construction; only the form scroll position is adjusted.
+   setTimeout(()=>{if(active===state)ensureRoom(state);},240);
   });
   input.addEventListener('input',()=>{
    const query=input.value;
@@ -166,11 +190,11 @@
   const selector='#newPOR, #modalBody select[data-wffield="POR"], #modalBody select[data-wffield="M3Pr"], #ce-form select[data-ce-scope="base"][data-ce-field="M3Pr"], #ce-form select[data-ce-scope="Макет10"][data-ce-field="POR"]';
   for(const sel of root.querySelectorAll(selector))mount(sel);
  }
- // Modal close, scrolling or resize should never leave a floating stale menu.
+ // Inline entries do not need viewport geometry recalculation; the fixed
+ // classic Maket10 board does need alignment when its zoom changes.
  document.addEventListener('scroll',()=>{if(active)movePopup(active);},true);
- window.addEventListener('resize',()=>{if(active){ensureRoom(active);movePopup(active);}});
- window.visualViewport?.addEventListener('resize',()=>{if(active){ensureRoom(active);movePopup(active);}});
- window.visualViewport?.addEventListener('scroll',()=>{if(active)movePopup(active);});
+ window.addEventListener('resize',()=>{if(active){movePopup(active);ensureRoom(active);}});
+ window.visualViewport?.addEventListener('resize',()=>{if(active)ensureRoom(active);});
  document.addEventListener('pointerdown',e=>{if(active&&!active.popup.contains(e.target)&&e.target!==active.input)hide();},true);
  window.SolinSpeciesEntry={mount,mountAll};
 })();
