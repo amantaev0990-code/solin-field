@@ -32,6 +32,20 @@ function copy(from,to,level=0){
  }
 }
 copy(root,out);
+// AAPT strips .gz AND decompresses asset bytes inside Android APK.
+// The old APK could not fetch refs-audit.json.gz, so all dependent
+// source-backed selectors stayed grey with no values. Keep the same
+// byte-identical compressed reference data under a safe .bin extension.
+const packedReferences=[
+ 'refs-audit.json.gz','solin-control-norms.json.gz',
+ 'solin-control-source-recovery.json.gz'
+];
+for(const file of packedReferences){
+ const original=path.join(root,file);
+ const destination=path.join(out,file.slice(0,-8)+'.packed.bin');
+ if(!fs.existsSync(original))throw Error('Missing source reference bundle: '+file);
+ fs.copyFileSync(original,destination);
+}
 const htmlPath=path.join(out,'index.html');
 let html=fs.readFileSync(htmlPath,'utf8');
 if(!html.includes('<head>'))throw Error('Capacitor needs an HTML head');
