@@ -15,3 +15,12 @@
 .transfer-file-picker:active #importForestButton{filter:brightness(.95)}
 
 @media(max-width:480px){.transfer-file-picker #importForestButton{font-size:13px}}
+
+/* Forest deletion: maintain the card layout and separate the delete control. */
+.forest-entry{position:relative;min-width:0}
+.forest-entry .forest-option{padding-right:58px}
+.forest-delete{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:36px;height:36px;border:1px solid #e4c8c8;border-radius:9px;background:#fff;color:#a53333;font-size:25px;line-height:1;cursor:pointer}
+.forest-delete:hover,.forest-delete:focus-visible{background:#fff0f0;border-color:#bb5959;outline-offset:2px}
+#forestDeleteFinal{background:#a93232;color:#fff;border:1px solid #a93232;border-radius:10px;padding:11px 14px;font-weight:700}
+#forestDeleteFinal:disabled{opacity:.5}
+@media(max-width:480px){.forest-entry .forest-option{padding-right:50px}.forest-delete{right:9px;width:32px;height:32px}}
