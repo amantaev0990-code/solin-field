@@ -25,6 +25,10 @@ on:
       - 'scripts/test-quarter-geography-selects.cjs'
       - 'scripts/test-hierarchy-deletion-browser.cjs'
       - 'scripts/test-species-quick-entry.cjs'
+      - 'scripts/test-android-selects.cjs'
+      - 'solin-android-selects.js'
+      - 'solin-android-selects.css'
+      - 'solin-card-assist.js'
       - 'scripts/test-offline-imagery.cjs'
       - 'solin-offline-imagery.js'
       - 'map.js'
@@ -69,6 +73,8 @@ jobs:
           node --check scripts/test-offline-imagery.cjs
           node --check app.js
           node --check solin-card-calculations.js
+          node --check solin-android-selects.js
+          node --check scripts/test-android-selects.cjs
           node --check solin-quarter-pickers.js
           node --check scripts/test-maket5-stock-breakdown.cjs
           node --check scripts/test-quarter-geography-selects.cjs
@@ -109,4 +115,5 @@ jobs:
           node scripts/test-stock-autocorrection-ui.cjs
           node scripts/test-hierarchy-deletion-browser.cjs
           node scripts/test-species-quick-entry.cjs
+          node scripts/test-android-selects.cjs
           node scripts/test-offline-imagery.cjs
