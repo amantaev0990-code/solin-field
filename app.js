@@ -87,7 +87,7 @@ function openQuarterForm(){const org=D.lesnichestvo?.[0]||{},source=D.source||{}
    {hint:$('#newFzonaHint')});
  choices?.mount($('#newRaion'),'Raion',()=>({KGLF:glfInput?.value}),
    {hint:$('#newRaionHint')});
- glfInput?.addEventListener('change',()=>fzonaPicker?.sync({clear:true}));
+ // Functional-zone options are independent of KGLF; do not reset the selection.
  const zoneInput=$('#newKlxr');
  const hint=document.createElement('small');hint.setAttribute('aria-live','polite');
  zoneInput.parentElement.append(hint);
