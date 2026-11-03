@@ -388,17 +388,20 @@ async function reopen(p,info){
  assert.equal(missingLayer.category,'');
  assert.match(missingLayer.reason,/категори/i,
   'Disabled layer picker must explain exactly which upstream field is missing');
- console.log('LAYER_SOURCE_DIAGNOSTIC',JSON.stringify(await p.evaluate(()=>{
-  const refs=SOLIN_REFS?.tables||{},engine=SolinDependentRules;
-  const examples=(refs.SKU||[]).filter(x=>[1,2,5,19,21].includes(Number(x.KU))).slice(0,9);
-  return {skuCount:refs.SKU?.length,siarCount:refs.SIAR?.length,
-   piapCount:refs.PIAP?.length,skuExamples:examples,
-   siarExamples:(refs.SIAR||[]).slice(0,5),piapExamples:(refs.PIAP||[]).slice(0,5),
-   allowed1:engine.allowedLayers({KU:1},refs),allowed2:engine.allowedLayers({KU:2},refs)};
- })));
+ const sourceStatus=await p.evaluate(()=>{
+  const refs=SOLIN_REFS?.tables||{};
+  return {sku:refs.SKU?.length||0,siar:refs.SIAR?.length||0,piap:refs.PIAP?.length||0,
+   one:SolinDependentRules.allowedLayers({KU:1},refs)};
+ });
+ assert(sourceStatus.sku>0&&sourceStatus.siar>0,
+  'Must use the physical published SKU and SIAR, not synthetic dropdown choices');
+ assert.equal(sourceStatus.piap,0,'Reproduce missing PIAP on published iPhone refs-audit');
+ assert.equal(sourceStatus.one.status,'partial','Missing PIAP must preserve SIAR candidates but remain unverified');
  const one=await p.locator('#wfM10KU').locator('option[value="1"]').count();
  assert.equal(one,1,'Original SKU must offer source-backed stand categories');
  await p.locator('#wfM10KU').selectOption('1');
+ assert.match(await p.locator('#wfM10LayerHint').innerText(),/PIAP/);
+ assert.equal(await p.locator('#wfM10LayerHint').getAttribute('data-status'),'partial');
  assert.equal(await p.locator('#wf_IAR').isEnabled(),true,
   'Choosing a KU with SIAR layers should immediately enable IAR');
  assert.deepEqual(await p.locator('#wf_IAR option').evaluateAll(els=>
@@ -415,6 +418,11 @@ async function reopen(p,info){
  p.once('dialog',dialog=>dialog.accept());
  await p.locator('#wfSaveMaket').click();
  await p.waitForFunction(()=>current.KU===1&&current._children.Макет10[0].IAR===1);
+ await p.evaluate(()=>{closeModal();solinWorkflow.editMaket('Макет10',0)});
+ assert.equal(await p.locator('#wf_IAR').isEnabled(),true,
+  'Saved forest KU should keep IAR enabled despite missing PIAP');
+ assert.equal(await p.locator('#wf_IAR').inputValue(),'1');
+ await p.evaluate(()=>closeModal());
  assert.equal(await p.evaluate(()=>current._children.Макет10[0].POR),'В',
   'Updating category and IAR must not lose species');
  assert.equal(await p.evaluate(()=>current._children.Макет10[0].KOEF),10,
