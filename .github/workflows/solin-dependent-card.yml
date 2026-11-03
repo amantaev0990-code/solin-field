@@ -25,6 +25,10 @@ on:
       - 'scripts/test-quarter-geography-selects.cjs'
       - 'scripts/test-hierarchy-deletion-browser.cjs'
       - 'scripts/test-species-quick-entry.cjs'
+      - 'scripts/test-offline-imagery.cjs'
+      - 'solin-offline-imagery.js'
+      - 'map.js'
+      - 'map.css'
       - 'solin-species-entry.js'
       - 'solin-species-entry.css'
       - 'solin-readable.js'
@@ -61,6 +65,8 @@ jobs:
           node --check scripts/test-hierarchy-deletion-browser.cjs
           node --check solin-species-entry.js
           node --check scripts/test-species-quick-entry.cjs
+          node --check solin-offline-imagery.js
+          node --check scripts/test-offline-imagery.cjs
           node --check app.js
           node --check solin-card-calculations.js
           node --check solin-quarter-pickers.js
@@ -103,3 +109,4 @@ jobs:
           node scripts/test-stock-autocorrection-ui.cjs
           node scripts/test-hierarchy-deletion-browser.cjs
           node scripts/test-species-quick-entry.cjs
+          node scripts/test-offline-imagery.cjs
