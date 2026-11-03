@@ -34,6 +34,7 @@ function serve(dir,port){
     stands:Object.values(D.quarters).reduce((n,q)=>n+q.compartments.length,0),
     sample:D.quarters[Object.keys(D.quarters)[0]].compartments[0]?.VD};
   });
+  await original.evaluate(()=>show('menuScreen'));
   const [dl]=await Promise.all([
    original.waitForEvent('download'),
    original.locator('#solin-forest-transfer').click()
