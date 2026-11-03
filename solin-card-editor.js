@@ -204,6 +204,8 @@ function refreshLinked(){
  }
 
  for(const el of document.querySelectorAll('#ce-form select[data-ce-field]')){
+  // Quarter selectors maintain their independent lists and source KATO values.
+  if(el.dataset.quarterPicker)continue;
   const result=linkedOptions(el);
   if(!result)continue;
   const raw=linkedRow(el)[el.dataset.ceField];
