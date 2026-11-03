@@ -388,6 +388,14 @@ async function reopen(p,info){
  assert.equal(missingLayer.category,'');
  assert.match(missingLayer.reason,/категори/i,
   'Disabled layer picker must explain exactly which upstream field is missing');
+ console.log('LAYER_SOURCE_DIAGNOSTIC',JSON.stringify(await p.evaluate(()=>{
+  const refs=SOLIN_REFS?.tables||{},engine=SolinDependentRules;
+  const examples=(refs.SKU||[]).filter(x=>[1,2,5,19,21].includes(Number(x.KU))).slice(0,9);
+  return {skuCount:refs.SKU?.length,siarCount:refs.SIAR?.length,
+   piapCount:refs.PIAP?.length,skuExamples:examples,
+   siarExamples:(refs.SIAR||[]).slice(0,5),piapExamples:(refs.PIAP||[]).slice(0,5),
+   allowed1:engine.allowedLayers({KU:1},refs),allowed2:engine.allowedLayers({KU:2},refs)};
+ })));
  const one=await p.locator('#wfM10KU').locator('option[value="1"]').count();
  assert.equal(one,1,'Original SKU must offer source-backed stand categories');
  await p.locator('#wfM10KU').selectOption('1');
