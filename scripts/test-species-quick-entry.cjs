@@ -78,6 +78,7 @@ const server=http.createServer((req,res)=>{try{const file=path.resolve(root,'.'+
   await page.evaluate(()=>openQuarterForm());
   const quarterDistrict=page.locator('#newRaion');
   assert.equal(await quarterDistrict.locator('option[value="356400000"]').textContent(),'Шетский район');
+  assert.equal(await quarterDistrict.locator('option[value="153400000"]').textContent(),'Айтекебийский район');
   await quarterDistrict.selectOption('156000000');
   assert.equal(await page.locator('#modalBody .quarter-code-readonly').inputValue(),'156000000');
   await page.locator('#modalBody .quarter-code-readonly').evaluate(el=>{if(!el.readOnly)throw Error('KATO value should be read-only');});
