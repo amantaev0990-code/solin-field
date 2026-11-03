@@ -16,7 +16,23 @@
  function findElements(){return [...(board()?.querySelectorAll('[data-ce-field]')||[])].filter(el=>!el.closest('.ce-other')&&!el.closest('#ce-extra'));}
  function findRow(index){return board()?.querySelectorAll('#ce-table-Макет10 tbody tr')[index]||null;}
  function currentRow(){const rows=[...(board()?.querySelectorAll('#ce-table-Макет10 tbody tr')||[])];return Math.max(0,rows.findIndex(x=>x.classList.contains('dt-selected')));}
- function editField(el,returnRow=null,sequence=null){if(!el||!el.isConnected)return;const list=el.tagName==='SELECT'?[...el.options].map(o=>({value:o.value,name:o.value===''?'Не указано':SolinHuman.value(el.dataset.ceForm,el.dataset.ceField,o.value)})):null;state={mode:'field',el,returnRow,list,sequence};
+ function editField(el,returnRow=null,sequence=null){
+  if(!el||!el.isConnected)return;
+  // A disabled dependent field must not become editable through the
+  // mobile helper. Explain the genuine original-source prerequisite instead
+  // of showing an empty picker or accidentally committing an invalid code.
+  if(el.disabled||el.readOnly){
+   const why=el.title||el.dataset.dependentStatus||
+    (el.readOnly?'Это поле вычисляется или заполняется автоматически.':
+     'Сначала заполните связанные поля карточки или дождитесь загрузки справочников.');
+   state={mode:'blocked',el};
+   mount(locationName(el)+' · '+fieldLabel(el),
+    '<p class="ce-assist-tip">Это поле пока недоступно для ввода.</p>'+
+    '<p class="ce-assist-tip" role="status">'+h(why)+'</p>'+
+    '<div class="ce-assist-actions"><button type="button" data-ce-assist-close>Вернуться к карточке</button></div>',false);
+   return;
+  }
+  const list=el.tagName==='SELECT'?[...el.options].map(o=>({value:o.value,name:o.value===''?'Не указано':SolinHuman.value(el.dataset.ceForm,el.dataset.ceField,o.value)})):null;state={mode:'field',el,returnRow,list,sequence};
   const caption=locationName(el)+' · '+fieldLabel(el)+(sequence?' · '+(sequence.indexOf(el)+1)+'/'+sequence.length:'');
   if(list){mount(caption,'<p class="ce-assist-tip">Найдите значение по шифру или названию. Исходный код сохранится без изменения.</p><label class="ce-assist-searchlabel">Поиск по коду или названию<input id="ce-assist-query" type="search" autocomplete="off" placeholder="Например: 22 или пастбище"></label><div id="ce-assist-options" class="ce-assist-options" role="listbox"></div>',returnRow!=null);filterOptions('');}
   else{const val=el.value,mode=el.inputMode==='decimal'?'decimal':'text';mount(caption,'<p class="ce-assist-tip">Изменения остаются в черновике. Карточка запишется после «Сохранить».</p><label class="ce-assist-searchlabel">'+h(fieldLabel(el))+'<input id="ce-assist-value" type="text" inputmode="'+mode+'" enterkeyhint="next"'+(el.dataset.phantomZero==='1'?' data-phantom-zero="1" placeholder="0"':'')+' autocomplete="off" value="'+h(val)+'"></label><div class="ce-assist-error" id="ce-assist-error" role="alert"></div>'+(!sequence?'<div class="ce-assist-actions"><button type="button" data-ce-assist-apply>Применить</button></div>':''),!!returnRow);}
