@@ -25,7 +25,7 @@ async function snapshot(browser,port){
  const page=await ctx.newPage(),errors=[];
  page.on('pageerror',e=>errors.push(String(e.message)));
  await page.goto('http://127.0.0.1:'+port+'/',{waitUntil:'domcontentloaded'});
- await page.waitForFunction(()=>window.D?.quarters&&window.SolinWorkspace);
+ await page.waitForFunction(()=>typeof D!=='undefined'&&D?.quarters&&window.SolinWorkspace);
  await page.evaluate(()=>SolinWorkspace.ready);
  let result=await page.evaluate(async()=>{
   const forests=await SolinWorkspace.list();
