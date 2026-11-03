@@ -34,6 +34,13 @@ if(fs.existsSync(testSource)){
  fs.mkdirSync(path.dirname(testDest),{recursive:true});
  fs.copyFileSync(testSource,testDest);
 }
+// Run real WebView parity checks (forest, card, Maket10), not only MDB output.
+const uiTestSource=path.join(root,'native/android/SolinFieldUiInstrumentedTest.java');
+const uiTestDest=path.join(app,'src/androidTest/java/kz/solin/field/SolinFieldUiInstrumentedTest.java');
+if(fs.existsSync(uiTestSource)){
+ fs.mkdirSync(path.dirname(uiTestDest),{recursive:true});
+ fs.copyFileSync(uiTestSource,uiTestDest);
+}
 let build=fs.readFileSync(gradle,'utf8');
 const dep="implementation 'com.healthmarketscience.jackcess:jackcess:4.0.12'";
 if(!build.includes(dep)){
