@@ -2,7 +2,7 @@
 select.solin-species-native{position:absolute!important;width:1px!important;height:1px!important;min-width:0!important;min-height:0!important;max-width:1px!important;opacity:0!important;pointer-events:none!important;padding:0!important;border:0!important;clip-path:inset(50%)!important;overflow:hidden!important}
 .solin-species-query{display:block;box-sizing:border-box;width:100%;min-width:0;max-width:100%;background:#fff;color:#24432f;border:1px solid #c7d7c7;border-radius:9px;padding:10px 12px;min-height:44px;font:inherit;text-align:left!important}
 .solin-species-query:focus{outline:2px solid #a5c8ac;outline-offset:1px;border-color:#5b9368}
-.solin-species-results{position:fixed;z-index:1000005;overflow:auto;overscroll-behavior:contain;border:1px solid #b9cdbb;border-radius:10px;background:#fff;box-shadow:0 10px 32px #18382238;padding:4px;box-sizing:border-box;scrollbar-width:thin}
+.solin-species-results{position:static;z-index:auto;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;border:1px solid #b9cdbb;border-radius:10px;background:#fff;box-shadow:0 4px 16px #1838221c;padding:4px;box-sizing:border-box;scrollbar-width:thin;width:100%;max-height:224px;max-width:100%;margin:5px 0 2px;min-height:0}
 .solin-species-option{display:block;width:100%;text-align:left;padding:10px 12px;margin:0;background:#fff;color:#213b2b;border:0;border-radius:7px;font:14px/1.4 Arial,sans-serif;min-height:40px;cursor:pointer;overflow-wrap:anywhere}
 .solin-species-option[aria-selected="true"],.solin-species-option:hover{background:#e6f0e3;color:#155b34}
 .dt-board .ce-field .solin-species-query{width:100%;min-width:0;height:25px;min-height:25px;border:0;border-radius:0;padding:2px 3px;font:12px/1.2 Arial,sans-serif;background:#fff;color:#243e2d}
@@ -23,3 +23,11 @@ select.solin-species-native{position:absolute!important;width:1px!important;heig
 .solin-species-results[hidden]{display:none!important}
 .solin-species-results{max-width:calc(100vw - 16px);box-sizing:border-box}
 .solin-species-option{font-size:16px;line-height:1.35;min-height:44px}
+
+/* The suggestion list stays BELOW its input in document flow even while
+   iOS Safari moves the visual viewport for the on-screen keyboard. */
+.solin-species-results-inline{display:block;position:static!important;left:auto!important;top:auto!important;transform:none!important;width:100%!important;min-width:0!important;max-height:224px!important;contain:layout style}
+.solin-species-results-card{position:absolute;z-index:1001;max-height:230px;margin:0;max-width:340px}
+#modal:not(.ce-modal).solin-species-open #modalBody{padding-bottom:22px!important}
+#modal.ce-modal.solin-species-open .dt-viewport{padding-bottom:env(safe-area-inset-bottom,0px)}
+.solin-species-option{display:block;user-select:none;-webkit-user-select:none;touch-action:manipulation}
