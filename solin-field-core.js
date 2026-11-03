@@ -89,7 +89,7 @@ function editQuarter(k,index=0){const q=D.quarters[k],rows=q.quarterRows?.length
   if(['Raion','Fzona'].includes(el.dataset.qfield)&&value&&!/^\d+$/.test(value)){
    toast('Укажите числовой код: '+(D.fieldLabels[el.dataset.qfield]||el.dataset.qfield));return;
   }
-  next[el.dataset.qfield]=value||null;
+  next[el.dataset.qfield]=['Fzona','Raion'].includes(el.dataset.qfield)?(value===''?null:Number(value)):(value||null);
  }const zoning=window.SolinDependentRules?.options('Квартал','Klxr',next,null,D.lesnichestvo?.[0]);
  const zoningChanged=String(next.Kpz??'')!==String(selected.Kpz??'')||
   String(next.Klxr??'')!==String(selected.Klxr??'');
