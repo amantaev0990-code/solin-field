@@ -80,6 +80,20 @@ public class SolinFieldUiInstrumentedTest {
         SystemClock.sleep(500);
       }
       assertTrue("Native WebView failed to mount approved PWA after 40s: "+diagnostic,ready);
+      // Ensure source tables are populated in the native WebView; without
+      // these the dependent controls render grey with no choices.
+      JSONObject references=null;
+      for(int i=0;i<40;i++){
+        String value=eval(webview,"JSON.stringify({refs:!!window.SOLIN_REFS,tables:Object.keys(window.SOLIN_REFS?.tables||{}).length,"+
+          "gzip:typeof DecompressionStream,sku:window.SOLIN_REFS?.tables?.SKU?.length||0,"+
+          "siar:window.SOLIN_REFS?.tables?.SIAR?.length||0,species:window.SOLIN_REFS?.tables?.SDP_Tip?.length||0})");
+        references=parseJsonString(value);
+        if(references.optInt("tables")>=100)break;
+        SystemClock.sleep(500);
+      }
+      System.out.println("SOLIN_ANDROID_REFERENCE_DIAGNOSTIC: "+references);
+      assertTrue("Android missing full forestry reference tables; dependent choices stay disabled: "+references,
+        references!=null&&references.optInt("tables")>=100);
       eval(webview,"window.__solinNativeParity='pending';(async()=>{"+
        "await SolinWorkspace.ready;"+
        "const forests=await SolinWorkspace.list();if(!forests.length)throw Error('No forest fixture');"+
