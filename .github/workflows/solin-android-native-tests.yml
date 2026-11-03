@@ -1,10 +1,11 @@
-name: SOLI-N Android MDB — actual device-emulator roundtrip
+name: SOLI-N Android — native MDB and UI emulator checks
 on:
   workflow_dispatch:
   push:
     paths:
       - 'native/android/SolinMdbPlugin.java'
       - 'native/android/SolinMdbInstrumentedTest.java'
+      - 'native/android/SolinFieldUiInstrumentedTest.java'
       - 'scripts/install-android-mdb.mjs'
       - '.github/workflows/solin-android-native-tests.yml'
 permissions:
@@ -64,7 +65,7 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Android 35 on-emulator MDB write / reopen and rejection tests
+      - name: Android 35 on-emulator WebView UI parity + MDB write / reopen tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
