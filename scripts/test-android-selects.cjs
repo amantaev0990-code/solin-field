@@ -49,6 +49,22 @@ const server=http.createServer((req,res)=>{
   });
   await page.locator('#ce-form').waitFor();
   assert(await page.locator('#ce-form').isVisible());
+  assert(await page.locator('.ce-assist-shortcuts').isVisible(),
+    'Large Android tablet must show field and Maket edit shortcuts');
+  assert(await page.locator('.ce-mobile-tabs').isVisible(),
+    'Large Android tablet must show Maket shortcut tabs');
+  const originalArea=await page.evaluate(()=>current.PLV);
+  const area=page.locator('#ce-form input[data-ce-scope="base"][data-ce-field="PLV"]').first();
+  assert(await area.isVisible(),'Area input must remain reachable');
+  await area.dispatchEvent('pointerdown',{pointerType:'touch',isPrimary:true});
+  assert(await page.locator('#ce-assist-value').isVisible(),
+    'Tapping a numeric cell on Android opens the full-size editor');
+  assert.equal(await page.evaluate(()=>document.activeElement?.id),'ce-assist-value',
+    'Numeric field focuses an actual editable input for Android keyboard');
+  await page.locator('#ce-assist-value').fill(String(Number(originalArea||1)+.5));
+  await page.locator('[data-ce-assist-apply]').click();
+  assert.equal(await page.evaluate(()=>current.PLV),originalArea,
+    'Editing numeric field must remain a draft until the tax card is saved');
   const native=await page.evaluate(()=>({
    isAndroid:window.Capacitor.isNativePlatform(),
    enabled:[...document.querySelectorAll('.dt-board select[data-ce-field]')].filter(x=>!x.disabled&&x.getBoundingClientRect().width>20).map(x=>x.id)
@@ -60,6 +76,6 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.evaluate(()=>document.activeElement?.id),'ce-assist-query','Card assistant must focus Android keyboard');
   assert.equal(await page.locator('#solin-android-picker').count(),0,'No double modal in desktop card');
   assert.deepEqual(errors,[],'No JS errors in Android-select interactions');
-  console.log('ANDROID_SELECTS_OK: native 960px tablet keyboard focus, source-code search, change events, real card assistant on Android and no competing dialogs');
+  console.log('ANDROID_SELECTS_OK: 960px Android tablet shows maket tabs, keyboard focus for code and numeric fields, source-code preservation, draft safety and no double dialogs');
  }finally{await browser?.close();await new Promise(done=>server.close(done));}
 })().catch(e=>{console.error(e);process.exitCode=1;});
