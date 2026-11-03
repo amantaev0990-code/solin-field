@@ -63,7 +63,7 @@ public class SolinFieldUiInstrumentedTest {
       boolean ready=false;
       String diagnostic="";
       for(int tries=0;tries<80;tries++){
-        String output=eval(webview,"JSON.stringify({href:location.href,loaded:!!(window.D && D.quarters),"+
+        String output=eval(webview,"JSON.stringify({href:location.href,loaded:!!(typeof D!=='undefined' && D.quarters),"+
          "ready:!!window.SolinWorkspace,editor:!!window.SolinCardEditor,main:document.querySelector('.brand h1')?.textContent,"+
          "status:document.getElementById('forestListStatus')?.textContent||'',screen:document.querySelector('.screen.active')?.id})");
         diagnostic=output;
