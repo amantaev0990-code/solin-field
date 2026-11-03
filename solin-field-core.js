@@ -86,7 +86,7 @@ function editQuarter(k,index=0){const q=D.quarters[k],rows=q.quarterRows?.length
   refreshIncompleteRows();
  };document.querySelector('#saveQuarter').onclick=()=>{const before=clone(q),next={...selected};for(const el of document.querySelectorAll('#modalBody [data-qfield]')){
   const value=String(window.SolinQuarterPickers?.value(el)??el.value).trim();
-  if(['Raion','Fzona'].includes(el.dataset.qfield)&&value&&!/^\\d+$/.test(value)){
+  if(['Raion','Fzona'].includes(el.dataset.qfield)&&value&&!/^\d+$/.test(value)){
    toast('Укажите числовой код: '+(D.fieldLabels[el.dataset.qfield]||el.dataset.qfield));return;
   }
   next[el.dataset.qfield]=value||null;
