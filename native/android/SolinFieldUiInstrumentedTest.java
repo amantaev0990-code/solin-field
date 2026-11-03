@@ -97,7 +97,7 @@ public class SolinFieldUiInstrumentedTest {
        "'started'");
       JSONObject result=null;
       for(int tries=0;tries<60;tries++){
-        String v=eval(webview,"JSON.stringify(window.__solinNativeParity||'pending')");
+        String v=eval(webview,"window.__solinNativeParity||'pending'");
         Object decoded=new org.json.JSONTokener(v).nextValue();
         if(decoded instanceof String && !decoded.equals("pending")){
           result=new JSONObject((String)decoded);break;
