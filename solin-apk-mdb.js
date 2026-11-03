@@ -34,6 +34,16 @@
       tx.onerror=()=>bad(tx.error);tx.onabort=()=>bad(tx.error);
     });}finally{db.close();}
   }
+  async function deleteStored(id){
+    const db=await openDB();
+    try {await new Promise((resolve,reject)=>{
+      const tx=db.transaction('files','readwrite');
+      tx.objectStore('files').delete(id);
+      tx.oncomplete=resolve;
+      tx.onerror=()=>reject(tx.error||Error('Не удалось удалить сохранённый MDB'));
+      tx.onabort=()=>reject(tx.error||Error('Удаление MDB отменено'));
+    });}finally{db.close();}
+  }
   const android = () => window.Capacitor?.getPlatform?.()==='android' &&
     window.Capacitor?.isNativePlatform?.();
   const plugin = () => window.Capacitor?.Plugins?.SolinMdb;
@@ -102,7 +112,7 @@
     b.innerHTML='<span><b>Экспорт</b><small>Создание MDB без сервера (APK Android)</small></span><span>⇩</span>';
     b.type='button';b.onclick=exportMDB;
   }
-  window.SolinOfflineMDB={exportMDB,readStored,saveStored};
+  window.SolinOfflineMDB={exportMDB,readStored,saveStored,deleteStored};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});
   else install();
 })();
