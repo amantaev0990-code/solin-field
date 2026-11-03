@@ -101,6 +101,9 @@
    const picker={select,manual,sync,value,get items(){return lastItems;}};
    select.__solinQuarterPicker=picker;
    sync({value:options.current??input.value??''});
+   // If user opens the quarter before the offline reference bundle is ready,
+   // enrich the same mounted iOS select when the real SFZ rows arrive.
+   window.addEventListener?.('solin-refs-ready',()=>sync({value:value()}),{once:true});
    return picker;
  }
  function value(el){return el?.__solinQuarterPicker?.value()??el?.value??'';}
