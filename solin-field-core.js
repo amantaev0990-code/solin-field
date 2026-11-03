@@ -63,36 +63,34 @@ function editQuarter(k,index=0){const q=D.quarters[k],rows=q.quarterRows?.length
  const districtInput=document.querySelector('#modalBody [data-qfield="Raion"]');
  const functionHint=document.createElement('p'),districtHint=document.createElement('p');
  functionHint.className='wf-form-note';districtHint.className='wf-form-note';
- functionInput?.parentElement?.append(functionHint);
- districtInput?.parentElement?.append(districtHint);
- const functionList=document.createElement('datalist');
- functionList.id='solin-quarter-functional-source';
- if(functionInput){functionInput.setAttribute('list',functionList.id);document.querySelector('#modalBody')?.append(functionList);}
+ functionHint.setAttribute('aria-live','polite');districtHint.setAttribute('aria-live','polite');
+ functionInput?.parentElement?.append(functionHint);districtInput?.parentElement?.append(districtHint);
+ const picker=window.SolinQuarterPickers;
+ const functionalPicker=picker?.mount(functionInput,'Fzona',()=>selected,
+  {current:selected.Fzona,org:()=>D.lesnichestvo?.[0],hint:functionHint});
+ const districtPicker=picker?.mount(districtInput,'Raion',()=>selected,
+  {current:selected.Raion,org:()=>D.lesnichestvo?.[0],hint:districtHint});
  const refreshIncompleteRows=()=>{
-  const rules=window.SolinDependentRules;
-  const forest=D.lesnichestvo?.[0]||{};
-  if(functionInput){
-   const result=rules?.options('Квартал','Fzona',selected,null,forest);
-   functionList.replaceChildren(...(result?.items||[]).map(x=>new Option(
-    x.value+' — '+x.label,x.value)));
-   functionHint.textContent=(result?.reason||'Неизвестна связь функциональных зон')+
-    '. Полный SQL Access пока отсутствует; ручное значение не изменяется.';
-  }
-  if(districtInput){
-   const result=rules?.options('Квартал','Raion',selected,null,forest);
-   districtHint.textContent=result?.reason||'Нет подтверждённого исходного справочника районов';
-  }
+  functionalPicker?.sync({value:selected.Fzona??''});
+  districtPicker?.sync({value:selected.Raion??''});
  };
- refreshIncompleteRows();
  document.querySelector('#quarterCategory').onchange=e=>{
   const nextIndex=Number(e.target.value);
   if(!rows[nextIndex])return;
   index=nextIndex;selected=rows[index];
-  for(const input of document.querySelectorAll('#modalBody [data-qfield]'))
+  for(const input of document.querySelectorAll('#modalBody [data-qfield]')){
+   if(input.__solinQuarterPicker)continue;
    input.value=selected[input.dataset.qfield]??'';
+  }
   updateZoneHint();
   refreshIncompleteRows();
- };document.querySelector('#saveQuarter').onclick=()=>{const before=clone(q),next={...selected};for(const el of document.querySelectorAll('[data-qfield]'))next[el.dataset.qfield]=el.value.trim()||null;const zoning=window.SolinDependentRules?.options('Квартал','Klxr',next,null,D.lesnichestvo?.[0]);
+ };document.querySelector('#saveQuarter').onclick=()=>{const before=clone(q),next={...selected};for(const el of document.querySelectorAll('#modalBody [data-qfield]')){
+  const value=String(window.SolinQuarterPickers?.value(el)??el.value).trim();
+  if(['Raion','Fzona'].includes(el.dataset.qfield)&&value&&!/^\\d+$/.test(value)){
+   toast('Укажите числовой код: '+(D.fieldLabels[el.dataset.qfield]||el.dataset.qfield));return;
+  }
+  next[el.dataset.qfield]=value||null;
+ }const zoning=window.SolinDependentRules?.options('Квартал','Klxr',next,null,D.lesnichestvo?.[0]);
  const zoningChanged=String(next.Kpz??'')!==String(selected.Kpz??'')||
   String(next.Klxr??'')!==String(selected.Klxr??'');
  if(zoningChanged&&next.Klxr!=null&&window.SolinDependentRules?.currentIsAllowed(next.Klxr,zoning)!==true){
