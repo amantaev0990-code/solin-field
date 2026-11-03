@@ -117,6 +117,14 @@
      if(select.value===MANUAL&&!select.disabled)manual.focus();
      else manual.value='';
    });
+   // Forward free-text edits to existing card form listeners. The select is
+   // the canonical control, its value() resolves the manual code.
+   const forward=type=>{
+    if(typeof Event==='function'&&typeof select.dispatchEvent==='function')
+     select.dispatchEvent(new Event(type,{bubbles:true}));
+   };
+   manual.addEventListener('input',()=>forward('input'));
+   manual.addEventListener('change',()=>forward('change'));
    const picker={select,manual,sync,value,get items(){return lastItems;}};
    select.__solinQuarterPicker=picker;
    sync({value:options.current??input.value??''});
