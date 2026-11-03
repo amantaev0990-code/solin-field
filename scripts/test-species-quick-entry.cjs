@@ -26,6 +26,16 @@ const server=http.createServer((req,res)=>{try{const file=path.resolve(root,'.'+
   assert.equal(await page.locator('#newBon').count(),0,'Manual bonitet removed from new stand form');
   assert(await page.locator('#newPOR__quick').isVisible(),'Quick species search visible in create form');
   await page.locator('#newPOR__quick').fill('В');
+  const popupLayout=await page.evaluate(()=>{
+   const input=document.querySelector('#newPOR__quick'),popup=document.querySelector('.solin-species-results');
+   const a=input.getBoundingClientRect(),b=popup.getBoundingClientRect();
+   return {font:parseFloat(getComputedStyle(input).fontSize),below:b.top>=a.bottom-1,
+    top:b.top,fieldBottom:a.bottom,popupWidth:b.width,fieldWidth:a.width};
+  });
+  assert(popupLayout.font>=16,'iPhone typing field must not trigger Safari auto-zoom');
+  assert(popupLayout.below,'Suggestions must always be beneath the typing field');
+  assert(popupLayout.popupWidth>=Math.min(230,popupLayout.fieldWidth));
+
   assert.equal(await page.locator('#newPOR').inputValue(),'В','Single original code should choose elm (вяз)');
   await page.locator('#newPOR__quick').fill('ос');
   assert.equal(await page.locator('#newPOR').inputValue(),'ОС','Cyrillic casefold must choose aspen (осина)');
@@ -43,6 +53,13 @@ const server=http.createServer((req,res)=>{try{const file=path.resolve(root,'.'+
   assert.equal(values.bonitet,0,'Unknown bonitet remains zero after initial stand creation');
   await page.evaluate(({k,vd})=>{const r=D.quarters[k].compartments.find(x=>Number(x.VD)===vd);SolinCardEditor.open(r);},fixture);
   await page.locator('#ce-form').waitFor();
+  const districtSelect=page.locator('#ce-form select[data-quarter-picker="Raion"]');
+  assert.equal(await districtSelect.count(),1,'District must be a separate native name picker in the full card');
+  const districtLabel=await districtSelect.locator('option[value="156000000"]').textContent();
+  assert.equal(districtLabel,'Хромтауский район','KATO code must not appear inside district name');
+  await districtSelect.selectOption('356400000');
+  assert.equal(await page.locator('#ce-form .quarter-code-readonly').inputValue(),'356400000','Selected district code must display separately');
+
   const quick=page.locator('#ce-form .solin-species-query').filter({has:page.locator('nonexistent-x')});
   const main=page.locator('#ce-form select[data-ce-field="M3Pr"]');
   const m10=page.locator('#ce-form select[data-ce-scope="Макет10"][data-ce-field="POR"]').first();
@@ -51,10 +68,20 @@ const server=http.createServer((req,res)=>{try{const file=path.resolve(root,'.'+
   const m10Quick=page.locator('#'+(await m10.getAttribute('id'))+'__quick');
   assert(await m10Quick.isVisible(),'Maket 10 species quick typing visible');
   await m10Quick.fill('ос');
+  assert.equal(await districtSelect.inputValue(),'356400000','Maket10 dependency refresh must not reset district choice');
+
   assert.equal(await m10.inputValue(),'ОС','Maket 10 code ОС selected by typing ос');
   await m10Quick.fill('В');
   assert.equal(await m10.inputValue(),'В','Maket 10 code В selected by typing one letter');
   await page.locator('#ce-cancel').click();
+  // Also check the quarter-creation form, not only the taxation-card header.
+  await page.evaluate(()=>openQuarterForm());
+  const quarterDistrict=page.locator('#newRaion');
+  assert.equal(await quarterDistrict.locator('option[value="356400000"]').textContent(),'Шетский район');
+  await quarterDistrict.selectOption('156000000');
+  assert.equal(await page.locator('#modalBody .quarter-code-readonly').inputValue(),'156000000');
+  await page.locator('#modalBody .quarter-code-readonly').evaluate(el=>{if(!el.readOnly)throw Error('KATO value should be read-only');});
+  await page.locator('#modal .modalHead .close').click();
   // In the real card editor, Maket 10 source fields must update M3B in the
   // draft automatically; the persisted record changes only after Save.
   await page.evaluate(({k,vd})=>{
@@ -82,7 +109,7 @@ const server=http.createServer((req,res)=>{try{const file=path.resolve(root,'.'+
   assert.equal(K58.status,'complete');assert.equal(K58.value,'4');
   assert.equal(K58.waiting,'waiting');
   assert.deepEqual(errors,[]);
-  console.log('SPECIES_QUICK_OK: В and ос select original codes, ambiguous prefix safe, no manual bonitet, zero fallback, Maket10 typing and K58');
+  console.log('SPECIES_QUICK_OK: iOS 16px input, downward popup, Maket10 entry, named Raion with separate KATO code, K58');
   await context.close();
  }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
 })().catch(error=>{console.error(error);process.exitCode=1;});
