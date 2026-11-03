@@ -251,7 +251,7 @@ if(kuChanged){
  r.KU=Number(desiredKU);
 }
 target[m]=list;
-let calculated=[],k59Check=null,stockEdited=m==='Макет10'&&String(values.ZAP??'')!==String(existing.ZAP??'');
+let calculated=[],k59Check=null,stockEdited=m==='Макет10'&&['IAR','POR','KOEF','LET','PH','PD2','POL','ZAP'].some(k=>String(values[k]??'')!==String(existing[k]??''));
 if(m==='Макет10'&&window.SolinCardCalculations){
  const org=db()?.lesnichestvo?.find(x=>String(x.POS)===String(r.POS)&&String(x.LESN)===String(r.LESN));
  const quarter=window.SolinAddressContext?.resolveQuarter(r,db()?.quarters?.[String(r.KV)]);
@@ -290,9 +290,18 @@ if(m==='Макет10'&&(calculated.length||stockEdited)){
      h((k59Check.availableZones||[]).join(', ')||'нет однозначного варианта'))+
    '<p>Это <b>варианты для проверки</b>, а не автоматически выбранная зона. Для квартала '+h(r.KV)+
    ' уточните код Klxr. Правильную зону нельзя определить только по KTO.</p></section>':'';
+ const stock=window.SolinCardCalculations?.standStock(r),parts=window.SolinCardCalculations?.stockBreakdown?.(r);
+ const stockInfo='<section class="wf-form-note"><b>Проверка итогового запаса Макета 5</b><p>'+
+ (stock?.status==='complete'?
+  'STUR1: '+h(stock.expectedPerHa)+' м³/га, STUR: '+h(stock.expectedTotal)+' м³. Расчёт из ZAP; норматив К59 проверяется отдельно.':
+  'Автоматический пересчёт STUR не выполнен: '+h(stock?.reason||'нет исходных данных'))+'</p>'+
+ (parts?.singleTrees?.length?'<p>Ярус 7: единичные деревья '+h(parts.singleTreesPerHa)+' м³/га — отдельно от STUR.</p>':'')+
+ (parts?.freshDeadwood?.length?'<p>Ярус 8: свежий сухостой '+h(parts.freshDeadwoodPerHa)+' м³/га; неоднозначные группы не исправляются.</p>':'')+
+ (parts?.drywoodPerHa!=null?'<p>Макет 4 M4SS: '+h(parts.drywoodPerHa)+' м³/га — отдельно, без двойного подсчёта.</p>':'')+
+ '</section>';
  const quarterLink=k59Check?.status==='unsupported-zone'?
     '<button type="button" id="wf-k59-open-quarter" class="secondary">Открыть квартал '+h(r.KV)+'</button>':'';
- openModal(heading,explanation+zoneInfo+table+quarterLink+
+ openModal(heading,explanation+stockInfo+zoneInfo+table+quarterLink+
   '<button type="button" class="primary" onclick="closeModal()">Понятно</button>');
  const link=document.getElementById('wf-k59-open-quarter');
  if(link)link.onclick=()=>{
