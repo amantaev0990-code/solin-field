@@ -18,39 +18,60 @@
    }
    return rows;
  };
- const fromScreenshot=org=>same(org?.POS,723)&&same(org?.LESN,4);
+ // All verified/observed codes are available irrespective of category or area.
+ // Administrative full Кл_Рай is not in the archived public reference package.
+ const KNOWN_DISTRICTS=[
+  {value:'156000000',label:'Исходная база Transf_213_2_2026 (название района не восстановлено)'},
+  {value:'356400000',label:'Шетский район · оригинальная обложка SOLI-N (723 / 4)'}
+ ];
+ let persistedForests=[],listing=null;
+ async function loadSavedDirectory(){
+  if(listing)return listing;
+  listing=(async()=>{
+   try{
+    await window.SolinWorkspace?.ready;
+    persistedForests=await window.SolinWorkspace?.list?.()||[];
+    window.dispatchEvent?.(new Event('solin-quarter-directory-ready'));
+   }catch(_){persistedForests=[];}
+  })();
+  return listing;
+ }
+ const knownRows=()=>{
+  const rows=[];
+  const append=quarters=>{
+   for(const [kv,q] of Object.entries(quarters||{}))
+    for(const r of originalQuarterRows(q))rows.push({...r,KV:r.KV??kv});
+  };
+  if(typeof D!=='undefined')append(D?.quarters);
+  for(const forest of persistedForests)append(forest.quarters);
+  return rows;
+ };
  function candidates(field,row,org){
-   const source=window.SolinDependentRules?.options('Квартал',field,row,null,org);
-   const results=new Map(),sameForest=recordPairs(org),confirmed=new Set();
-   const add=(value,label,verified=false)=>{
-     const key=clean(value);if(!numeric(key))return;
-     if(!results.has(key))results.set(key,{value:key,label:clean(label)});
-     if(verified)confirmed.add(key);
-   };
-   if(field==='Raion'){
-     for(const item of source?.items||[])add(item.value,item.label);
-     const saved=new Set();
-     for(const r of sameForest)if(numeric(r.Raion)&&Number(r.Raion)>0){const v=clean(r.Raion);saved.add(v);add(v,'Из ранее сохранённого квартала '+r.KV,true);}
-     if(fromScreenshot(org)){add('356400000','Шетский район · проверено по исходному SOLI-N',true);saved.add('356400000');}
-     const only=saved.size===1?[...saved][0]:null;
-     return {items:[...results.values()],auto:only,reason:results.size?
-       'Коды из кварталов этого лесничества / сверенного образца. Исходный полный справочник «Кл_Рай» отсутствует: при необходимости выберите другой проверенный код вручную.':
-       'Для этого лесничества нет сохранённого списка районов. Введите код из оригинальной SOLI-N или официального КАТО вручную.'};
-   }
-   if(field==='Fzona'){
-     for(const item of source?.items||[])add(item.value,item.label||'Кандидат из SFZ');
-     const saved=new Set();
-     for(const r of sameForest)if(numeric(r.Fzona)&&same(r.KGLF,row?.KGLF)){
-       const v=clean(r.Fzona);saved.add(v);add(v,'Из квартала '+r.KV+' этой категории ГЛФ',true);
-     }
-     if(fromScreenshot(org)&&same(row?.KGLF,27)){
-       add('0','Без функциональной зоны · исходный пример',true);saved.add('0');
-     }
-     return {items:[...results.values()],auto:saved.size===1?[...saved][0]:null,
-       reason:(source?.reason||'Справочник SFZ недоступен')+
-       '. В списке — варианты по категории ГЛФ и коды из сохранённых кварталов. Неподтверждённые значения проверьте по оригиналу.'};
-   }
-   return {items:[],auto:null,reason:'Нет доступного справочника'};
+  const results=new Map(),mine=new Set(),all=knownRows(),current=recordPairs(org);
+  const add=(value,label)=>{
+   const k=clean(value);if(!numeric(k))return;
+   if(!results.has(k))results.set(k,{value:k,label:clean(label)});
+   else if(label&&!results.get(k).label)results.get(k).label=clean(label);
+  };
+  if(field==='Raion'){
+   for(const item of KNOWN_DISTRICTS)add(item.value,item.label);
+   for(const r of all)if(numeric(r.Raion)&&Number(r.Raion)>0)
+    add(r.Raion,'Из сохранённой обложки квартала');
+   for(const r of current)if(numeric(r.Raion)&&Number(r.Raion)>0)mine.add(clean(r.Raion));
+   return {items:[...results.values()].sort((a,b)=>Number(a.value)-Number(b.value)),
+    auto:null,reason:'Доступные известные коды районов всех сохранённых лесничеств. Полная Кл_Рай отсутствует — при отсутствии района используйте ручной ввод проверенного кода. Выбор не зависит от КГЛФ или области.'};
+  }
+  if(field==='Fzona'){
+   add('0','Без функциональной зоны · значение из исходной обложки');
+   const table=window.SOLIN_REFS?.tables?.SFZ||[];
+   for(const r of table)if(numeric(r.KFZ))
+    add(r.KFZ,String(r.NFZK||r.NFZ||'Из справочника SFZ'));
+   for(const r of all)if(numeric(r.Fzona))
+    add(r.Fzona,'Из сохранённой обложки квартала');
+   return {items:[...results.values()].sort((a,b)=>Number(a.value)-Number(b.value)),
+    auto:null,reason:'Полный доступный список кодов из SFZ и сохранённых кварталов без фильтра по КГЛФ. Нормативный SQL Access восстановлен не полностью — значение при необходимости сверяйте по оригиналу.'};
+  }
+  return {items:[],auto:null,reason:'Нет доступного справочника'};
  }
  function mount(input,field,context,options={}){
    if(!input||!['Fzona','Raion'].includes(field))return null;
@@ -86,10 +107,8 @@
      else if(!opts.disableAuto&&data.auto&&seen.has(data.auto)){select.value=data.auto;manual.value='';}
      else if(items.length){select.value='';manual.value='';}
      else{select.value=MANUAL;manual.value='';}
-     const waiting=field==='Fzona'&&!clean(row?.KGLF);
-     select.disabled=waiting;manual.disabled=waiting;
-     if(waiting){select.value='';manual.value='';}
-     manual.hidden=waiting||select.value!==MANUAL;
+     select.disabled=false;manual.disabled=false;
+     manual.hidden=select.value!==MANUAL;
      if(hint)hint.textContent=data.reason;
      return data;
    };
@@ -104,6 +123,8 @@
    // If user opens the quarter before the offline reference bundle is ready,
    // enrich the same mounted iOS select when the real SFZ rows arrive.
    window.addEventListener?.('solin-refs-ready',()=>sync({value:value()}),{once:true});
+   window.addEventListener?.('solin-quarter-directory-ready',()=>sync({value:value()}),{once:true});
+   void loadSavedDirectory();
    return picker;
  }
  function value(el){return el?.__solinQuarterPicker?.value()??el?.value??'';}
