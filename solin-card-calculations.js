@@ -60,14 +60,38 @@ function bonitet(record,refs){
  return {status:'complete',reason:'К58 · SSHB (происхождение '+origin+', возраст '+age+', высота '+h+' м)',expected:match[1],
   field:'M3B',rawCurrent:record.M3B,origin,age,height:h,scaleAge:scale['Возр'],scale};
 }
+// Explain every Maket 10 layer without treating separate timber categories
+// as an additional STUR value. Original SIAR: 7=single trees, 8=fresh deadwood.
+function stockBreakdown(record){
+ const out={included:[],singleTrees:[],freshDeadwood:[],other:[],missing:[],drywoodPerHa:n(record?.M4SS),clutterPerHa:n(record?.M4ZO),liquidClutterPerHa:n(record?.M4ZL)};
+ for(const [index,row]of (record?._children?.Макет10||[]).entries()){
+  if(!childMatches(record,row))continue;
+  const iar=n(row.IAR),zap=n(row.ZAP),leading=same(row.POR,record.M3Pr);
+  const item={index:index+1,iar,por:row.POR??null,zap,leading};
+  if(iar===7){out.singleTrees.push(item);continue;}
+  if(iar===8)out.freshDeadwood.push(item);
+  if(leading&&[1,2,3,8].includes(iar)){
+   if(zap===null){out.missing.push(item);continue;}
+   if(zap!==0)out.included.push(item);
+  }else out.other.push(item);
+ }
+ out.candidatePerHa=out.included.reduce((sum,row)=>sum+row.zap,0);
+ out.singleTreesPerHa=out.singleTrees.reduce((sum,row)=>sum+(row.zap??0),0);
+ out.freshDeadwoodPerHa=out.freshDeadwood.reduce((sum,row)=>sum+(row.zap??0),0);
+ out.area=n(record?.PLV);
+ return out;
+}
 function standStock(record){
  const category=n(record?.KU),area=n(record?.PLV);
  if(category===null||area===null||area<=0)return status('Не заданы категория угодий или площадь','waiting');
  if(category>=20)return status('Расчёт Макет10ЗАП1 применяется к KU меньше 20','not-applicable');
+ const overview=stockBreakdown(record);
+ if(overview.missing.length)return status('Запас нельзя уточнить: у '+overview.missing.length+
+   ' строки (строк) главной породы в ярусе 1/2/3/8 отсутствует ZAP','waiting');
  const eligible=(record?._children?.['Макет10']||[]).filter(row=>
-   childMatches(record,row)&&same(row.POR,record.M3Pr)&&n(row.IAR)!==null&&(n(row.IAR)<4||n(row.IAR)===8)&&
-   n(row.ZAP)!==null&&n(row.ZAP)!==0);
- if(!eligible.length)return status('В макете 10 нет подходящих строк с запасом главной породы','waiting');
+   childMatches(record,row)&&same(row.POR,record.M3Pr)&&
+   [1,2,3,8].includes(n(row.IAR))&&n(row.ZAP)!==null&&n(row.ZAP)!==0);
+ if(!eligible.length)return status('В макете 10 нет подходящих строк с запасом главной породы (IAR 1, 2, 3, 8)','waiting');
  const grouped=eligible.map(x=>['IAR','KOEF','LET','PH','PD2','POL'].map(k=>String(x[k]??'')).join('|'));
  if(new Set(grouped).size>1)
   return status('Несколько групп Макет10ЗАП1; оригинальное UPDATE не имеет единственного результата','ambiguous');
@@ -215,5 +239,5 @@ function corrections(record,refs,org,quarterRow=null){
  }else unknown.push({field:'STUR',...stock});
  return {issues,unknown,bonitet:b,standStock:stock,stockPerHectare:k59};
 }
-window.SolinCardCalculations={bonitet,standStock,stockPerHectare,stockZoneOptions,corrections,safeRoundHalf,accessRound,k59Round};
+window.SolinCardCalculations={bonitet,standStock,stockBreakdown,stockPerHectare,stockZoneOptions,corrections,safeRoundHalf,accessRound,k59Round};
 })();
