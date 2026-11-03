@@ -3,12 +3,25 @@ on:
   workflow_dispatch:
   push:
     paths:
+      # Any change to the PWA must trigger a fresh Android build.
+      # Previously only Android source changes triggered APK builds, leaving
+      # the installed APK stale even after new card fixes were published.
+      - '*.js'
+      - '*.css'
+      - '*.html'
+      - '*.json'
+      - '*.gz'
+      - quarters/**
+      - refs/**
+      - vendor/**
       - package.json
       - capacitor.config.json
       - scripts/**
       - native/android/**
-      - solin-apk-mdb.js
       - .github/workflows/solin-android-apk.yml
+concurrency:
+  group: solin-apk-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -36,6 +49,12 @@ jobs:
         run: npm run build
       - name: Verify Android staged assets and blank MDB only
         run: node scripts/test-android-assets.cjs
+      - name: Verify exact GitHub Pages vs native APK source parity
+        run: node scripts/test-apk-web-parity.cjs
+      - name: Verify real mobile UI in web and APK local asset modes
+        run: |
+          npm install --no-save --no-package-lock playwright-core
+          PLAYWRIGHT_PATH=playwright-core BROWSER_CHANNEL=chrome node scripts/test-apk-mobile-parity.cjs
       - name: Create native Android project
         run: npx cap add android
       - name: Register offline MDB writer
