@@ -108,7 +108,7 @@ function createQuarter(){const raw=$('#newKV').value.trim();if(!/^\d+$/.test(raw
  const fzona=window.SolinQuarterPickers?.value($('#newFzona'))??$('#newFzona').value;
  const raion=window.SolinQuarterPickers?.value($('#newRaion'))??$('#newRaion').value;
  for(const [field,value] of [['функциональной зоны',fzona],['административного района',raion]])
-  if(value&&!/^\\d+$/.test(value))return toast('Код '+field+' должен содержать только цифры');
+  if(value&&!/^\d+$/.test(value))return toast('Код '+field+' должен содержать только цифры');
  const checkZone=$('#newKlxr').value;
  const rules=window.SolinDependentRules;
  for(const [field,value] of [['KGLF',$('#newKGLF').value],['Kpz',$('#newKpz').value],['Klxr',checkZone]]){
