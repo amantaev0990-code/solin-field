@@ -55,6 +55,22 @@ const server=http.createServer((req,res)=>{try{const file=path.resolve(root,'.'+
   await m10Quick.fill('В');
   assert.equal(await m10.inputValue(),'В','Maket 10 code В selected by typing one letter');
   await page.locator('#ce-cancel').click();
+  // In the real card editor, Maket 10 source fields must update M3B in the
+  // draft automatically; the persisted record changes only after Save.
+  await page.evaluate(({k,vd})=>{
+   const record=D.quarters[k].compartments.find(x=>Number(x.VD)===vd);
+   Object.assign(record,{KU:1,M3Pr:'В',M3B:0});
+   record._children={Макет10:[{POS:record.POS,LESN:record.LESN,KV:record.KV,KGLF:record.KGLF,VD:record.VD,
+    IAR:1,POR:'В',KOEF:10,PROI:7,POL:0.5,LET:5,PH:2,ZAP:40}]};
+   SOLIN_REFS.tables.SSHB=[{Происх:7,Возр:5,ВозрН:5,ВозрК:6,Н1б:99,Н1а:99,Н1:5,Н2:4,Н3:3,Н4:1,Н5:0,Н5а:0,Н5б:0}];
+   SolinCardEditor.open(record);
+  },fixture);
+  await page.locator('#ce-form select[data-ce-scope="Макет10"][data-ce-field="POR"]').first().evaluate(el=>el.dispatchEvent(new Event('change',{bubbles:true})));
+  await page.waitForFunction(()=>document.querySelector('#ce-form select[data-ce-field="M3B"][data-ce-scope="base"]')?.value==='4');
+  assert.equal(await page.evaluate(({k,vd})=>D.quarters[k].compartments.find(x=>Number(x.VD)===vd).M3B,fixture),0,
+   'K58 correction must not persist before Save');
+  await page.locator('#ce-save').click();
+  await page.waitForFunction(({k,vd})=>String(D.quarters[k].compartments.find(x=>Number(x.VD)===vd).M3B)==='4',fixture);
   // Pure audited K58 contract: a single eligible Maket 10 row auto-produces bonitet 4.
   const K58=await page.evaluate(()=>{
    const scale={Происх:7,Возр:5,ВозрН:5,ВозрК:6,Н1б:99,Н1а:99,Н1:5,Н2:4,Н3:3,Н4:1,Н5:0,Н5а:0,Н5б:0};
