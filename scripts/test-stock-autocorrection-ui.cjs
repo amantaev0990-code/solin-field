@@ -370,6 +370,48 @@ async function reopen(p,info){
   'Running the full source dependency audit cannot modify the saved forest');
  await p.locator('#wfCloseDependencyAudit').click();
  console.log('PASS Chrome dependency audit dialog: card scope, complete downloadable JSON, no database edits');
+ // Regression for iPhone "Древостой": IAR is disabled when KU is missing,
+ // but the user must be able to set KU explicitly IN THIS SAME MODAL.
+ // Changing KU must be confirmed and saved atomically with Maket10.
+ await p.evaluate(()=>{
+  closeModal();
+  current=D.quarters['1'].compartments[0];
+  current.KU=null;current._children.Макет10[0].IAR=null;
+  solinWorkflow.editMaket('Макет10',0);
+ });
+ const missingLayer=await p.evaluate(()=>{
+  const el=document.getElementById('wf_IAR');
+  return {disabled:el.disabled,reason:document.getElementById('wfM10LayerHint').textContent,
+   category:document.getElementById('wfM10KU').value};
+ });
+ assert.equal(missingLayer.disabled,true);
+ assert.equal(missingLayer.category,'');
+ assert.match(missingLayer.reason,/категори/i,
+  'Disabled layer picker must explain exactly which upstream field is missing');
+ const one=await p.locator('#wfM10KU').locator('option[value="1"]').count();
+ assert.equal(one,1,'Original SKU must offer source-backed stand categories');
+ await p.locator('#wfM10KU').selectOption('1');
+ assert.equal(await p.locator('#wf_IAR').isEnabled(),true,
+  'Choosing a KU with SIAR layers should immediately enable IAR');
+ assert.deepEqual(await p.locator('#wf_IAR option').evaluateAll(els=>
+  els.filter(x=>x.value&&!x.disabled).map(x=>x.value)),['1','2','7','8'],
+  'Original KU=1 → SIAR.Ia=1 → PIAP must offer only the four real IAR codes');
+ await p.locator('#wf_IAR').selectOption('1');
+ await p.locator('#modalBody .formActions .secondary').click();
+ assert.equal(await p.evaluate(()=>current.KU),null,
+  'Canceling the Maket10 dialog must not mutate parent KU');
+ assert.equal(await p.evaluate(()=>current._children.Макет10[0].IAR),null);
+ await p.evaluate(()=>solinWorkflow.editMaket('Макет10',0));
+ await p.locator('#wfM10KU').selectOption('1');
+ await p.locator('#wf_IAR').selectOption('1');
+ p.once('dialog',dialog=>dialog.accept());
+ await p.locator('#wfSaveMaket').click();
+ await p.waitForFunction(()=>current.KU===1&&current._children.Макет10[0].IAR===1);
+ assert.equal(await p.evaluate(()=>current._children.Макет10[0].POR),'В',
+  'Updating category and IAR must not lose species');
+ assert.equal(await p.evaluate(()=>current._children.Макет10[0].KOEF),10,
+  'Updating category and IAR must not lose coefficients');
+ console.log('PASS Maket10 mobile layer edit: missing KU explained; choose source-backed category → original IAR options → atomic confirmed save');
  await desktop.close();
  const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
  const m=await mobile.newPage();m.on('pageerror',e=>errors.push(e.message));
