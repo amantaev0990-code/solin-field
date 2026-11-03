@@ -30,7 +30,7 @@
    if(field==='Raion'){
      for(const item of source?.items||[])add(item.value,item.label);
      const saved=new Set();
-     for(const r of sameForest)if(numeric(r.Raion)){const v=clean(r.Raion);saved.add(v);add(v,'Из ранее сохранённого квартала '+r.KV,true);}
+     for(const r of sameForest)if(numeric(r.Raion)&&Number(r.Raion)>0){const v=clean(r.Raion);saved.add(v);add(v,'Из ранее сохранённого квартала '+r.KV,true);}
      if(fromScreenshot(org)){add('356400000','Шетский район · проверено по исходному SOLI-N',true);saved.add('356400000');}
      const only=saved.size===1?[...saved][0]:null;
      return {items:[...results.values()],auto:only,reason:results.size?
