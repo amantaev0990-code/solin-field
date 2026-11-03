@@ -11,7 +11,7 @@ const stamp=d=>JSON.stringify([d.quarters,d.lesnichestvo,d._transferExtras]);
 const pending=new WeakMap();let sqlPromise,normPromise;
 function localDate(){const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');}
 function sql(){return sqlPromise??=(initSqlJs({locateFile:f=>'./vendor/'+f}).catch(e=>{sqlPromise=null;throw e;}));}
-async function norms(){return normPromise??=(async()=>{const r=await fetch('./solin-control-norms.json.gz');if(!r.ok)throw Error('Не загрузились исходные нормативные таблицы');const bytes=await r.arrayBuffer();
+async function norms(){return normPromise??=(async()=>{let r=await fetch(window.Capacitor?.isNativePlatform?.()?'./solin-control-norms.packed.bin':'./solin-control-norms.json.gz');if(!r.ok&&window.Capacitor?.isNativePlatform?.())r=await fetch('./solin-control-norms.json.gz');if(!r.ok)throw Error('Не загрузились исходные нормативные таблицы');const bytes=await r.arrayBuffer();
  if(window.crypto?.subtle){const digest=await crypto.subtle.digest('SHA-256',bytes),actual=[...new Uint8Array(digest)].map(v=>v.toString(16).padStart(2,'0')).join('');if(actual!==N.source.normsSha256)throw Error('Нормативные таблицы не соответствуют версии контроля');}
  return JSON.parse(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text());})().catch(e=>{normPromise=null;throw e;});}
 function sourceTables(database,records,settings,reference){
