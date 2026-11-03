@@ -18,7 +18,7 @@ function text(v){const s=clean(v);return expansions[s]||s;}
 const extra=[
  ['Квартал','KGLF','Sples','KOD','T1'],['ВыделВ','KGLF','Sples','KOD','T1'],['Квартал','Fzona','SFZ','KFZ','NFZ'],['ВыделВ','Fzona','SFZ','KFZ','NFZ'],['Квартал','Kpz','Spzon','Kpz','Npz'],['Квартал','Klxr','Slxr','Klxz','Nlxr'],['ВыделВ','KlxrVD','Slxr','Klxz','Nlxr'],['ВыделВ','ErV','SErv','KErv','Erv'],['ВыделВ','ErCt','SErCt','KErct','Erct'],['Макет21','SD','SDL','KSD','Klass'],['Макет16','Por16','SDP','KPC','NDP'],['Макет14','KU','SKU','KU','NKU'],['Макет27','KU_St','SKU','KU','NKU']
 ].map(([form,field,table,code,label])=>({form,field,table,code,label}));
-const localLists={'ВыделВ.M3B':{'1Б':'Класс Iб','1А':'Класс Iа','1':'Класс I','2':'Класс II','3':'Класс III','4':'Класс IV','5':'Класс V','5А':'Класс Vа','5Б':'Класс Vб'},'Квартал.Dost':{'1':'Труднодоступный','2':'Доступный'},'Квартал.Rel':{'1':'Равнинный','2':'Горный'}};
+const localLists={'ВыделВ.M3B':{'0':'Не рассчитан','1Б':'Класс Iб','1А':'Класс Iа','1':'Класс I','2':'Класс II','3':'Класс III','4':'Класс IV','5':'Класс V','5А':'Класс Vа','5Б':'Класс Vб'},'Квартал.Dost':{'1':'Труднодоступный','2':'Доступный'},'Квартал.Rel':{'1':'Равнинный','2':'Горный'}};
 const sources=()=>[...(window.SOLIN_LOOKUP_SOURCES||[]),...extra];
 function source(form,field){form=canonical(form);return sources().find(s=>s.form===form&&s.field===field);}
 const cache=new Map();let cachedTables=null;
