@@ -51,7 +51,23 @@ function field(k,v){if(window.SolinHuman)return `<div class="humanField"><span>$
 function section(title,keys,o){const a=keys.filter(k=>o[k]!==undefined&&o[k]!==null&&o[k]!=='');return a.length?`<div class="humanSection"><h3>${title}</h3><div class="humanGrid">${a.map(k=>field(k,o[k])).join('')}</div></div>`:''}
 function renderComp(){const r=current;$('#cardTitle').textContent=`Квартал ${r.KV} · Выдел ${r.VD}`;$('#cardSub').textContent=`${num(r.PLV)} га · ${landName(r.KU)||'категория не указана'}`;$('#humanContent').innerHTML=section('Основные сведения',['PLV','KU','KGLF','Fzona','OZU'],r)+section('Лесорастительные условия',['M3Pr','M3B','M3TL','M3TLU','M3G','M3KP'],r)+section('Проектируемые мероприятия',['M2PM1','M2Pr'],r)+section('Подрост',['PRkol','PRH','PRA'],r);const names=Object.keys(r._children||{});$('#childTabs').innerHTML=names.map((n,i)=>`<button class="chip ${i===0?'active':''}" onclick="renderChild('${n}',this)">${childNames[n]||n}</button>`).join('');$('#childContent').innerHTML='';if(names[0])renderChild(names[0],$('#childTabs button'))}
 function renderChild(n,btn){$$('.chip').forEach(x=>x.classList.remove('active'));btn?.classList.add('active');const rs=current._children?.[n]||[];$('#childContent').innerHTML=`<div class="humanSection"><h3>${childNames[n]||n}</h3>${rs.map(r=>`<div class="humanGrid">${Object.entries(r).filter(([k,v])=>!['POS','LESN','KV','KGLF','VD'].includes(k)&&v!==null&&v!=='').map(([k,v])=>field(k,v)).join('')}</div>`).join('')||'<div class="empty">Нет данных</div>'}</div>`}
-function openQuarterForm(){openModal('Новый квартал',`<div class="formGrid"><label><span>Номер квартала</span><input id="newKV" inputmode="numeric" placeholder="Например, 91"></label><label><span>Категория лесного фонда</span><input id="newKGLF" inputmode="numeric" placeholder="Шифр, если известен"></label><label><span>Природная зона</span><input id="newKpz" inputmode="numeric" placeholder="Шифр"></label><label><span>Функциональная зона</span><input id="newFzona" inputmode="numeric" list="solin-new-fzona-options" placeholder="По категории ГЛФ"><datalist id="solin-new-fzona-options"></datalist><small id="newFzonaHint">Связь с категорией ГЛФ проверяется по SFZ</small></label><label><span>Административный район</span><input id="newRaion" inputmode="numeric" placeholder="Код района"><small id="newRaionHint">Исходная Кл_Рай отсутствует; код вводится только по проверенному документу</small></label><label><span>Лесорастительная зона</span><input id="newKlxr" inputmode="numeric" placeholder="Шифр"><small>Код зоны Klxr зависит от KTO лесничества и Kpz квартала. Список строится по исходным Slxr и Szap. Правильную зону выбирает таксатор.</small></label></div><div class="formActions"><button class="secondary" onclick="closeModal()">Отмена</button><button class="primary" onclick="createQuarter()">Создать</button></div>`);
+function openQuarterForm(){const org=D.lesnichestvo?.[0]||{},source=D.source||{};
+ openModal('Новый квартал',`<p class="quarter-address-info"><b>Лесовладелец:</b> ${esc(org.POS??'—')} · ${esc(org.NLX||'Не указан')}<br><b>Лесничество:</b> ${esc(org.LESN??'—')} · ${esc(org.NOS||'Не указано')}</p>
+ <div class="formGrid">
+ <label><span>Номер квартала</span><input id="newKV" inputmode="numeric" placeholder="Например, 91"></label>
+ <label><span>Категория ГЛФ</span><input id="newKGLF" inputmode="numeric" placeholder="Выберите категорию"></label>
+ <label><span>Функциональная зона</span><input id="newFzona" inputmode="numeric" placeholder="Выберите код"><small id="newFzonaHint" aria-live="polite"></small></label>
+ <label><span>Административный район</span><input id="newRaion" inputmode="numeric" placeholder="Выберите код района"><small id="newRaionHint" aria-live="polite"></small></label>
+ <label><span>Рельеф</span><select id="newRel"><option value="">— Не указано —</option><option value="1">1 — Равнинный</option><option value="2">2 — Горный</option></select></label>
+ <label><span>Природная зона</span><input id="newKpz" inputmode="numeric" placeholder="Выберите природную зону"></label>
+ <label><span>Лесохозяйственная зона</span><input id="newKlxr" inputmode="numeric" placeholder="По природной зоне"><small>Зависит от KTO лесничества, Kpz квартала и исходных Slxr/Szap.</small></label>
+ <label><span>Доступность</span><input id="newDost" inputmode="numeric" placeholder="Код (2 — доступный)"></label>
+ <label><span>Удалённость от дороги</span><input id="newUdal" inputmode="numeric" placeholder="Код (1 — до 10 км)"></label>
+ <label><span>Год таксации</span><input id="newGodT" inputmode="numeric" value="${esc(org.GodT??'')}"></label>
+ <label><span>Таксатор</span><input id="newTax" value="${esc(source.taxator||'')}"></label>
+ <label><span>Площадь принял</span><input id="newPrin" placeholder="ФИО"></label>
+ <label><span>Корректор</span><input id="newKorr" placeholder="ФИО"></label>
+ </div><div class="formActions"><button class="secondary" onclick="closeModal()">Отмена</button><button class="primary" onclick="createQuarter()">Создать</button></div>`);
  const rules=window.SolinDependentRules;
  let kpzInput=$('#newKpz');
  for(const [field,selector] of [['KGLF','#newKGLF'],['Kpz','#newKpz']]){
@@ -65,21 +81,13 @@ function openQuarterForm(){openModal('Новый квартал',`<div class="fo
    el.parentElement?.append(note);
   }
  }
- // Existing SFZ rows give only KLF-dependent *candidates*: the rest
- // of the original Access WHERE is truncated, so never choose by default.
- const fzonaInput=$('#newFzona'),fzonaList=$('#solin-new-fzona-options'),
-  fzonaHint=$('#newFzonaHint'),districtHint=$('#newRaionHint');
- const glfInput=$('#newKGLF');
- const updateFunctional=()=>{
-  const result=rules?.options('Квартал','Fzona',{KGLF:glfInput?.value},null,D.lesnichestvo?.[0]);
-  fzonaList?.replaceChildren(...(result?.items||[]).map(x=>new Option(x.value+' — '+x.label,x.value)));
-  if(fzonaHint)fzonaHint.textContent=result?.reason||'Связь функциональной зоны пока не подтверждена';
-  const district=rules?.options('Квартал','Raion',{},null,D.lesnichestvo?.[0]);
-  if(districtHint)districtHint.textContent=district?.reason||'Исходный район не проверен';
- };
- glfInput?.addEventListener('change',updateFunctional);
- glfInput?.addEventListener('input',updateFunctional);
- updateFunctional();
+ // Native select fields work on iPhone; manual code is always available.
+ const glfInput=$('#newKGLF'),choices=window.SolinQuarterPickers;
+ const fzonaPicker=choices?.mount($('#newFzona'),'Fzona',()=>({KGLF:glfInput?.value}),
+   {hint:$('#newFzonaHint')});
+ choices?.mount($('#newRaion'),'Raion',()=>({KGLF:glfInput?.value}),
+   {hint:$('#newRaionHint')});
+ glfInput?.addEventListener('change',()=>fzonaPicker?.sync({clear:true}));
  const zoneInput=$('#newKlxr');
  const hint=document.createElement('small');hint.setAttribute('aria-live','polite');
  zoneInput.parentElement.append(hint);
@@ -97,6 +105,10 @@ function openQuarterForm(){openModal('Новый квартал',`<div class="fo
  refresh();
 }
 function createQuarter(){const raw=$('#newKV').value.trim();if(!/^\d+$/.test(raw)||Number(raw)<=0)return toast('Номер квартала должен быть положительным целым');const k=String(Number(raw));if(!k)return toast('Укажи номер квартала');if(D.quarters[k])return toast('Такой квартал уже есть');
+ const fzona=window.SolinQuarterPickers?.value($('#newFzona'))??$('#newFzona').value;
+ const raion=window.SolinQuarterPickers?.value($('#newRaion'))??$('#newRaion').value;
+ for(const [field,value] of [['функциональной зоны',fzona],['административного района',raion]])
+  if(value&&!/^\\d+$/.test(value))return toast('Код '+field+' должен содержать только цифры');
  const checkZone=$('#newKlxr').value;
  const rules=window.SolinDependentRules;
  for(const [field,value] of [['KGLF',$('#newKGLF').value],['Kpz',$('#newKpz').value],['Klxr',checkZone]]){
@@ -108,7 +120,7 @@ function createQuarter(){const raw=$('#newKV').value.trim();if(!/^\d+$/.test(raw
    return toast(result?.reason||'Не удалось подтвердить лесохозяйственную зону.');
  }
  D.quarters[k]={meta:{POS:D.lesnichestvo?.[0]?.POS,LESN:D.lesnichestvo?.[0]?.LESN,KV:+k||k,KGLF:$('#newKGLF').value||null,Kpz:$('#newKpz').value||null,Klxr:$('#newKlxr').value||null,
- Fzona:$('#newFzona').value||null,Raion:$('#newRaion').value||null,GodT:D.lesnichestvo?.[0]?.GodT??null},compartments:[],_local:true};saveLocal();closeModal();refresh();show('quartersScreen');toast('Квартал создан')}
+ Fzona:fzona||null,Raion:raion||null,Rel:$('#newRel').value||null,Dost:$('#newDost').value||null,Udal:$('#newUdal').value||null,GodT:$('#newGodT').value||D.lesnichestvo?.[0]?.GodT||null,Tax:$('#newTax').value.trim()||null,Prin:$('#newPrin').value.trim()||null,Korr:$('#newKorr').value.trim()||null},compartments:[],_local:true};saveLocal();closeModal();refresh();show('quartersScreen');toast('Квартал создан')}
 function openCompForm(k='',selectedKGLF=null){if(!D?.quarters)return;const quarterIds=Object.keys(D.quarters).sort((a,b)=>+a-+b);if(!quarterIds.length)return toast('Сначала создайте квартал');if(!D.quarters[k])k=quarterIds[0];const opts=quarterIds.map(x=>`<option value="${esc(x)}" ${String(x)===String(k)?'selected':''}>Квартал ${esc(x)}</option>`).join('');const ku=Object.entries(D.fieldLookups?.KU||{}).filter(([c,n])=>c&&n).map(([c,n])=>`<option value="${esc(c)}">${esc(n)} · ${esc(c)}</option>`).join('');openModal('Новый выдел',`<div class="formGrid"><label><span>Квартал</span><select id="newCompKV" onchange="updateNewCompQuarter(this.value)">${opts}</select></label><label><span>Категория ГЛФ</span><select id="newCompKGLF">${(D.quarters[k]?.quarterRows||[D.quarters[k]?.meta||{}]).map(x=>`<option value="${esc(x.KGLF??'')}" ${selectedKGLF!=null&&String(x.KGLF)===String(selectedKGLF)?'selected':''}>${esc(x.KGLF)}</option>`).join('')}</select></label><label><span>Номер выдела</span><input id="newVD" inputmode="numeric" placeholder="Например, 12"></label><label><span>Площадь, га</span><input id="newPLV" inputmode="decimal" value="1.0" aria-describedby="newAreaHelp"><small id="newAreaHelp">Можно оставить 1.0 до переноса точных площадей: MapInfo → Excel → SOLI-N.</small></label><label><span>Категория угодий</span><select id="newKU"><option value="">Выбрать…</option>${ku}</select></label><label><span>Преобладающая порода</span><input id="newPOR" inputmode="numeric" placeholder="Шифр породы"></label><label><span>Класс бонитета</span><input id="newBon" inputmode="numeric" placeholder="Шифр"></label></div><div class="formActions"><button class="secondary" onclick="closeModal()">Отмена</button><button class="primary" onclick="createComp()">Создать</button></div>`)}
 // The native iOS <select> is still finishing its change event here.
 // Rebuilding the entire modal in that event can strand an invisible picker
