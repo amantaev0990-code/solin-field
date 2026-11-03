@@ -178,6 +178,10 @@
   window.SolinOfflineImageryActive=null;
   updateButtons();
  }
+ function hideStored(){
+  if(activeLayer&&mapRef?.hasLayer(activeLayer))mapRef.removeLayer(activeLayer);
+  updateButtons();
+ }
  function updateButtons(mode){
   const offline=document.getElementById('offlineBtn');
   if(offline){offline.disabled=!activePack;offline.classList.toggle('active',mode==='offline');}
@@ -230,7 +234,7 @@
   });
  }
  window.SolinOfflineImagery={attach,restore,importFile,readTile,packs,remove,
-  show:showStored,pick,get active(){return activePack;}};
+  show:showStored,hide:hideStored,pick,get active(){return activePack;}};
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});
  else setup();
 })();
