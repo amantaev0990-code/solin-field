@@ -151,7 +151,12 @@
   input.setAttribute('role','combobox');input.setAttribute('aria-autocomplete','list');
   input.setAttribute('aria-expanded','false');input.setAttribute('aria-controls',input.id+'-suggestions');
   select.classList.add('solin-species-native');select.tabIndex=-1;select.setAttribute('aria-hidden','true');
-  select.after(input);
+  // iPhone Safari: an implicit <label> can activate a hidden SELECT rather
+  // than the visible INPUT. Keep the SELECT only for codes and events,
+  // outside the label, so a tap opens the keyboard (not the native wheel).
+  const owner=select.closest('label');
+  select.before(input);
+  if(owner){owner.htmlFor=input.id;owner.after(select);}
   const state={select,input,popup:null,items:[],index:0};mounted.set(select,state);syncUI(state);
   input.addEventListener('focus',()=>{
    const found=entries(select).find(x=>x.code===select.value);
