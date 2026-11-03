@@ -35,6 +35,33 @@ const server=http.createServer((req,res)=>{try{const file=path.resolve(root,'.'+
   assert(popupLayout.font>=16,'iPhone typing field must not trigger Safari auto-zoom');
   assert(popupLayout.below,'Suggestions must always be beneath the typing field');
   assert(popupLayout.popupWidth>=Math.min(230,popupLayout.fieldWidth));
+  // Regression for the actual iPhone symptom: an overlay in document.body
+  // jumps to the top after Safari shifts the visual viewport for the keyboard.
+  // The new list must instead be the input's NEXT sibling in normal flow.
+  const anchorState=()=>page.evaluate(()=>{
+   const input=document.querySelector('#newPOR__quick'),
+     popup=document.querySelector('.solin-species-results');
+   const ir=input.getBoundingClientRect(),pr=popup.getBoundingClientRect();
+   return {inline:popup.previousElementSibling===input,
+     sameLabel:popup.parentElement===input.parentElement,
+     bodyPortal:popup.parentElement===document.body,
+     position:getComputedStyle(popup).position,
+     below:pr.top>=ir.bottom,
+     visible:pr.height>0,scroll:document.querySelector('#modalBody').scrollTop};
+  });
+  let inline=await anchorState();
+  assert(inline.inline&&inline.sameLabel&&!inline.bodyPortal,'Suggestions must live directly after the input, not in document.body');
+  assert.equal(inline.position,'static');
+  assert(inline.below,'Initial in-flow popup must be below input');
+  await page.setViewportSize({width:390,height:530}); // approximate keyboard-limited mobile viewport
+  await page.locator('#newPOR__quick').fill('ос');
+  inline=await anchorState();
+  assert(inline.inline&&inline.below&&inline.visible,'List must remain below its input while viewport shrinks');
+  await page.locator('#newPOR__quick').fill('В');
+  await page.evaluate(()=>{document.querySelector('#modalBody').scrollTop+=46;});
+  inline=await anchorState();
+  assert(inline.inline&&inline.below,'Modal scrolling must never detach the list from the input');
+  await page.setViewportSize({width:390,height:844});
 
   assert.equal(await page.locator('#newPOR').inputValue(),'В','Single original code should choose elm (вяз)');
   await page.locator('#newPOR__quick').fill('ос');
@@ -68,6 +95,13 @@ const server=http.createServer((req,res)=>{try{const file=path.resolve(root,'.'+
   const m10Quick=page.locator('#'+(await m10.getAttribute('id'))+'__quick');
   assert(await m10Quick.isVisible(),'Maket 10 species quick typing visible');
   await m10Quick.fill('ос');
+  const cardAnchor=await m10Quick.evaluate(input=>{
+    const popup=document.querySelector('.solin-species-results'),ir=input.getBoundingClientRect(),pr=popup.getBoundingClientRect();
+    return {board:popup.parentElement.classList.contains('dt-board'),
+      position:getComputedStyle(popup).position,below:pr.top>=ir.bottom-2};
+  });
+  assert(cardAnchor.board&&cardAnchor.position==='absolute'&&cardAnchor.below,
+    'Classic Maket10 suggestions should travel with the card board below the field');
   assert.equal(await districtSelect.inputValue(),'356400000','Maket10 dependency refresh must not reset district choice');
 
   assert.equal(await m10.inputValue(),'ОС','Maket 10 code ОС selected by typing ос');
@@ -110,7 +144,7 @@ const server=http.createServer((req,res)=>{try{const file=path.resolve(root,'.'+
   assert.equal(K58.status,'complete');assert.equal(K58.value,'4');
   assert.equal(K58.waiting,'waiting');
   assert.deepEqual(errors,[]);
-  console.log('SPECIES_QUICK_OK: iOS 16px input, downward popup, Maket10 entry, named Raion with separate KATO code, K58');
+  console.log('SPECIES_QUICK_OK: iOS inline anchored dropdown remains below field through keyboard viewport resize and modal scroll; Maket10 board anchored; species codes and K58');
   await context.close();
  }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
 })().catch(error=>{console.error(error);process.exitCode=1;});
