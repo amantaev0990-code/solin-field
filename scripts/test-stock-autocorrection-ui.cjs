@@ -447,6 +447,20 @@ async function reopen(p,info){
  assert.equal(await val(m,'Макет10','ZAP'),35);
  assert.equal(await val(m,'base','STUR'),70);
  console.log('PASS mobile quick entry, automatic correction, Save and reopen');
+ // The user's actual phone workflow: open "Древостой" from the simplified
+ // stand view. KU=2 is already present, but physical PIAP is absent.
+ await m.locator('#ce-cancel').click();
+ await m.evaluate(()=>solinWorkflow.openMaket('Макет10'));
+ await m.locator('#childContent [data-edit="0"]').click();
+ assert.equal(await m.locator('#wfM10KU').inputValue(),'2');
+ assert.equal(await m.locator('#wf_IAR').isEnabled(),true,
+  'iPhone Maket10 IAR must not stay disabled when SIAR group exists without PIAP');
+ assert.deepEqual(await m.locator('#wf_IAR option').evaluateAll(options=>
+   options.filter(x=>x.value&&!x.disabled).map(x=>x.value)),['1','2','3','4','5','7','8']);
+ assert.match(await m.locator('#wfM10LayerHint').innerText(),/PIAP/);
+ assert.equal(await m.evaluate(()=>Number(current.KU)),2,
+  'Opening a layer selector cannot silently rewrite category KU');
+ console.log('PASS iPhone simplified Древостой: existing KU=2, editable IAR choices from SIAR without missing PIAP');
  assert.deepEqual(errors,[]);console.log('STOCK_AUTO_CORRECTION_UI_OK');
  await mobile.close();
 }catch(e){console.error(e.stack||e);process.exitCode=1;}finally{await browser?.close();server.close();}})();
