@@ -170,7 +170,7 @@ function markup(){const s=session,r=s.draft,o=D.lesnichestvo?.find(x=>same(x.POS
 
 function readValue(el,old){const raw=el.__solinQuarterPicker?el.__solinQuarterPicker.value():el.tagName==='SELECT'?el.value:el.value.trim(),field=el.dataset.ceField;
  if(raw==='')return null;
- if(field==='Fzona'&&!/^\d+$/.test(raw))throw Error('Функциональная зона: укажите числовой код');
+ if(['Fzona','Raion'].includes(field)&&!/^\d+$/.test(raw))throw Error('Укажите числовой код для '+field);
  if(numeric.has(field)){const n=Number(raw.trim().replace(',','.'));if(!Number.isFinite(n))throw Error('Проверьте число: '+el.getAttribute('aria-label'));return n;}
  if(old!=null&&raw===String(old))return old;
  // Access TEXT keys (STL.KTL in particular) may have significant whitespace.
