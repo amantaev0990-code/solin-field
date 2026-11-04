@@ -343,13 +343,15 @@ if(m==='Макет10'&&(calculated.length||stockEdited)){
    ' уточните код Klxr. Правильную зону нельзя определить только по KTO.</p></section>':'';
  const stock=window.SolinCardCalculations?.standStock(r),parts=window.SolinCardCalculations?.stockBreakdown?.(r);
  const stockInfo='<section class="wf-form-note"><b>Проверка итогового запаса Макета 5</b><p>'+
- (stock?.status==='complete'?
-  'STUR1: '+h(stock.expectedPerHa)+' м³/га, STUR: '+h(stock.expectedTotal)+' м³. Расчёт из ZAP; норматив К59 проверяется отдельно.':
-  'Автоматический пересчёт STUR не выполнен: '+h(stock?.reason||'нет исходных данных'))+'</p>'+
- (parts?.singleTrees?.length?'<p>Ярус 7: единичные деревья '+h(parts.singleTreesPerHa)+' м³/га — отдельно от STUR.</p>':'')+
- (parts?.freshDeadwood?.length?'<p>Ярус 8: свежий сухостой '+h(parts.freshDeadwoodPerHa)+' м³/га; неоднозначные группы не исправляются.</p>':'')+
- (parts?.drywoodPerHa!=null?'<p>Макет 4 M4SS: '+h(parts.drywoodPerHa)+' м³/га — отдельно, без двойного подсчёта.</p>':'')+
- '</section>';
+  (stock?.status==='complete'?
+   'Все живые породы: STUR1 = '+h(stock.expectedPerHa)+' м³/га; STUR = '+h(stock.expectedTotal)+' м³ на выдел. Расчёт из введённых ZAP; К59 проверяется отдельно.':
+   'Автоматический пересчёт STUR не выполнен: '+h(stock?.reason||'нет исходных данных'))+'</p>'+
+  (stock?.status==='complete'?'<p>По ярусам: '+h(stock.byLayer.map(x=>'№'+x.iar+' — '+x.zap).join('; '))+
+   ' м³/га. По породам: '+h(stock.bySpecies.map(x=>x.por+' — '+x.zap).join('; '))+' м³/га.</p>':'')+
+  (parts?.singleTrees?.length?'<p>Ярус 7: единичные деревья '+h(parts.singleTreesPerHa)+' м³/га, '+h(parts.singleTreesTotal)+' м³ на выдел — отдельно от STUR.</p>':'')+
+  (parts?.freshDeadwood?.length?'<p>Ярус 8: свежий сухостой '+h(parts.freshDeadwoodPerHa)+' м³/га, '+h(parts.freshDeadwoodTotal)+' м³ на выдел — отдельно от живого древостоя.</p>':'')+
+  (parts?.drywoodPerHa!=null?'<p>M4SS: сухостой '+h(parts.drywoodPerHa)+' м³/га, '+h(parts.drywoodTotal)+' м³ на выдел. Не суммируем с ярусом 8: возможен повторный учёт.</p>':'')+
+  '</section>';
  const quarterLink=k59Check?.status==='unsupported-zone'?
     '<button type="button" id="wf-k59-open-quarter" class="secondary">Открыть квартал '+h(r.KV)+'</button>':'';
  openModal(heading,explanation+stockInfo+zoneInfo+table+quarterLink+
@@ -404,7 +406,7 @@ document.querySelector('#wfSaveBase').onclick=()=>{
  closeModal();if(typeof renderComp==='function')renderComp();if(typeof refresh==='function')refresh();notify('Поля выдела сохранены');
 };}
 function exitCard(){const r=record();if(!r)return;
- // Макет10ЗАП: aggregate the eligible main-species rows, never copy the
+ // Макет 5: sum all recorded live species and layers, never copy the
  // first arbitrary Maket10.ZAP into STUR1 when leaving the card.
  const stock=window.SolinCardCalculations?.standStock(r);
  if(stock?.status==='complete'&&(Number(r.STUR1)!==stock.expectedPerHa||Number(r.STUR)!==stock.expectedTotal)){
@@ -423,8 +425,19 @@ const seen=new Map();for(const m of CORE){for(const [i,row]of rowsOf(r,m).entrie
  if(m==='Макет23'){for(let k=1;k<=8;k++){const v=row['K'+k];if(v!==''&&v!==null&&v!==undefined){seen.set(String(v), (seen.get(String(v))||0)+1)}}}
  }}
  for(const [code,count]of seen)if(count>1)msgs.push({status:'warn',message:'Макет 23: код особенности '+code+' встречается '+count+' раза'});
- const total=rowsOf(r,'Макет10').reduce((sum,row)=>sum+(Number(row.ZAP)||0),0);
- const html='<div class="wf-form-note">Локальная предварительная проверка, не замена 142 контрольных форм оригинальной SOLI-N.</div><p><b>Найдено замечаний:</b> '+msgs.length+'</p>'+msgs.map(x=>'<div class="wf-check '+x.status+'">'+h(x.message)+'</div>').join('')+(msgs.length===0?'<div class="wf-check ok">По базовым правилам ошибок не обнаружено.</div>':'')+'<div class="wf-form-note">Σ ZAP по Макету 10: <b>'+h(total.toLocaleString('ru-RU'))+'</b> (только информационная сумма, не общий расчёт исходной системы).</div><button class="primary" onclick="closeModal()">Закрыть</button>';
+ const stock=window.SolinCardCalculations?.standStock(r);
+ const parts=window.SolinCardCalculations?.stockBreakdown?.(r);
+ const html='<div class="wf-form-note">Локальная предварительная проверка, не замена 142 контрольных форм оригинальной SOLI-N.</div><p><b>Найдено замечаний:</b> '+msgs.length+'</p>'+
+  msgs.map(x=>'<div class="wf-check '+x.status+'">'+h(x.message)+'</div>').join('')+
+  (msgs.length===0?'<div class="wf-check ok">По базовым правилам ошибок не обнаружено.</div>':'')+
+  '<div class="wf-form-note"><b>Макет 5 · запас всех пород живых ярусов</b><p>'+
+  (stock?.status==='complete'?h(stock.expectedPerHa)+' м³/га × '+h(stock.area)+' га = '+h(stock.expectedTotal)+' м³':
+   'Расчёт не завершён: '+h(stock?.reason||'нет исходных данных'))+
+  '</p><p>Свежий сухостой (ярус 8): '+h(parts?.freshDeadwoodPerHa??'—')+
+  ' м³/га; отдельно M4SS: '+h(parts?.drywoodPerHa??'—')+
+  ' м³/га; единичные деревья (ярус 7): '+h(parts?.singleTreesPerHa??'—')+
+  ' м³/га. Все три категории учитываются отдельно во избежание повторного подсчёта.</p></div>'+
+  '<button class="primary" onclick="closeModal()">Закрыть</button>';
 if(modal)openModal('Контроль выдела '+r.KV+'-'+r.VD,html);
 return msgs;}
 function printCard(){const r=record();if(!r)return;let html='<h1>Карточка таксации SOLI-N Field</h1><p>Лесничество: '+h(db()?.source?.forestDistrict||'')+'</p><p><b>Квартал '+h(r.KV)+' · Выдел '+h(r.VD)+'</b> · Площадь '+h(r.PLV)+' га</p>';
