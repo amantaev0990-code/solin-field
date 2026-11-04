@@ -25,11 +25,12 @@ assert.equal(c.standStock(eighth).status,'complete',
  'Fresh deadwood must not make the independent live-stock sum ambiguous');
 assert.equal(c.stockBreakdown(eighth).freshDeadwoodTotal,24,
  'Fresh standing deadwood is quantified per hectare and for the stand');
-// Mixed stands are not monotypes. Each species from each live layer
-// contributes its own recorded ZAP; IAR7 and IAR8 are different categories.
+// In real SOLI-N Taxation cards, the ZAP of the leading species is the
+// WHOLE-layer stock: В9 ZAP=16 + ЛХ1 ZAP=null -> STUR1=16, not missing.
+// Additional independent living layers contribute separately.
 const mixed={...base,STUR1:1,STUR:2,M4SS:12,_children:{Макет10:[
  {IAR:1,POR:'В',KOEF:6,ZAP:30},
- {IAR:1,POR:'Б',KOEF:4,ZAP:20},
+ {IAR:1,POR:'Б',KOEF:4,ZAP:null},
  {IAR:2,POR:'С',KOEF:7,ZAP:15},
  {IAR:3,POR:'Л',KOEF:3,ZAP:5},
  {IAR:4,POR:'ОС',KOEF:10,ZAP:8},
@@ -41,11 +42,13 @@ const mixed={...base,STUR1:1,STUR:2,M4SS:12,_children:{Макет10:[
 const mixedSnapshot=JSON.stringify(mixed);
 const totals=c.standStock(mixed),parts=c.stockBreakdown(mixed);
 assert.equal(totals.status,'complete');
-assert.equal(totals.expectedPerHa,91);
-assert.equal(totals.expectedTotal,182);
+assert.equal(totals.expectedPerHa,71);
+assert.equal(totals.expectedTotal,142);
 assert.equal(totals.liveSpeciesCount,7);
-assert.equal(parts.byLayer.find(x=>x.iar===1)?.zap,50,
- 'Two species within one tier must be summed exactly once');
+assert.equal(parts.byLayer.find(x=>x.iar===1)?.zap,30,
+ 'Secondary species without ZAP is COVERED by the leading row of this tier');
+assert.equal(parts.companions.length,1);
+assert.equal(parts.byLayer[0].composition.length,2);
 assert.equal(parts.byLayer.find(x=>x.iar===2)?.zap,15);
 assert.equal(parts.singleTreesPerHa,4);
 assert.equal(parts.singleTreesTotal,8);
@@ -56,8 +59,9 @@ assert.equal(parts.drywoodTotal,24);
 assert.equal(JSON.stringify(mixed),mixedSnapshot,'Never mutate the source data');
 const mixedAudit=c.corrections(mixed,{SSHB:[],Szap:[]});
 assert.deepEqual(Array.from(mixedAudit.issues,x=>x.field),['STUR1','STUR']);
-assert.deepEqual(Array.from(mixedAudit.issues,x=>x.expected),[91,182]);
-const unknown={...mixed,_children:{Макет10:[...mixed._children.Макет10,{IAR:3,POR:'И',ZAP:null}]}};
+assert.deepEqual(Array.from(mixedAudit.issues,x=>x.expected),[71,142]);
+const unknown={...mixed,_children:{Макет10:mixed._children.Макет10.map(r=>
+ r.IAR===3?{...r,ZAP:null}:r)}};
 assert.equal(c.standStock(unknown).status,'waiting','Unknown timber volumes cannot be silently counted as zero');
 const repeated={...mixed,_children:{Макет10:[...mixed._children.Макет10,{IAR:1,POR:'Б',ZAP:10}]}};
 assert.equal(c.standStock(repeated).status,'ambiguous','Repeated species+layer might double-count timber');
@@ -69,10 +73,34 @@ const wrongForestMixed={...addressed,LESN:1};
 assert.equal(c.standStock(wrongForestMixed).status,'waiting','Cross-forest rows must never contribute');
 const mixedWithAlien={...addressed,_children:{Макет10:[...addressed._children.Макет10,
  {POS:999,LESN:2,KV:1,KGLF:27,VD:'1',IAR:2,POR:'С',ZAP:9999}]}};
-assert.equal(c.standStock(mixedWithAlien).expectedPerHa,91,'Do not include another forest\'s row');
+assert.equal(c.standStock(mixedWithAlien).expectedPerHa,71,'Do not include another forest\'s row');
 // Critical: do NOT claim mixed-layer normative K59 validation from a
 // single leading-species table; only arithmetic of recorded ZAP is verified.
 assert.equal(c.stockPerHectare(mixed,null,null).status,'unavailable');
+
+// Source-grounded regression: all seven real mixed-tier stands in the
+// project's 10 bundled quarter chunks have a ZAP on the leading row and
+// null ZAP on the companion; their saved STUR1 must be reproduced EXACTLY.
+let originalMixedCount=0;
+for(let chunk=1;chunk<=10;chunk++){
+ const original=JSON.parse(fs.readFileSync('quarters/q'+chunk+'.json','utf8'));
+ for(const q of Object.values(original))for(const record of q.compartments||[]){
+  const grouped=new Map();
+  for(const row of record._children?.Макет10||[]){
+   const n=Number(row.IAR);
+   if(n<1||n>6)continue;
+   grouped.set(n,[...(grouped.get(n)||[]),row]);
+  }
+  const actual=[...grouped.values()].filter(rs=>new Set(rs.map(x=>x.POR)).size>1);
+  if(!actual.length)continue;
+  originalMixedCount++;
+  const output=c.standStock(record);
+  assert.equal(output.status,'complete','Real multi-species '+record.KV+'/'+record.VD+': '+output.reason);
+  assert.equal(output.expectedPerHa,Number(record.STUR1),'Real STUR1 and tier-stock mismatch '+record.KV+'/'+record.VD);
+  assert(output.liveSpeciesCount>=2);
+ }
+}
+assert(originalMixedCount>=7,'The original project must retain its real mixed-stand samples');
 
 const excluded={...base,_children:{Макет10:[...base._children.Макет10,{IAR:7,POR:'С',ZAP:50}]}};
 assert.equal(c.standStock(excluded).expectedTotal,60);
@@ -87,4 +115,4 @@ const editor=fs.readFileSync('solin-card-editor.js','utf8');
 for(const key of ['refreshStockPanel()','ce-stock-audit','ce-stock-single',
  'ce-stock-drywood','M4SS','recalculateEditedField({dataset'])
  assert(editor.includes(key),'Editor integration missing: '+key);
-console.log('MAKET5_LAYER_AUDIT_OK: seven species, mixed first and additional layers, separate fresh drywood/M4SS/single trees, totals, missing rows and duplicate protection');
+console.log('MAKET5_LAYER_AUDIT_OK: seven real original mixed stands, leading ZAP covers companion species, additional tiers, separate fresh drywood/M4SS/single trees, no double counts');
