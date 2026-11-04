@@ -34,7 +34,7 @@ const server=http.createServer((req,res)=>{
    const address=Object.fromEntries(['POS','LESN','KV','KGLF','VD'].map(k=>[k,r[k]]));
    r._children={...r._children,Макет10:[
     {...address,IAR:1,POR:'В',KOEF:6,PH:6,POL:.6,LET:40,PROI:7,ZAP:30},
-    {...address,IAR:1,POR:'Б',KOEF:4,PH:6,POL:.6,LET:40,PROI:7,ZAP:20},
+    {...address,IAR:1,POR:'Б',KOEF:4,PH:6,POL:.6,LET:40,PROI:7,ZAP:null},
     {...address,IAR:2,POR:'С',KOEF:10,PH:3,POL:.4,LET:20,PROI:7,ZAP:10},
     {...address,IAR:7,POR:'В',ZAP:4},
     {...address,IAR:8,POR:'Б',ZAP:12}
@@ -43,23 +43,34 @@ const server=http.createServer((req,res)=>{
   });
   await page.locator('#ce-form').waitFor();
   assert.match(await page.locator('#ce-stock-audit').innerText(),/всех пород живых ярусов/i);
-  for(const [id,expected] of [['ce-stock-live','60'],['ce-stock-fresh','12'],['ce-stock-drywood','7'],['ce-stock-single','4']]){
+  for(const [id,expected] of [['ce-stock-live','40'],['ce-stock-fresh','12'],['ce-stock-drywood','7'],['ce-stock-single','4']]){
    assert.match(await page.locator('#'+id).innerText(),new RegExp('^'+expected+'$'),
     'Wrong Maket5 summary '+id);
   }
   const audit=await page.locator('#ce-stock-audit').innerText();
-  assert.match(audit,/В: 30/);assert.match(audit,/Б: 20/);assert.match(audit,/С: 10/);
+  assert.match(audit,/В: 30/);assert.match(audit,/С: 10/);
+  assert.match(audit,/состав: В 6 \\+ Б 4/,'Companion species must appear in layer composition');
+  assert.match(audit,/запас ЯРУСА|запас всего яруса/i,'The UI must not claim a separate B species volume');
   assert.match(audit,/24 м³ на выдел/,'Fresh drywood total by area must be visible');
   assert.match(audit,/14 м³ на выдел/,'M4SS separate total by area must be visible');
   assert.match(audit,/8 м³ на выдел/,'Isolated trees separate total by area must be visible');
-  const row1=page.locator('#ce-form [data-ce-scope="Макет10"][data-ce-field="ZAP"][data-ce-row="1"]');
-  await row1.fill('25');await row1.press('Tab');
-  assert.equal(Number(await page.locator('#ce-form [data-ce-scope="base"][data-ce-field="STUR1"]').inputValue()),65);
-  assert.equal(Number(await page.locator('#ce-form [data-ce-scope="base"][data-ce-field="STUR"]').inputValue()),130);
-  assert.match(await page.locator('#ce-stock-live').innerText(),/^65$/);
+  const row2=page.locator('#ce-form [data-ce-scope="Макет10"][data-ce-field="ZAP"][data-ce-row="2"]');
+  await row2.fill('15');await row2.press('Tab');
+  assert.equal(Number(await page.locator('#ce-form [data-ce-scope="base"][data-ce-field="STUR1"]').inputValue()),45);
+  assert.equal(Number(await page.locator('#ce-form [data-ce-scope="base"][data-ce-field="STUR"]').inputValue()),90);
+  assert.match(await page.locator('#ce-stock-live').innerText(),/^45$/);
   assert.match(await page.locator('#ce-stock-fresh').innerText(),/^12$/);
   assert.equal(await page.evaluate(()=>current.STUR1),0,'Editing must remain in a draft before Save');
+  // If somebody fills an additional POR's ZAP in the SAME tier, its meaning
+  // (component share vs repeated whole-tier stock) is not proven. Block.
+  const companion=page.locator('#ce-form [data-ce-scope="Макет10"][data-ce-field="ZAP"][data-ce-row="1"]');
+  await companion.fill('20');await companion.press('Tab');
+  assert.equal(await page.locator('#ce-stock-audit').getAttribute('data-stock-status'),'ambiguous');
+  assert.match(await page.locator('#ce-stock-live').innerText(),/^—$/);
+  assert.equal(Number(await page.locator('#ce-form [data-ce-scope="base"][data-ce-field="STUR1"]').inputValue()),45,
+   'Ambiguous extra POR stock must not silently replace tier total');
+
   assert.deepEqual(errors,[]);
-  console.log('MAKET5_MULTI_BROWSER_OK: two species in tier 1, tier 2, live stock 60->65 m3/ha, isolated trees, fresh and M4SS drywood separately; no persistent edit before Save');
+  console.log('MAKET5_MULTI_BROWSER_OK: source-style В6+Б4 one tier ZAP, extra layer 40->45 m3/ha, deadwood separately; extra second species ZAP ambiguity blocked');
  }finally{await browser?.close();await new Promise(ok=>server.close(ok));}
 })().catch(e=>{console.error(e);process.exitCode=1;});
