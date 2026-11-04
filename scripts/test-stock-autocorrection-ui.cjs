@@ -114,6 +114,17 @@ async function reopen(p,info){
  assert.equal(await p.evaluate(()=>current.STUR1),info.norms.half+10);
  assert.equal(await p.evaluate(()=>current.STUR),(info.norms.half+10)*3);
  console.log('PASS alternate exit aggregates Maket10 ZAP and recalculates STUR');
+ const preservedHistorical=await p.evaluate(()=>{
+   const record=current,before1=record.STUR1,before=record.STUR;
+   record.STUR1=777;record.STUR=888;
+   solinWorkflow.exitCard();
+   const result={perHa:record.STUR1,total:record.STUR};
+   record.STUR1=before1;record.STUR=before;
+   return result;
+ });
+ assert.deepEqual(preservedHistorical,{perHa:777,total:888},
+  'Exiting a card must not silently overwrite existing historical Access stock totals');
+ console.log('PASS historical stock preserved on exit unless original totals were empty');
  // Deliberately make the normative source unavailable. The entered ZAP must
  // never be presented as independently verified merely because STUR follows it.
  await p.evaluate(()=>{
