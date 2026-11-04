@@ -63,8 +63,13 @@ const repeated={...mixed,_children:{Макет10:[...mixed._children.Макет1
 assert.equal(c.standStock(repeated).status,'ambiguous','Repeated species+layer might double-count timber');
 const negative={...mixed,_children:{Макет10:[...mixed._children.Макет10,{IAR:3,POR:'И',ZAP:-7}]}};
 assert.equal(c.standStock(negative).status,'ambiguous','Negative ZAP must never lower total');
-const wrongForestMixed={...mixed,LESN:1};
+const addressed={...mixed,_children:{Макет10:mixed._children.Макет10.map(r=>
+ ({...r,POS:213,LESN:2,KV:1,KGLF:27,VD:'1'}))}};
+const wrongForestMixed={...addressed,LESN:1};
 assert.equal(c.standStock(wrongForestMixed).status,'waiting','Cross-forest rows must never contribute');
+const mixedWithAlien={...addressed,_children:{Макет10:[...addressed._children.Макет10,
+ {POS:999,LESN:2,KV:1,KGLF:27,VD:'1',IAR:2,POR:'С',ZAP:9999}]}};
+assert.equal(c.standStock(mixedWithAlien).expectedPerHa,91,'Do not include another forest\'s row');
 // Critical: do NOT claim mixed-layer normative K59 validation from a
 // single leading-species table; only arithmetic of recorded ZAP is verified.
 assert.equal(c.stockPerHectare(mixed,null,null).status,'unavailable');
