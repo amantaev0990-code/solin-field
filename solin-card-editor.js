@@ -160,8 +160,9 @@ function markup(){const s=session,r=s.draft,o=D.lesnichestvo?.find(x=>same(x.POS
  maket('2',cell('M2PM1',r.M2PM1,'base','ВыделВ',{label:'Первое мероприятие',weight:3.1,split:true})+cell('M2Pr',r.M2Pr,'base','ВыделВ',{label:'Процент',weight:.55})+cell('M22',r.M22,'base','ВыделВ',{label:'Второе мероприятие',weight:2.6,split:true})+cell('M23',r.M23,'base','ВыделВ',{label:'Третье мероприятие',weight:2.6,split:true})+cell('M2Cp',r.M2Cp,'base','ВыделВ',{label:'Целевая порода',weight:2.2,split:true}))+
  maket('3',cell('M3Pr',r.M3Pr,'base','ВыделВ',{label:'Главная порода',weight:3,split:true})+cell('M3B',r.M3B,'base','ВыделВ',{label:'Бонитет',weight:.6})+cell('M3TLU',r.M3TLU,'base','ВыделВ',{label:'Характеристика типа леса',weight:3.3,split:true})+cell('M3G',r.M3G,'base','ВыделВ',{label:'Год выруб.',weight:.75})+cell('M3KP',r.M3KP,'base','ВыделВ',{label:'Пней всего, шт.',weight:.9})+cell('M3KPC',r.M3KPC,'base','ВыделВ',{label:'в т.ч. хвойных',weight:.9}))+
  maket('4',cell('M4ZO',r.M4ZO,'base','ВыделВ',{label:'Захламленность общая, м3/га',inline:true,weight:3.5})+cell('M4ZL',r.M4ZL,'base','ВыделВ',{label:'Ликвид, м3/га',inline:true,weight:2.1})+cell('M4SS',r.M4SS,'base','ВыделВ',{label:'Сухостой, м3/га',inline:true,weight:2.1}))+
- maket('5',cell('AKL',r.AKL,'base','ВыделВ',{label:'Класс возраста',inline:true,weight:1.8})+cell('AGR',r.AGR,'base','ВыделВ',{label:'Группа возраста',inline:true,weight:1.8})+cell('AGR1',r.AGR1,'base','ВыделВ',{label:'Группа возр. ТО',inline:true,weight:1.9})+cell('STUR',r.STUR,'base','ВыделВ',{label:'Запас выдела',inline:true,weight:1.9})+fixed('в т.ч.3 или 5 яр.','',156,{inline:true,unavailable:true})+'<div class="dt-fixed dt-inline ce-stock-metric"><span>Ед. деревья, м³/га</span><output id="ce-stock-single">—</output></div>'+
- '<div class="dt-fixed dt-inline ce-stock-metric"><span>Сухостой M4SS, м³/га</span><output id="ce-stock-drywood">—</output></div>')+
+ maket('5',cell('AKL',r.AKL,'base','ВыделВ',{label:'Класс возраста',inline:true,weight:1.8})+cell('AGR',r.AGR,'base','ВыделВ',{label:'Группа возраста',inline:true,weight:1.8})+cell('AGR1',r.AGR1,'base','ВыделВ',{label:'Группа возр. ТО',inline:true,weight:1.9})+cell('STUR',r.STUR,'base','ВыделВ',{label:'Запас выдела',inline:true,weight:1.9})+'<div class="dt-fixed dt-inline ce-stock-metric"><span>Все живые ярусы, м³/га</span><output id="ce-stock-live">—</output></div><div class="dt-fixed dt-inline ce-stock-metric"><span>Ед. деревья, м³/га</span><output id="ce-stock-single">—</output></div>'+
+ '<div class="dt-fixed dt-inline ce-stock-metric"><span>Свежий сухостой ярус 8, м³/га</span><output id="ce-stock-fresh">—</output></div>'+
+  '<div class="dt-fixed dt-inline ce-stock-metric"><span>Сухостой M4SS, м³/га</span><output id="ce-stock-drywood">—</output></div>')+
  
  '<section class="dt-stand" id="ce-section-10" aria-label="Макет 10"><b class="dt-stand-title">Макет 10</b><div id="ce-table-Макет10">'+table('Макет10')+'</div></section>'+
  maket('31',cell('PRkol',r.PRkol,'base','ВыделВ',{label:'К-во, тыс.шт.',weight:.65})+cell('PRH',r.PRH,'base','ВыделВ',{label:'Ср. выс.',weight:.6})+cell('PRA',r.PRA,'base','ВыделВ',{label:'Ср. возр.',weight:.6})+cell('PRK1',r.PRK1,'base','ВыделВ',{label:'коэфф. 1',weight:.55})+cell('PRP1',r.PRP1,'base','ВыделВ',{label:'1 порода',weight:2,split:true})+cell('PRK2',r.PRK2,'base','ВыделВ',{label:'коэфф. 2',weight:.55})+cell('PRP2',r.PRP2,'base','ВыделВ',{label:'2 порода',weight:2,split:true})+cell('PRK3',r.PRK3,'base','ВыделВ',{label:'коэфф. 3',weight:.55})+cell('PRP3',r.PRP3,'base','ВыделВ',{label:'3 порода',weight:2,split:true}))+
@@ -229,25 +230,37 @@ function refreshStockPanel(){
  const calc=window.SolinCardCalculations;
  if(!calc?.standStock||!calc?.stockBreakdown)return;
  const d=calc.stockBreakdown(session.draft),stock=calc.standStock(session.draft);
- const fmt=v=>v===null||v===undefined||!Number.isFinite(Number(v))?'—':Number(v).toLocaleString('ru-RU',{maximumFractionDigits:3});
- const single=document.getElementById('ce-stock-single'),dry=document.getElementById('ce-stock-drywood'),panel=document.getElementById('ce-stock-audit');
- if(single)single.textContent=fmt(d.singleTreesPerHa);
- if(dry)dry.textContent=fmt(d.drywoodPerHa);
+ const fmt=v=>v===null||v===undefined||!Number.isFinite(Number(v))?'—':
+  Number(v).toLocaleString('ru-RU',{maximumFractionDigits:3});
+ const write=(id,val)=>{const el=document.getElementById(id);if(el)el.textContent=fmt(val);};
+ write('ce-stock-live',stock.status==='complete'?stock.expectedPerHa:null);
+ write('ce-stock-single',d.singleTreesPerHa);
+ write('ce-stock-fresh',d.freshDeadwoodPerHa);
+ write('ce-stock-drywood',d.drywoodPerHa);
+ const panel=document.getElementById('ce-stock-audit');
  if(!panel)return;
  const lines=[];
- if(stock.status==='complete')
-  lines.push('<b>Расчётный запас: '+h(fmt(stock.expectedPerHa))+' м³/га × '+h(fmt(stock.area))+
-   ' га = '+h(fmt(stock.expectedTotal))+' м³.</b> '+h(stock.reason));
- else lines.push('<b>Расчёт общего запаса не подтверждён.</b> '+h(stock.reason)+
-  (d.included.length?' Предварительная сумма введённых ZAP: '+h(fmt(d.candidatePerHa))+' м³/га, в STUR не записывается.':''));
- if(d.singleTrees.length)lines.push('Ярус 7 — единичные деревья ('+h(fmt(d.singleTreesPerHa))+
-  ' м³/га): учтены отдельно, в STUR по исходному фильтру не входят.');
- if(d.freshDeadwood.length)lines.push('Ярус 8 — свежий сухостой ('+h(fmt(d.freshDeadwoodPerHa))+
-  ' м³/га): в исходном фильтре Макет10ЗАП1 присутствует при совпадении главной породы. Неоднозначные группы автоматически не заменяются.');
- if(d.drywoodPerHa!==null)lines.push('Сухостой Макета 4 M4SS: '+h(fmt(d.drywoodPerHa))+
-  ' м³/га; отдельный показатель, повторно к STUR не прибавляется.');
- lines.push('Арифметический результат ZAP не является нормативной проверкой К59. Данные сохраняются только кнопкой «Сохранить».');
- panel.innerHTML=lines.map(v=>'<p>'+v+'</p>').join('');
+ if(stock.status==='complete'){
+  lines.push('<b>Макет 5 · запас всех пород живых ярусов: '+h(fmt(stock.expectedPerHa))+
+   ' м³/га × '+h(fmt(stock.area))+' га = '+h(fmt(stock.expectedTotal))+
+   ' м³.</b> '+h(stock.liveSpeciesCount)+' пород(ы).');
+  lines.push('По ярусам: '+h(stock.byLayer.map(x=>x.iar+': '+fmt(x.zap)+' м³/га').join('; '))+'.');
+  lines.push('По породам: '+h(stock.bySpecies.map(x=>x.por+': '+fmt(x.zap)+' м³/га').join('; '))+'.');
+ }else lines.push('<b>Общий запас живого древостоя не рассчитан.</b> '+h(stock.reason)+
+  (d.included.length?' Предварительная сумма заполненных строк: '+h(fmt(d.livePerHa))+
+  ' м³/га, в STUR1/STUR не записывается.':''));
+ if(d.freshDeadwood.length)
+  lines.push('Свежий сухостой (ярус 8): '+h(fmt(d.freshDeadwoodPerHa))+
+   ' м³/га · '+h(fmt(d.freshDeadwoodTotal))+' м³ на выдел. Не входит в запас живого древостоя.');
+ if(d.drywoodPerHa!==null)
+  lines.push('Отдельный сухостой M4SS: '+h(fmt(d.drywoodPerHa))+
+   ' м³/га · '+h(fmt(d.drywoodTotal))+
+   ' м³ на выдел. Не складываем автоматически с ярусом 8: возможен повторный учёт.');
+ if(d.singleTrees.length)
+  lines.push('Единичные деревья (ярус 7): '+h(fmt(d.singleTreesPerHa))+
+   ' м³/га · '+h(fmt(d.singleTreesTotal))+' м³ на выдел. Учитываются отдельно.');
+ lines.push('STUR1/STUR — сумма введённых ZAP живого древостоя. К59 для смешанного состава требует отдельной нормативной проверки каждой породы и яруса.');
+ panel.innerHTML=lines.map(line=>'<p>'+line+'</p>').join('');
  panel.dataset.stockStatus=stock.status;
 }
 function recalculateEditedField(el){
