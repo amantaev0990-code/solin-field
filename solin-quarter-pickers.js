@@ -22,6 +22,31 @@
  // Administrative full Кл_Рай is not in the archived public reference package.
  // Independent verified 2026 KATO district names. The full original Кл_Рай
  // table is not available; expand only with source-confirmed administrative codes.
+ // KATO district codes in the verified subset are 9 digits. Their first
+ // two digits are the region key KTO in the original catalogue. This
+ // *only* filters known codes: it does not fabricate any missing districts.
+ const districtRegion=value=>{
+  const v=clean(value);
+  return /^\d{9}$/.test(v)?String(Math.floor(Number(v)/10000000)*10000000):null;
+ };
+ const regionKTO=org=>{
+  const direct=clean(org?.KTO);
+  if(/^\d{9}$/.test(direct)&&Number(direct)>0)return direct;
+  const derived=window.SolinAddressContext?.originalKTO?.(org?.POS,org?.LESN);
+  return derived?String(derived):null;
+ };
+ function validateDistrict(value,org){
+  const v=clean(value);
+  if(!v)return {status:'empty',reason:'Район не выбран'};
+  if(!/^\d+$/.test(v))return {status:'invalid',reason:'Код района должен содержать только цифры'};
+  const source=districtRegion(v),region=regionKTO(org);
+  if(source&&region&&source!==region)
+   return {status:'mismatch',reason:'Район '+v+' относится к КАТО области '+source+
+    ', а выбранное лесничество — к области '+region};
+  return {status:source&&region?'matched':'unknown',reason:source&&region?
+   'Региональная часть КАТО соответствует KTO лесничества':
+   'Полная Кл_Рай отсутствует; принадлежность этого кода к области не подтверждена'};
+ }
  const KNOWN_DISTRICTS=[
   {value:'153200000',label:'Алгинский район'},
   {value:'153400000',label:'Айтекебийский район'},
@@ -60,29 +85,44 @@
   return rows;
  };
  function candidates(field,row,org){
-  const results=new Map(),mine=new Set(),all=knownRows(),current=recordPairs(org);
+  const results=new Map(),all=knownRows(),current=recordPairs(org),area=regionKTO(org);
   const add=(value,label)=>{
    const k=clean(value);if(!numeric(k))return;
    if(!results.has(k))results.set(k,{value:k,label:clean(label)});
    else if(label&&!results.get(k).label)results.get(k).label=clean(label);
   };
   if(field==='Raion'){
-   for(const item of KNOWN_DISTRICTS)add(item.value,item.label);
-   for(const r of all)if(numeric(r.Raion)&&Number(r.Raion)>0)
-    add(r.Raion,'Название района не установлено');
-   for(const r of current)if(numeric(r.Raion)&&Number(r.Raion)>0)mine.add(clean(r.Raion));
+   // Never show codes from another oblast. Saved entries without a region
+   // prefix are available only inside their own forest, not countrywide.
+   for(const item of KNOWN_DISTRICTS)
+    if(area&&districtRegion(item.value)===area)add(item.value,item.label);
+   if(area)for(const r of all)
+    if(numeric(r.Raion)&&Number(r.Raion)>0&&districtRegion(r.Raion)===area)
+     add(r.Raion,'Код из сохранённой карточки; название не подтверждено');
+   for(const r of current)if(numeric(r.Raion)&&Number(r.Raion)>0&&
+     (!area||districtRegion(r.Raion)===area||districtRegion(r.Raion)===null))
+    add(r.Raion,'Код этого лесничества; название не подтверждено');
    return {items:[...results.values()].sort((a,b)=>Number(a.value)-Number(b.value)),
-    auto:null,reason:'Подтверждённые названия районов КАТО Актюбинской области и Шетского района, а также коды сохранённых кварталов. Полная Кл_Рай отсутствует — неизвестный код можно ввести вручную. Выбор не зависит от КГЛФ.'};
+    auto:null,region:area,status:area?'partial':'unavailable',
+    reason:area?'Коды КАТО отфильтрованы по области KTO '+area+
+     '. Названия подтверждены только для части районов, полный справочник Кл_Рай ещё не восстановлен.':
+     'Область KTO не установлена. Чужие районы не показываются; при необходимости введите код вручную.'};
   }
   if(field==='Fzona'){
-   add('0','Без функциональной зоны · значение из исходной обложки');
+   add('0','Без функциональной зоны');
+   const kglf=clean(row?.KGLF);
    const table=window.SOLIN_REFS?.tables?.SFZ||[];
-   for(const r of table)if(numeric(r.KFZ))
-    add(r.KFZ,String(r.NFZK||r.NFZ||'Из справочника SFZ'));
-   for(const r of all)if(numeric(r.Fzona))
-    add(r.Fzona,'Из сохранённой обложки квартала');
+   if(kglf)for(const r of table)
+    if(numeric(r.KFZ)&&Number(r.KFZ)>0&&same(r.KLF,kglf))
+     add(r.KFZ,String(r.NFZK||r.NFZ||'Из справочника SFZ'));
+   if(kglf)for(const r of all)
+    if(same(r.KGLF,kglf)&&numeric(r.Fzona))
+     add(r.Fzona,'Код из сохранённого квартала; связь не подтверждена');
    return {items:[...results.values()].sort((a,b)=>Number(a.value)-Number(b.value)),
-    auto:null,reason:'Полный доступный список кодов из SFZ и сохранённых кварталов без фильтра по КГЛФ. Нормативный SQL Access восстановлен не полностью — значение при необходимости сверяйте по оригиналу.'};
+    auto:null,status:'partial',
+    reason:kglf?'Показаны функциональные зоны SFZ.KLF='+kglf+
+     ' и коды сохранённых кварталов той же категории ГЛФ. Полное условие Access WHERE недоступно; дополнительные коды вводятся вручную.':
+     'Сначала выберите категорию ГЛФ, чтобы отфильтровать функциональные зоны. Полная таблица условий Access недоступна.'};
   }
   return {items:[],auto:null,reason:'Нет доступного справочника'};
  }
@@ -165,5 +205,5 @@
    return picker;
  }
  function value(el){return el?.__solinQuarterPicker?.value()??el?.value??'';}
- window.SolinQuarterPickers={mount,value,candidates};
+ window.SolinQuarterPickers={mount,value,candidates,districtRegion,regionKTO,validateDistrict};
 })();
