@@ -1,0 +1,17 @@
+'use strict';
+const assert=require('node:assert/strict'),{compare}=require('./query-contract.cjs');
+const row=(Attribute,values={})=>({Attribute,Order:{data:[0,0,0,1]},...values});
+const field=(name,position)=>row(6,{Expression:'T.'+name,Order:{data:[0,0,0,position]},Name1:null});
+const attrs=[row(1,{Flag:1}),row(5,{Name1:'T'}),field('B',2),field('A',1)];
+const base={kind:'select',columns:[{expression:'T.A',alias:'A'},{expression:'T.B',alias:'B'}],from:{sources:[{name:'T',alias:'T'}]},group:[],order:[],where:null,having:null,distinct:false,into:null};
+assert.equal(compare({attributes:attrs},base).status,'matched','Physical row order must not masquerade as SQL column order');
+assert.equal(compare({attributes:attrs},{...base,columns:[...base.columns].reverse()}).status,'different','Actual ordered-column changes still matter');
+const update={kind:'update',target:'T',assignments:[{table:'T',field:'A',expression:'1'}],from:base.from,where:null};
+assert.equal(compare({attributes:[row(1,{Flag:4}),row(5,{Name1:'T'}),row(6,{Expression:'1',Name2:'T.A'})]},update).status,'matched');
+assert.equal(compare({attributes:[row(1,{Flag:5}),row(5,{Name1:'T'}),field('A',1),field('B',2)]},{kind:'delete',target:'T',from:base.from,where:null}).status,'matched');
+const append={kind:'insert',target:'U',fields:['A','B'],select:base};
+assert.equal(compare({attributes:[row(1,{Flag:3,Name1:'U'}),row(5,{Name1:'T'}),{...field('A',1),Name2:'A'},{...field('B',2),Name2:'B'}]},append).status,'matched');
+assert.equal(compare({attributes:[row(1,{Flag:99})]},base).status,'unverified');
+assert.equal(compare({objectFlags:0,attributes:attrs.filter(a=>a.Attribute!==1)},base).status,'matched','SELECT type comes from MSysObjects when its type row is omitted');
+assert.equal(compare({objectFlags:48,attributes:[row(1,{Flag:5})]},base).status,'unverified','Conflicting type metadata cannot be accepted');
+console.log('QUERY_CONTRACT_OK: Jet Order, SELECT aliases, UPDATE/DELETE/INSERT targets and unsupported-type handling');

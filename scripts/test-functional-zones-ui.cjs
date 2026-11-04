@@ -1,0 +1,20 @@
+'use strict';
+const fs=require('node:fs'),http=require('node:http'),path=require('node:path'),assert=require('node:assert/strict');
+const {chromium}=require(process.env.PLAYWRIGHT_PATH||'playwright'),root=path.resolve(__dirname,'..');
+const server=http.createServer((req,res)=>{try{let file=path.resolve(root,'.'+decodeURIComponent(req.url.split('?')[0]));if(!file.startsWith(root+path.sep)&&file!==root)throw Error('Path');if(fs.statSync(file).isDirectory())file=path.join(file,'index.html');res.setHeader('Content-Type',({'.js':'text/javascript','.html':'text/html','.wasm':'application/wasm','.css':'text/css'})[path.extname(file)]||'application/octet-stream');res.end(fs.readFileSync(file));}catch{res.writeHead(404);res.end();}});
+(async()=>{let browser;try{
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));browser=await chromium.launch({channel:process.env.BROWSER_CHANNEL||'chrome',headless:true});const page=await browser.newPage({viewport:{width:430,height:932}});
+ await page.goto('http://127.0.0.1:'+server.address().port);await page.waitForFunction(()=>window.SolinWorkspace&&window.SOLIN_REFS&&window.SolinQuarterPickers);await page.evaluate(()=>SolinWorkspace.ready);
+ await page.evaluate(async()=>{const list=await SolinWorkspace.list();await SolinWorkspace.activate(list[0].id);openQuarterForm();});
+ const glf=page.locator('#newKGLF'),zone=page.locator('#newFzona');
+ await glf.selectOption('4');assert.deepEqual(await zone.locator('option').evaluateAll(xs=>xs.map(x=>x.value).filter(x=>/^\d+$/.test(x))),['0'],'Create form must not borrow edit-only 12–15');
+ await glf.selectOption('5');assert.deepEqual(await zone.locator('option').evaluateAll(xs=>xs.map(x=>x.value).filter(x=>/^\d+$/.test(x))),['1','2','3','4']);
+ await zone.selectOption('2');await glf.selectOption('27');
+ assert.equal(await page.evaluate(()=>SolinQuarterPickers.value(document.getElementById('newFzona'))),'2','Changing the parent must preserve the value for explicit review');
+ assert.deepEqual(await zone.locator('option').evaluateAll(xs=>xs.map(x=>x.value).filter(x=>/^\d+$/.test(x))),['0'],'Old selected code must not become an allowed option');
+ const result=await page.evaluate(()=>{const before=JSON.stringify(D.quarters);document.getElementById('newKV').value='9999';createQuarter();return{created:!!D.quarters['9999'],unchanged:JSON.stringify(D.quarters)===before};});assert.equal(result.created,false);assert.equal(result.unchanged,true);
+ const edit=await page.evaluate(()=>{closeModal();const q=D.quarters[Object.keys(D.quarters)[0]],r=(q.quarterRows?.length?q.quarterRows:[q.meta])[0];r.KGLF=5;r.Fzona=12;solinEditQuarter(String(r.KV));return{code:r.Fzona};});
+ const editZone=page.locator('#modalBody [data-qfield="Fzona"]');assert.equal(edit.code,12);assert.equal(await page.evaluate(()=>SolinQuarterPickers.value(document.querySelector('#modalBody [data-qfield="Fzona"]'))),'12');
+ assert.deepEqual(await editZone.locator('option').evaluateAll(xs=>xs.map(x=>x.value).filter(x=>/^\d+$/.test(x))),['1','2','3','4','12','13','14','15']);
+ console.log('FZONA_UI_OK: distinct create/edit lists, parent refresh, preserved pending value and invalid-save rejection');
+}finally{await browser?.close();await new Promise(r=>server.close(r));}})().catch(e=>{console.error(e);process.exitCode=1;});

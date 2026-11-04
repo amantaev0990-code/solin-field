@@ -95,6 +95,11 @@ function editQuarter(k,index=0){const q=D.quarters[k],rows=q.quarterRows?.length
     ['invalid','mismatch'].includes(regionCheck?.status)){
   toast(regionCheck.reason);return;
  }
+ const fzonaChanged=String(next.Fzona??'')!==String(selected.Fzona??'');
+ if(fzonaChanged&&next.Fzona!=null){
+  const list=window.SolinDependentRules?.functionalZones(next);
+  if(!list||window.SolinDependentRules.currentIsAllowed(next.Fzona,list)!==true){toast('Выберите функциональную зону из исходного списка этой категории ГЛФ.');return;}
+ }
  const zoning=window.SolinDependentRules?.options('Квартал','Klxr',next,null,D.lesnichestvo?.[0]);
  const zoningChanged=String(next.Kpz??'')!==String(selected.Kpz??'')||
   String(next.Klxr??'')!==String(selected.Klxr??'');

@@ -38,7 +38,7 @@ jobs:
           npm run build
           node scripts/test-android-assets.cjs
           npx cap add android
-          node scripts/install-android-mdb.mjs
+          SOLIN_CLOUD_LAB_BUILD=1 node scripts/install-android-mdb.mjs
           npx cap sync android
       - name: Compile native app + instrumented test APK before emulator starts
         run: cd android && ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest

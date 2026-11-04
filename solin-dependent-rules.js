@@ -86,6 +86,35 @@ function allowedLayers(card,refs=ref()){
   items,category:c.category,categoryName:c.name,group:c.group,
   notApplicable:c.group===0,sourceJoinVerified:piapAvailable};
 }
+// Recovered saved RowSource predicates, not an SFZ.KLF join. The two
+// frontends and the create/edit forms intentionally have separate profiles.
+// Source QueryDef and serialized-form evidence is verified; live Access
+// event execution is a separate, still unverified claim.
+function functionalZones(row,refs=ref(),context={}){
+ const frontend=String(context.frontend||window.SOLIN_SOURCE_PROFILE?.frontend||'Solim').replace(/\.mdb$/i,'');
+ const form=context.form||(context.scenario==='create'?'КварталНов':'Квартал');
+ const category=num(row?.KGLF??row?.KGLF2);
+ if(category===null)return {status:'waiting',reason:'Сначала выберите категорию ГЛФ',items:[],zeroIsValue:true};
+ if(!['Solim','Database'].includes(frontend)||!['Квартал','КварталНов'].includes(form))
+  return {status:'unavailable',reason:'Не подтверждён профиль исходной формы функциональной зоны',items:[],zeroIsValue:true};
+ if(!Array.isArray(refs?.SFZ)||!refs.SFZ.length)
+  return {status:'unavailable',reason:'Исходная таблица SFZ недоступна',items:[],zeroIsValue:true};
+ const allow=new Set();
+ if([5,9].includes(category))for(const c of [1,2,3,4])allow.add(c);
+ if(category===7)for(const c of [1,7])allow.add(c);
+ if(category===10)for(const c of [9,10,11])allow.add(c);
+ if(![5,7,10].includes(category))allow.add(0);
+ if(form==='Квартал'&&(category===4||frontend==='Solim'&&[5,9].includes(category)))
+  for(const c of [12,13,14,15])allow.add(c);
+ const unique=new Map();
+ for(const r of refs.SFZ){const c=num(r.KFZ);if(c!==null&&allow.has(c)&&!unique.has(c))
+  unique.set(c,{value:String(r.KFZ),label:String(r.NFZK??r.NFZ??'')});}
+ const items=[...unique].sort(([a],[b])=>a-b).map(([,v])=>v);
+ return {status:items.length?'complete':'empty',items,frontend,form,zeroIsValue:true,
+  definitionVerified:true,runtimeVerified:false,dependencies:['KGLF'],
+  reason:'Функциональные зоны для категории ГЛФ '+category+
+   (form==='КварталНов'?' при создании квартала.':' при редактировании квартала.')};
+}
 function suggestedOrigin(species,refs=ref()){
  const physical=(refs?.SDP||[]).find(r=>same(r.KPC,species));
  if(!physical||!filled(physical['ОбПор']))return null;
@@ -99,6 +128,8 @@ function distinctOptions(table,field,allowed,excluded=[]){
  return (table||[]).filter(r=>allowed(r)&&!excluded.some(v=>filled(v)&&same(r[field],v)));
 }
 function options(form,field,row,card,org,refs=ref()){
+ if(['Квартал','КварталНов','ВыделВ'].includes(form)&&field==='Fzona')
+  return functionalZones(form==='ВыделВ'?card||row:row,refs,{form:form==='КварталНов'?form:'Квартал'});
  if(form==='Макет10'&&field==='IAR')return allowedLayers(card,refs);
  if(form==='ВыделВ'&&field==='M3TLU'){
   const r=forestTypes(card,org,refs);
@@ -126,23 +157,6 @@ function options(form,field,row,card,org,refs=ref()){
   const items=refs.Sples.filter(r=>filled(r.KOD)&&num(r.PR)>0)
    .map(r=>({value:code(r.KOD),label:String(r.T1??'')}));
   return {status:'complete',reason:'Оригинальная строка выбора: Sples.PR > 0',items};
- }
- // Original Квартал.Fzona RowSource starts with SFZ.KLF joined to
- // Forms!Квартал!KGLF. The exported WHERE is truncated, so these are
- // *source-associated candidates*, not a complete claim of Access parity.
- if(form==='Квартал'&&field==='Fzona'){
-  if(!filled(row?.KGLF))return {status:'waiting',reason:'Сначала выберите КГЛФ квартала',items:[]};
-  if(!refs?.SFZ?.length)return {status:'unavailable',reason:'Исходный справочник SFZ не загружен',items:[]};
-  const matches=refs.SFZ.filter(r=>num(r.KLF)>0&&same(r.KLF,row.KGLF)&&num(r.KFZ)>0);
-  if(!matches.length)return {status:'unavailable',
-   reason:'Для КГЛФ '+code(row.KGLF)+' справочник SFZ не содержит однозначной связки KLF. Условие Access WHERE не восстановлено; не подставляем функциональную зону.',
-   items:[]};
-  const unique=new Map();
-  for(const entry of matches)if(!unique.has(code(entry.KFZ)))
-   unique.set(code(entry.KFZ),{value:code(entry.KFZ),label:String(entry.NFZK||entry.NFZ||'')});
-  return {status:'partial',reason:'Подтверждена связь SFZ.KLF='+code(row.KGLF)+
-   ' с KFZ. Оставшаяся часть Access WHERE не восстановлена — варианты требуют сверки.',
-   items:[...unique.values()]};
  }
  // Кл_Рай отсутствует в сохранённом нормативном пакете. Не показываем
  // произвольные районы другой области и не выдаём чужие коды за верные.
@@ -329,6 +343,7 @@ function validateTransition(before,after,org,refs=ref(),opts={}){
    issue(form,field,index,row[field],
     form+'.'+field+': зависимость пока не подтверждена полностью. '+(result.reason||''),true);
  };
+ inspect('ВыделВ','Fzona',after,null,baseDirty(['KGLF','Fzona']));
  for(const [field,deps] of Object.entries(BASE_CHAIN))
   inspect('ВыделВ',field,after,null,baseDirty(deps));
  const beforeChildren=before?._children||{},children=after._children||{};
@@ -410,8 +425,8 @@ function applySelect(select,result,opts={}){
 function currentIsAllowed(value,result){
  if(!result||result.status==='waiting'||result.status==='unavailable')return null;
  if(!filled(value))return null;
- if(code(value)==='0' && !result.items.some(r=>same(r.value,0)))return null;
+ if(code(value)==='0'&&!result.zeroIsValue&&!result.items.some(r=>same(r.value,0)))return null;
  return result.items.some(r=>same(r.value,value));
 }
-window.SolinDependentRules={forestTypes,options,currentIsAllowed,applySelect,treeDependencies,validateTransition,kto,region,speciesGroup,suggestedOrigin,landCategory,allowedLayers};
+window.SolinDependentRules={forestTypes,options,currentIsAllowed,applySelect,treeDependencies,validateTransition,kto,region,speciesGroup,suggestedOrigin,landCategory,allowedLayers,functionalZones};
 })();

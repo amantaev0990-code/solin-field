@@ -87,6 +87,15 @@ if(process.env.SOLIN_TABLET_BUILD==='1'){
  const strings=fs.readFileSync(stringsFile,'utf8').replace(/(<string name="app_name">)[^<]+/, '$1SOLI-N Field V14');
  fs.writeFileSync(stringsFile,strings);
 }
+if(process.env.SOLIN_CLOUD_LAB_BUILD==='1'){
+ // Parallel package protects every installed V14 and its sandbox. Never
+ // masquerade as an in-place upgrade without the original signing key.
+ build=build.replace(/applicationId\s+"[^"]+"/,'applicationId "kz.solin.field.cloudlab"');
+ build=build.replace(/versionCode\s+\d+/,'versionCode 15').replace(/versionName\s+"[^"]+"/,'versionName "0.3.0-cloudlab.15"');
+ fs.writeFileSync(gradle,build);
+ const stringsFile=path.join(app,'src/main/res/values/strings.xml');
+ fs.writeFileSync(stringsFile,fs.readFileSync(stringsFile,'utf8').replace(/(<string name="app_name">)[^<]+/,'$1SOLI-N Field Lab'));
+}
 // Android V13: the user-approved S / pixel forest / GPS icon.
 // Preserve the original artwork, replace only white OUTER corners,
 // slightly enlarge the motif, and install both legacy + Adaptive Icon

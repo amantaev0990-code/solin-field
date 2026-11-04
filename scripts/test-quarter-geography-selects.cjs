@@ -5,11 +5,8 @@ const user={POS:213,LESN:2,KTO:150000000},shet={POS:723,LESN:4,KTO:350000000},an
 const D={lesnichestvo:[user],quarters:{1:{quarterRows:[
  {POS:213,LESN:2,KV:1,KGLF:27,Fzona:0,Raion:156000000}
 ]}}};
-const window={SOLIN_REFS:{tables:{SFZ:[
- {KLF:24,KFZ:2,NFZK:'Функциональная зона 2'},
- {KLF:27,KFZ:3,NFZK:'Функциональная зона 3'},
- {KLF:54,KFZ:7,NFZK:'Функциональная зона 7'}
-]}},SolinWorkspace:{ready:Promise.resolve(),list:async()=>[]},addEventListener(){}};
+const window={SOLIN_REFS:{tables:{SFZ:JSON.parse(require('node:zlib').gunzipSync(fs.readFileSync('refs-audit.json.gz'))).tables.SFZ
+}},SolinWorkspace:{ready:Promise.resolve(),list:async()=>[]},addEventListener(){}};
 class Element{
  constructor(tag){this.tagName=tag.toUpperCase();this.attributes=[];this.dataset={};
   this.parentElement={};this.handlers={};this.value='';this.hidden=false;}
@@ -23,6 +20,7 @@ class Element{
 }
 class Option{constructor(text,value){this.textContent=text;this.value=value;}}
 const document={createElement:tag=>new Element(tag)};
+vm.runInNewContext(fs.readFileSync('solin-dependent-rules.js','utf8'),{window});
 vm.runInNewContext(fs.readFileSync('solin-quarter-pickers.js','utf8'),
  {window,D,document,Option});
 const api=window.SolinQuarterPickers;
@@ -40,10 +38,10 @@ assert.equal(api.validateDistrict('356400000',shet).status,'matched');
 assert.equal(api.candidates('Raion',{},another).items.length,1);
 const one=Array.from(api.candidates('Fzona',{},another).items,x=>x.value);
 const two=Array.from(api.candidates('Fzona',{KGLF:27},shet).items,x=>x.value);
-assert.deepEqual(one,['0'],'Without KGLF only zero + manual fallback may be offered');
-assert.deepEqual(two,['0','3'],'Functional zones SFZ must be filtered by KGLF 27');
+assert.deepEqual(one,[],'Without KGLF no source zone is confirmed');
+assert.deepEqual(two,['0'],'The original SQL gives KGLF 27 only the explicit zero row');
 const after=Array.from(api.candidates('Fzona',{KGLF:54},shet).items,x=>x.value);
-assert.deepEqual(after,['0','7'],'Changing KGLF must change linked SFZ choices');
+assert.deepEqual(after,['0'],'SFZ.KLF is not the KGLF predicate');
 const input=new Element('input'),district=api.mount(input,'Raion',()=>({}),{org:()=>user});
 assert.equal(district.select.tagName,'SELECT');
 assert.equal(district.value(),'','Never force default district for a new quarter');

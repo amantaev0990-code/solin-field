@@ -22,15 +22,14 @@ const qRefs={...tables,
 assert.deepEqual(values('Квартал','KGLF',{},null,{KTO:350000000},qRefs),['1']);
 assert.deepEqual(values('Квартал','Kpz',{},null,{KTO:350000000},qRefs),['2','3']);
 assert.equal(engine.options('Квартал','KGLF',{},null,{KTO:350000000},{...tables,Sples:[]}).status,'unavailable');
-// Incomplete original RowSource must be honest: SFZ.KLF is a proven
-// association, but the WHERE tail is missing and cannot justify "complete".
+// Saved Fzona SQL has been recovered; the KLF association is not its predicate.
 const functional=engine.options('Квартал','Fzona',{KGLF:54},null,{KTO:350000000},tables);
-assert.equal(functional.status,'partial');
-assert.deepEqual(Array.from(functional.items,x=>x.value),['1']);
-assert.match(functional.reason,/не восстановлена/);
+assert.equal(functional.status,'complete');
+assert.deepEqual(Array.from(functional.items,x=>x.value),['0']);
+assert.equal(functional.runtimeVerified,false);
 const otherFunctional=engine.options('Квартал','Fzona',{KGLF:24},null,{KTO:350000000},tables);
-assert.equal(otherFunctional.status,'unavailable',
- 'No matching SFZ.KLF; never substitute unrelated category values');
+assert.equal(otherFunctional.status,'complete');
+assert.deepEqual(Array.from(otherFunctional.items,x=>x.value),['0']);
 assert.equal(engine.options('Квартал','Raion',{KGLF:54},null,{KTO:350000000},tables).status,
  'unavailable','Кл_Рай is absent from the extracted source package');
 for(const [form,field] of [['Макет17','P17'],['Макет19','ZP']]){

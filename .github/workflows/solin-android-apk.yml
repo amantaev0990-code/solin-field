@@ -67,6 +67,7 @@ jobs:
           PLAYWRIGHT_PATH=playwright-core BROWSER_CHANNEL=chrome node scripts/test-cross-device-forest-transfer.cjs
           PLAYWRIGHT_PATH=playwright-core BROWSER_CHANNEL=chrome node scripts/test-tablet-field-fixes.cjs
           PLAYWRIGHT_PATH=playwright-core BROWSER_CHANNEL=chrome node scripts/test-offline-imagery.cjs
+          PLAYWRIGHT_PATH=playwright-core BROWSER_CHANNEL=chrome node scripts/test-functional-zones-ui.cjs
       - name: Create native Android project
         run: npx cap add android
       - name: Register offline MDB writer
@@ -82,5 +83,20 @@ jobs:
         with:
           name: solin-field-offline-mdb-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 7
+      - name: Build separate Cloud Lab package for private offline references
+        run: |
+          SOLIN_CLOUD_LAB_BUILD=1 node scripts/install-android-mdb.mjs
+          cd android
+          ./gradlew --no-daemon assembleDebug
+      - name: Stage public signing utilities for private packaging
+        run: node scripts/stage-apk-signing-tools.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: solin-cloud-lab-base-and-signing-tools
+          path: |
+            android/app/build/outputs/apk/debug/*.apk
+            android/cloud-lab-toolchain/**
           if-no-files-found: error
           retention-days: 7

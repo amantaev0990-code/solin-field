@@ -30,4 +30,6 @@ Confirmed kernel changes:
 - K59 respects source NDR/SzapCK branch selection, address context and quarter-derived GodT1.
 - Rounding uses the saved strict midpoint comparison, without widening its boundary.
 
-Unverified: full form-event/RowSource equivalence, complete Fzona predicate, all macros and special layers, current national classifiers, full source DB decoding with the browser MDB reader, physical Android behavior, and reopening in desktop SOLI-N. Test success is not a production certification.
+The resumed stage restores four Fzona profiles (Solim/Database, create/edit) and verifies them against saved predicates. `query-contract.cjs` compares Jet query types, ordered columns, action targets, assignments, grouping and sorting; it keeps native Access execution separate. `package-private-apk.py` packages the private references locally, verifies signatures and preserves the tested assets. It refuses an in-place V14 update without the original certificate and key. Cloud Lab uses the separate `kz.solin.field.cloudlab` identity and a durable private key.
+
+Unverified: full form-event equivalence, all macros and special layers, current national classifiers, full source DB decoding with the browser MDB reader, physical Android field behavior, and reopening in desktop SOLI-N. Test success is not a production certification. Keep signing backups private and outside this repository.

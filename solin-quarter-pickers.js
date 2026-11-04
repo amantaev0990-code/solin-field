@@ -84,7 +84,7 @@
   for(const forest of persistedForests)append(forest.quarters);
   return rows;
  };
- function candidates(field,row,org){
+ function candidates(field,row,org,context={}){
   const results=new Map(),all=knownRows(),current=recordPairs(org),area=regionKTO(org);
   const add=(value,label)=>{
    const k=clean(value);if(!numeric(k))return;
@@ -115,20 +115,8 @@
      'Область KTO не установлена. Чужие районы не показываются; при необходимости введите код вручную.'};
   }
   if(field==='Fzona'){
-   add('0','Без функциональной зоны');
-   const kglf=clean(row?.KGLF);
-   const table=window.SOLIN_REFS?.tables?.SFZ||[];
-   if(kglf)for(const r of table)
-    if(numeric(r.KFZ)&&Number(r.KFZ)>0&&same(r.KLF,kglf))
-     add(r.KFZ,String(r.NFZK||r.NFZ||'Из справочника SFZ'));
-   if(kglf)for(const r of all)
-    if(same(r.KGLF,kglf)&&numeric(r.Fzona))
-     add(r.Fzona,'Код из сохранённого квартала; связь не подтверждена');
-   return {items:[...results.values()].sort((a,b)=>Number(a.value)-Number(b.value)),
-    auto:null,status:'partial',
-    reason:kglf?'Показаны функциональные зоны SFZ.KLF='+kglf+
-     ' и коды сохранённых кварталов той же категории ГЛФ. Полное условие Access WHERE недоступно; дополнительные коды вводятся вручную.':
-     'Сначала выберите категорию ГЛФ, чтобы отфильтровать функциональные зоны. Полная таблица условий Access недоступна.'};
+   const result=window.SolinDependentRules?.functionalZones?.(row,window.SOLIN_REFS?.tables,context);
+   return {...(result||{status:'unavailable',items:[],reason:'Не загружены исходные правила Fzona'}),auto:null};
   }
   return {items:[],auto:null,reason:'Нет доступного справочника'};
  }
@@ -166,7 +154,7 @@
    const sync=(opts={})=>{
      const row=typeof context==='function'?context():context;
      const org=options.org?.()||((typeof D!=='undefined'&&D?.lesnichestvo?.[0])||{});
-     const data=candidates(field,row||{},org);
+     const data=candidates(field,row||{},org,options);
      const previous=opts.clear?'':(opts.value!==undefined?clean(opts.value):value());
      const seen=new Set(),items=[];
      for(const item of data.items){if(seen.has(item.value))continue;seen.add(item.value);items.push(item);}

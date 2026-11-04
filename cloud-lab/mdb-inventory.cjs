@@ -9,7 +9,7 @@ function inventory(source,selected=[]){
  const out={format:'SOLIN-CLOUD-LAB-source-v1',source:{name:path.basename(source),size:bytes.length,sha256:crypto.createHash('sha256').update(bytes).digest('hex'),reader:M.version},tables:[],linkedTables:reader.getTableNames({normalTables:false,linkedTables:true}),queries:[],rows:{},errors:[]};
  for(const name of reader.getTableNames())try{const t=reader.getTable(name);out.tables.push({name,rowCount:t.rowCount,columns:t.getColumns()});if(selected.includes(name))out.rows[name]=t.getData();}catch(e){out.errors.push({table:name,error:e.message});}
  try{
-  const objects=reader.getTable('MSysObjects').getData().filter(o=>o.Type===5),byId=new Map(objects.map(o=>[o.Id,{name:o.Name,id:o.Id,attributes:[]}]));
+  const objects=reader.getTable('MSysObjects').getData().filter(o=>o.Type===5),byId=new Map(objects.map(o=>[o.Id,{name:o.Name,id:o.Id,objectFlags:o.Flags,attributes:[]}]));
   for(const row of reader.getTable('MSysQueries').getData()){const q=byId.get(row.ObjectId);if(q)q.attributes.push(row);}
   out.queries=[...byId.values()];
  }catch(e){out.errors.push({table:'saved-query-definitions',error:e.message});}

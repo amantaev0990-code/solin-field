@@ -7,9 +7,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 const window={
- SOLIN_REFS:{tables:{SFZ:[
-  {KLF:54,KFZ:1,NFZK:'Заповедный режим'},
-  {KLF:27,KFZ:3,NFZK:'Другая зона'}]}},
+ SOLIN_REFS:{tables:{SFZ:JSON.parse(require('node:zlib').gunzipSync(fs.readFileSync('refs-audit.json.gz'))).tables.SFZ}},
  SolinWorkspace:{ready:Promise.resolve(),list:async()=>[]},
  addEventListener:()=>{},
  SolinDependentRules:{validateTransition:()=>({errors:[],warnings:[]})},
@@ -22,8 +20,9 @@ const D={lesnichestvo:[{POS:213,LESN:2,KTO:150000000}],quarters:{
 }};
 const context=vm.createContext({window,D,document:{},Option:class{}});
 for(const path of ['solin-forest-catalog.js','solin-address-context.js',
- 'solin-quarter-pickers.js','solin-dependency-audit.js'])
+ 'solin-dependent-rules.js','solin-quarter-pickers.js','solin-dependency-audit.js'])
  vm.runInContext(fs.readFileSync(path,'utf8'),context,{filename:path});
+window.SolinDependentRules.validateTransition=()=>({errors:[],warnings:[]});
 const catalog=window.SOLIN_FOREST_CATALOG.rows;
 assert.equal(catalog.length,877,'Original KUch active rows must remain complete');
 assert.equal(catalog.filter(x=>Number(x[1])>0).length,644);
@@ -42,9 +41,9 @@ assert.equal(kt.validateDistrict('356400000',act).status,'mismatch');
 assert.equal(kt.validateDistrict('156000000',act).status,'matched');
 assert.equal(kt.validateDistrict('356400000',kar).status,'matched');
 assert.equal(kt.candidates('Raion',{},{}).items.length,0);
-assert.deepEqual(Array.from(kt.candidates('Fzona',{KGLF:54},act).items,x=>x.value),['0','1']);
-assert.deepEqual(Array.from(kt.candidates('Fzona',{KGLF:27},act).items,x=>x.value),['0','3']);
-assert.deepEqual(Array.from(kt.candidates('Fzona',{},act).items,x=>x.value),['0']);
+assert.deepEqual(Array.from(kt.candidates('Fzona',{KGLF:54},act).items,x=>x.value),['0']);
+assert.deepEqual(Array.from(kt.candidates('Fzona',{KGLF:27},act).items,x=>x.value),['0']);
+assert.deepEqual(Array.from(kt.candidates('Fzona',{},act).items,x=>x.value),[]);
 const address={POS:213,LESN:2,KV:1,KGLF:54,VD:'1'};
 const make=(props={})=>({...address,PLV:2,Fzona:1,KlxrVD:3,
  _children:{Макет10:[{...address,IAR:1,POR:'ОС',KOEF:10,ZAP:30}]},...props});

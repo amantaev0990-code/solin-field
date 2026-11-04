@@ -2,6 +2,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),crypto=require('node:crypto'),z=require('node:zlib');
 const root=path.resolve(__dirname,'..'),[input,output]=process.argv.slice(2);if(!input||!output)throw Error('Usage: node cloud-lab/audit.cjs PRIVATE_INVENTORY_DIRECTORY PRIVATE_OUTPUT_DIRECTORY');
+const {compare}=require('./query-contract.cjs');
 const src=path.resolve(input),out=path.resolve(output);if(out.startsWith(root+path.sep))throw Error('Detailed source registry is private; choose an output outside the public repo');fs.mkdirSync(out,{recursive:true});
 const read=p=>JSON.parse(fs.readFileSync(p,'utf8')),window={};
 for(const f of ['solin-native-control-data.js','solin-audit-data.js','solin-sql-source.js'])vm.runInNewContext(fs.readFileSync(path.join(root,f),'utf8'),{window});
@@ -15,12 +16,10 @@ for(const f of fs.readdirSync(src).filter(n=>n.endsWith('-inventory.json'))){
  for(const q of d.queries){
   const id=node(prefix+':query:'+q.name,{kind:'query',name:q.name,source:prefix});
   const p=prefix==='Solim.mdb'?N.queries[q.name]:null;
-  const attrs=q.attributes,columns=attrs.filter(a=>a.Attribute===6).map(a=>norm(a.Expression)),saved=p?.columns?.map(c=>norm(c.expression));
-  const where=attrs.find(a=>a.Attribute===8)?.Expression??null,having=attrs.find(a=>a.Attribute===10)?.Expression??null;
-  const componentsMatch=Boolean(p&&JSON.stringify(columns)===JSON.stringify(saved)&&norm(where)===norm(p.where)&&norm(having)===norm(p.having));
+  const attrs=q.attributes,contract=compare(q,p),componentsMatch=contract.status==='matched';
   rules.push({id,kind:'saved-query',source:prefix,name:q.name,sourceAttributes:attrs,
    implementation:p?{file:'solin-native-control-data.js',hash:p.sourceHash}:null,
-   status:p?'partial':'absent',sourceComponentsMatch:componentsMatch,
+   status:p?'partial':'absent',sourceComponentsMatch:componentsMatch,definitionContract:contract,
    verification:p?'parsed-plan-present; Access runtime parity is separate':'unverified'});
   for(const a of attrs){
    if(a.Attribute===5&&a.Name1)edges.push({from:prefix+':table:'+a.Name1,to:id,relation:'query-source',evidence:{attribute:5}});
@@ -30,6 +29,7 @@ for(const f of fs.readdirSync(src).filter(n=>n.endsWith('-inventory.json'))){
 }
 for(const v of A.validations||[])rules.push({kind:'validation',form:v.form,field:v.name,source:v.source,rule:v.rule,status:'unverified',implementation:null});
 for(const v of A.formulas||[])rules.push({kind:'form-expression',...v,status:'unverified'});
+for(const v of window.SOLIN_LOOKUP_SOURCES||[])rules.push({kind:'lookup-binding',...v,status:'partial',runtimeBindingVerified:false});
 for(const [form,routes]of Object.entries(A.routes||{}))for(const route of routes)rules.push({kind:'form-route',form,...route,status:'unverified'});
 const refs=JSON.parse(z.gunzipSync(fs.readFileSync(path.join(root,'refs-audit.json.gz'))));
 const solim=sources.find(s=>s.name==='Solim.mdb'),planCount=Object.keys(N.queries).length;
@@ -38,11 +38,11 @@ const coverage={generatedAt:new Date().toISOString(),overallCoveragePercent:null
  categories:[
   {category:'Solim saved-query inventory',discovered:solim?.queryCount,inventoried:solim?.queryCount,status:'implemented',scope:'Direct read of MSysQueries and MSysObjects'},
   {category:'Solim saved-query plans in mobile control runtime',discovered:solim?.queryCount,present:planCount,inventoryPercent:solim?Math.round(planCount/solim.queryCount*1000)/10:null,status:'partial'},
-  {category:'Current source SQL component comparison',tested:rules.filter(r=>r.implementation).length,matched:rules.filter(r=>r.sourceComponentsMatch).length,status:'partial',scope:'Projection/WHERE/HAVING only; not complete SQL equivalence'},
+  {category:'Current source SQL component comparison',tested:rules.filter(r=>r.implementation).length,matched:rules.filter(r=>r.sourceComponentsMatch).length,status:'partial',scope:'Ordered projections, aliases, actions, targets, predicates, grouping, sorting and source tables. Native execution and join-tree precedence are separate.'},
   {category:'Normative reference tables bundled previously',present:Object.keys(refs.tables).length,status:'partial'},
   {category:'Saved form inventory',discovered:A.summary.formCount,rowSources:A.summary.rowSources,validationRules:A.validations.length,formExpressions:A.formulas.length,status:'partial'},
   {category:'Original control definition comparison',matchedPreviously:N.source.definitionsMatched,comparedPreviously:N.source.definitionsCompared,status:'partial',scope:'Saved prior Access comparison; not re-executed on Access this session'},
-  {category:'Fzona full original RowSource',status:'unverified'},
+  {category:'Fzona saved RowSource profiles',status:'partial',scope:'Solim/Database, create/edit predicates restored. Original Access event execution is unverified.'},
   {category:'Physical Android and desktop reopening',status:'unverified'}],sources};
 const meta=read(path.join(root,'data-meta.json'));
 const makets=Object.entries(meta.transfSchema).map(([name,fields])=>({name,fields,storage:'transfer-table',rules:rules.filter(r=>r.form===name).length,status:'partial'}));

@@ -134,10 +134,10 @@ function openQuarterForm(){const org=D.lesnichestvo?.[0]||{},source=D.source||{}
  // Native select fields work on iPhone; manual code is always available.
  const glfInput=$('#newKGLF'),choices=window.SolinQuarterPickers;
  const fzonaPicker=choices?.mount($('#newFzona'),'Fzona',()=>({KGLF:glfInput?.value}),
-   {hint:$('#newFzonaHint')});
+   {hint:$('#newFzonaHint'),scenario:'create'});
  choices?.mount($('#newRaion'),'Raion',()=>({KGLF:glfInput?.value}),
    {hint:$('#newRaionHint')});
- // KGLF is the verified SFZ.KLF prerequisite; refresh options on change.
+ // Re-evaluate the original create-form predicate after KGLF changes.
  glfInput?.addEventListener('change',()=>fzonaPicker?.sync({value:fzonaPicker.value()}));
  glfInput?.addEventListener('input',()=>fzonaPicker?.sync({value:fzonaPicker.value()}));
  const zoneInput=$('#newKlxr');
@@ -166,6 +166,11 @@ function createQuarter(){const raw=$('#newKV').value.trim();if(!/^\d+$/.test(raw
   return toast(districtCheck.reason);
  const checkZone=$('#newKlxr').value;
  const rules=window.SolinDependentRules;
+ if(fzona!==''){
+  const list=rules?.functionalZones({KGLF:$('#newKGLF').value},undefined,{scenario:'create'});
+  if(!list||!['complete','empty'].includes(list.status)||rules.currentIsAllowed(fzona,list)!==true)
+   return toast(list?.reason||'Выберите допустимую функциональную зону.');
+ }
  for(const [field,value] of [['KGLF',$('#newKGLF').value],['Kpz',$('#newKpz').value],['Klxr',checkZone]]){
   if(!value)continue;
   const result=rules?.options('Квартал',field,{Kpz:$('#newKpz').value},null,D.lesnichestvo?.[0]);
