@@ -156,6 +156,23 @@ public class SolinFieldUiInstrumentedTest {
       assertFalse("Mixed stand calculation error: "+mixed,mixed.has("error"));
       assertEquals("Original Szap.v19=287, rounded 287*0.6",172,mixed.getInt("perHa"));
       assertEquals(344,mixed.getInt("total"));assertEquals("Do not write until Save",0,mixed.getInt("saved"));
+      JSONObject sourceRules=parseJsonString(eval(webview,"JSON.stringify((()=>{"+
+        "const r={POS:213,LESN:2,KV:1,KGLF:27,VD:'1',KU:1,M3Pr:'Б',M3B:'3',GodT1:2016,"+
+        "_children:{Макет10:[{IAR:1,POR:'ОС',POL:.5,PROI:7,LET:5,PH:.6,ZAP:40}]}};"+
+        "const refs=SOLIN_REFS.tables,before=JSON.stringify(r),early=SolinCardCalculations.bonitet(r,refs);"+
+        "const later=SolinCardCalculations.bonitet({...r,GodT1:2026},refs);"+
+        "const special=SolinCardCalculations.bonitet({...r,M3Pr:'БРК',GodT1:2026},refs);"+
+        "const edit=SolinDependentRules.functionalZones({KGLF:5},refs,{form:'Квартал'});"+
+        "const create=SolinDependentRules.functionalZones({KGLF:5},refs,{scenario:'create'});"+
+        "return {early:early.expected,later:later.expected,special:special.scaleOrigin,"+
+        "edit:edit.codes.join(','),create:create.codes.join(','),preserved:before===JSON.stringify(r)};"+
+        "})())"));
+      assertEquals("Pre-2017 low-height K58 branch", "4",sourceRules.getString("early"));
+      assertEquals("2017+ K58 branch", "5",sourceRules.getString("later"));
+      assertEquals("Second SSHB join uses substituted origin",9,sourceRules.getInt("special"));
+      assertEquals("1,2,3,4,12,13,14,15",sourceRules.getString("edit"));
+      assertEquals("1,2,3,4",sourceRules.getString("create"));
+      assertTrue("Source-backed previews must not mutate inputs",sourceRules.getBoolean("preserved"));
     } finally {
       getInstrumentation().runOnMainSync(activity::finish);
     }

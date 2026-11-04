@@ -51,7 +51,7 @@ assert.equal(calc.stockPerHectare(wrongForest,stockRefs,{KTO:150000000}).status,
 
 assert.equal(calc.bonitet({...card,KU:21},refs).status,'not-applicable');
 assert.equal(calc.standStock({...card,KU:21}).status,'not-applicable');
-assert.equal(calc.bonitet({...card,M3Pr:'Б'},refs).status,'waiting');
+assert.equal(calc.bonitet({...card,M3Pr:'Б'},refs).expected,'4','Макет10Бон_1 does not filter POR by M3Pr');
 assert.equal(calc.bonitet({...card,_children:{Макет10:[...card._children.Макет10,...card._children.Макет10]}},refs).status,'ambiguous');
 assert.equal(calc.bonitet({...card,_children:{Макет10:[{...card._children.Макет10[0],LET:199}]}},refs).status,'ambiguous');
 assert.equal(calc.bonitet(card,{SSHB:[sshb,ssbh()]}).status,'ambiguous');

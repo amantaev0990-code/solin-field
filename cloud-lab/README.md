@@ -32,6 +32,7 @@ Confirmed kernel changes:
 - Living-layer subtotal is separate from the scalar source UPDATE; automatic stand-stock changes require agreement with one unambiguous original group.
 - K59 respects source NDR/SzapCK branch selection, address context and quarter-derived GodT1.
 - Rounding uses the saved strict midpoint comparison, without widening its boundary.
+- K58 follows the positive-stock/minimum-layer prerequisite, the pre-2017 low-height branch and the two SSHB joins for special species. A POR=M3Pr restriction is not invented. More than one nonzero-fullness row and unresolved Jet midpoints remain guarded.
 
 The resumed stage restores four Fzona profiles (Solim/Database, create/edit) and verifies them against saved predicates. `query-contract.cjs` compares Jet query types, ordered columns, action targets, assignments, grouping and sorting; it keeps native Access execution separate. `package-private-apk.py` packages the private references locally, verifies signatures and preserves the tested assets. It refuses an in-place V14 update without the original certificate and key. Cloud Lab uses the separate `kz.solin.field.cloudlab` identity and a durable private key.
 

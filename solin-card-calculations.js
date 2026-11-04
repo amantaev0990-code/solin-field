@@ -35,32 +35,51 @@ function k59Round(value,places=0){
  const factor=10**places,scaled=value*factor,lo=Math.floor(scaled);
  return (lo+(scaled-lo>=0.5?1:0))/factor;
 }
-function bonitet(record,refs){
+function bonitet(record,refs,quarterRow=null){
  if(!refs?.SSHB?.length)return status('Нет оригинальной шкалы SSHB');
  const category=n(record?.KU);
  if(category===null)return status('Сначала выберите категорию угодий','waiting');
  if(category>=11)return status('Контроль К58 относится к категориям KU меньше 11','not-applicable');
- const rows=(record?._children?.['Макет10']||[]).filter(row=>childMatches(record,row)&&n(row.IAR)===1&&n(row.POL)!==null&&n(row.POL)!==0&&same(row.POR,record.M3Pr));
- if(rows.length!==1)return status('К58: нужна одна однозначная ведущая строка 1-го яруса макета 10'+(rows.length?' (найдено '+rows.length+')':'') ,rows.length?'ambiguous':'waiting');
+ if(!defined(record?.M3Pr))return status('К58: не задана главная порода','waiting');
+ if(n(record.GodT1)!==null&&n(quarterRow?.GodT)!==null&&n(record.GodT1)!==n(quarterRow.GodT))
+  return status('К58: GodT1 расходится с Квартал.GodT; требуется обновить контекст','ambiguous');
+ const children=(record?._children?.['Макет10']||[]).filter(row=>childMatches(record,row));
+ // Макет10Ярмин groups by POL and requires Min(IAR)=1, Max(ZAP)>0.
+ // Макет10Бон_1 joins this result by address/IAR, not by POR or POL.
+ const groups=new Map();
+ for(const r of children){const key=n(r.POL);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r);}
+ const eligible=[...groups.values()].some(g=>{
+  const layers=g.map(r=>n(r.IAR)).filter(v=>v!==null),stocks=g.map(r=>n(r.ZAP)).filter(v=>v!==null);
+  return layers.length&&Math.min(...layers)===1&&stocks.length&&Math.max(...stocks)>0;
+ });
+ if(!eligible)return status('К58: Макет10Ярмин не создаёт строку с минимальным ярусом 1 и положительным ZAP','waiting');
+ const rows=children.filter(row=>n(row.IAR)===1&&n(row.POL)!==null&&n(row.POL)!==0);
+ if(rows.length!==1)return status('К58: нужна одна однозначная строка 1-го яруса с ненулевой полнотой'+(rows.length?' (найдено '+rows.length+')':'') ,rows.length?'ambiguous':'waiting');
  const row=rows[0],age=n(row.LET),height=n(row.PH),origin=n(row.PROI);
  if(age===null||height===null||origin===null||age<=0||height<0)return status('К58: не хватает возраста, высоты или происхождения','waiting');
- // Original QueryDef sets Проис=9 for these species AFTER first joining SSHB
- // on the original PROI; do not infer that first-stage Access join.
+ // The first SSHB join selects Voz using the original PROI. Only the second
+ // join substitutes origin 9 for these species, retaining the first Voz.
  const special=new Set(['БРК','БОЯ','КЛН','РК','Ч','ОБ','СИР']);
- if(special.has(String(record.M3Pr).trim())&&origin!==9)
-  return status('К58: особый класс происхождения; точный двухэтапный Access JOIN не подтверждён','ambiguous');
  const scales=refs.SSHB.filter(r=>n(r['Происх'])===origin&&
    n(r['ВозрН'])!==null&&n(r['ВозрК'])!==null&&age>=n(r['ВозрН'])&&age<n(r['ВозрК']));
  if(scales.length!==1)return status('К58: отсутствует либо неоднозначна возрастная строка SSHB','ambiguous');
- const h=safeRoundHalf(height,1);
+ let h=safeRoundHalf(height,1);
  if(h===null)return status('К58: высота попадает на границу округления Jet','ambiguous');
- const scale=scales[0];
+ const year=n(quarterRow?.GodT)??n(record.GodT1);
+ if(origin!==5&&h>0&&h<1){
+  if(year===null)return status('К58: для высоты менее 1 м нужен исходный год таксации','ambiguous');
+  if(year<2017)h=1;
+ }
+ const scaleOrigin=special.has(String(record.M3Pr).trim().toLocaleUpperCase('ru-RU'))?9:origin;
+ const targets=refs.SSHB.filter(r=>n(r['Происх'])===scaleOrigin&&n(r['Возр'])===n(scales[0]['Возр']));
+ if(targets.length!==1)return status('К58: отсутствует либо неоднозначна вторая строка SSHB по происхождению и Возр','ambiguous');
+ const scale=targets[0];
  const thresholds=[['Н1б','1Б'],['Н1а','1А'],['Н1','1'],['Н2','2'],['Н3','3'],['Н4','4'],['Н5','5'],['Н5а','5А'],['Н5б','5Б']];
  if(thresholds.some(([key])=>n(scale[key])===null))return status('К58: неполная строка SSHB','ambiguous');
  const match=thresholds.find(([key])=>h>=n(scale[key]));
  if(!match)return status('К58: высота ниже минимальной шкалы SSHB','ambiguous');
- return {status:'complete',reason:'К58 · SSHB (происхождение '+origin+', возраст '+age+', высота '+h+' м)',expected:match[1],
-  field:'M3B',rawCurrent:record.M3B,origin,age,height:h,scaleAge:scale['Возр'],scale};
+ return {status:'complete',reason:'К58 · SSHB (происхождение '+origin+' → '+scaleOrigin+', возраст '+age+', высота '+h+' м)',expected:match[1],
+  field:'M3B',rawCurrent:record.M3B,origin,scaleOrigin,age,height:h,scaleAge:scale['Возр'],scale};
 }
 // Each Maket10 species participates in the layer composition, but one
 // leading POR row can carry the WHOLE-tier ZAP for all its species. Categories 7 and 8 are
@@ -347,7 +366,7 @@ function stockPerHectare(record,refs,org,quarterRow=null,targetLayer=null){
 }
 function corrections(record,refs,org,quarterRow=null){
  const issues=[],unknown=[];
- const b=bonitet(record,refs);
+ const b=bonitet(record,refs,quarterRow);
  if(b.status==='complete'&&defined(record.M3B)&&!same(record.M3B,b.expected))
   issues.push({field:'M3B',label:'Бонитет',previous:String(record.M3B),expected:String(b.expected),reason:b.reason});
  else if(b.status==='complete'&&!defined(record.M3B))
