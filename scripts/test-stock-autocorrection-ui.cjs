@@ -224,7 +224,7 @@ async function reopen(p,info){
   const codes=[...functional.options].map(o=>o.value).filter(Boolean);
   const before=codes.join(',');
   const category=document.querySelector('#newKGLF');
-  if([...category.options].some(x=>x.value==='54')){category.value='54';category.dispatchEvent(new Event('change',{bubbles:true}));}
+  if([...category.options].some(x=>x.value==='27')){category.value='27';category.dispatchEvent(new Event('change',{bubbles:true}));}
   return {functional:functional.tagName,raion:district.tagName,
    codes,before,after:[...functional.options].map(o=>o.value).filter(Boolean).join(','),
    value:functional.value,districtCodes:[...district.options].map(o=>o.value),
@@ -235,8 +235,8 @@ async function reopen(p,info){
  assert.equal(newQuarterContext.value,'','Do not guess a default SFZ code');
  assert(newQuarterContext.codes.includes('0')&&!newQuarterContext.codes.includes('1'),
    'Without KGLF, do not offer unrelated functional zones');
-  assert(newQuarterContext.after.split(',').includes('1'),
-   'KGLF=54 must offer its source-linked SFZ zone 1');
+  assert(!newQuarterContext.after.split(',').includes('1'),
+   'Actual Sples KGLF=27 has no SFZ.KLF=27: do not offer unrelated zone 1');
  assert(newQuarterContext.districtCodes.includes('356400000'));
  assert.match(newQuarterContext.districtHint,/Кл_Рай/);
  await p.evaluate(()=>closeModal());
