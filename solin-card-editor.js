@@ -580,6 +580,13 @@ function preview(print){const popup=window.open('','_blank');if(!popup)return to
 function newCard(e){const previous=session.draft,kv=previous.KV;if(!save(e))return;const q=D.quarters[kv],org=D.lesnichestvo?.[0]||{},r=Object.fromEntries((D.transfSchema['Выдел']||[]).map(f=>[f,null]));for(const f of numeric)if(f in r)r[f]=0;for(const f of ['CR','OZU','ErV','ErCt','M2PM1','M22','M23','PLG'])r[f]=0;Object.assign(r,{POS:previous.POS??org.POS,LESN:previous.LESN??org.LESN,KV:kv,KGLF:previous.KGLF,VD:Math.max(0,...q.compartments.filter(x=>same(x.POS,previous.POS)&&same(x.LESN,previous.LESN)&&same(x.KGLF,previous.KGLF)).map(x=>Number(x.VD)||0))+1,PLV:1,KU:null,Fzona:previous.Fzona,KlxrVD:previous.KlxrVD,_children:{},_local:true});window.SolinAddressContext?.enrichStand(r,q,org);open(r,{isNew:true});}
 function updateBadges(form){const n=session.draft._children[form]?.length||0;document.querySelectorAll('[data-ce-badge="'+form+'"]').forEach(b=>b.textContent=n||'');}
 function validate(){
+ const originalRegion=String(session.originalQuarter?.Raion??'');
+ const chosenRegion=String(session.quarter?.Raion??'');
+ if(originalRegion!==chosenRegion){
+  const geo=window.SolinQuarterPickers?.validateDistrict?.(chosenRegion,linkedOrg());
+  if(['invalid','mismatch'].includes(geo?.status))
+   throw {message:geo.reason,el:document.querySelector('#ce-form [data-ce-scope="quarter"][data-ce-field="Raion"]')};
+ }
  const linkIssue=linkedIssues();if(linkIssue)throw linkIssue;
  const invalid=document.querySelector('#ce-form [aria-invalid="true"]');if(invalid)throw {message:invalid.validationMessage,el:invalid};
  if(!(Number(session.draft.PLV)>0))throw {message:'Площадь выдела должна быть больше нуля.',el:document.querySelector('[data-ce-field="PLV"]')};
