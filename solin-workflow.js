@@ -409,7 +409,11 @@ function exitCard(){const r=record();if(!r)return;
  // Макет 5: sum all recorded live species and layers, never copy the
  // first arbitrary Maket10.ZAP into STUR1 when leaving the card.
  const stock=window.SolinCardCalculations?.standStock(r);
- if(stock?.status==='complete'&&(Number(r.STUR1)!==stock.expectedPerHa||Number(r.STUR)!==stock.expectedTotal)){
+ // Never silently replace already populated historical Access totals merely
+ // by leaving the screen: the new mixed-species Field arithmetic can differ
+ // from the audited original main-species-only Maket10ZAP subset.
+ const emptyVolume=v=>v===null||v===undefined||v===''||Number(v)===0;
+ if(stock?.status==='complete'&&emptyVolume(r.STUR1)&&emptyVolume(r.STUR)){
   const original1=r.STUR1,original=r.STUR;
   r.STUR1=stock.expectedPerHa;r.STUR=stock.expectedTotal;
   try{saveAll(r);}catch(e){r.STUR1=original1;r.STUR=original;notify('Не сохранилось: '+e.message);return;}
