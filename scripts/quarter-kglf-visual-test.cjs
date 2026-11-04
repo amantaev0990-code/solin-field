@@ -9,8 +9,11 @@ const source=fs.readFileSync('app.js','utf8');
 const nodes={};
 const makeNode=(key='')=>{
   let html='';
-  const node={children:[],onclick:null,className:'',type:'',textContent:'',
-    appendChild(child){this.children.push(child);}};
+  const node={children:[],onclick:null,className:'',type:'',textContent:'',attributes:{},
+    appendChild(child){this.children.push(child);return child;},
+    append(...children){this.children.push(...children);},
+    setAttribute(name,value){this.attributes[name]=String(value);},
+    getAttribute(name){return this.attributes[name]??null;}};
   Object.defineProperty(node,'innerHTML',{get(){return html;},set(value){
     html=value;node.children=[];
     // Replacing the parent DOM replaces all nested elements as in a browser.
