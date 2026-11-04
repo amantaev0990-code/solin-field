@@ -98,10 +98,10 @@
   // panel with a real keyboard. Card editor controls use SolinCardAssist.
   e.preventDefault();e.stopImmediatePropagation();open(select);
  }
- // Window capture happens before the desktop-card assistant's document
- // handlers, so no two competing dialogs are opened for the same tap.
- window.addEventListener('pointerdown',hit,true);
- // Some Android accessibility click paths do not emit pointerdown.
- window.addEventListener('click',e=>{if(!overlay)hit(e);},true);
+ // Open after the tap is complete, not on pointerdown: on a physical
+ // Android tablet, creating the sheet under the same touch lets the
+ // ensuing pointerup/click land on its backdrop and immediately close it.
+ // Capturing click also cancels the native HTML select popup.
+ window.addEventListener('click',hit,true);
  window.SolinAndroidSelects={open,close:cleanup};
 })();
