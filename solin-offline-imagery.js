@@ -116,6 +116,18 @@
     const [z,x,y]=key.slice(pack.id.length+1).split('/').map(Number);
     if(!levels.has(z))levels.set(z,new Map());levels.get(z).set(x+'/'+y,{x,y});
    }
+   // MBTiles may omit bounds. Infer the actual finest-level coverage,
+   // before adding global overview tiles, so import still zooms to its map.
+   let validBounds=false;try{if(pack.bounds){extent(pack.bounds);validBounds=true;}}catch(_){}
+   if(!validBounds){
+    const finest=[...(levels.get(pack.maxZoom)||new Map()).values()];
+    if(finest.length){
+     let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+     for(const {x,y}of finest){x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x+1);y1=Math.max(y1,y+1);}
+     const count=2**pack.maxZoom,lat=y=>Math.atan(Math.sinh(Math.PI*(1-2*y/count)))*180/Math.PI;
+     pack.bounds=[x0/count*360-180,lat(y1),x1/count*360-180,lat(y0)];
+    }
+   }
    const canvas=document.createElement('canvas');canvas.width=canvas.height=256;
    const ctx=canvas.getContext('2d',{alpha:true});ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='low';
    let added=0;

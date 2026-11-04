@@ -83,9 +83,9 @@ const server=http.createServer((req,res)=>{try{
    const bytes=db.export();db.close();const p=await SolinOfflineImagery.importFile(new File([bytes],'detail-only.mbtiles'));
    const blob=await SolinOfflineImagery.readTile(p.id,4,8,5),image=await createImageBitmap(blob),c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');g.drawImage(image,0,0);image.close();
    const pixels=[[64,64],[192,64],[64,192],[192,192]].map(([x,y])=>Array.from(g.getImageData(x,y,1,1).data));
-   return {pixels,min:p.minZoom,max:p.maxZoom,version:p.pyramidVersion,overviews:p.overviewCount,cache:SolinOfflineImagery.cacheStats};
+   return {pixels,bounds:p.bounds,min:p.minZoom,max:p.maxZoom,version:p.pyramidVersion,overviews:p.overviewCount,cache:SolinOfflineImagery.cacheStats};
   });
-  assert.equal(pyramid.min,0);assert.equal(pyramid.max,5);assert.equal(pyramid.version,1);assert(pyramid.overviews>=5);
+  assert.equal(pyramid.bounds[0],0);assert.equal(pyramid.bounds[2],22.5);assert(pyramid.bounds[3]>pyramid.bounds[1]);assert.equal(pyramid.min,0);assert.equal(pyramid.max,5);assert.equal(pyramid.version,1);assert(pyramid.overviews>=5);
   const [red,green,blue,yellow]=pyramid.pixels;
   assert(red[0]>220&&red[1]<30&&red[2]<30);assert(green[1]>220&&green[0]<30);assert(blue[2]>220&&blue[0]<30);assert(yellow[0]>220&&yellow[1]>220&&yellow[2]<30);
   assert(pyramid.cache.tiles<=64&&pyramid.cache.bytes<=8*1024*1024);
