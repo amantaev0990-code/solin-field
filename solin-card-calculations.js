@@ -77,7 +77,7 @@ function stockBreakdown(record){
  const out={included:[],singleTrees:[],freshDeadwood:[],other:[],missing:[],
   invalid:[],duplicates:[],unclassified:[],byLayer:[],bySpecies:[],
   drywoodPerHa:n(record?.M4SS),clutterPerHa:n(record?.M4ZO),liquidClutterPerHa:n(record?.M4ZL)};
- const layers=new Map(),species=new Map(),seen=new Set();
+ const layers=new Map(),species=new Map(),seen=new Map();
  for(const [index,row]of (record?._children?.Макет10||[]).entries()){
   if(!childMatches(record,row))continue;
   const iar=n(row.IAR),zap=n(row.ZAP),por=String(row.POR??'').trim();
@@ -91,8 +91,12 @@ function stockBreakdown(record){
   if(!por||zap===null){out.missing.push(item);continue;}
   if(zap<0){out.invalid.push(item);continue;}
   const key=iar+'|'+por;
-  if(seen.has(key))out.duplicates.push(item);
-  else seen.add(key);
+  // Same-species rows in the SAME source Maket10ZAP group can be
+  // legitimately aggregated (historical Access behavior). Only conflicting
+  // height, age, fullness or coefficient groups are ambiguous.
+  const signature=['KOEF','LET','PH','PD2','POL'].map(k=>String(row[k]??'')).join('|');
+  if(seen.has(key)&&seen.get(key)!==signature)out.duplicates.push(item);
+  else seen.set(key,signature);
   out.included.push(item);
   layers.set(iar,(layers.get(iar)||0)+zap);
   species.set(por,(species.get(por)||0)+zap);
@@ -123,7 +127,7 @@ function standStock(record){
  if(out.unclassified.length)return status('Есть строка с запасом ZAP, но без подтверждённого номера яруса','waiting');
  if(out.missing.length)return status('Запас не суммирован: заполните породу POR и запас ZAP у всех '+out.missing.length+
   ' строк живого древостоя (ярусы 1–6)','waiting');
- if(out.duplicates.length)return status('Повторяется порода в одном ярусе макета 10; нельзя исключить двойной подсчёт','ambiguous');
+ if(out.duplicates.length)return status('Повторяется порода в одном ярусе с разными возрастом, высотой, полнотой или коэффициентом; исходный запрос даёт неоднозначные группы','ambiguous');
  if(!out.included.length)return status('В макете 10 нет заполненных запасов ZAP живых ярусов 1–6','waiting');
  const perHa=out.livePerHa,total=accessRound(perHa*area,0);
  if(total===null)return status('Невозможно округлить общий запас по правилу Access Round','ambiguous');
