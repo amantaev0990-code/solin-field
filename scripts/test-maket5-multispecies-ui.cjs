@@ -33,11 +33,16 @@ const server=http.createServer((req,res)=>{try{
  assert(await value('STUR1').isVisible(),'Maket5 stock per hectare must be visible');
  await cell('PH',1).fill('18');const total=fixture.first+fixture.second;await waitTotal(total);
  assert.equal(Number(await cell('ZAP',0).inputValue()),fixture.first,'Weighted height (6*20+4*18)/10=19.2 -> v19*0.6');
- assert.equal(await cell('ZAP',1).inputValue(),'','Do not double-count whole-tier stock on companion');
+ assert.equal(await cell('ZAP',1).inputValue(),'0','The companion species ZAP must be zero');
  assert.equal(Number(await cell('ZAP',2).inputValue()),fixture.second);assert.equal(Number(await value('STUR').inputValue()),total*2);
  assert.match(await page.locator('#ce-stock-live').innerText(),new RegExp('^'+total+'$'));
  assert.match(await page.locator('#ce-stock-fresh').innerText(),/^12$/);assert.match(await page.locator('#ce-stock-drywood').innerText(),/^7$/);
  assert.equal(await page.evaluate(()=>current.STUR1),0,'Editing remains a draft');
+ // Input error must be rejected before it ever reaches persisted Maket10.
+ await cell('ZAP',1).fill('3120');
+ await cell('ZAP',1).press('Tab');
+ await page.waitForFunction(()=>document.querySelector('[data-ce-scope="Макет10"][data-ce-field="ZAP"][data-ce-row="1"]')?.value==='0');
+ assert.equal(await cell('ZAP',1).inputValue(),'0','Typing 3120 for 4Б is corrected to 0');
  await cell('PH',1).fill('22');const updated=fixture.changed+fixture.second;await waitTotal(updated);
  await cell('KOEF',1).fill('3');await page.waitForFunction(()=>document.querySelector('[data-ce-scope="base"][data-ce-field="STUR1"]').value==='');
  assert.equal(await page.locator('#ce-stock-audit').getAttribute('data-stock-status'),'waiting','Incomplete 6+3 must clear stale totals');
@@ -45,6 +50,6 @@ const server=http.createServer((req,res)=>{try{
  await page.locator('#ce-save').click();await page.waitForFunction(()=>!document.querySelector('#ce-form'));assert.equal(await page.evaluate(()=>current.STUR1),updated);
  await page.reload();await page.waitForFunction(()=>window.SolinWorkspace&&window.SolinCardEditor&&window.SOLIN_REFS);await page.evaluate(()=>SolinWorkspace.ready);
  const saved=await page.evaluate(async f=>{await SolinWorkspace.activate(f.id);const r=Object.values(D.quarters).flatMap(q=>q.compartments||[]).find(r=>String(r.KV)===String(f.kv)&&String(r.VD)===String(f.vd));return {perHa:r.STUR1,total:r.STUR,zap:r._children.Макет10[0].ZAP,companion:r._children.Макет10[1].ZAP};},fixture);
- assert.equal(saved.perHa,updated);assert.equal(saved.total,updated*2);assert.equal(saved.zap,fixture.changed);assert.equal(saved.companion,null);assert.deepEqual(errors,[]);
+ assert.equal(saved.perHa,updated);assert.equal(saved.total,updated*2);assert.equal(saved.zap,fixture.changed);assert.equal(saved.companion,0);assert.deepEqual(errors,[]);
  console.log('MAKET5_MIXED_AUTOCALC_OK: 6ОС+4Б, live entry, companion height affects norm, independent second tier, incomplete composition clears stale totals, deadwood separate, save/reload');
 }finally{await browser?.close();await new Promise(r=>server.close(r));}})().catch(e=>{console.error(e);process.exitCode=1;});
