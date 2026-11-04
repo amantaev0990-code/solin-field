@@ -136,6 +136,7 @@ public class SolinFieldUiInstrumentedTest {
       eval(webview,"window.__mixedNative='pending';(async()=>{"+
        "document.querySelector('#ce-assist [data-ce-assist-close]')?.click();document.getElementById('ce-cancel')?.click();"+
        "const r=JSON.parse(JSON.stringify(current));Object.assign(r,{KU:2,PLV:2,KlxrVD:8,GodT1:2015,M3Pr:'ОС',STUR1:0,STUR:0});"+
+       "const quarter=SolinAddressContext.resolveQuarter(r,D.quarters[String(r.KV)]);if(quarter)quarter.GodT=2015;"+
        "D.lesnichestvo[0].KTO=150000000;const address=Object.fromEntries(['POS','LESN','KV','KGLF','VD'].map(k=>[k,r[k]]));"+
        "r._children={Макет10:[{...address,IAR:1,POR:'ОС',KOEF:6,PH:20,POL:.6,LET:40,PROI:7,ZAP:null},"+
        "{...address,IAR:1,POR:'Б',KOEF:4,PH:null,POL:null,LET:40,PROI:7,ZAP:null}]};"+
