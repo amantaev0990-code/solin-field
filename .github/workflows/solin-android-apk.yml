@@ -47,6 +47,12 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Stage existing SOLI-N Field web assets
         run: npm run build
+      - name: Verify forest, quarter, stand and Maket dependencies
+        run: |
+          node scripts/test-system-links.cjs
+          node scripts/test-quarter-geography-selects.cjs
+          node scripts/test-card-calculations.cjs
+          node scripts/test-maket5-stock-breakdown.cjs
       - name: Verify Android staged assets and blank MDB only
         run: node scripts/test-android-assets.cjs
       - name: Verify exact GitHub Pages vs native APK source parity
