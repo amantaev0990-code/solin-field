@@ -329,13 +329,17 @@ function recalculateEditedField(el){
  }
  const notice=document.getElementById('ce-calc-notice');
  if(!notice)return;
- const normativeCorrected=changed.some(item=>item.field==='ZAP');
+ const normativeCorrected=changed.some(item=>item.field==='ZAP'&&item.kind!=='companion-zero');
+ const companionCorrected=changed.some(item=>item.kind==='companion-zero');
  const k59=check.stockPerHectare,normativeVerified=k59?.status==='complete';
  if(!normativeVerified)session.calcNotices=session.calcNotices.filter(x=>x.field!=='ZAP');
  const headline=normativeCorrected?'К59: нормативный ZAP исправлен':
+  companionCorrected?'Макет 10: запас примесной породы обнулён':
   normativeVerified?'К59: запас проверен, итоги пересчитаны':'Запас не проверен по К59 · пересчитаны только зависимые значения';
  const explanation=normativeCorrected?
   'Неверный ZAP автоматически исправлен по исходной таблице SOLI-N. Итоговые запасы пересчитаны из нормативного значения. Изменения пока находятся в черновике.':
+  companionCorrected?
+   'У примеси запас должен быть 0: запас яруса хранится только у ведущей породы. Проверка К59: '+(normativeVerified?'норматив подтверждён.':(k59?.reason||'пока не подтверждён.'))+' Черновик не сохранён.':
   normativeVerified?
    'Введённый ZAP соответствует расчёту К59. Зависимые запасы пересчитаны. Изменения пока не сохранены.':
    'К59 не подтвердил введённый ZAP: '+(k59?.reason||'нет однозначного расчёта')+
