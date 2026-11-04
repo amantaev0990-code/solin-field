@@ -36,7 +36,8 @@ const server=http.createServer((req,res)=>{
   const candidate=await page.locator('#newKU').evaluate(el=>[...el.options].find(x=>x.value&&!x.disabled)?.value);
   assert(candidate,'Source-backed KU code must be offered to Android user');
   await page.locator('#newKU').tap({force:true});
-  assert(await page.locator('#sap-search').isVisible(),'Android opens custom searchable selector after a completed tap');
+  await page.locator('#sap-search').waitFor({state:'visible'});
+  assert.equal(await page.locator('#solin-android-picker').count(),1,'Only one custom sheet exists');
   await page.waitForTimeout(120);
   assert(await page.locator('#sap-search').isVisible(),'Picker must stay open after touchend/click (no flash-and-close regression)');
   assert.notEqual(await page.evaluate(()=>document.activeElement?.id),'sap-search','Picker must not open keyboard automatically');
