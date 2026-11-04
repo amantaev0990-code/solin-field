@@ -91,10 +91,10 @@
   }else{query='';draw();}
   document.addEventListener('keydown',onKey,true);
  }
- // A native Android SELECT must never receive its own pointer default.
- // Preventing only click is too late on WebView: the OS picker has already
- // opened on touchstart/pointerdown, producing TWO lists on the tablet.
- // Open the custom sheet only AFTER the whole tap/click has completed.
+ // WebView opens a native picker before the click default on some tablets.
+ // For touch input use the complete touch sequence. Cancelling a touch
+ // pointerdown may issue pointercancel instead of pointerup, so depending on
+ // pointerup alone would leave the custom picker permanently closed.
  let pending=null,tapSerial=0;
  const targetSelect=e=>{
   const t=e.target;
@@ -105,39 +105,60 @@
   const options=[...label.querySelectorAll('select')].filter(ordinary);
   return options.length===1?options[0]:null;
  };
- function swallow(e){e.preventDefault();e.stopImmediatePropagation();}
- function onPointerDown(e){
-  const select=targetSelect(e);
-  if(!ordinary(select))return;
-  swallow(e);
-  pending={select,id:e.pointerId,serial:++tapSerial};
+ function swallow(e){
+  if(e.cancelable)e.preventDefault();
+  e.stopImmediatePropagation();
  }
- function onPointerUp(e){
-  if(!pending||pending.id!==e.pointerId)return;
-  const {select,serial}=pending;swallow(e);
-  // Release the pointer before creating a new full-screen element.
-  // If the sheet exists during the same gesture, Android may send click
-  // to its backdrop and close it instantly.
+ function queueOpen(select,serial){
+  // Never place a sheet under an active touch; the trailing click could
+  // hit its backdrop and close it again in the same gesture.
   setTimeout(()=>{
    if(serial!==tapSerial)return;
    pending=null;
    if(ordinary(select))open(select);
   },0);
  }
+ function onTouchStart(e){
+  const select=targetSelect(e);
+  if(!ordinary(select))return;
+  swallow(e);
+  pending={select,kind:'touch',serial:++tapSerial};
+ }
+ function onTouchEnd(e){
+  if(pending?.kind!=='touch')return;
+  const {select,serial}=pending;swallow(e);queueOpen(select,serial);
+ }
+ function onTouchCancel(e){
+  if(pending?.kind==='touch'){pending=null;tapSerial++;}
+ }
+ function onPointerDown(e){
+  if(e.pointerType==='touch')return; // handled by touchstart/end
+  const select=targetSelect(e);
+  if(!ordinary(select))return;
+  swallow(e);
+  pending={select,id:e.pointerId,kind:'pointer',serial:++tapSerial};
+ }
+ function onPointerUp(e){
+  if(pending?.kind!=='pointer'||pending.id!==e.pointerId)return;
+  const {select,serial}=pending;swallow(e);queueOpen(select,serial);
+ }
  function onPointerCancel(e){
-  if(pending&&pending.id===e.pointerId){pending=null;tapSerial++;}
+  if(pending?.kind==='pointer'&&pending.id===e.pointerId){
+   pending=null;tapSerial++;
+  }
  }
  function onClick(e){
   const select=targetSelect(e);
   if(!ordinary(select))return;
   swallow(e);
-  // Pointer path already scheduled its sheet. Click can be retargeted to
-  // the new DOM by Android; it must not open a native SELECT or duplicate.
   if(pending?.select===select)return;
-  // Keyboard / accessibility activation has no pointer sequence.
-  const serial=++tapSerial;
-  setTimeout(()=>{if(serial===tapSerial&&ordinary(select))open(select);},0);
+  // Accessibility and keyboard activation do not necessarily send
+  // pointer/touch events but should use the same custom list.
+  queueOpen(select,++tapSerial);
  }
+ window.addEventListener('touchstart',onTouchStart,{capture:true,passive:false});
+ window.addEventListener('touchend',onTouchEnd,{capture:true,passive:false});
+ window.addEventListener('touchcancel',onTouchCancel,true);
  window.addEventListener('pointerdown',onPointerDown,true);
  window.addEventListener('pointerup',onPointerUp,true);
  window.addEventListener('pointercancel',onPointerCancel,true);
