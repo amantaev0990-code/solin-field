@@ -324,14 +324,18 @@ else openMaket(m);
 notify('Сохранено: '+m);
 if(m==='Макет10'&&(calculated.length||stockEdited)){
  const k59Verified=k59Check?.status==='complete';
- const normativeFix=calculated.some(x=>x.field==='ZAP');
+ const normativeFix=calculated.some(x=>x.field==='ZAP'&&x.kind!=='companion-zero');
+ const companionFix=calculated.some(x=>x.kind==='companion-zero');
  const dependent=calculated.filter(x=>x.field==='STUR1'||x.field==='STUR');
  const previous=calculated.filter(x=>x.field!=='ZAP'&&x.field!=='STUR1'&&x.field!=='STUR');
  const reason=h(k59Check?.reason||'Нет однозначного результата нормативного расчёта');
  const heading=normativeFix?'К59: нормативный запас автоматически исправлен':
+   companionFix?'Макет 10: запас примеси сброшен на 0':
    k59Verified?'К59: введённый запас проверен по нормативу':'Запас НЕ проверен по нормативу К59';
  const explanation=normativeFix?
    '<p>Значение ZAP заменено по таблице SOLI-N Szap/SzapCK. Итоги STUR1 и STUR пересчитаны из <b>нормативного</b> запаса.</p>':
+   companionFix?
+    '<p>У примесной породы запас обнулён. Весь запас яруса принадлежит строке ведущей породы. '+(k59Verified?'Норматив К59 подтверждён.':'Сам норматив К59 не подтверждён: '+reason)+'.</p>':
    k59Verified?
      '<p>К59 подтвердил запас в макете 10. Пересчитаны зависимые итоги.</p>':
      '<p><b>Внимание: введённый запас ZAP не подтверждён по К59.</b> Причина: '+reason+'.</p>'+
