@@ -29,6 +29,8 @@ assert.equal(updated.stockPerHectare.status,'unsupported-zone');
 assert.equal(JSON.stringify(r),snap,'No mutation before explicit user save');
 const zone4={...r,KlxrVD:4};
 let corrected=calc.stockPerHectare(zone4,tables,owner,{...q,Klxr:4});
+assert.equal(corrected.status,'ambiguous','Conflicting cached GodT1 must not silently select a normative branch');
+corrected=calc.stockPerHectare({...zone4,GodT1:2026},tables,owner,{...q,Klxr:4});
 assert.equal(corrected.status,'complete','Actual original Karaganda Szap row for species В and LXZ4');
 assert.equal(typeof corrected.expected,'number');
 assert.equal(corrected.expected>0,true);

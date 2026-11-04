@@ -26,14 +26,14 @@ function safeRoundHalf(numb,places=0){
 function accessRound(value,places=0){
  if(!Number.isFinite(value)||value<0)return null;
  const factor=10**places,scaled=value*factor,lo=Math.floor(scaled),fraction=scaled-lo;
- if(Math.abs(fraction-0.5)<1e-8)return (lo%2===0?lo:lo+1)/factor;
+ if(fraction===0.5)return (lo%2===0?lo:lo+1)/factor;
  return Math.round(scaled)/factor;
 }
 // К59_1 uses Int() and an explicit <0.5 comparison: midpoint goes UP.
 function k59Round(value,places=0){
  if(!Number.isFinite(value)||value<0)return null;
  const factor=10**places,scaled=value*factor,lo=Math.floor(scaled);
- return (lo+(scaled-lo>=0.5-1e-9?1:0))/factor;
+ return (lo+(scaled-lo>=0.5?1:0))/factor;
 }
 function bonitet(record,refs){
  if(!refs?.SSHB?.length)return status('Нет оригинальной шкалы SSHB');
@@ -93,12 +93,12 @@ function companionStockIssues(record){
   if(rows.length<2||rows.some(x=>!defined(x.row.POR)||!(n(x.row.KOEF)>0)))continue;
   const dominant=layerLead(rows,record);
   for(const entry of rows){
-   if(entry===dominant||n(entry.row.ZAP)===0)continue;
-   issues.push({field:'ZAP',scope:'Макет10',index:entry.index,kind:'companion-zero',
+   if(entry===dominant||!defined(entry.row.ZAP)||n(entry.row.ZAP)===0)continue;
+   issues.push({field:'ZAP',scope:'Макет10',index:entry.index,kind:'companion-conflict',
     label:'Запас примеси яруса '+iar+' ('+entry.row.POR+')',
     previous:defined(entry.row.ZAP)?String(entry.row.ZAP):'Не указан',
-    expected:0,reason:'Полный запас яруса учитывается только у ведущей породы '+dominant.row.POR+
-    '; запас примесной породы не суммируется повторно'});
+    severity:'warning',status:'unverified',reason:'В смешанном ярусе у нескольких пород указан ZAP. '+
+    'Правило автоматического обнуления не подтверждено исходным запросом; значения сохранены для проверки.'});
   }
  }
  return issues;
@@ -194,6 +194,32 @@ function standStock(record){
   drywoodPerHa:out.drywoodPerHa,drywoodTotal:out.drywoodTotal,
   basis:'source-backed-tier-arithmetic-not-complete-K59'};
 }
+// Read-only replay of the scalar part of Макет10ЗАП1 / Макет10ЗАП.
+// The source GROUP BY includes IAR and the five species measurements.
+// Several groups update one address: no deterministic scalar result is proven.
+// Keep this distinct from the useful Field subtotal of living layers 1–6.
+function sourceStandStock(record){
+ const category=n(record?.KU),area=n(record?.PLV);
+ if(category===null||area===null||area<=0||!defined(record?.M3Pr))
+  return status('Для исходного запроса не заданы KU, PLV или M3Pr','waiting');
+ if(category>=20)return status('Исходный Макет10ЗАП1 выполняется при KU < 20','not-applicable');
+ const groups=new Map();
+ for(const row of record?._children?.Макет10||[]){
+  const iar=n(row.IAR),zap=n(row.ZAP);
+  if(!childMatches(record,row)||!same(row.POR,record.M3Pr)||iar===null||!(iar<4||iar===8))continue;
+  if(defined(row.ZAP)&&zap===null||zap!==null&&zap<0)
+   return status('Недопустимое значение ZAP в исходной группе','ambiguous');
+  const signature=JSON.stringify(['KOEF','LET','PH','PD2','POL','IAR'].map(k=>n(row[k])));
+  const group=groups.get(signature)||{sum:0,known:false};
+  if(zap!==null){group.sum+=zap;group.known=true;}
+  groups.set(signature,group);
+ }
+ const selected=[...groups.values()].filter(g=>g.known&&g.sum!==0);
+ if(!selected.length)return status('Макет10ЗАП1 не создаёт строку с ненулевым запасом','waiting');
+ if(selected.length!==1)return status('Макет10ЗАП1 создаёт несколько групп для одного адреса; порядок UPDATE в Access не подтверждён','ambiguous');
+ return {status:'complete',expectedPerHa:selected[0].sum,expectedTotal:accessRound(selected[0].sum*area),
+  reason:'Макет10ЗАП1 → Макет10ЗАП: одна исходная группа POR=M3Pr, IAR<4 или IAR=8',basis:'original-saved-query-scalar'};
+}
 // The original forest registry contains the KTO of each district. Older
 // Field-created forests omitted it despite having an exact POS/LESN match.
 function originalForestKTO(record){
@@ -214,6 +240,10 @@ function stockZoneOptions(refs,region,kpz=null){
 }
 function stockPerHectare(record,refs,org,quarterRow=null,targetLayer=null){
  if(!refs?.Szap?.length)return status('Таблица запасов Szap недоступна');
+ if(org&&['POS','LESN'].some(k=>defined(org[k])&&!same(org[k],record?.[k])))
+  return status('К59: лесничество не соответствует адресу карточки','ambiguous');
+ if(quarterRow&&address.slice(0,4).some(k=>defined(quarterRow[k])&&!same(quarterRow[k],record?.[k])))
+  return status('К59: квартал не соответствует полному адресу карточки','ambiguous');
  const category=n(record?.KU),area=n(record?.PLV),original=originalForestKTO(record);
  const direct=n(org?.KTO),region=direct!==null&&direct>0?direct:original;
  const explicit=n(record?.KlxrVD),quarterZone=n(quarterRow?.Klxr);
@@ -285,29 +315,32 @@ function stockPerHectare(record,refs,org,quarterRow=null,targetLayer=null){
    ', автоматический норматив неоднозначен.',region,zone,species:specie,availableZones,zoneOptions};
  const v=n(rows[0]['v'+height]),pol=n(row.POL);
  if(v===null||v<=0)return status('К59: нет нормативного запаса для этой высоты','ambiguous');
+ if(pol>1)return status('К59: относительная полнота вне диапазона 0–1','ambiguous');
  const standard=k59Round(v*pol,0);
  if(standard===null)return status('К59: расчёт попал на неоднозначное округление','ambiguous');
  let expected=standard,source='Szap, высота '+height+' м, полнота '+pol;
- const CK=(refs.SzapCK||[]).filter(r=>same(r.Obl,region)&&same(r.p1,row.POR)&&same(r.Boni,record.M3B));
+ // An omitted table is not the same as a verified LEFT JOIN with no rows.
+ if(!Array.isArray(refs.SzapCK))return status('К59: таблица SzapCK отсутствует; выбор нормативной ветви не подтверждён','unavailable');
+ const CK=refs.SzapCK.filter(r=>same(r.Obl,region)&&same(r.p1,row.POR)&&same(r.Boni,record.M3B));
  if(CK.length>1)return status('К59: несколько совпадающих таблиц SzapCK','ambiguous');
- if(CK.length){
-   const step=k59Round(weighted,1);
-   if(step===null)return status('К59: неоднозначное округление высоты в SzapCK','ambiguous');
-   const col='v'+Math.round(step*10).toString().padStart(2,'0')+'c';
-   const vck=n(CK[0][col]);
-   if(vck!==null&&vck>0){
-     const year=n(record.GodT1)??n(quarterRow?.GodT);
-     // QueryDef uses ВыделВыб.GodT1, NOT the quarter's current GodT.
-     if(year===null)return status('К59: для выбора SzapCK нужен исходный GodT1 (год таксации выдела)','ambiguous');
-     if(year>2016){
-       const species=(refs.SDP_Tip||refs.SDP||[]).find(r=>same(r.KPC,row.POR));
-       const ndr=n(species?.NDR);
-       if(ndr===null)return status('К59: группа NDR неизвестна для выбора нормы SzapCK','ambiguous');
-       expected=k59Round(vck*pol,ndr===4?1:0);
-       if(expected===null)return status('К59: неоднозначное округление SzapCK','ambiguous');
-       source='SzapCK, высота '+step+' м, полнота '+pol+', год '+year;
-     }
-   }
+ const species=(refs.SDP_Tip||refs.SDP||[]).filter(r=>same(r.KPC,row.POR));
+ if(species.length!==1||n(species[0].NDR)===null)
+  return status('К59: нет единственной исходной группы SDP_Tip.NDR','unavailable');
+ const ndr=n(species[0].NDR);
+ // ВыделЛес.GodT1 is explicitly projected from Квартал.GodT.
+ if(n(record.GodT1)!==null&&n(quarterRow?.GodT)!==null&&n(record.GodT1)!==n(quarterRow.GodT))
+  return status('К59: GodT1 расходится с Квартал.GodT; требуется обновить контекст','ambiguous');
+ const year=n(quarterRow?.GodT)??n(record.GodT1),step=k59Round(weighted,1);
+ const col='v'+Math.round(step*10).toString().padStart(2,'0')+'c';
+ // The saved expression enumerates heights 0.5..3.8; outside that
+ // domain its three IIf branches are zero even on an unmatched LEFT JOIN.
+ const ckValue=step>=0.5&&step<=3.8?(CK.length?n(CK[0][col]):null):0;
+ if(year===null&&(ndr===4||ckValue!==null&&ckValue>0))
+  return status('К59: для выбора SzapCK нужен исходный GodT1 (Квартал.GodT)','ambiguous');
+ if(year>2016&&(ndr===4||ckValue!==null&&ckValue>0)){
+  if(ckValue===null)return status('К59: исходная ветвь NDR=4 требует значение SzapCK, а не подмену таблицей Szap','unavailable');
+  expected=k59Round(ckValue*pol,ndr===4?1:0);
+  source='SzapCK, высота '+step+' м, полнота '+pol+', год '+year;
  }
  return {status:'complete',field:'ZAP',index,expected,layer:n(layer),weightedHeight:weighted,composition:sameLayer.map(r=>({por:r.POR,coef:n(r.KOEF),height:n(r.PH)})),reason:'К59 · Σ(коэфф. × высота)/10 = '+weighted+' м · '+source+
   ' · POR '+specie+', KTO '+region+', LXZ '+zone+', KUL '+cul};
@@ -328,12 +361,9 @@ function corrections(record,refs,org,quarterRow=null){
  const layerCalculations=layers.map(iar=>({...stockPerHectare(bonitetChecked,refs,org,quarterRow,iar),layer:iar}));
  const k59=layerCalculations.find(x=>x.layer===1)||layerCalculations[0]||stockPerHectare(bonitetChecked,refs,org,quarterRow);
  let computedRecord={...record,_children:{...record._children,Макет10:(record?._children?.Макет10||[]).map(r=>({...r}))}};
- // Normalize companions regardless of whether Szap is available: the
- // representation invariant is independent of the normative stock value.
- for(const issue of companionStockIssues(record)){
-  issues.push(issue);
-  computedRecord._children.Макет10[issue.index].ZAP=0;
- }
+ // A source observation is not an UPDATE rule. Never erase a companion's
+ // entered stock (or replace NULL with zero) merely to make totals pass.
+ unknown.push(...companionStockIssues(record));
  for(const result of layerCalculations){
   if(result.status!=='complete'){unknown.push({field:'ZAP',...result});continue;}
   const current=record._children.Макет10[result.index].ZAP;
@@ -346,16 +376,18 @@ function corrections(record,refs,org,quarterRow=null){
  if(!layers.length)unknown.push({field:'ZAP',...k59});
  const blocked=layerCalculations.filter(x=>x.status==='waiting'&&/коэффициент|состав|высоту|сумма/.test(x.reason));
  const stock=blocked.length?status(blocked.map(x=>x.reason).join('; '),'waiting'):standStock(computedRecord);
- if(blocked.length)for(const field of ['STUR1','STUR'])if(defined(record[field]))
-  issues.push({field,label:field,previous:String(record[field]),expected:null,reason:stock.reason});
- if(stock.status==='complete'){
+ const sourceStock=sourceStandStock(computedRecord);
+ const standStockVerified=stock.status==='complete'&&sourceStock.status==='complete'&&
+  stock.expectedPerHa===sourceStock.expectedPerHa&&stock.expectedTotal===sourceStock.expectedTotal;
+ if(standStockVerified){
   for(const [field,label,expected] of [['STUR1','Запас на 1 га, м³/га',stock.expectedPerHa],['STUR','Запас выдела, м³',stock.expectedTotal]]){
    const value=record?.[field];
    if(!defined(value)||n(value)!==expected)
     issues.push({field,label,previous:defined(value)?String(value):'Не указан',expected,reason:stock.reason});
   }
- }else unknown.push({field:'STUR',...stock});
- return {issues,unknown,bonitet:b,standStock:stock,stockPerHectare:k59,layerCalculations};
+ }else unknown.push({field:'STUR',...stock,status:stock.status==='complete'?'unverified':stock.status,
+  reason:stock.status==='complete'?'Живой запас подсчитан, но совпадение с исходным Макет10ЗАП1 не подтверждено. STUR1 и STUR сохранены. '+sourceStock.reason:stock.reason});
+ return {issues,unknown,bonitet:b,standStock:stock,originalStandStock:sourceStock,standStockVerified,stockPerHectare:k59,layerCalculations};
 }
-window.SolinCardCalculations={bonitet,standStock,stockBreakdown,stockPerHectare,stockZoneOptions,companionStockIssues,corrections,safeRoundHalf,accessRound,k59Round};
+window.SolinCardCalculations={bonitet,standStock,sourceStandStock,stockBreakdown,stockPerHectare,stockZoneOptions,companionStockIssues,corrections,safeRoundHalf,accessRound,k59Round};
 })();

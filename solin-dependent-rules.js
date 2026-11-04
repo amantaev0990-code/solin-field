@@ -147,6 +147,11 @@ function options(form,field,row,card,org,refs=ref()){
  // Кл_Рай отсутствует в сохранённом нормативном пакете. Не показываем
  // произвольные районы другой области и не выдаём чужие коды за верные.
  if(form==='Квартал'&&field==='Raion'){
+  if(Array.isArray(refs['Кл_Рай'])){
+   const area=kto(org);if(!area)return {status:'waiting',reason:'Сначала определите область KTO',items:[]};
+   const items=refs['Кл_Рай'].filter(r=>same(r.ТЕОб,area)).map(r=>({value:code(r.te),label:String(r.rus_name??'')}));
+   return {status:'complete',reason:'Исходный Кл_Рай (СОАТО), ТЕОб=KTO. Историческая версия справочника.',items};
+  }
   return {status:'unavailable',reason:'Исходная таблица «Кл_Рай» и полный фильтр ТЕОб не сохранены. Район нельзя подтвердить без первоисточника.',items:[]};
  }
  if(form==='Квартал'&&field==='Klxr'){

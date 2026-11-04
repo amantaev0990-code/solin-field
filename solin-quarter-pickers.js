@@ -92,6 +92,12 @@
    else if(label&&!results.get(k).label)results.get(k).label=clean(label);
   };
   if(field==='Raion'){
+   const source=window.SOLIN_REFS?.tables?.['Кл_Рай'];
+   if(Array.isArray(source)){
+    if(area)for(const r of source)if(same(r.ТЕОб,area))add(r.te,r.rus_name);
+    return {items:[...results.values()],auto:null,region:area,status:area?'complete':'waiting',
+     reason:area?'Исходный Кл_Рай: районы исторической версии СОАТО по ТЕОб='+area:'Сначала укажите область KTO'};
+   }
    // Never show codes from another oblast. Saved entries without a region
    // prefix are available only inside their own forest, not countrywide.
    for(const item of KNOWN_DISTRICTS)

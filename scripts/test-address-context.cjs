@@ -60,7 +60,7 @@ vm.runInNewContext(fs.readFileSync('solin-card-calculations.js','utf8'),context)
 const calc=context.window.SolinCardCalculations;
 const card={POS:723,LESN:4,KV:1,KGLF:1,VD:1,KlxrVD:null,KU:2,PLV:1,M3Pr:'В',
  _children:{Макет10:[{POS:723,LESN:4,KV:1,KGLF:1,VD:1,IAR:1,KOEF:10,POR:'В',PH:6,POL:0.6,ZAP:150}]}};
-const norm=calc.stockPerHectare(card,{Szap:[{Obl:350000000,p1:'В',LXZ:8,KUL:'.',v6:59}],SzapCK:[]},owner,match);
+const norm=calc.stockPerHectare(card,{Szap:[{Obl:350000000,p1:'В',LXZ:8,KUL:'.',v6:59}],SzapCK:[],SDP_Tip:[{KPC:'В',NDR:2}]},owner,match);
 assert.equal(norm.status,'complete','K59 can use matched quarter Klxr without modifying the card');
 assert.equal(norm.expected,35);
 assert.equal(card.KlxrVD,null,'Pure calculation must not mutate existing data');

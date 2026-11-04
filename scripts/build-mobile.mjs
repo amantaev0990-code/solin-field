@@ -5,7 +5,7 @@ import path from 'node:path';
 const root=path.resolve(import.meta.dirname,'..');
 const out=path.join(root,'www');
 const extensions=new Set(['.html','.htm','.js','.mjs','.css','.json','.webmanifest','.png','.jpg','.jpeg','.webp','.svg','.ico','.gif','.gz','.wasm','.woff','.woff2','.ttf','.otf','.txt']);
-const excluded=new Set(['node_modules','.git','.github','www','android','ios','flutter_app','mdb-service','scripts','windows','native','docs','.vscode']);
+const excluded=new Set(['node_modules','.git','.github','www','android','ios','flutter_app','mdb-service','scripts','windows','native','docs','cloud-lab','tests','.vscode']);
 const forbidden=/\.(?:mdb|accdb|ldb|laccdb|ps1|zip|apk|aab|key|keystore|env)$/i;
 if(fs.existsSync(out)) fs.rmSync(out,{recursive:true,force:true});
 let count=0;
@@ -32,6 +32,10 @@ function copy(from,to,level=0){
  }
 }
 copy(root,out);
+// Optional original reference supplement stays outside public git.
+if(process.env.SOLIN_PRIVATE_REFERENCE_PACK){
+ fs.copyFileSync(path.resolve(process.env.SOLIN_PRIVATE_REFERENCE_PACK),path.join(out,'solin-private-refs.packed.bin'));
+}
 // AAPT strips .gz AND decompresses asset bytes inside Android APK.
 // The old APK could not fetch refs-audit.json.gz, so all dependent
 // source-backed selectors stayed grey with no values. Keep the same

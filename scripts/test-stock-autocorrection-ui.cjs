@@ -32,6 +32,7 @@ async function fixture(p){
   // Reproduce forests created by the previous three-select flow: missing KTO.
   delete org.KTO;
   if(!window.SOLIN_FOREST_CATALOG?.rows?.some(x=>x[0]===213&&x[1]===2&&x[4]===150000000))throw Error('Original owner catalogue is unavailable');
+  const quarter=SolinAddressContext.resolveQuarter(r,D.quarters[String(r.KV)]);if(quarter)quarter.GodT=2015;
   Object.assign(r,{KU:2,PLV:2,M3Pr:'В',M3B:'3',KlxrVD:8,GodT1:2015,STUR1:99,STUR:198});
   r._children.Макет10=[{...r._children.Макет10[0],POS:r.POS,LESN:r.LESN,KV:r.KV,KGLF:r.KGLF,VD:r.VD,
    IAR:1,POR:'В',KOEF:10,PH:6,POL:0.6,LET:5,PROI:7,ZAP:99}];
@@ -250,7 +251,7 @@ async function reopen(p,info){
  await p.evaluate(()=>{
   const q=D.quarters['1'],r=q.compartments[0];
   q.meta.Kpz=2;q.meta.Klxr=8;r.KlxrVD=8;r.M3Pr='В';r.M3B='3';r.KU=2;r.PLV=1;
-  r.STUR1=154;r.STUR=154;r.GodT1=2015;
+  r.STUR1=154;r.STUR=154;r.GodT1=2015;q.meta.GodT=2015;for(const qr of q.quarterRows||[])qr.GodT=2015;
   r._children.Макет10=[{POS:723,LESN:4,KV:1,KGLF:r.KGLF,VD:1,IAR:1,KOEF:10,POR:'В',PH:6,POL:0.6,LET:5,PROI:7,ZAP:154}];
   current=r;renderComp();show('card');solinWorkflow.editMaket('Макет10',0);
  });

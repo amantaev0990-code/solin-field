@@ -1,0 +1,10 @@
+#!/usr/bin/env node
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),cp=require('node:child_process');
+const root=path.resolve(__dirname,'..');
+const tests=['scripts/build-mobile.mjs','cloud-lab/test-core.cjs','scripts/test-card-calculations.cjs','scripts/test-maket5-stock-breakdown.cjs','scripts/test-dependent-field-rules.cjs','scripts/test-category-layer-dependencies.cjs','scripts/test-system-links.cjs','scripts/test-address-context.cjs','scripts/test-szap-region-zones.cjs','scripts/test-whole-card-dependencies.cjs','scripts/test-cross-editor-dependencies.cjs','scripts/test-contextual-comboboxes.cjs','scripts/test-android-assets.cjs','scripts/test-dependency-audit.cjs','tests/forest-catalog-verification.cjs','control-engine-test.cjs','native-control-test.cjs','source-recovery-test.cjs','transfer-address-test.cjs'];
+const report={version:1,startedAt:new Date().toISOString(),nativeAccessExecuted:false,physicalAndroidExecuted:false,tests:[]};
+for(const file of tests){const start=Date.now(),r=cp.spawnSync(process.execPath,[file],{cwd:root,encoding:'utf8',timeout:180000,maxBuffer:2*1024*1024});report.tests.push({file,status:r.status===0?'passed':'failed',milliseconds:Date.now()-start,output:(r.stdout||'')+(r.stderr||''),error:r.error?.message});console.log((r.status===0?'PASS ':'FAIL ')+file);if(r.status!==0)console.error(report.tests.at(-1).output.slice(-5000));}
+report.finishedAt=new Date().toISOString();report.passed=report.tests.filter(t=>t.status==='passed').length;report.failed=report.tests.length-report.passed;
+const out=path.resolve(process.env.CLOUD_LAB_OUTPUT||path.join(os.tmpdir(),'solin-cloud-lab-results.json'));fs.mkdirSync(path.dirname(out),{recursive:true});fs.writeFileSync(out,JSON.stringify(report,null,2));
+console.log(JSON.stringify({passed:report.passed,failed:report.failed,report:out}));if(report.failed)process.exitCode=1;

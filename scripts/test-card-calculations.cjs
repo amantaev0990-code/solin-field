@@ -21,7 +21,7 @@ assert.deepEqual(Array.from(result.issues,x=>String(x.expected)),['4','40','80']
 assert.equal(JSON.stringify(card),snapshot,'Calculations must never mutate saved or draft data');
 // K59 physical stage has 58 rows, including a V species row with
 // height 6, POL approx 0.6, table v6=59 => ZAP=35.
-const stockRefs={Szap:[{Obl:150000000,LXZ:8,KUL:'.',p1:'В',v6:59}],SzapCK:[]};
+const stockRefs={Szap:[{Obl:150000000,LXZ:8,KUL:'.',p1:'В',v6:59}],SzapCK:[],SDP_Tip:[{KPC:'В',NDR:2}]};
 const k59Card={POS:213,LESN:1,KV:6,KGLF:26,VD:'2',M3Pr:'В',KlxrVD:8,KU:2,PLV:2,STUR1:99,STUR:198,
  _children:{Макет10:[{POS:213,LESN:1,KV:6,KGLF:26,VD:'2',IAR:1,POR:'В',POL:0.6000000238418579,KOEF:10,PH:6,ZAP:99}]}};
 const k59Snapshot=JSON.stringify(k59Card);
@@ -41,7 +41,7 @@ assert.deepEqual(Array.from(cascaded.issues,x=>x.expected),[35,35,70]);
 assert.equal(JSON.stringify(k59Card),k59Snapshot,'K59 corrections must not modify source data');
 assert.equal(calc.stockPerHectare(k59Card,stockRefs,null).status,'waiting');
 const height7={...k59Card,_children:{Макет10:[{...k59Card._children.Макет10[0],PH:6.5}]}};
-assert.equal(calc.stockPerHectare(height7,{Szap:[{...stockRefs.Szap[0],v7:80}],SzapCK:[]},{KTO:150000000}).expected,48,
+assert.equal(calc.stockPerHectare(height7,{...stockRefs,Szap:[{...stockRefs.Szap[0],v7:80}]},{KTO:150000000}).expected,48,
  'K59_1 rounds a weighted 6.5m height up to 7m');
 assert.equal(calc.stockPerHectare({...k59Card,KU:21},stockRefs,{KTO:150000000}).status,'not-applicable');
 assert.equal(calc.stockPerHectare(k59Card,{Szap:[stockRefs.Szap[0],stockRefs.Szap[0]]},{KTO:150000000}).status,'ambiguous');

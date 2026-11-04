@@ -58,18 +58,19 @@ assert.equal(parts.drywoodPerHa,12);
 assert.equal(parts.drywoodTotal,24);
 assert.equal(JSON.stringify(mixed),mixedSnapshot,'Never mutate the source data');
 const mixedAudit=c.corrections(mixed,{SSHB:[],Szap:[]});
-assert.deepEqual(Array.from(mixedAudit.issues,x=>x.field),['ZAP','STUR1','STUR']);
-assert.deepEqual(Array.from(mixedAudit.issues,x=>x.expected),[0,71,142]);
-// V13: deliberately false 3120 m³/ha in 4Б must become zero.
+assert.deepEqual(Array.from(mixedAudit.issues,x=>x.field),[]);
+assert.equal(mixedAudit.standStockVerified,false,'Living subtotal is not original scalar UPDATE parity');
+assert(mixedAudit.unknown.some(x=>x.field==='STUR'&&x.status==='unverified'));
+// A conflicting companion stock needs review, never an invented zero UPDATE.
 const spurious={...mixed,_children:{Макет10:mixed._children.Макет10.map((r,i)=>
  i===1?{...r,ZAP:3120}:r)}};
 const spuriousBefore=JSON.stringify(spurious);
 assert.equal(c.standStock(spurious).status,'ambiguous','Do not aggregate a non-leading stock');
 const cleaned=c.corrections(spurious,{SSHB:[],Szap:[]});
-assert.equal(cleaned.issues.find(x=>x.kind==='companion-zero')?.expected,0);
-assert.equal(cleaned.issues.find(x=>x.kind==='companion-zero')?.index,1);
-assert.equal(cleaned.standStock.expectedPerHa,71);
-assert.equal(cleaned.standStock.expectedTotal,142);
+assert.equal(cleaned.issues.some(x=>x.field==='ZAP'),false);
+assert.equal(cleaned.unknown.find(x=>x.kind==='companion-conflict')?.index,1);
+assert.equal(cleaned.standStock.status,'ambiguous');
+assert.equal(cleaned.issues.some(x=>['STUR','STUR1'].includes(x.field)),false);
 assert.equal(JSON.stringify(spurious),spuriousBefore,'Corrections must not mutate source');
 const unknown={...mixed,_children:{Макет10:mixed._children.Макет10.map(r=>
  r.IAR===3?{...r,ZAP:null}:r)}};

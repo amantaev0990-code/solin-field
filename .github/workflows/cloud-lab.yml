@@ -1,0 +1,32 @@
+name: SOLI-N Cloud Lab
+on:
+  push:
+    paths:
+      - 'cloud-lab/**'
+      - 'solin-*.js'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'package.json'
+      - '.github/workflows/cloud-lab.yml'
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verified-logic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run source differential and preservation regressions
+        run: npm run test:logic
+        env:
+          CLOUD_LAB_OUTPUT: /tmp/solin-cloud-lab-results.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cloud-lab-test-results
+          path: /tmp/solin-cloud-lab-results.json

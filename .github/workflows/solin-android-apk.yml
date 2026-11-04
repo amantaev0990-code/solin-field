@@ -47,6 +47,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Stage existing SOLI-N Field web assets
         run: npm run build
+      - name: Gate candidate APK on Cloud Lab logic and preservation checks
+        run: npm run test:logic
       - name: Verify forest, quarter, stand and Maket dependencies
         run: |
           node scripts/test-system-links.cjs
