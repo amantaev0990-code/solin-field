@@ -111,7 +111,7 @@ function stockBreakdown(record){
   if(positive.length===1&&rows.length>1){
    const higher=rows.some(r=>r.coef!==null&&carrier.coef!==null&&r.coef>carrier.coef);
    const tied=rows.some(r=>r!==carrier&&r.coef!==null&&r.coef>0&&r.coef===carrier.coef);
-   if(higher||tied)out.conflicts.push({iar,reason:'Нельзя определить однозначную ведущую породу яруса '+iar+' по коэффициенту состава'});
+   if(higher)out.conflicts.push({iar,reason:'Нельзя определить однозначную ведущую породу яруса '+iar+' по коэффициенту состава'});
   }
   // The historical Access STUR query also sums repeated Maket10 rows when
   // their GROUP BY fields match. Different groups of the SAME species
@@ -190,7 +190,7 @@ function stockZoneOptions(refs,region,kpz=null){
    (kpz===null||kpz===undefined||same(r.Kpz,kpz))).map(r=>({value:n(r.Klxz),name:String(r.Nlxr??'')}));
  return {regionRows,availableZones,zoneOptions};
 }
-function stockPerHectare(record,refs,org,quarterRow=null){
+function stockPerHectare(record,refs,org,quarterRow=null,targetLayer=null){
  if(!refs?.Szap?.length)return status('Таблица запасов Szap недоступна');
  const category=n(record?.KU),area=n(record?.PLV),original=originalForestKTO(record);
  const direct=n(org?.KTO),region=direct!==null&&direct>0?direct:original;
@@ -204,15 +204,29 @@ function stockPerHectare(record,refs,org,quarterRow=null){
  if(missing.length)return status('К59: отсутствует '+missing.join('; ')+'. Адрес '+[record?.POS,record?.LESN,record?.KV,record?.VD].join('/') ,'waiting');
  if(category>=11)return status('К59 проверяет KU10 меньше 11','not-applicable');
  const all=record?._children?.['Макет10']||[];
- const selected=all.map((row,index)=>({row,index})).filter(({row})=>
-   childMatches(record,row)&&same(row.POR,record.M3Pr)&&
-   [1,2,3,5].includes(n(row.IAR))&&n(row.KOEF)!==null&&n(row.KOEF)!==0&&
-   n(row.POL)!==null&&n(row.POL)>0);
- if(selected.length!==1)return status('К59: не найдена однозначная строка основного яруса для расчёта',selected.length?'ambiguous':'waiting');
- const {row,index}=selected[0],sameLayer=all.filter(r=>childMatches(record,r)&&same(r.IAR,row.IAR));
- if(sameLayer.length!==1)return status('К59: несколько строк с одинаковым ярусом; необходимо суммирование по запросу','ambiguous');
- const weighted=n(row.KOEF)*n(row.PH)/10;
- if(!Number.isFinite(weighted)||weighted<=0)return status('К59: не указаны коэффициент состава или высота','waiting');
+ const eligible=all.map((row,index)=>({row,index})).filter(({row})=>childMatches(record,row)&&
+   [1,2,3,5].includes(n(row.IAR))&&defined(row.POR)&&n(row.KOEF)>0);
+ const layer=targetLayer??eligible.find(x=>n(x.row.IAR)===1&&same(x.row.POR,record.M3Pr))?.row.IAR??
+   eligible.find(x=>same(x.row.POR,record.M3Pr))?.row.IAR;
+ const sameLayer=all.filter(r=>childMatches(record,r)&&same(r.IAR,layer));
+ if(!sameLayer.length)return status('К59: сначала заполните состав яруса','waiting');
+ if(sameLayer.some(r=>!defined(r.POR)||n(r.KOEF)===null||n(r.KOEF)<=0||n(r.PH)===null||n(r.PH)<=0))
+  return status('К59: укажите породу, коэффициент и высоту каждой строки яруса '+layer,'waiting');
+ if(new Set(sameLayer.map(r=>String(r.POR).trim())).size!==sameLayer.length)
+  return status('К59: повторные группы одной породы в ярусе требуют проверки','ambiguous');
+ const coefficient=sameLayer.reduce((sum,r)=>sum+n(r.KOEF),0);
+ if(sameLayer.length>1&&Math.abs(coefficient-10)>0.00001)
+  return status('К59: сумма коэффициентов состава яруса '+layer+' должна быть 10 (сейчас '+coefficient+')','waiting');
+ const candidates=eligible.filter(x=>same(x.row.IAR,layer)&&n(x.row.POL)>0);
+ if(!candidates.length)return status('К59: укажите полноту у ведущей породы яруса '+layer,'waiting');
+ candidates.sort((a,b)=>n(b.row.KOEF)-n(a.row.KOEF)||Number(same(b.row.POR,record.M3Pr))-Number(same(a.row.POR,record.M3Pr))||a.index-b.index);
+ const {row,index}=candidates[0];
+ const fullness=new Set(candidates.map(x=>n(x.row.POL)));
+ if(fullness.size>1)return status('К59: у пород одного яруса указана разная полнота. Укажите общую полноту у ведущей строки','ambiguous');
+ // Original К59_2: Sum(Макет10Выб!KOEF*Макет10Выб!PH)/10,
+ // joined on the complete address AND IAR. Companion species matter even
+ // when POL and ZAP are stored only on the leading row.
+ const weighted=sameLayer.reduce((sum,r)=>sum+n(r.KOEF)*n(r.PH),0)/10;
  const height=k59Round(weighted,0);
  if(height===null||height<1||height>39)return status('К59: неоднозначная или недоступная высота в таблице Szap','ambiguous');
  const specie=String(row.POR).trim();
@@ -272,7 +286,7 @@ function stockPerHectare(record,refs,org,quarterRow=null){
      }
    }
  }
- return {status:'complete',field:'ZAP',index,expected,reason:'К59 · '+source+
+ return {status:'complete',field:'ZAP',index,expected,layer:n(layer),weightedHeight:weighted,composition:sameLayer.map(r=>({por:r.POR,coef:n(r.KOEF),height:n(r.PH)})),reason:'К59 · Σ(коэфф. × высота)/10 = '+weighted+' м · '+source+
   ' · POR '+specie+', KTO '+region+', LXZ '+zone+', KUL '+cul};
 }
 function corrections(record,refs,org,quarterRow=null){
@@ -287,21 +301,24 @@ function corrections(record,refs,org,quarterRow=null){
  // must use that value, never the stale manually entered class.
  const bonitetChecked=b.status==='complete'&&!same(record.M3B,b.expected)?
    {...record,M3B:b.expected}:record;
- const k59=stockPerHectare(bonitetChecked,refs,org,quarterRow);
- let computedRecord=record;
- if(k59.status==='complete'){
-  const current=record._children.Макет10[k59.index].ZAP;
-  if(!defined(current)||n(current)!==k59.expected){
-    issues.push({field:'ZAP',scope:'Макет10',index:k59.index,label:'Запас на 1 га (макет 10), м³/га',
-      previous:defined(current)?String(current):'Не указан',expected:k59.expected,reason:k59.reason});
-    // Recalculate STUR from the corrected per-hectare value, not from
-    // the user-entered wrong ZAP; never modify the supplied record.
-    const children={...record._children,Макет10:record._children.Макет10.map((r,i)=>
-      i===k59.index?{...r,ZAP:k59.expected}:r)};
-    computedRecord={...record,_children:children};
+ const layers=[...new Set((record?._children?.Макет10||[]).filter(r=>childMatches(record,r)&&[1,2,3,5].includes(n(r.IAR))).map(r=>n(r.IAR)))];
+ const layerCalculations=layers.map(iar=>({...stockPerHectare(bonitetChecked,refs,org,quarterRow,iar),layer:iar}));
+ const k59=layerCalculations.find(x=>x.layer===1)||layerCalculations[0]||stockPerHectare(bonitetChecked,refs,org,quarterRow);
+ let computedRecord={...record,_children:{...record._children,Макет10:(record?._children?.Макет10||[]).map(r=>({...r}))}};
+ for(const result of layerCalculations){
+  if(result.status!=='complete'){unknown.push({field:'ZAP',...result});continue;}
+  const current=record._children.Макет10[result.index].ZAP;
+  if(!defined(current)||n(current)!==result.expected){
+   issues.push({field:'ZAP',scope:'Макет10',index:result.index,label:'Запас яруса '+result.layer+' на 1 га, м³/га',
+     previous:defined(current)?String(current):'Не указан',expected:result.expected,reason:result.reason});
+   computedRecord._children.Макет10[result.index].ZAP=result.expected;
   }
- }else unknown.push({field:'ZAP',...k59});
- const stock=standStock(computedRecord);
+ }
+ if(!layers.length)unknown.push({field:'ZAP',...k59});
+ const blocked=layerCalculations.filter(x=>x.status==='waiting'&&/коэффициент|состав|высоту|сумма/.test(x.reason));
+ const stock=blocked.length?status(blocked.map(x=>x.reason).join('; '),'waiting'):standStock(computedRecord);
+ if(blocked.length)for(const field of ['STUR1','STUR'])if(defined(record[field]))
+  issues.push({field,label:field,previous:String(record[field]),expected:null,reason:stock.reason});
  if(stock.status==='complete'){
   for(const [field,label,expected] of [['STUR1','Запас на 1 га, м³/га',stock.expectedPerHa],['STUR','Запас выдела, м³',stock.expectedTotal]]){
    const value=record?.[field];
@@ -309,7 +326,7 @@ function corrections(record,refs,org,quarterRow=null){
     issues.push({field,label,previous:defined(value)?String(value):'Не указан',expected,reason:stock.reason});
   }
  }else unknown.push({field:'STUR',...stock});
- return {issues,unknown,bonitet:b,standStock:stock,stockPerHectare:k59};
+ return {issues,unknown,bonitet:b,standStock:stock,stockPerHectare:k59,layerCalculations};
 }
 window.SolinCardCalculations={bonitet,standStock,stockBreakdown,stockPerHectare,stockZoneOptions,corrections,safeRoundHalf,accessRound,k59Round};
 })();

@@ -131,6 +131,30 @@ public class SolinFieldUiInstrumentedTest {
       assertTrue("Native Android selector helper missing",result.optBoolean("nativePicker"));
       assertTrue("KU contains no selectable source-backed values",result.optInt("kuChoices")>=2);
       assertEquals("Android taxonomy search must receive keyboard focus", "ce-assist-query",result.optString("keyboardField"));
+      // The user's failing mixed stand must calculate in a REAL Android
+      // WebView, not only in the desktop/browser test harness.
+      eval(webview,"window.__mixedNative='pending';(async()=>{"+
+       "document.querySelector('#ce-assist [data-ce-assist-close]')?.click();document.getElementById('ce-cancel')?.click();"+
+       "const r=JSON.parse(JSON.stringify(current));Object.assign(r,{KU:2,PLV:2,KlxrVD:8,GodT1:2015,M3Pr:'ОС',STUR1:0,STUR:0});"+
+       "D.lesnichestvo[0].KTO=150000000;const address=Object.fromEntries(['POS','LESN','KV','KGLF','VD'].map(k=>[k,r[k]]));"+
+       "r._children={Макет10:[{...address,IAR:1,POR:'ОС',KOEF:6,PH:20,POL:.6,LET:40,PROI:7,ZAP:null},"+
+       "{...address,IAR:1,POR:'Б',KOEF:4,PH:null,POL:null,LET:40,PROI:7,ZAP:null}]};"+
+       "current=r;SolinCardEditor.open(r);"+
+       "const h=[...document.querySelectorAll('#ce-form [data-ce-field]')].find(e=>e.dataset.ceScope==='Макет10'&&e.dataset.ceField==='PH'&&e.dataset.ceRow==='1');"+
+       "h.value='18';h.dispatchEvent(new Event('input',{bubbles:true}));await new Promise(done=>setTimeout(done,500));"+
+       "const read=f=>Number([...document.querySelectorAll('#ce-form [data-ce-field]')].find(e=>e.dataset.ceScope==='base'&&e.dataset.ceField===f).value);"+
+       "return {perHa:read('STUR1'),total:read('STUR'),saved:current.STUR1};"+
+       "})().then(x=>window.__mixedNative=JSON.stringify(x)).catch(e=>window.__mixedNative=JSON.stringify({error:e.message}));'started'");
+      JSONObject mixed=null;
+      for(int i=0;i<40;i++){
+        Object value=new org.json.JSONTokener(eval(webview,"window.__mixedNative")).nextValue();
+        if(value instanceof String&&!value.equals("pending")){mixed=new JSONObject((String)value);break;}
+        SystemClock.sleep(250);
+      }
+      assertNotNull("6ОС+4Б native calculation timed out",mixed);
+      assertFalse("Mixed stand calculation error: "+mixed,mixed.has("error"));
+      assertEquals("Original Szap.v19=287, rounded 287*0.6",172,mixed.getInt("perHa"));
+      assertEquals(344,mixed.getInt("total"));assertEquals("Do not write until Save",0,mixed.getInt("saved"));
     } finally {
       getInstrumentation().runOnMainSync(activity::finish);
     }

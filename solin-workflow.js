@@ -234,6 +234,13 @@ if(m==='Макет10'){
   else live.innerHTML='<b>Бонитет пока не рассчитан</b><p>'+
    h(result.reason||'Нет достаточных данных')+
    '. Значение останется 0 или ранее сохранённым, пока расчёт не подтверждён.</p>';
+  const org=db()?.lesnichestvo?.find(x=>String(x.POS)===String(r.POS)&&String(x.LESN)===String(r.LESN));
+  const quarter=window.SolinAddressContext?.resolveQuarter(r,db()?.quarters?.[String(r.KV)]);
+  const stock=calc.corrections(prospective,window.SOLIN_REFS?.tables,org,quarter).standStock;
+  live.innerHTML+='<p id="wfStockLive">'+(stock.status==='complete'?
+   'Общий запас: <b>'+h(stock.expectedPerHa)+' м³/га</b> · '+h(stock.expectedTotal)+' м³ на выдел':
+   'Запас: '+h(stock.reason))+'</p>';
+
  };
  modalBody.addEventListener('input',refreshBonitet);
  modalBody.addEventListener('change',refreshBonitet);
@@ -305,7 +312,7 @@ if(m==='Макет10'&&window.SolinCardCalculations){
  calculated=audit.issues;k59Check=audit.stockPerHectare;
  for(const issue of calculated){
   if(issue.field==='ZAP'&&Number.isInteger(issue.index))r._children?.Макет10?.[issue.index]&&(r._children.Макет10[issue.index].ZAP=Number(issue.expected));
-  else r[issue.field]=issue.field==='M3B'?String(issue.expected):Number(issue.expected);
+  else r[issue.field]=issue.expected===null?null:issue.field==='M3B'?String(issue.expected):Number(issue.expected);
  }
 }
 try{saveAll(r);}catch(e){Object.assign(r,JSON.parse(before));notify('Не удалось сохранить: '+e.message);return;}

@@ -160,13 +160,13 @@ function markup(){const s=session,r=s.draft,o=D.lesnichestvo?.find(x=>same(x.POS
  maket('2',cell('M2PM1',r.M2PM1,'base','ВыделВ',{label:'Первое мероприятие',weight:3.1,split:true})+cell('M2Pr',r.M2Pr,'base','ВыделВ',{label:'Процент',weight:.55})+cell('M22',r.M22,'base','ВыделВ',{label:'Второе мероприятие',weight:2.6,split:true})+cell('M23',r.M23,'base','ВыделВ',{label:'Третье мероприятие',weight:2.6,split:true})+cell('M2Cp',r.M2Cp,'base','ВыделВ',{label:'Целевая порода',weight:2.2,split:true}))+
  maket('3',cell('M3Pr',r.M3Pr,'base','ВыделВ',{label:'Главная порода',weight:3,split:true})+cell('M3B',r.M3B,'base','ВыделВ',{label:'Бонитет',weight:.6})+cell('M3TLU',r.M3TLU,'base','ВыделВ',{label:'Характеристика типа леса',weight:3.3,split:true})+cell('M3G',r.M3G,'base','ВыделВ',{label:'Год выруб.',weight:.75})+cell('M3KP',r.M3KP,'base','ВыделВ',{label:'Пней всего, шт.',weight:.9})+cell('M3KPC',r.M3KPC,'base','ВыделВ',{label:'в т.ч. хвойных',weight:.9}))+
  maket('4',cell('M4ZO',r.M4ZO,'base','ВыделВ',{label:'Захламленность общая, м3/га',inline:true,weight:3.5})+cell('M4ZL',r.M4ZL,'base','ВыделВ',{label:'Ликвид, м3/га',inline:true,weight:2.1})+cell('M4SS',r.M4SS,'base','ВыделВ',{label:'Сухостой, м3/га',inline:true,weight:2.1}))+
- maket('5',cell('AKL',r.AKL,'base','ВыделВ',{label:'Класс возраста',inline:true,weight:1.8})+cell('AGR',r.AGR,'base','ВыделВ',{label:'Группа возраста',inline:true,weight:1.8})+cell('AGR1',r.AGR1,'base','ВыделВ',{label:'Группа возр. ТО',inline:true,weight:1.9})+cell('STUR',r.STUR,'base','ВыделВ',{label:'Запас выдела',inline:true,weight:1.9})+'<div class="dt-fixed dt-inline ce-stock-metric"><span>Все живые ярусы, м³/га</span><output id="ce-stock-live">—</output></div><div class="dt-fixed dt-inline ce-stock-metric"><span>Ед. деревья, м³/га</span><output id="ce-stock-single">—</output></div>'+
+ maket('5',cell('AKL',r.AKL,'base','ВыделВ',{label:'Класс возраста',inline:true,weight:1.8})+cell('AGR',r.AGR,'base','ВыделВ',{label:'Группа возраста',inline:true,weight:1.8})+cell('AGR1',r.AGR1,'base','ВыделВ',{label:'Группа возр. ТО',inline:true,weight:1.9})+cell('STUR',r.STUR,'base','ВыделВ',{label:'Запас выдела',inline:true,weight:1.9})+cell('STUR1',r.STUR1,'base','ВыделВ',{label:'Запас на гектар',inline:true,weight:2})+'<div class="dt-fixed dt-inline ce-stock-metric"><span>Все живые ярусы, м³/га</span><output id="ce-stock-live">—</output></div><div class="dt-fixed dt-inline ce-stock-metric"><span>Ед. деревья, м³/га</span><output id="ce-stock-single">—</output></div>'+
  '<div class="dt-fixed dt-inline ce-stock-metric"><span>Свежий сухостой ярус 8, м³/га</span><output id="ce-stock-fresh">—</output></div>'+
   '<div class="dt-fixed dt-inline ce-stock-metric"><span>Сухостой M4SS, м³/га</span><output id="ce-stock-drywood">—</output></div>')+
  
  '<section class="dt-stand" id="ce-section-10" aria-label="Макет 10"><b class="dt-stand-title">Макет 10</b><div id="ce-table-Макет10">'+table('Макет10')+'</div></section>'+
  maket('31',cell('PRkol',r.PRkol,'base','ВыделВ',{label:'К-во, тыс.шт.',weight:.65})+cell('PRH',r.PRH,'base','ВыделВ',{label:'Ср. выс.',weight:.6})+cell('PRA',r.PRA,'base','ВыделВ',{label:'Ср. возр.',weight:.6})+cell('PRK1',r.PRK1,'base','ВыделВ',{label:'коэфф. 1',weight:.55})+cell('PRP1',r.PRP1,'base','ВыделВ',{label:'1 порода',weight:2,split:true})+cell('PRK2',r.PRK2,'base','ВыделВ',{label:'коэфф. 2',weight:.55})+cell('PRP2',r.PRP2,'base','ВыделВ',{label:'2 порода',weight:2,split:true})+cell('PRK3',r.PRK3,'base','ВыделВ',{label:'коэфф. 3',weight:.55})+cell('PRP3',r.PRP3,'base','ВыделВ',{label:'3 порода',weight:2,split:true}))+
- maket('32',cell('PLG',r.PLG,'base','ВыделВ',{label:'Густота',weight:2,split:true})+cell('PLP1',r.PLP1,'base','ВыделВ',{label:'1 порода',weight:2.8,split:true})+cell('PLP2',r.PLP2,'base','ВыделВ',{label:'2 порода',weight:2.8,split:true})+cell('PLP3',r.PLP3,'base','ВыделВ',{label:'3 порода',weight:2.8,split:true}))+footer()+'</div><div id="ce-extra" hidden></div><div id="ce-action-panel" hidden></div><div class="ce-other" hidden><div class="ce-grid">'+fields('ВыделВ',rest,r,'base')+cell('STUR1',r.STUR1,'base','ВыделВ',{label:'Запас на гектар'})+'</div></div></div></div></div><div id="ce-error" role="alert" tabindex="-1"></div></form>';
+ maket('32',cell('PLG',r.PLG,'base','ВыделВ',{label:'Густота',weight:2,split:true})+cell('PLP1',r.PLP1,'base','ВыделВ',{label:'1 порода',weight:2.8,split:true})+cell('PLP2',r.PLP2,'base','ВыделВ',{label:'2 порода',weight:2.8,split:true})+cell('PLP3',r.PLP3,'base','ВыделВ',{label:'3 порода',weight:2.8,split:true}))+footer()+'</div><div id="ce-extra" hidden></div><div id="ce-action-panel" hidden></div><div class="ce-other" hidden><div class="ce-grid">'+fields('ВыделВ',rest,r,'base')+'</div></div></div></div></div><div id="ce-error" role="alert" tabindex="-1"></div></form>';
 }
 
 function readValue(el,old){const raw=el.__solinQuarterPicker?el.__solinQuarterPicker.value():el.tagName==='SELECT'?el.value:el.value.trim(),field=el.dataset.ceField;
@@ -229,7 +229,7 @@ function refreshStockPanel(){
  if(!session)return;
  const calc=window.SolinCardCalculations;
  if(!calc?.standStock||!calc?.stockBreakdown)return;
- const d=calc.stockBreakdown(session.draft),stock=calc.standStock(session.draft);
+ const d=calc.stockBreakdown(session.draft),stock=session.stockTouched?calc.corrections(session.draft,window.SOLIN_REFS?.tables,linkedOrg(),session.quarter).standStock:calc.standStock(session.draft);
  const fmt=v=>v===null||v===undefined||!Number.isFinite(Number(v))?'—':
   Number(v).toLocaleString('ru-RU',{maximumFractionDigits:3});
  const write=(id,val)=>{const el=document.getElementById(id);if(el)el.textContent=fmt(val);};
@@ -262,10 +262,11 @@ function refreshStockPanel(){
  if(d.singleTrees.length)
   lines.push('Единичные деревья (ярус 7): '+h(fmt(d.singleTreesPerHa))+
    ' м³/га · '+h(fmt(d.singleTreesTotal))+' м³ на выдел. Учитываются отдельно.');
- lines.push('STUR1/STUR — сумма введённых ZAP живого древостоя. К59 для смешанного состава требует отдельной нормативной проверки каждой породы и яруса.');
+ lines.push('STUR1/STUR — сумма введённых ZAP живого древостоя. К59: высота яруса = Σ(коэффициент × высота всех пород) / 10. Норма ведущей породы × полнота даёт запас яруса; общий запас — сумма ярусов.');
  panel.innerHTML=lines.map(line=>'<p>'+line+'</p>').join('');
  panel.dataset.stockStatus=stock.status;
 }
+let stockTimer=null;
 function recalculateEditedField(el){
  const calc=window.SolinCardCalculations;
  if(!session||!calc||!el?.dataset?.ceField)return;
@@ -276,13 +277,14 @@ function recalculateEditedField(el){
  if(!(scope==='base'&&baseFields.has(field)||scope==='Макет10'&&standFields.has(field)))return;
  // Keep malformed numeric input and its error visible instead of overwriting it.
  if(el.getAttribute('aria-invalid')==='true')return;
+ session.stockTouched=true;
  const check=calc.corrections(session.draft,window.SOLIN_REFS?.tables,linkedOrg(),session.quarter);
  const changed=[];
  for(const issue of check.issues){
    if(!['M3B','STUR1','STUR','ZAP'].includes(issue.field))continue;
    const isTree=issue.field==='ZAP'&&Number.isInteger(issue.index);
    const prior=isTree?session.draft._children?.Макет10?.[issue.index]?.ZAP:session.draft[issue.field];
-   const corrected=issue.field==='M3B'?String(issue.expected):Number(issue.expected);
+   const corrected=issue.expected===null?null:issue.field==='M3B'?String(issue.expected):Number(issue.expected);
    if(String(prior??'')===String(corrected))continue;
    if(isTree){
      session.draft._children.Макет10[issue.index].ZAP=corrected;
@@ -295,7 +297,7 @@ function recalculateEditedField(el){
    if(fieldEl){
      if(fieldEl.tagName==='SELECT'&&!Array.from(fieldEl.options).some(o=>o.value===String(corrected)))
        fieldEl.add(new Option(String(corrected),String(corrected)));
-     fieldEl.value=String(corrected);
+     fieldEl.value=corrected===null?'':String(corrected);
      const output=document.querySelector('[data-ce-display-for="'+fieldEl.id+'"]');
      if(output)output.textContent=description(isTree?'Макет10':'ВыделВ',issue.field,corrected);
    }
@@ -304,6 +306,7 @@ function recalculateEditedField(el){
   if(scope==='Макет10'&&standFields.has(field)){
    const root=document.getElementById('ce-calc-notice'),k59=check.stockPerHectare;
    if(root){
+    if(!root.hidden&&root.querySelector('table')&&(session.calcNotices||[]).length)return;
     root.hidden=false;
     root.innerHTML=k59?.status==='complete'?
      '<strong>К59: нормативный запас проверен</strong><p>Расчётный запас '+h(k59.expected)+' м³/га совпадает со значением макета 10. Автоматическая замена не требовалась.</p>':
@@ -687,8 +690,8 @@ function open(record,options={}){if(!record)return;
  form.querySelector('.dt-toolbar').after(entry);
  const areaHelp=document.createElement('p');areaHelp.className='ce-area-help';areaHelp.textContent='При наборе можно оставить площадь 1.0 га. Точные площади полигонов переносятся позже: MapInfo → Excel → SOLI-N.';
  entry.after(areaHelp);
- form.addEventListener('input',e=>{capture(e.target);if(e.target.dataset.ceScope?.startsWith('Макет'))session.changedMakets.add(e.target.dataset.ceScope);if(session.entryTouched?.has(e.target.dataset.ceScope+':'+e.target.dataset.ceField))refreshEntryChecks()});
- form.addEventListener('focusout',e=>{if(!e.target.matches('[data-ce-field]'))return;(session.entryTouched??=new Set()).add(e.target.dataset.ceScope+':'+e.target.dataset.ceField);refreshEntryChecks();});
+ form.addEventListener('input',e=>{capture(e.target);if(e.target.matches('[data-ce-field]')&&!['ZAP','STUR','STUR1'].includes(e.target.dataset.ceField)){clearTimeout(stockTimer);const el=e.target;stockTimer=setTimeout(()=>{if(el.isConnected)recalculateEditedField(el);},160);}if(e.target.dataset.ceScope?.startsWith('Макет'))session.changedMakets.add(e.target.dataset.ceScope);if(session.entryTouched?.has(e.target.dataset.ceScope+':'+e.target.dataset.ceField))refreshEntryChecks()});
+ form.addEventListener('focusout',e=>{if(!e.target.matches('[data-ce-field]'))return;clearTimeout(stockTimer);recalculateEditedField(e.target);(session.entryTouched??=new Set()).add(e.target.dataset.ceScope+':'+e.target.dataset.ceField);refreshEntryChecks();});
  form.addEventListener('change',e=>{
   if(e.target.matches('.dt-maket-select')){const n=e.target.value;e.target.value='';if(n==='10'||n==='31'||n==='32')showMain(n);else if(n)showExtra('Макет'+n);return;}
   capture(e.target);

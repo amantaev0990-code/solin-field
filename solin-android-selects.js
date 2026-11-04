@@ -23,7 +23,7 @@
  const ordinary=select=>select instanceof HTMLSelectElement&&
   // These controls use the dedicated searchable original-card editor.
   !select.closest('.ce-modal #ce-form .dt-board')&&visible(select);
- function cleanup(restoreFocus=true){
+ function cleanup(restoreFocus=false){
   if(!overlay)return;
   if(document.activeElement?.closest?.('#solin-android-picker'))document.activeElement.blur();
   overlay.remove();overlay=null;selection=null;values=[];
@@ -72,8 +72,8 @@
    '<div id="sap-count" class="sap-count"></div><div id="sap-options" class="sap-options" role="listbox"></div></section>';
   document.body.append(overlay);
   viewport();
-  overlay.querySelector('.sap-close').onclick=cleanup;
-  overlay.querySelector('.sap-backdrop').onclick=cleanup;
+  overlay.querySelector('.sap-close').onclick=()=>cleanup(false);
+  overlay.querySelector('.sap-backdrop').onclick=()=>cleanup(false);
   overlay.querySelector('.sap-options').addEventListener('click',e=>{
    const button=e.target.closest('[data-sap-index]');
    if(button)choose(Number(button.dataset.sapIndex));
@@ -86,7 +86,8 @@
    // Small lists are immediately tappable. Focusing search on every tap
    // forced the keyboard over the choices on landscape Android tablets.
    // The user can still tap search whenever it is useful.
-   if(values.length>12)input.focus({preventScroll:true});
+   // Search is opt-in for ALL lists, including the region list.
+   // Android IME opens only when the user taps this input.
   }else{query='';draw();}
   document.addEventListener('keydown',onKey,true);
  }

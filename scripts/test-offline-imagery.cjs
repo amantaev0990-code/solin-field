@@ -70,8 +70,43 @@ const server=http.createServer((req,res)=>{try{
   await page.locator('#offlineBtn').click();
   assert.equal(await page.locator('#offlineBtn').evaluate(el=>el.classList.contains('active')),true);
   assert.match(await page.locator('#offlineImageryStatus').innerText(),/Офлайн-снимок/);
+  const pyramid=await page.evaluate(async()=>{
+   const sql=await initSqlJs({locateFile:name=>'./vendor/'+name}),db=new sql.Database();
+   db.run('CREATE TABLE metadata(name TEXT,value TEXT)');db.run('CREATE TABLE tiles(zoom_level INTEGER,tile_column INTEGER,tile_row INTEGER,tile_data BLOB)');
+   db.run("INSERT INTO metadata VALUES ('format','png')");
+   const colors=['#ff0000','#00ff00','#0000ff','#ffff00'];
+   for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++){
+    const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');g.fillStyle=colors[dy*2+dx];g.fillRect(0,0,256,256);
+    const bytes=Uint8Array.from(atob(c.toDataURL().split(',')[1]),x=>x.charCodeAt(0));
+    db.run('INSERT INTO tiles VALUES (5,?,?,?)',[16+dx,31-(10+dy),bytes]);
+   }
+   const bytes=db.export();db.close();const p=await SolinOfflineImagery.importFile(new File([bytes],'detail-only.mbtiles'));
+   const blob=await SolinOfflineImagery.readTile(p.id,4,8,5),image=await createImageBitmap(blob),c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');g.drawImage(image,0,0);image.close();
+   const pixels=[[64,64],[192,64],[64,192],[192,192]].map(([x,y])=>Array.from(g.getImageData(x,y,1,1).data));
+   return {pixels,min:p.minZoom,max:p.maxZoom,version:p.pyramidVersion,overviews:p.overviewCount,cache:SolinOfflineImagery.cacheStats};
+  });
+  assert.equal(pyramid.min,0);assert.equal(pyramid.max,5);assert.equal(pyramid.version,1);assert(pyramid.overviews>=5);
+  const [red,green,blue,yellow]=pyramid.pixels;
+  assert(red[0]>220&&red[1]<30&&red[2]<30);assert(green[1]>220&&green[0]<30);assert(blue[2]>220&&blue[0]<30);assert(yellow[0]>220&&yellow[1]>220&&yellow[2]<30);
+  assert(pyramid.cache.tiles<=64&&pyramid.cache.bytes<=8*1024*1024);
+  // Large vector layer: all geometry remains, only visible readable labels
+  // are mounted. Zooming out removes detailed stand labels entirely.
+  await page.evaluate(()=>{
+   const features=[];for(let y=0;y<25;y++)for(let x=0;x<40;x++){
+    const lon=59.2+x*.0002,lat=50.1+y*.0002;
+    features.push({type:'Feature',properties:{Nкварт:1,Nвыд:y*40+x+1},geometry:{type:'Polygon',coordinates:[[[lon,lat],[lon+.00018,lat],[lon+.00018,lat+.00018],[lon,lat+.00018],[lon,lat]]]}});
+   }
+   const layer=makeGeoGroup({type:'FeatureCollection',features});
+   const entry={cmf2:true,name:'performance-fixture',geometryEntries:[{source:'ВыдПород',layer}]};importedMapLayers.push(entry);window.__labelFixture=entry;
+   fieldMap.setView([50.1025,59.204],17);SolinCmfLabelLayerV5.buildLabels(entry);
+  });
+  await page.waitForFunction(()=>window.__labelFixture.labelLayers.stands.getLayers().length>0);
+  const labels=await page.evaluate(()=>({visible:__labelFixture.labelLayers.stands.getLayers().length,source:__labelFixture.labelLayers.vCount,geometry:__labelFixture.geometryEntries[0].layer.getLayers().length}));
+  assert.equal(labels.source,1000);assert.equal(labels.geometry,1000);assert(labels.visible<=220);
+  await page.evaluate(()=>{fieldMap.setView([50.1025,59.204],9);});
+  await page.waitForFunction(()=>__labelFixture.labelLayers.stands.getLayers().length===0&&__labelFixture.labelLayers.quarters.getLayers().length===0);
   assert.deepEqual(errors,[]);
-  console.log('OFFLINE_IMAGERY_OK: import raster MBTiles, store tile in IndexedDB, restore after reload, forestry isolation, offline/online switch');
+  console.log('OFFLINE_IMAGERY_OK: import raster MBTiles, store tile in IndexedDB, restore after reload, forestry isolation, offline/online switch, four-quadrant overview pyramid, bounded cache, 1000-feature label culling');
   await ctx.close();
  }finally{if(browser)await browser.close();await new Promise(done=>server.close(done));}
 })().catch(err=>{console.error(err);process.exitCode=1;});

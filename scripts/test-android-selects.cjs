@@ -37,7 +37,9 @@ const server=http.createServer((req,res)=>{
   assert(candidate,'Source-backed KU code must be offered to Android user');
   await page.locator('#newKU').dispatchEvent('pointerdown',{pointerType:'touch',isPrimary:true});
   assert(await page.locator('#sap-search').isVisible(),'Android opens custom searchable selector');
-  assert.equal(await page.evaluate(()=>document.activeElement?.id),'sap-search','Picker should focus keyboard input');
+  assert.notEqual(await page.evaluate(()=>document.activeElement?.id),'sap-search','Picker must not open keyboard automatically');
+  await page.locator('#sap-search').click();
+  assert.equal(await page.evaluate(()=>document.activeElement?.id),'sap-search','Explicit search tap focuses keyboard input');
   await page.locator('#sap-search').fill(candidate);
   assert(await page.locator('#sap-options button').count()>=1);
   await page.locator('#sap-options button').filter({hasText:candidate}).first().click();

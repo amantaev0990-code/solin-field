@@ -15,14 +15,53 @@ function interiorPointForPolygon(poly){const outer=poly?.[0];if(!outer?.length)r
 function interiorPoint(f){const g=f?.geometry;if(!g)return null;if(g.type==='Polygon'){const p=interiorPointForPolygon(g.coordinates);return p?L.latLng(p[1],p[0]):null}if(g.type==='MultiPolygon'){let best=null,bestA=-1;for(const poly of g.coordinates){const a=ringAreaHa(poly?.[0]||[]);if(a>bestA){bestA=a;best=poly}}const p=interiorPointForPolygon(best);return p?L.latLng(p[1],p[0]):null}const b=featureBounds(f);return b?.isValid()?b.getCenter():null}
 function soliQuarterArea(q){const rs=window.D?.quarters?.[String(q)]?.compartments||[];return rs.reduce((s,r)=>s+(Number(r.PLV)||0),0)||0}
 function clearOld(entry){for(const l of Object.values(entry?.labelLayers||{})){if(l?.removeFrom&&window.fieldMap?.hasLayer?.(l))fieldMap.removeLayer(l)}entry.labelLayers=null;entry._cmfLabelsBuilt=false}
-function buildLabels(entry,force=false){if(!entry?.cmf2)return;if(entry._cmfLabelsBuilt&&!force)return;if(force)clearOld(entry);const stand=(entry.geometryEntries||[]).find(g=>/выдпород|выдел/i.test(g.source||''));const feats=stand?.layer?._layers?Object.values(stand.layer._layers).map(x=>x.feature).filter(Boolean):[];if(!feats.length)return;const qGroup=L.layerGroup(),vGroup=L.layerGroup(),quarters=new Map();let vCount=0,labeledFeatures=0;for(const f of feats){const p=f.properties||{},q=prop(p,['Nкварт','NКВАРТ','KV','Квартал']),v=prop(p,['Nвыд','NВЫД','VD','Выдел']),b=featureBounds(f);if(!b?.isValid())continue;if(q!=null||v!=null)labeledFeatures++;if(v!=null){const pos=interiorPoint(f);if(pos){L.marker(pos,{interactive:false,icon:labelIcon(`<span>${String(v)}</span>`,'cmfStandNoIcon')}).addTo(vGroup);vCount++}}if(q!=null){const key=String(q);let x=quarters.get(key);if(!x){x={bounds:L.latLngBounds(b),area:0};quarters.set(key,x)}else x.bounds.extend(b);const explicit=Number(prop(p,['Площ','PL','Площадь','Площ_геом'])),fa=Number.isFinite(explicit)&&explicit>0?explicit:geometryAreaHa(f.geometry);if(Number.isFinite(fa)&&fa>0)x.area+=fa}}
-  /* Do not freeze an empty label state. If recovery failed, a later recovery can rebuild. */
-  if(!labeledFeatures)return;
-  for(const[q,x]of quarters){let area=x.area;if(!(area>0))area=soliQuarterArea(q);const shown=area>0?Math.round(area):'';const html=`<div class="cmfQuarterNo"><b>${q}</b><i></i><span>${shown}</span></div>`;L.marker(x.bounds.getCenter(),{interactive:false,icon:labelIcon(html,'cmfQuarterNoIcon')}).addTo(qGroup)}entry.labelLayers={quarters:qGroup,stands:vGroup,quartersVisible:true,standsVisible:true,qCount:quarters.size,vCount};qGroup.addTo(fieldMap);vGroup.addTo(fieldMap);entry._cmfLabelsBuilt=true}
+function updateLabels(entry){
+ const labels=entry?.labelLayers;if(!labels||typeof fieldMap==='undefined'||!fieldMap)return;
+ const zoom=fieldMap.getZoom(),viewport=fieldMap.getBounds().pad(.15);
+ for(const [type,minimum,limit] of [['quarters',10,120],['stands',14,220]]){
+  const group=labels[type];group.clearLayers();
+  if(zoom<minimum||!labels[type+'Visible']||!fieldMap.hasLayer(group))continue;
+  const used=new Set();let count=0;
+  for(const item of labels[type+'Items']){
+   if(!viewport.intersects(item.bounds))continue;
+   const point=item.point||(item.point=item.feature?interiorPoint(item.feature):item.bounds.getCenter());
+   if(!point||!viewport.contains(point))continue;
+   const pixel=fieldMap.latLngToContainerPoint(point),step=type==='stands'?38:85,
+    key=Math.floor(pixel.x/step)+'/'+Math.floor(pixel.y/step);
+   if(used.has(key))continue;used.add(key);
+   L.marker(point,{interactive:false,keyboard:false,icon:labelIcon(item.html,type==='stands'?'cmfStandNoIcon':'cmfQuarterNoIcon')}).addTo(group);
+   if(++count>=limit)break;
+  }
+ }
+}
+let labelFrame=null;
+function scheduleLabels(){if(labelFrame!==null)return;labelFrame=requestAnimationFrame(()=>{labelFrame=null;for(const e of importedMapLayers)updateLabels(e);});}
+let labelMap=null;
+function buildLabels(entry,force=false){
+ if(!entry?.cmf2)return;if(entry._cmfLabelsBuilt&&!force)return;if(force)clearOld(entry);
+ const stand=(entry.geometryEntries||[]).find(g=>/выдпород|выдел/i.test(g.source||''));
+ const features=stand?.layer?._layers?Object.values(stand.layer._layers).filter(x=>x.feature):[];
+ if(!features.length)return;
+ const qGroup=L.layerGroup(),vGroup=L.layerGroup(),quarters=new Map(),stands=[];
+ for(const layer of features){
+  const f=layer.feature,p=f.properties||{},q=prop(p,['Nкварт','NКВАРТ','KV','Квартал']),v=prop(p,['Nвыд','NВЫД','VD','Выдел']),
+   bounds=layer.getBounds?.()||featureBounds(f);
+  if(!bounds?.isValid())continue;
+  if(v!=null)stands.push({feature:f,bounds,html:'<span>'+String(v).replace(/[<>&]/g,'')+'</span>'});
+  if(q!=null){const key=String(q);let item=quarters.get(key);if(!item){item={bounds:L.latLngBounds(bounds),area:0};quarters.set(key,item);}else item.bounds.extend(bounds);
+   const explicit=Number(prop(p,['Площ','PL','Площадь','Площ_геом'])),area=Number.isFinite(explicit)&&explicit>0?explicit:geometryAreaHa(f.geometry);if(area>0)item.area+=area;}
+ }
+ if(!stands.length&&!quarters.size)return;
+ const quarterItems=[...quarters].map(([q,item])=>({bounds:item.bounds,html:'<div class="cmfQuarterNo"><b>'+q.replace(/[<>&]/g,'')+'</b><i></i><span>'+Math.round(item.area||soliQuarterArea(q)||0)+'</span></div>'}));
+ entry.labelLayers={quarters:qGroup,stands:vGroup,quartersItems:quarterItems,standsItems:stands,quartersVisible:true,standsVisible:true,qCount:quarters.size,vCount:stands.length};
+ qGroup.addTo(fieldMap);vGroup.addTo(fieldMap);entry._cmfLabelsBuilt=true;
+ if(labelMap!==fieldMap){labelMap=fieldMap;fieldMap.on('moveend zoomend',scheduleLabels);}
+ updateLabels(entry);
+}
 window.rebuildCmfLabels=function(index){const e=importedMapLayers[index];if(e)buildLabels(e,true)};
-window.toggleCmfLabelLayer=function(index,type,on){const e=importedMapLayers[index],l=e?.labelLayers?.[type];if(!l)return;e.labelLayers[type+'Visible']=on;if(on){if(!fieldMap.hasLayer(l))l.addTo(fieldMap)}else if(fieldMap.hasLayer(l))fieldMap.removeLayer(l)};
+window.toggleCmfLabelLayer=function(index,type,on){const e=importedMapLayers[index],l=e?.labelLayers?.[type];if(!l)return;e.labelLayers[type+'Visible']=on;if(on){if(!fieldMap.hasLayer(l))l.addTo(fieldMap)}else if(fieldMap.hasLayer(l))fieldMap.removeLayer(l);updateLabels(e)};
 function addLabelRows(){const box=document.getElementById('mapLayerList');if(!box)return;importedMapLayers.forEach((e,i)=>{if(!e?.cmf2||!e.labelLayers)return;const mark='cmf-label-controls-'+i;if(document.getElementById(mark))return;const wrap=document.createElement('div');wrap.id=mark;wrap.className='cmfLabelControls';wrap.innerHTML=`<label class="mapLayerRow"><input type="checkbox" checked onchange="toggleCmfLabelLayer(${i},'quarters',this.checked)"><span>T</span><span><b>Ном кв</b><small>${e.labelLayers.qCount} подписей кварталов</small></span></label><label class="mapLayerRow"><input type="checkbox" checked onchange="toggleCmfLabelLayer(${i},'stands',this.checked)"><span>T</span><span><b>Ном Выд</b><small>${e.labelLayers.vCount} подписей выделов</small></span></label>`;box.prepend(wrap)})}
 function installRenderWrap(){if(typeof window.renderMapLayerList!=='function'||window.renderMapLayerList._labelV5)return false;const original=window.renderMapLayerList;const wrapped=function(){for(const e of importedMapLayers)buildLabels(e);const r=original();addLabelRows();return r};wrapped._labelV5=true;window.renderMapLayerList=wrapped;return true}
 if(!installRenderWrap())setTimeout(installRenderWrap,0);
-window.SolinCmfLabelLayerV5={buildLabels};
+window.SolinCmfLabelLayerV5={buildLabels,updateLabels};
 })();

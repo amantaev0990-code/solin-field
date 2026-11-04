@@ -58,7 +58,7 @@ const server=http.createServer((req,res)=>{try{
   await page.waitForFunction(()=>typeof fieldMap!=='undefined'&&fieldMap);
   // Controlled tile server. Assert complete area, then actual flight mode
   // with app reload and ZERO possible remote imagery reads.
-  const raster=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6hR8AAAAASUVORK5CYII=','base64');
+  const raster=Buffer.from(await page.evaluate(()=>{const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');g.fillStyle='#367c36';g.fillRect(0,0,256,256);return c.toDataURL('image/png').split(',')[1];}),'base64');
   let mode='ok',requests=0,partialSuccess=3;
   await context.route('https://tiles.maps.eox.at/**',async route=>{
    requests++;

@@ -80,11 +80,11 @@ fs.writeFileSync(gradle,build);
 if(process.env.SOLIN_TABLET_BUILD==='1'){
  // Historical APKs used ephemeral CI debug certificates. A separate app ID
  // allows field verification without uninstalling the old APK or its data.
- build=build.replace(/applicationId\s+"kz\.solin\.field"/, 'applicationId "kz.solin.field.tablet"');
- build=build.replace(/versionCode\s+\d+/, 'versionCode 10').replace(/versionName\s+"[^"]+"/,'versionName "0.3.0-tablet.10"');
+ build=build.replace(/applicationId\s+"kz\.solin\.field(?:\.tablet(?:\.v\d+)?)?"/, 'applicationId "kz.solin.field.tablet.v11"');
+ build=build.replace(/versionCode\s+\d+/, 'versionCode 11').replace(/versionName\s+"[^"]+"/,'versionName "0.3.0-tablet.11"');
  fs.writeFileSync(gradle,build);
  const stringsFile=path.join(app,'src/main/res/values/strings.xml');
- const strings=fs.readFileSync(stringsFile,'utf8').replace(/(<string name="app_name">)[^<]+/, '$1SOLI-N Field V10');
+ const strings=fs.readFileSync(stringsFile,'utf8').replace(/(<string name="app_name">)[^<]+/, '$1SOLI-N Field V11');
  fs.writeFileSync(stringsFile,strings);
 }
 console.log('Native Android MDB plugin and on-emulator roundtrip checks registered.');

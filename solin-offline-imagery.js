@@ -86,7 +86,64 @@
   if(bytes.length>=12&&bytes[0]===0x52&&bytes[1]===0x49&&bytes[2]===0x46&&bytes[3]===0x46&&bytes[8]===0x57)return 'image/webp';
   return null;
  }
- async function readTile(id,z,x,y){return (await get('tiles',tileId(id,z,x,y)))?.blob||null;}
+ const rasterCache=new Map();let cacheBytes=0;
+ async function readTile(id,z,x,y){
+  const key=tileId(id,z,x,y),cached=rasterCache.get(key);
+  if(cached){rasterCache.delete(key);rasterCache.set(key,cached);return cached;}
+  const blob=(await get('tiles',key))?.blob||null;
+  if(blob){rasterCache.set(key,blob);cacheBytes+=blob.size;
+   while(rasterCache.size>64||cacheBytes>8*1024*1024){const [old,value]=rasterCache.entries().next().value;rasterCache.delete(old);cacheBytes-=value.size;}}
+  return blob;
+ }
+ const pyramidJobs=new Map();
+ async function tileKeys(id){
+  const d=await db();return new Promise((resolve,reject)=>{
+   const q=d.transaction('tiles').objectStore('tiles').index('packId').getAllKeys(IDBKeyRange.only(id));
+   q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error);
+  });
+ }
+ async function bitmap(blob){
+  if(window.createImageBitmap)return createImageBitmap(blob);
+  return new Promise((resolve,reject)=>{const img=new Image(),url=URL.createObjectURL(blob);
+   img.onload=()=>{URL.revokeObjectURL(url);resolve(img);};img.onerror=()=>{URL.revokeObjectURL(url);reject(Error('Повреждённое изображение карты'));};img.src=url;});
+ }
+ async function ensurePyramid(pack,signal){
+  if(pack.pyramidVersion===1)return pack;
+  if(pyramidJobs.has(pack.id))return pyramidJobs.get(pack.id);
+  const job=(async()=>{
+   const levels=new Map();
+   for(const key of await tileKeys(pack.id)){
+    const [z,x,y]=key.slice(pack.id.length+1).split('/').map(Number);
+    if(!levels.has(z))levels.set(z,new Map());levels.get(z).set(x+'/'+y,{x,y});
+   }
+   const canvas=document.createElement('canvas');canvas.width=canvas.height=256;
+   const ctx=canvas.getContext('2d',{alpha:true});ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='low';
+   let added=0;
+   for(let z=pack.maxZoom-1;z>=0;z--){
+    const parents=new Map(),children=levels.get(z+1)||new Map(),existing=levels.get(z)||new Map();
+    for(const {x,y} of children.values()){const px=Math.floor(x/2),py=Math.floor(y/2),k=px+'/'+py;if(!existing.has(k))parents.set(k,{x:px,y:py});}
+    for(const [key,{x,y}] of parents){
+     if(signal?.aborted)throw Error('Загрузка приостановлена');
+     ctx.clearRect(0,0,256,256);let painted=0;
+     for(let dx=0;dx<2;dx++)for(let dy=0;dy<2;dy++){
+      const blob=await readTile(pack.id,z+1,2*x+dx,2*y+dy);if(!blob)continue;
+      const image=await bitmap(blob);try{ctx.drawImage(image,dx*128,dy*128,128,128);painted++;}finally{image.close?.();}
+     }
+     if(!painted)continue;
+     const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/webp',.75));
+     if(!blob)throw Error('Не удалось сохранить обзорный масштаб');
+     await writeBatch([{key:tileId(pack.id,z,x,y),packId:pack.id,blob,overview:true}]);
+     existing.set(key,{x,y});added++;
+     if(added%16===0){setStatus('Подготавливаю плавное масштабирование: '+added+' обзорных фрагментов');await new Promise(r=>setTimeout(r,0));}
+    }
+    levels.set(z,existing);
+   }
+   pack.overviewCount=(pack.overviewCount||0)+added;pack.pyramidVersion=1;pack.minZoom=0;
+   await putPack(pack);return pack;
+  })();
+  pyramidJobs.set(pack.id,job);
+  try{return await job;}finally{pyramidJobs.delete(pack.id);}
+ }
  async function importFile(file){
   const forest=forestId();
   if(!forest)throw Error('Сначала откройте нужное лесничество');
@@ -137,6 +194,8 @@
    stmt.free();
    await writeBatch(batch);
    if(pack.count!==count)throw Error('Количество считанных фрагментов не совпало с пакетом');
+   sql.close();sql=null; // Release the full SQLite file before building small overviews.
+   await ensurePyramid(pack);
    pack.status='ready';await putPack(pack);
    await navigator.storage?.persist?.().catch(()=>false);
    if(forest===forestId()){await select(pack);await showStored();}
@@ -149,19 +208,23 @@
   }finally{try{sql?.close();}catch(_){}loading=false;}
  }
  function layer(pack){
-  return L.gridLayer({tileSize:256,minZoom:pack.minZoom,maxNativeZoom:pack.maxZoom,
+  return L.gridLayer({tileSize:256,minZoom:0,minNativeZoom:0,maxNativeZoom:pack.maxZoom,
+   bounds:pack.bounds?[[pack.bounds[1],pack.bounds[0]],[pack.bounds[3],pack.bounds[2]]]:undefined,
+   updateWhenIdle:true,updateWhenZooming:false,updateInterval:200,keepBuffer:1,noWrap:true,
    maxZoom:21,attribution:pack.attribution||'Офлайн MBTiles · '+html(pack.name)});
  }
  function buildLayer(pack){
   const grid=layer(pack);
+  grid.on('tileunload',e=>{if(e.tile._solinUrl)URL.revokeObjectURL(e.tile._solinUrl);e.tile._solinDisposed=true;});
   grid.createTile=(coords,doneTile)=>{
    const img=document.createElement('img');
    img.alt='';img.setAttribute('role','presentation');
    img.style.width='256px';img.style.height='256px';
    readTile(pack.id,coords.z,coords.x,coords.y).then(blob=>{
+    if(img._solinDisposed)return;
     if(!blob){doneTile(null,img);return;}
-    const url=URL.createObjectURL(blob);
-    const cleanup=()=>URL.revokeObjectURL(url);
+    const url=URL.createObjectURL(blob);img._solinUrl=url;
+    const cleanup=()=>{URL.revokeObjectURL(url);img._solinUrl=null;};
     img.onload=()=>{cleanup();doneTile(null,img);};
     img.onerror=()=>{cleanup();doneTile(Error('Не удалось прочитать офлайн-фрагмент'),img);};
     img.src=url;
@@ -173,6 +236,8 @@
  async function select(pack){
   if(!mapRef||pack.forest!==forestId())return;
   restoreEpoch++;
+  await ensurePyramid(pack);
+  if(pack.forest!==forestId())return;
   if(activeLayer)mapRef.removeLayer(activeLayer);
   activeLayer=buildLayer(pack);activePack=pack;
   window.SolinOfflineImageryActive=pack;
@@ -313,6 +378,7 @@
    await Promise.all([worker(),worker()]);
    if(failed)throw failed;
    if(signal.aborted||pack.count!==pack.total)throw Error('Загрузка приостановлена');
+   await ensurePyramid(pack,signal);
    pack.status='ready';await putPack(pack);
    await navigator.storage?.persist?.().catch(()=>false);
    if(forest===forestId()){await select(pack);await showStored(false);}
@@ -381,6 +447,7 @@
  }
  window.SolinOfflineImagery={attach,restore,importFile,readTile,packs,remove,
   show:showStored,hide:hideStored,pick,openDownload,downloadArea,cancelDownload,plan,
+  ensurePyramid,get cacheStats(){return {tiles:rasterCache.size,bytes:cacheBytes};},
   get active(){return activePack;}};
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});
  else setup();
