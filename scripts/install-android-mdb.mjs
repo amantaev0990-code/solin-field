@@ -80,11 +80,11 @@ fs.writeFileSync(gradle,build);
 if(process.env.SOLIN_TABLET_BUILD==='1'){
  // Historical APKs used ephemeral CI debug certificates. A separate app ID
  // allows field verification without uninstalling the old APK or its data.
- build=build.replace(/applicationId\s+"kz\.solin\.field(?:\.tablet(?:\.v\d+)?)?"/, 'applicationId "kz.solin.field.tablet.v13"');
- build=build.replace(/versionCode\s+\d+/, 'versionCode 13').replace(/versionName\s+"[^"]+"/,'versionName "0.3.0-tablet.13"');
+ build=build.replace(/applicationId\s+"kz\.solin\.field(?:\.tablet(?:\.v\d+)?)?"/, 'applicationId "kz.solin.field.tablet.v14"');
+ build=build.replace(/versionCode\s+\d+/, 'versionCode 14').replace(/versionName\s+"[^"]+"/,'versionName "0.3.0-tablet.14"');
  fs.writeFileSync(gradle,build);
  const stringsFile=path.join(app,'src/main/res/values/strings.xml');
- const strings=fs.readFileSync(stringsFile,'utf8').replace(/(<string name="app_name">)[^<]+/, '$1SOLI-N Field V13');
+ const strings=fs.readFileSync(stringsFile,'utf8').replace(/(<string name="app_name">)[^<]+/, '$1SOLI-N Field V14');
  fs.writeFileSync(stringsFile,strings);
 }
 // Android V13: the user-approved S / pixel forest / GPS icon.
