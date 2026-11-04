@@ -165,7 +165,7 @@ public class SolinFieldUiInstrumentedTest {
         "const edit=SolinDependentRules.functionalZones({KGLF:5},refs,{form:'Квартал'});"+
         "const create=SolinDependentRules.functionalZones({KGLF:5},refs,{scenario:'create'});"+
         "return {early:early.expected,later:later.expected,special:special.scaleOrigin,"+
-        "edit:edit.codes.join(','),create:create.codes.join(','),preserved:before===JSON.stringify(r)};"+
+        "edit:edit.items.map(x=>x.value).join(','),create:create.items.map(x=>x.value).join(','),preserved:before===JSON.stringify(r)};"+
         "})())"));
       assertEquals("Pre-2017 low-height K58 branch", "4",sourceRules.getString("early"));
       assertEquals("2017+ K58 branch", "5",sourceRules.getString("later"));
