@@ -137,7 +137,9 @@ function openQuarterForm(){const org=D.lesnichestvo?.[0]||{},source=D.source||{}
    {hint:$('#newFzonaHint')});
  choices?.mount($('#newRaion'),'Raion',()=>({KGLF:glfInput?.value}),
    {hint:$('#newRaionHint')});
- // Functional-zone options are independent of KGLF; do not reset the selection.
+ // KGLF is the verified SFZ.KLF prerequisite; refresh options on change.
+ glfInput?.addEventListener('change',()=>fzonaPicker?.sync({value:fzonaPicker.value()}));
+ glfInput?.addEventListener('input',()=>fzonaPicker?.sync({value:fzonaPicker.value()}));
  const zoneInput=$('#newKlxr');
  const hint=document.createElement('small');hint.setAttribute('aria-live','polite');
  zoneInput.parentElement.append(hint);
@@ -159,6 +161,9 @@ function createQuarter(){const raw=$('#newKV').value.trim();if(!/^\d+$/.test(raw
  const raion=window.SolinQuarterPickers?.value($('#newRaion'))??$('#newRaion').value;
  for(const [field,value] of [['функциональной зоны',fzona],['административного района',raion]])
   if(value&&!/^\d+$/.test(value))return toast('Код '+field+' должен содержать только цифры');
+ const districtCheck=window.SolinQuarterPickers?.validateDistrict?.(raion,D.lesnichestvo?.[0]);
+ if(['invalid','mismatch'].includes(districtCheck?.status))
+  return toast(districtCheck.reason);
  const checkZone=$('#newKlxr').value;
  const rules=window.SolinDependentRules;
  for(const [field,value] of [['KGLF',$('#newKGLF').value],['Kpz',$('#newKpz').value],['Klxr',checkZone]]){
