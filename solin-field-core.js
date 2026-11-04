@@ -90,7 +90,12 @@ function editQuarter(k,index=0){const q=D.quarters[k],rows=q.quarterRows?.length
    toast('Укажите числовой код: '+(D.fieldLabels[el.dataset.qfield]||el.dataset.qfield));return;
   }
   next[el.dataset.qfield]=['Fzona','Raion'].includes(el.dataset.qfield)?(value===''?null:Number(value)):(value||null);
- }const zoning=window.SolinDependentRules?.options('Квартал','Klxr',next,null,D.lesnichestvo?.[0]);
+ }const regionCheck=window.SolinQuarterPickers?.validateDistrict?.(next.Raion,D.lesnichestvo?.[0]);
+ if(String(next.Raion??'')!==String(selected.Raion??'')&&
+    ['invalid','mismatch'].includes(regionCheck?.status)){
+  toast(regionCheck.reason);return;
+ }
+ const zoning=window.SolinDependentRules?.options('Квартал','Klxr',next,null,D.lesnichestvo?.[0]);
  const zoningChanged=String(next.Kpz??'')!==String(selected.Kpz??'')||
   String(next.Klxr??'')!==String(selected.Klxr??'');
  if(zoningChanged&&next.Klxr!=null&&window.SolinDependentRules?.currentIsAllowed(next.Klxr,zoning)!==true){
