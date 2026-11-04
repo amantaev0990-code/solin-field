@@ -125,6 +125,9 @@ async function reopen(p,info){
  assert.deepEqual(preservedHistorical,{perHa:777,total:888},
   'Exiting a card must not silently overwrite existing historical Access stock totals');
  console.log('PASS historical stock preserved on exit unless original totals were empty');
+ // Remove the deliberately invalid duplicate row before testing lack of
+ // Szap. The two cases must not affect each other's warning expectations.
+ await p.evaluate(()=>{current._children.Макет10=current._children.Макет10.slice(0,1);});
  // Deliberately make the normative source unavailable. The entered ZAP must
  // never be presented as independently verified merely because STUR follows it.
  await p.evaluate(()=>{
