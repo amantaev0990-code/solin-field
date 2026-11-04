@@ -99,8 +99,9 @@ const server=http.createServer((req,res)=>{try{const file=path.resolve(root,'.'+
   assert.equal(await districtSelect.count(),1,'District must be a separate native name picker in the full card');
   const districtLabel=await districtSelect.locator('option[value="156000000"]').textContent();
   assert.equal(districtLabel,'Хромтауский район','KATO code must not appear inside district name');
-  await districtSelect.selectOption('356400000');
-  assert.equal(await page.locator('#ce-form .quarter-code-readonly').inputValue(),'356400000','Selected district code must display separately');
+  assert.equal(await districtSelect.locator('option[value="356400000"]').count(),0,'Shet district must not leak into Aktobe');
+   await districtSelect.selectOption('153400000');
+  assert.equal(await page.locator('#ce-form .quarter-code-readonly').inputValue(),'153400000','Selected district code must display separately');
 
   const quick=page.locator('#ce-form .solin-species-query').filter({has:page.locator('nonexistent-x')});
   const main=page.locator('#ce-form select[data-ce-field="M3Pr"]');
@@ -117,7 +118,7 @@ const server=http.createServer((req,res)=>{try{const file=path.resolve(root,'.'+
   });
   assert(cardAnchor.board&&cardAnchor.position==='absolute'&&cardAnchor.below,
     'Classic Maket10 suggestions should travel with the card board below the field');
-  assert.equal(await districtSelect.inputValue(),'356400000','Maket10 dependency refresh must not reset district choice');
+  assert.equal(await districtSelect.inputValue(),'153400000','Maket10 dependency refresh must not reset district choice');
 
   assert.equal(await m10.inputValue(),'ОС','Maket 10 code ОС selected by typing ос');
   await m10Quick.fill('В');
@@ -126,7 +127,7 @@ const server=http.createServer((req,res)=>{try{const file=path.resolve(root,'.'+
   // Also check the quarter-creation form, not only the taxation-card header.
   await page.evaluate(()=>openQuarterForm());
   const quarterDistrict=page.locator('#newRaion');
-  assert.equal(await quarterDistrict.locator('option[value="356400000"]').textContent(),'Шетский район');
+  assert.equal(await quarterDistrict.locator('option[value="356400000"]').count(),0,'Foreign region district must not appear');
   assert.equal(await quarterDistrict.locator('option[value="153400000"]').textContent(),'Айтекебийский район');
   await quarterDistrict.selectOption('156000000');
   assert.equal(await page.locator('#modalBody .quarter-code-readonly').inputValue(),'156000000');
