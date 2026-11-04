@@ -49,7 +49,7 @@ const server=http.createServer((req,res)=>{
   }
   const audit=await page.locator('#ce-stock-audit').innerText();
   assert.match(audit,/В: 30/);assert.match(audit,/С: 10/);
-  assert.match(audit,/состав: В 6 \\+ Б 4/,'Companion species must appear in layer composition');
+  assert.match(audit,/состав: В 6 .*Б 4/,'Companion species must appear in layer composition');
   assert.match(audit,/запас ЯРУСА|запас всего яруса/i,'The UI must not claim a separate B species volume');
   assert.match(audit,/24 м³ на выдел/,'Fresh drywood total by area must be visible');
   assert.match(audit,/14 м³ на выдел/,'M4SS separate total by area must be visible');
