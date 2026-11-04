@@ -4,10 +4,70 @@
 (()=>{'use strict';
 const html=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','"':'&quot;',"'":'&#39;'}[c]));
 const address=r=>[r.POS,r.LESN,r.KV,r.KGLF,r.VD].map(x=>String(x??'?')).join('/');
+// Whole-card integrity on top of the source-backed dropdown rules.
+// Audit is read-only: an old imported inconsistency must be reported,
+// not silently rewritten during an unrelated field edit.
 function checkOne(record,org,refs){
  const audit=window.SolinDependentRules?.validateTransition?.(
   null,record,org,refs,{isNew:true})||{errors:[],warnings:[]};
- return {address:address(record),errors:audit.errors,warnings:audit.warnings};
+ const errors=[...audit.errors],warnings=[...audit.warnings];
+ const flag=(hard,form,field,value,reason,index=null)=>
+  (hard?errors:warnings).push({form,field,index,value:String(value??''),reason});
+ const database=typeof D!=='undefined'?D:window.D;
+ const quarter=database?.quarters?.[String(record?.KV)];
+ const quarterRows=quarter&&(window.SolinAddressContext?.quarterRows?.(quarter)||
+  (quarter.quarterRows?.length?quarter.quarterRows:[quarter.meta]));
+ if(database?.quarters){
+  if(!quarter)flag(true,'Квартал','KV',record?.KV,'Выдел ссылается на отсутствующий квартал');
+  else{
+   const matches=(quarterRows||[]).filter(q=>
+    ['POS','LESN','KV','KGLF'].every(k=>q?.[k]==null||record?.[k]==null||
+      String(q[k]).trim()===String(record[k]).trim()));
+   if(matches.length!==1)
+    flag(matches.length===0,'Квартал','KGLF',record?.KGLF,
+     matches.length===0?'Квартал не содержит категорию ГЛФ этого выдела':
+     'Адрес квартала неоднозначен: '+matches.length+' строк с той же категорией');
+   if(matches.length===1){
+    const q=matches[0];
+    if(q.Fzona!=null&&record.Fzona!=null&&String(q.Fzona)!==String(record.Fzona))
+     flag(false,'ВыделВ','Fzona',record.Fzona,'Функциональная зона выдела отличается от исходной строки квартала');
+    if(q.Klxr!=null&&record.KlxrVD!=null&&String(q.Klxr)!==String(record.KlxrVD))
+     flag(false,'ВыделВ','KlxrVD',record.KlxrVD,'Зона выдела отличается от зоны квартала: проверьте индивидуальное назначение');
+    const geo=window.SolinQuarterPickers?.validateDistrict?.(q.Raion,org);
+    if(geo?.status==='mismatch'||geo?.status==='invalid')
+     flag(true,'Квартал','Raion',q.Raion,geo.reason);
+    else if(geo?.status==='unknown'&&q.Raion!=null)
+     flag(false,'Квартал','Raion',q.Raion,geo.reason);
+   }
+  }
+ }
+ for(const [form,rows] of Object.entries(record?._children||{})){
+  if(!/^Макет\d+$/.test(form)||!Array.isArray(rows))continue;
+  for(let i=0;i<rows.length;i++)
+   for(const key of ['POS','LESN','KV','KGLF','VD']){
+    const value=rows[i]?.[key],parent=record[key];
+    if(value!=null&&String(value).trim()!==''&&parent!=null&&
+       String(value).trim()!==String(parent).trim())
+     flag(true,form,key,value,'Строка макета ссылается на другой адрес выдела '+key,i);
+   }
+ }
+ const stock=window.SolinCardCalculations?.standStock?.(record);
+ if(stock?.status==='ambiguous')
+  flag(true,'Макет10','ZAP',record?.STUR1,stock.reason||'Запас яруса неоднозначен');
+ else if(stock?.status==='waiting'&&record?._children?.Макет10?.length)
+  flag(false,'Макет10','ZAP',record?.STUR1,stock.reason||'Запас не может быть проверен из введённых значений');
+ return {address:address(record),errors,warnings};
+}
+function coverage(){
+ const summary=window.SOLIN_AUDIT?.summary||{};
+ const refTables=window.SOLIN_REFS?.tables||{};
+ return {archivedForms:summary.formCount??null,
+  archivedRowSources:summary.rowSources??null,
+  archivedValidationRules:summary.validationRules??null,
+  availableReferenceTables:Object.keys(refTables).length,
+  districtOriginalTableAvailable:Boolean(refTables['Кл_Рай']),
+  sourceCoverage:'partial',
+  note:'Проверяются только реализованные источники и межтабличная целостность. Это не полное выполнение всех Access SQL/VBA правил.'};
 }
 function scan(records,org,refs){
  const list=Array.isArray(records)?records:[],results=list.map(r=>checkOne(r,typeof org==='function'?org(r):org,refs));
@@ -65,7 +125,7 @@ function open(records,opts={}){
    status.textContent='Проверено '+cursor+' из '+collection.length+' выделов';
    setTimeout(step,0);return;
   }
-  const report={version:'SOLIN-Field-Dependency-Audit-v1',scope:opts.caption||'Лесничество',
+  const report={version:'SOLIN-Field-Dependency-Audit-v2',coverage:coverage(),scope:opts.caption||'Лесничество',
    generatedAt:new Date().toISOString(),records:collection.length,
    errors,warnings,affected,results:details};
   host.innerHTML='<p>Проверено выделов: <b>'+collection.length+'</b>. Несоответствий: <b>'+
@@ -102,5 +162,5 @@ function open(records,opts={}){
  };
  step();
 }
-window.SolinDependencyAudit={checkOne,scan,csv,open};
+window.SolinDependencyAudit={checkOne,scan,csv,open,coverage};
 })();
