@@ -61,4 +61,38 @@ D.quarters['1'].meta.Raion=156000000;
 assert.equal(audit.coverage().archivedRowSources,321);
 assert.equal(audit.coverage().districtOriginalTableAvailable,false);
 assert.equal(audit.coverage().sourceCoverage,'partial','Never claim all Access rules are ported');
-console.log('SYSTEM_LINKS_OK: 877 KUch rows, 14 historical region registry, isolated KATO districts, KGLF/SFZ linkage, quarter→stand→maket integrity, missing-source transparency');
+// Read-only full check of every original bundled quarter/stand/child row.
+const original={};
+for(let chunk=1;chunk<=10;chunk++)
+ Object.assign(original,JSON.parse(fs.readFileSync('quarters/q'+chunk+'.json','utf8')));
+assert.equal(Object.keys(original).length,70,'All bundled original quarters must remain');
+let stands=0,children=0,mismatches=0,stockDuplicates=0;
+for(const [kv,q] of Object.entries(original)){
+ const quarterRows=q.quarterRows?.length?q.quarterRows:(q.meta?[q.meta]:[]);
+ for(const r of q.compartments||[]){
+  stands++;
+  const matches=quarterRows.filter(x=>['POS','LESN','KV','KGLF'].every(k=>
+   x[k]==null||r[k]==null||String(x[k])===String(r[k])));
+  if(matches.length!==1)mismatches++;
+  if(matches[0]?.Raion!=null&&kt.validateDistrict(matches[0].Raion,act).status==='mismatch')
+   mismatches++;
+  for(const [form,rows] of Object.entries(r._children||{}))
+   if(Array.isArray(rows))for(const x of rows){
+    children++;
+    for(const k of ['POS','LESN','KV','KGLF','VD'])
+     if(x[k]!=null&&r[k]!=null&&String(x[k])!==String(r[k]))mismatches++;
+   }
+  const layers=new Map();
+  for(const row of r._children?.Макет10||[]){
+   const n=Number(row.IAR);if(n<1||n>6)continue;
+   layers.set(n,[...(layers.get(n)||[]),row]);
+  }
+  for(const rows of layers.values())if(rows.filter(x=>Number(x.ZAP)>0).length>1)
+   stockDuplicates++;
+ }
+}
+assert.equal(stands,471);
+assert.equal(children,681);
+assert.equal(mismatches,0,'Original quarter/stand/maket addresses and KATO must match');
+assert.equal(stockDuplicates,0,'Original mixed stands must not double-count species stocks');
+console.log('SYSTEM_LINKS_OK: 877 KUch rows, 70 original quarters / 471 stands / 681 child records, isolated KATO districts, KGLF/SFZ linkage, quarter→stand→maket integrity, missing-source transparency');
