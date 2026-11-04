@@ -2,7 +2,9 @@
  * K58: Макет10Бон_1/2 -> SSHB -> Макет10Бон -> К58 -> К58_Зам.
  * Stock: Макет10ЗАП1 -> Макет10ЗАП2 -> Макет10ЗАП.
  * Source: verified Solim.mdb MSysQueries and 254 SSHB rows; 134/134
- * historical STUR1/STUR matches. Never writes MDB, never guesses missing
+ * historical STUR1/STUR matches (single main species). The new Field
+ * multi-species aggregation is explicitly distinct from that historical
+ * Access subset. Never writes MDB, never guesses missing
  * lookups and never performs unattended persistent updates. */
 (()=>{'use strict';
 const defined=x=>x!==null&&x!==undefined&&String(x).trim()!=='';
@@ -60,45 +62,79 @@ function bonitet(record,refs){
  return {status:'complete',reason:'К58 · SSHB (происхождение '+origin+', возраст '+age+', высота '+h+' м)',expected:match[1],
   field:'M3B',rawCurrent:record.M3B,origin,age,height:h,scaleAge:scale['Возр'],scale};
 }
-// Explain every Maket 10 layer without treating separate timber categories
-// as an additional STUR value. Original SIAR: 7=single trees, 8=fresh deadwood.
+// Each Maket 10 row describes a species and a layer. For the Field
+// live-stock summary, ALL declared species and ALL live layers (1–6)
+// contribute their existing per-hectare ZAP. Categories 7 and 8 are
+// independent: isolated trees and fresh deadwood. M4SS is a separate
+// existing stand-level drywood value. Never add it to fresh deadwood,
+// because the source data may describe overlapping timber.
+//
+// This is a Field arithmetic summary of entered/computed ZAP values.
+// It is NOT a claim that the single-row source K59 stock TABLE formula
+// has been validated for a mixed layer.
+const LIVE_LAYERS=new Set([1,2,3,4,5,6]);
 function stockBreakdown(record){
- const out={included:[],singleTrees:[],freshDeadwood:[],other:[],missing:[],drywoodPerHa:n(record?.M4SS),clutterPerHa:n(record?.M4ZO),liquidClutterPerHa:n(record?.M4ZL)};
+ const out={included:[],singleTrees:[],freshDeadwood:[],other:[],missing:[],
+  invalid:[],duplicates:[],unclassified:[],byLayer:[],bySpecies:[],
+  drywoodPerHa:n(record?.M4SS),clutterPerHa:n(record?.M4ZO),liquidClutterPerHa:n(record?.M4ZL)};
+ const layers=new Map(),species=new Map(),seen=new Set();
  for(const [index,row]of (record?._children?.Макет10||[]).entries()){
   if(!childMatches(record,row))continue;
-  const iar=n(row.IAR),zap=n(row.ZAP),leading=same(row.POR,record.M3Pr);
-  const item={index:index+1,iar,por:row.POR??null,zap,leading};
-  if(iar===7){out.singleTrees.push(item);continue;}
-  if(iar===8)out.freshDeadwood.push(item);
-  if(leading&&[1,2,3,8].includes(iar)){
-   if(zap===null){out.missing.push(item);continue;}
-   if(zap!==0)out.included.push(item);
-  }else out.other.push(item);
+  const iar=n(row.IAR),zap=n(row.ZAP),por=String(row.POR??'').trim();
+  const item={index:index+1,iar,por:por||null,zap,leading:same(por,record.M3Pr)};
+  if(iar===7){out.singleTrees.push(item);if(zap!==null&&zap<0)out.invalid.push(item);continue;}
+  if(iar===8){out.freshDeadwood.push(item);if(zap!==null&&zap<0)out.invalid.push(item);continue;}
+  if(!LIVE_LAYERS.has(iar)){
+   if(zap!==null&&zap!==0)out.unclassified.push(item);
+   out.other.push(item);continue;
+  }
+  if(!por||zap===null){out.missing.push(item);continue;}
+  if(zap<0){out.invalid.push(item);continue;}
+  const key=iar+'|'+por;
+  if(seen.has(key))out.duplicates.push(item);
+  else seen.add(key);
+  out.included.push(item);
+  layers.set(iar,(layers.get(iar)||0)+zap);
+  species.set(por,(species.get(por)||0)+zap);
  }
+ out.byLayer=[...layers].sort((a,b)=>a[0]-b[0]).map(([iar,zap])=>({iar,zap}));
+ out.bySpecies=[...species].map(([por,zap])=>({por,zap}));
  out.candidatePerHa=out.included.reduce((sum,row)=>sum+row.zap,0);
- out.singleTreesPerHa=out.singleTrees.reduce((sum,row)=>sum+(row.zap??0),0);
- out.freshDeadwoodPerHa=out.freshDeadwood.reduce((sum,row)=>sum+(row.zap??0),0);
+ out.livePerHa=out.candidatePerHa;
+ out.singleTreesPerHa=out.singleTrees.every(x=>x.zap!==null&&x.zap>=0)?
+  out.singleTrees.reduce((sum,row)=>sum+row.zap,0):null;
+ out.freshDeadwoodPerHa=out.freshDeadwood.every(x=>x.zap!==null&&x.zap>=0)?
+  out.freshDeadwood.reduce((sum,row)=>sum+row.zap,0):null;
  out.area=n(record?.PLV);
+ out.singleTreesTotal=out.area!==null&&out.singleTreesPerHa!==null?
+  accessRound(out.singleTreesPerHa*out.area,0):null;
+ out.freshDeadwoodTotal=out.area!==null&&out.freshDeadwoodPerHa!==null?
+  accessRound(out.freshDeadwoodPerHa*out.area,0):null;
+ out.drywoodTotal=out.area!==null&&out.drywoodPerHa!==null?
+  accessRound(out.drywoodPerHa*out.area,0):null;
  return out;
 }
 function standStock(record){
  const category=n(record?.KU),area=n(record?.PLV);
  if(category===null||area===null||area<=0)return status('Не заданы категория угодий или площадь','waiting');
- if(category>=20)return status('Расчёт Макет10ЗАП1 применяется к KU меньше 20','not-applicable');
- const overview=stockBreakdown(record);
- if(overview.missing.length)return status('Запас нельзя уточнить: у '+overview.missing.length+
-   ' строки (строк) главной породы в ярусе 1/2/3/8 отсутствует ZAP','waiting');
- const eligible=(record?._children?.['Макет10']||[]).filter(row=>
-   childMatches(record,row)&&same(row.POR,record.M3Pr)&&
-   [1,2,3,8].includes(n(row.IAR))&&n(row.ZAP)!==null&&n(row.ZAP)!==0);
- if(!eligible.length)return status('В макете 10 нет подходящих строк с запасом главной породы (IAR 1, 2, 3, 8)','waiting');
- const grouped=eligible.map(x=>['IAR','KOEF','LET','PH','PD2','POL'].map(k=>String(x[k]??'')).join('|'));
- if(new Set(grouped).size>1)
-  return status('Несколько групп Макет10ЗАП1; оригинальное UPDATE не имеет единственного результата','ambiguous');
- const perHa=eligible.reduce((s,x)=>s+n(x.ZAP),0),total=accessRound(perHa*area,0);
- if(total===null)return status('Невозможно округлить общий запас Access Round','ambiguous');
- return {status:'complete',reason:'Макет10ЗАП · ΣZAP главной породы '+perHa+' м³/га × '+area+' га',
-   expectedPerHa:perHa,expectedTotal:total,area};
+ if(category>=20)return status('Расчёт запаса древостоя относится к KU меньше 20; единичные деревья и сухостой показаны отдельно','not-applicable');
+ const out=stockBreakdown(record);
+ if(out.invalid.length)return status('Недопустимый отрицательный запас ZAP в строке макета 10','ambiguous');
+ if(out.unclassified.length)return status('Есть строка с запасом ZAP, но без подтверждённого номера яруса','waiting');
+ if(out.missing.length)return status('Запас не суммирован: заполните породу POR и запас ZAP у всех '+out.missing.length+
+  ' строк живого древостоя (ярусы 1–6)','waiting');
+ if(out.duplicates.length)return status('Повторяется порода в одном ярусе макета 10; нельзя исключить двойной подсчёт','ambiguous');
+ if(!out.included.length)return status('В макете 10 нет заполненных запасов ZAP живых ярусов 1–6','waiting');
+ const perHa=out.livePerHa,total=accessRound(perHa*area,0);
+ if(total===null)return status('Невозможно округлить общий запас по правилу Access Round','ambiguous');
+ return {status:'complete',reason:'ΣZAP всех пород живых ярусов 1–6 ('+
+   out.byLayer.map(x=>'ярус '+x.iar+': '+x.zap).join('; ')+'); свежий сухостой, M4SS и единичные деревья отдельно',
+  expectedPerHa:perHa,expectedTotal:total,area,byLayer:out.byLayer,
+  bySpecies:out.bySpecies,liveSpeciesCount:out.bySpecies.length,
+  freshDeadwoodPerHa:out.freshDeadwoodPerHa,freshDeadwoodTotal:out.freshDeadwoodTotal,
+  singleTreesPerHa:out.singleTreesPerHa,singleTreesTotal:out.singleTreesTotal,
+  drywoodPerHa:out.drywoodPerHa,drywoodTotal:out.drywoodTotal,
+  basis:'arithmetic-entered-ZAP-not-multispecies-K59'};
 }
 // The original forest registry contains the KTO of each district. Older
 // Field-created forests omitted it despite having an exact POS/LESN match.
