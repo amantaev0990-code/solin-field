@@ -26,8 +26,8 @@ import org.junit.runner.RunWith;
 @RunWith(AndroidJUnit4.class)
 public class SolinGpsInstrumentedTest {
   private void shell(String command) throws Exception {
-    try(android.os.ParcelFileDescriptor fd=getInstrumentation().getUiAutomation().executeShellCommand(command);
-        java.io.FileInputStream stream=new java.io.FileInputStream(fd.getFileDescriptor())) {
+    android.os.ParcelFileDescriptor fd=getInstrumentation().getUiAutomation().executeShellCommand(command);
+    try(java.io.InputStream stream=new android.os.ParcelFileDescriptor.AutoCloseInputStream(fd)) {
       byte[] buffer=new byte[1024];while(stream.read(buffer)!=-1){}
     }
   }

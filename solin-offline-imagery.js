@@ -171,7 +171,8 @@
   return grid;
  }
  async function select(pack){
-  if(!mapRef)return;
+  if(!mapRef||pack.forest!==forestId())return;
+  restoreEpoch++;
   if(activeLayer)mapRef.removeLayer(activeLayer);
   activeLayer=buildLayer(pack);activePack=pack;
   window.SolinOfflineImageryActive=pack;
@@ -215,6 +216,7 @@
   if(found.length){await select(found[0]);await showStored();
    setStatus('Офлайн-снимок готов: '+found[0].name+' ('+found[0].count+' фрагментов).');
   }else{
+   if(navigator.onLine!==false&&typeof setBaseMap==='function')setBaseMap('google');
    setStatus(navigator.onLine===false?'Нет сохранённой карты. Подключитесь к интернету и нажмите «Скачать карту» перед выездом.':'Карта ещё не сохранена. Нажмите «Скачать карту» для работы без интернета.');
   }
  }
