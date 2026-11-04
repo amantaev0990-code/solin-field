@@ -111,9 +111,9 @@ async function reopen(p,info){
   current._children.Макет10.push({...base,ZAP:10});
   current.STUR=0;current.STUR1=0;solinWorkflow.exitCard();
  });
- assert.equal(await p.evaluate(()=>current.STUR1),info.norms.half+10);
- assert.equal(await p.evaluate(()=>current.STUR),(info.norms.half+10)*3);
- console.log('PASS alternate exit aggregates Maket10 ZAP and recalculates STUR');
+ assert.equal(await p.evaluate(()=>current.STUR1),0);
+ assert.equal(await p.evaluate(()=>current.STUR),0);
+ console.log('PASS alternate exit rejects duplicate ZAP instead of double-counting the layer');
  const preservedHistorical=await p.evaluate(()=>{
    const record=current,before1=record.STUR1,before=record.STUR;
    record.STUR1=777;record.STUR=888;
