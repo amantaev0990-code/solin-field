@@ -25,8 +25,10 @@ const server=http.createServer((req,res)=>{try{
   await page.locator('#orgRegion').selectOption('200');
   const owner=await page.locator('#orgOwner').evaluate(el=>[...el.options].find(o=>o.textContent.includes('Актюбинское государственное'))?.value||el.options[1].value);
   await page.locator('#orgOwner').selectOption(owner);
-  await page.locator('#orgDistrict').dispatchEvent('pointerdown',{pointerType:'touch',isPrimary:true});
-  assert(await page.locator('#sap-search').isVisible());
+  await page.locator('#orgDistrict').tap({force:true});
+  assert(await page.locator('#sap-search').isVisible(),'Tap must show the selector');
+  await page.waitForTimeout(120);
+  assert(await page.locator('#sap-search').isVisible(),'Selector must not disappear at touch release');
   assert.notEqual(await page.evaluate(()=>document.activeElement.id),'sap-search','Small list should remain visible without forced keyboard');
   await page.setViewportSize({width:1280,height:340});
   await page.waitForFunction(()=>document.querySelector('.sap-sheet').getBoundingClientRect().bottom<=innerHeight+1);
