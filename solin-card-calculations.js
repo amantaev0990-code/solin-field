@@ -72,6 +72,37 @@ function bonitet(record,refs){
 // It is NOT a claim that the single-row source K59 stock TABLE formula
 // has been validated for a mixed layer.
 const LIVE_LAYERS=new Set([1,2,3,4,5,6]);
+// SOLI-N keeps the TOTAL stock of a layer in the dominant species row.
+// Select that row by composition, not by whichever row happens to contain
+// a manually entered ZAP/POL. Stable tie-break: main species, then row order.
+function layerLead(rows,record){
+ return [...rows].sort((a,b)=>
+  (n(b.row.KOEF)??-1)-(n(a.row.KOEF)??-1)||
+  Number(same(b.row.POR,record?.M3Pr))-Number(same(a.row.POR,record?.M3Pr))||
+  a.index-b.index)[0];
+}
+function companionStockIssues(record){
+ const groups=new Map(),issues=[];
+ for(const [index,row] of (record?._children?.Макет10||[]).entries()){
+  if(!childMatches(record,row)||!LIVE_LAYERS.has(n(row.IAR)))continue;
+  const iar=n(row.IAR);
+  if(!groups.has(iar))groups.set(iar,[]);
+  groups.get(iar).push({row,index});
+ }
+ for(const [iar,rows] of groups){
+  if(rows.length<2||rows.some(x=>!defined(x.row.POR)||!(n(x.row.KOEF)>0)))continue;
+  const dominant=layerLead(rows,record);
+  for(const entry of rows){
+   if(entry===dominant||n(entry.row.ZAP)===0)continue;
+   issues.push({field:'ZAP',scope:'Макет10',index:entry.index,kind:'companion-zero',
+    label:'Запас примеси яруса '+iar+' ('+entry.row.POR+')',
+    previous:defined(entry.row.ZAP)?String(entry.row.ZAP):'Не указан',
+    expected:0,reason:'Полный запас яруса учитывается только у ведущей породы '+dominant.row.POR+
+    '; запас примесной породы не суммируется повторно'});
+  }
+ }
+ return issues;
+}
 function stockBreakdown(record){
  const out={included:[],singleTrees:[],freshDeadwood:[],other:[],missing:[],
   invalid:[],duplicates:[],conflicts:[],companions:[],unclassified:[],byLayer:[],bySpecies:[],
@@ -100,19 +131,12 @@ function stockBreakdown(record){
   if(!observed.length){
    out.missing.push({iar,por:null,zap:null,reason:'Для яруса '+iar+' не введён запас ZAP'});continue;
   }
-  const distinctPositive=new Set(positive.map(x=>x.por));
-  if(distinctPositive.size>1){
-   out.conflicts.push({iar,reason:'У разных пород одного яруса одновременно заполнен ZAP: невозможно определить, это доли или повторно общий запас яруса'});
+  const carrier=layerLead(rows.map(x=>({row:x.row,index:x.index-1,item:x})),record)?.item;
+  if(!carrier||carrier.zap===null){
+   out.missing.push({iar,por:carrier?.por||null,zap:null,reason:'Запас ведущей породы яруса '+iar+' не задан'});continue;
   }
-  // Original forestry records store a WHOLE-TIER ZAP on the prevailing
-  // composition row. Example: IAR1 В=9 (ZAP=16), ЛХ=1 (ZAP null),
-  // STUR1=16. A blank secondary species is NOT missing stock!
-  const carrier=positive[0]||observed[0];
-  if(positive.length===1&&rows.length>1){
-   const higher=rows.some(r=>r.coef!==null&&carrier.coef!==null&&r.coef>carrier.coef);
-   const tied=rows.some(r=>r!==carrier&&r.coef!==null&&r.coef>0&&r.coef===carrier.coef);
-   if(higher)out.conflicts.push({iar,reason:'Нельзя определить однозначную ведущую породу яруса '+iar+' по коэффициенту состава'});
-  }
+  if(rows.length>1&&rows.some(x=>x!==carrier&&x.zap!==null&&x.zap!==0))
+   out.conflicts.push({iar,reason:'У примесной породы яруса '+iar+' задан самостоятельный ZAP. Полный запас должен стоять только у '+carrier.por});
   // The historical Access STUR query also sums repeated Maket10 rows when
   // their GROUP BY fields match. Different groups of the SAME species
   // are ambiguous; avoid accidentally doubling a different cohort.
@@ -123,15 +147,13 @@ function stockBreakdown(record){
    if(signatures.has(key)&&signatures.get(key)!==sig)out.duplicates.push(item);
    signatures.set(key,sig);
   }
-  const total=observed.reduce((n,item)=>n+item.zap,0);
+  const total=carrier.zap;
   const composition=rows.map(x=>({por:x.por,coef:x.coef,hasZAP:x.zap!==null}));
   out.byLayer.push({iar,zap:total,por:carrier.por,composition,
-   sourceRows:observed.map(x=>x.index)});
-  for(const item of observed){
-   out.included.push(item);
-   carriers.set(item.por,(carriers.get(item.por)||0)+item.zap);
-  }
-  for(const row of rows.filter(x=>x.zap===null))out.companions.push(row);
+   sourceRows:[carrier.index]});
+  out.included.push(carrier);
+  carriers.set(carrier.por,(carriers.get(carrier.por)||0)+carrier.zap);
+  for(const row of rows.filter(x=>x!==carrier))out.companions.push(row);
  }
  out.bySpecies=[...carriers].map(([por,zap])=>({por,zap}));
  out.liveSpeciesCount=allSpecies.size;
@@ -217,11 +239,12 @@ function stockPerHectare(record,refs,org,quarterRow=null,targetLayer=null){
  const coefficient=sameLayer.reduce((sum,r)=>sum+n(r.KOEF),0);
  if(sameLayer.length>1&&Math.abs(coefficient-10)>0.00001)
   return status('К59: сумма коэффициентов состава яруса '+layer+' должна быть 10 (сейчас '+coefficient+')','waiting');
- const candidates=eligible.filter(x=>same(x.row.IAR,layer)&&n(x.row.POL)>0);
- if(!candidates.length)return status('К59: укажите полноту у ведущей породы яруса '+layer,'waiting');
- candidates.sort((a,b)=>n(b.row.KOEF)-n(a.row.KOEF)||Number(same(b.row.POR,record.M3Pr))-Number(same(a.row.POR,record.M3Pr))||a.index-b.index);
- const {row,index}=candidates[0];
- const fullness=new Set(candidates.map(x=>n(x.row.POL)));
+ const candidates=eligible.filter(x=>same(x.row.IAR,layer));
+ const dominant=layerLead(candidates,record);
+ if(!dominant||!(n(dominant.row.POL)>0))
+  return status('К59: укажите полноту у ведущей породы яруса '+layer,'waiting');
+ const {row,index}=dominant;
+ const fullness=new Set(candidates.map(x=>n(x.row.POL)).filter(x=>x!==null&&x>0));
  if(fullness.size>1)return status('К59: у пород одного яруса указана разная полнота. Укажите общую полноту у ведущей строки','ambiguous');
  // Original К59_2: Sum(Макет10Выб!KOEF*Макет10Выб!PH)/10,
  // joined on the complete address AND IAR. Companion species matter even
@@ -305,6 +328,12 @@ function corrections(record,refs,org,quarterRow=null){
  const layerCalculations=layers.map(iar=>({...stockPerHectare(bonitetChecked,refs,org,quarterRow,iar),layer:iar}));
  const k59=layerCalculations.find(x=>x.layer===1)||layerCalculations[0]||stockPerHectare(bonitetChecked,refs,org,quarterRow);
  let computedRecord={...record,_children:{...record._children,Макет10:(record?._children?.Макет10||[]).map(r=>({...r}))}};
+ // Normalize companions regardless of whether Szap is available: the
+ // representation invariant is independent of the normative stock value.
+ for(const issue of companionStockIssues(record)){
+  issues.push(issue);
+  computedRecord._children.Макет10[issue.index].ZAP=0;
+ }
  for(const result of layerCalculations){
   if(result.status!=='complete'){unknown.push({field:'ZAP',...result});continue;}
   const current=record._children.Макет10[result.index].ZAP;
@@ -328,5 +357,5 @@ function corrections(record,refs,org,quarterRow=null){
  }else unknown.push({field:'STUR',...stock});
  return {issues,unknown,bonitet:b,standStock:stock,stockPerHectare:k59,layerCalculations};
 }
-window.SolinCardCalculations={bonitet,standStock,stockBreakdown,stockPerHectare,stockZoneOptions,corrections,safeRoundHalf,accessRound,k59Round};
+window.SolinCardCalculations={bonitet,standStock,stockBreakdown,stockPerHectare,stockZoneOptions,companionStockIssues,corrections,safeRoundHalf,accessRound,k59Round};
 })();
