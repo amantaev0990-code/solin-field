@@ -5,7 +5,13 @@
 (()=>{'use strict';
  const DB_NAME='SOLIN_FIELD_OFFLINE_IMAGERY_V1',VERSION=1;
  const MAX_FILE=350*1024*1024,MAX_TILES=25000,CHUNK=80;
- let dbPromise=null,activeLayer=null,activePack=null,mapRef=null,loading=false;
+ let dbPromise=null,activeLayer=null,activePack=null,mapRef=null,loading=false,downloadAbort=null,restoreEpoch=0;
+ // 2016 is CC BY 4.0, including commercial embedding and offline tiles.
+ // Newer EOX mosaics and Google tiles are deliberately NOT downloaded.
+ const SOURCE={name:'Sentinel-2 · 2016–2017 · 10 м',maxZoom:14,
+  url:'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg',
+  attribution:'<a href="https://cloudless.eox.at">EOxCloudless</a> by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2016 &amp; 2017) · <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>'};
+ const MAX_DOWNLOAD=5000;
  const text=s=>String(s??'');
  const html=s=>text(s).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','"':'&quot;',"'":'&#39;'}[ch]));
  const forestId=()=>window.SolinWorkspace?.activeId||null;
@@ -41,12 +47,12 @@
    q.onerror=()=>reject(q.error);
   });
  }
- async function packs(forest=forestId()){
+ async function packs(forest=forestId(),includePartial=false){
   if(!forest)return [];
   const d=await db();
   return new Promise((resolve,reject)=>{
    const req=d.transaction('packs','readonly').objectStore('packs').getAll();
-   req.onsuccess=()=>resolve((req.result||[]).filter(x=>x.forest===forest&&x.status==='ready').sort((a,b)=>b.created-a.created));
+   req.onsuccess=()=>resolve((req.result||[]).filter(x=>x.forest===forest&&(x.status==='ready'||includePartial)).sort((a,b)=>b.created-a.created));
    req.onerror=()=>reject(req.error);
   });
  }
@@ -133,8 +139,7 @@
    if(pack.count!==count)throw Error('Количество считанных фрагментов не совпало с пакетом');
    pack.status='ready';await putPack(pack);
    await navigator.storage?.persist?.().catch(()=>false);
-   await select(pack);
-   await showStored();
+   if(forest===forestId()){await select(pack);await showStored();}
    setStatus('Офлайн-снимок сохранён для лесничества: '+pack.count+' фрагментов, масштабы '+pack.minZoom+'–'+pack.maxZoom);
    return pack;
   }catch(e){
@@ -145,7 +150,7 @@
  }
  function layer(pack){
   return L.gridLayer({tileSize:256,minZoom:pack.minZoom,maxNativeZoom:pack.maxZoom,
-   maxZoom:21,attribution:'Офлайн MBTiles · '+html(pack.name)});
+   maxZoom:21,attribution:pack.attribution||'Офлайн MBTiles · '+html(pack.name)});
  }
  function buildLayer(pack){
   const grid=layer(pack);
@@ -186,7 +191,7 @@
   const offline=document.getElementById('offlineBtn');
   if(offline){offline.disabled=!activePack;offline.classList.toggle('active',mode==='offline');}
  }
- async function showStored(){
+ async function showStored(fit=true){
   if(!activePack||!mapRef)return false;
   if(typeof baseGoogle!=='undefined'&&baseGoogle&&mapRef.hasLayer(baseGoogle))mapRef.removeLayer(baseGoogle);
   if(typeof baseOSM!=='undefined'&&baseOSM&&mapRef.hasLayer(baseOSM))mapRef.removeLayer(baseOSM);
@@ -195,7 +200,7 @@
   document.getElementById('satBtn')?.classList.remove('active');
   document.getElementById('osmBtn')?.classList.remove('active');
   updateButtons('offline');
-  if(activePack.bounds){
+  if(fit&&activePack.bounds){
    const [w,s,e,n]=activePack.bounds;
    if(n>s&&e>w)mapRef.fitBounds([[s,w],[n,e]],{padding:[15,15]});
   }
@@ -203,12 +208,14 @@
  }
  async function restore(){
   if(!mapRef)return;
+  const epoch=++restoreEpoch,forest=forestId();
   deactivate();
-  const found=await packs();
+  const found=await packs(forest);
+  if(epoch!==restoreEpoch||forest!==forestId())return;
   if(found.length){await select(found[0]);await showStored();
    setStatus('Офлайн-снимок готов: '+found[0].name+' ('+found[0].count+' фрагментов).');
   }else{
-   setStatus('Нет сохранённого спутникового пакета. Импортируйте MBTiles для этого лесничества.');
+   setStatus(navigator.onLine===false?'Нет сохранённой карты. Подключитесь к интернету и нажмите «Скачать карту» перед выездом.':'Карта ещё не сохранена. Нажмите «Скачать карту» для работы без интернета.');
   }
  }
  function setStatus(s){
@@ -223,6 +230,141 @@
   if(!forestId()){setStatus('Сначала откройте лесничество');return;}
   document.getElementById('offlineImageryInput')?.click();
  }
+ function extent(value){
+  const a=Array.isArray(value)?value:[value.getWest(),value.getSouth(),value.getEast(),value.getNorth()];
+  if(a.length!==4||!a.every(Number.isFinite)||a[0]<-180||a[2]>180||a[1]<-85.05112878||a[3]>85.05112878||a[2]<=a[0]||a[3]<=a[1])
+   throw Error('Выберите меньшую область карты без пересечения 180-го меридиана');
+  return a;
+ }
+ function plan(bounds,maxZoom=14){
+  const [w,s,e,n]=extent(bounds),max=Number(maxZoom);
+  if(!Number.isInteger(max)||max<10||max>SOURCE.maxZoom)throw Error('Масштаб загрузки должен быть от 10 до '+SOURCE.maxZoom);
+  const rows=[];
+  for(let z=8;z<=max;z++){
+   const count=2**z,tx=lon=>Math.max(0,Math.min(count-1,Math.floor((lon+180)/360*count))),
+    ty=lat=>Math.max(0,Math.min(count-1,Math.floor((1-Math.asinh(Math.tan(lat*Math.PI/180))/Math.PI)/2*count)));
+   const x0=tx(w),x1=tx(e),y0=ty(n),y1=ty(s);
+   if(rows.length+(x1-x0+1)*(y1-y0+1)>MAX_DOWNLOAD)throw Error('Область слишком большая. Приблизьте карту или выберите меньшую детализацию (не более '+MAX_DOWNLOAD+' фрагментов)');
+   for(let x=x0;x<=x1;x++)for(let y=y0;y<=y1;y++)rows.push({z,x,y});
+  }
+  return rows;
+ }
+ async function fetchRaster(coords,signal){
+  const url=SOURCE.url.replace('{z}',coords.z).replace('{x}',coords.x).replace('{y}',coords.y);
+  for(let attempt=0;attempt<3;attempt++){
+   const controller=new AbortController(),abort=()=>controller.abort(),timer=setTimeout(abort,20000);
+   signal.addEventListener('abort',abort,{once:true});
+   try{
+    if(signal.aborted)throw Error('Загрузка приостановлена');
+    const response=await fetch(url,{signal:controller.signal,credentials:'omit',cache:'no-store'});
+    if(!response.ok)throw Error('Сервер карты: '+response.status);
+    const bytes=new Uint8Array(await response.arrayBuffer()),mime=tileMime(bytes);
+    if(!mime||bytes.length<32||bytes.length>1500000)throw Error('Сервер вернул повреждённый фрагмент');
+    return new Blob([bytes],{type:mime});
+   }catch(e){if(signal.aborted)throw Error('Загрузка приостановлена');if(attempt===2)throw e;}
+   finally{clearTimeout(timer);signal.removeEventListener('abort',abort);}
+  }
+ }
+ async function downloadArea(bounds,maxZoom=14,options={}){
+  const forest=forestId();if(!forest)throw Error('Сначала откройте лесничество');
+  if(loading)throw Error('Дождитесь завершения текущей загрузки');
+  const rows=plan(bounds,maxZoom),area=extent(bounds);
+  let pack=options.resumeId?await get('packs',options.resumeId):null;
+  if(options.resumeId&&(!pack||pack.forest!==forest||pack.source!==SOURCE.url||JSON.stringify(pack.bounds)!==JSON.stringify(area)||pack.maxZoom!==Number(maxZoom)))throw Error('Параметры пакета не совпадают');
+  if(!pack)pack={id:forest+'|download|'+Date.now()+'|'+Math.random().toString(36).slice(2),forest,
+   name:'Спутниковая карта · '+new Date().toLocaleDateString('ru-RU'),created:Date.now(),source:SOURCE.url,
+   attribution:SOURCE.attribution,bounds:area,minZoom:8,maxZoom:Number(maxZoom),count:0,size:0,total:rows.length};
+  loading=true;downloadAbort=new AbortController();const signal=downloadAbort.signal;
+  let failed=null,next=0,commitTail=Promise.resolve();
+  const commit=(coords,blob)=>{
+   const task=commitTail.then(async()=>{
+    if(signal.aborted)return;
+    if(pack.size+blob.size>MAX_FILE)throw Error('Пакет достиг 350 МБ. Выберите меньшую область');
+    const d=await db(),tx=d.transaction(['tiles','packs'],'readwrite');
+    const nextPack={...pack,count:pack.count+1,size:pack.size+blob.size};
+    tx.objectStore('tiles').put({key:tileId(pack.id,coords.z,coords.x,coords.y),packId:pack.id,blob});
+    tx.objectStore('packs').put(nextPack);
+    await done(tx);Object.assign(pack,nextPack);progress();
+   });
+   commitTail=task.catch(()=>{});return task;
+  };
+  const progress=()=>{
+   const message='Сохранено '+pack.count+' из '+pack.total+' фрагментов · '+(pack.size/1024/1024).toFixed(1)+' МБ';
+   setStatus(message);options.onProgress?.(message,pack);
+  };
+  try{
+   pack.status='installing';await putPack(pack);progress();
+   // Two requests at a time: bound memory usage and public endpoint load.
+   async function worker(){
+    try{
+     while(!signal.aborted&&next<rows.length){
+      const coords=rows[next++];
+      if(await readTile(pack.id,coords.z,coords.x,coords.y))continue;
+      const blob=await fetchRaster(coords,signal);
+      if(signal.aborted)break;
+      // Commit tile and its package counter in ONE transaction, so a
+      // terminated app can resume without losing track of saved tiles.
+      await commit(coords,blob);
+     }
+    }catch(e){if(!failed)failed=e;downloadAbort?.abort();}
+   }
+   await Promise.all([worker(),worker()]);
+   if(failed)throw failed;
+   if(signal.aborted||pack.count!==pack.total)throw Error('Загрузка приостановлена');
+   pack.status='ready';await putPack(pack);
+   await navigator.storage?.persist?.().catch(()=>false);
+   if(forest===forestId()){await select(pack);await showStored(false);}
+   setStatus('Карта сохранена полностью: '+pack.count+' фрагментов. Доступна без интернета.');
+   return pack;
+  }catch(e){
+   pack.status='partial';await putPack(pack);
+   setStatus('Карта сохранена частично: '+pack.count+' из '+pack.total+'. Нажмите «Скачать карту», чтобы продолжить. '+e.message);
+   const error=new Error(e.message);error.offlinePack={...pack};throw error;
+  }finally{loading=false;downloadAbort=null;}
+ }
+ function cancelDownload(){downloadAbort?.abort();}
+ function vectorBounds(){
+  const result=L.latLngBounds([]);
+  if(typeof importedMapLayers!=='undefined')for(const entry of importedMapLayers){
+   for(const layer of [entry.layer,...(entry.geometryEntries||[]).map(g=>g.layer)]){
+    const b=layer?.getBounds?.();if(b?.isValid())result.extend(b);
+   }
+  }
+  return result.isValid()?extent(result):null;
+ }
+ async function openDownload(){
+  if(!forestId()||!mapRef){window.toast?.('Сначала откройте карту лесничества');return;}
+  if(loading){window.toast?.('Карта загружается. Дождитесь завершения');return;}
+  const visible=extent(mapRef.getBounds()),vectors=vectorBounds(),saved=await packs(forestId(),true);
+  openModal('Карта без интернета','<p>Выберите область и скачайте её перед выездом. Карта останется на планшете после закрытия приложения.</p>'+
+   '<label>Область<select id="mapDownloadArea">'+(vectors?'<option value="vectors">Вся открытая карта с контурами</option>':'')+'<option value="screen">Область на экране</option></select></label>'+
+   '<label>Детализация<select id="mapDownloadZoom"><option value="14">Подробная · снимок 10 м</option><option value="13">Средняя</option><option value="12">Обзорная</option></select></label>'+
+   '<p>Источник: Sentinel-2, съёмка 2016–2017. Для более свежих снимков можно импортировать свой MBTiles.</p>'+
+   '<p id="mapDownloadEstimate" role="status"></p><p id="mapDownloadProgress" role="status"></p>'+
+   '<div class="formActions"><button type="button" id="mapDownloadStart" class="primary">Скачать</button><button type="button" id="mapDownloadCancel">Закрыть</button></div>'+
+   '<div id="mapDownloadedPackages">'+saved.map((p,i)=>'<p>'+html(p.name)+' · '+p.count+(p.total?' / '+p.total:'')+' фрагментов'+(p.status==='ready'?' · готово':' · не завершено')+
+    (p.status!=='ready'&&p.source===SOURCE.url?' <button type="button" data-resume-map="'+i+'">Продолжить</button>':'')+'</p>').join('')+'</div>');
+  const start=document.getElementById('mapDownloadStart'),cancel=document.getElementById('mapDownloadCancel'),
+   area=document.getElementById('mapDownloadArea'),zoom=document.getElementById('mapDownloadZoom'),estimate=document.getElementById('mapDownloadEstimate'),progress=document.getElementById('mapDownloadProgress');
+  const chosen=()=>area.value==='vectors'?vectors:visible;
+  const update=()=>{try{const count=plan(chosen(),Number(zoom.value)).length;estimate.textContent=count+' фрагментов · ориентировочно '+Math.ceil(count*35/1024)+' МБ';start.disabled=false;}catch(e){estimate.textContent=e.message;start.disabled=true;}};
+  area.onchange=zoom.onchange=update;update();
+  const run=async pack=>{
+   start.disabled=true;area.disabled=true;zoom.disabled=true;cancel.textContent='Приостановить';
+   document.querySelectorAll('[data-resume-map]').forEach(b=>b.disabled=true);
+   try{
+    await downloadArea(pack?.bounds||chosen(),pack?.maxZoom||Number(zoom.value),{resumeId:pack?.id,onProgress:message=>progress.textContent=message});
+    progress.textContent='Готово. Карта полностью сохранена и работает без интернета.';cancel.textContent='Закрыть';
+   }catch(e){
+    progress.textContent=e.message+'. Сохранённую часть можно продолжить из этого окна.';cancel.textContent='Закрыть';start.disabled=false;
+    if(e.offlinePack){start.textContent='Продолжить';start.onclick=()=>run(e.offlinePack);}
+   }
+   finally{area.disabled=false;zoom.disabled=false;cancel.disabled=false;}
+  };
+  start.onclick=()=>run();
+  cancel.onclick=()=>{if(loading){cancelDownload();cancel.disabled=true;}else closeModal();};
+  for(const b of document.querySelectorAll('[data-resume-map]'))b.onclick=()=>run(saved[Number(b.dataset.resumeMap)]);
+ }
  function setup(){
   const input=document.getElementById('offlineImageryInput');
   if(input)input.addEventListener('change',async()=>{
@@ -230,11 +372,14 @@
    try{await importFile(f);}catch(e){window.toast?.(e.message);}
   });
   window.addEventListener('solin-forest-changed',()=>{
+   cancelDownload();
    restore().catch(e=>setStatus('Офлайн-карта: '+e.message));
   });
+  window.addEventListener('offline',()=>{if(activePack)void showStored(false);});
  }
  window.SolinOfflineImagery={attach,restore,importFile,readTile,packs,remove,
-  show:showStored,hide:hideStored,pick,get active(){return activePack;}};
+  show:showStored,hide:hideStored,pick,openDownload,downloadArea,cancelDownload,plan,
+  get active(){return activePack;}};
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});
  else setup();
 })();

@@ -7,3 +7,7 @@
 .sap-count{font-size:13px;color:#66806a;padding:9px 4px}.sap-options{overflow-y:auto;overscroll-behavior:contain;min-height:0;flex:1;max-height:100%;padding:0 0 4px}
 .sap-option{display:block;width:100%;min-height:45px;padding:11px;text-align:left;font:16px/1.4 system-ui,Arial,sans-serif;color:#24402e;background:#fff;border:0;border-bottom:1px solid #e2eae2;white-space:normal;overflow-wrap:anywhere}
 .sap-option[aria-selected="true"]{background:#e9f3e7;font-weight:700}.sap-help{margin:6px 0;padding:12px;font-size:14px;line-height:1.45;color:#5a623f;background:#f8f7e9;border-radius:8px}
+/* Android IME can resize only visualViewport. Keep choices above it. */
+.solin-android-picker{top:var(--sap-top,0);height:var(--sap-height,100dvh);bottom:auto}
+.sap-sheet{max-height:calc(var(--sap-height,100dvh) - 12px);box-sizing:border-box}
+.sap-head,.sap-count{flex-shrink:0}

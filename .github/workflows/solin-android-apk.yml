@@ -56,10 +56,12 @@ jobs:
           npm install --no-save --no-package-lock playwright-core
           PLAYWRIGHT_PATH=playwright-core BROWSER_CHANNEL=chrome node scripts/test-apk-mobile-parity.cjs
           PLAYWRIGHT_PATH=playwright-core BROWSER_CHANNEL=chrome node scripts/test-cross-device-forest-transfer.cjs
+          PLAYWRIGHT_PATH=playwright-core BROWSER_CHANNEL=chrome node scripts/test-tablet-field-fixes.cjs
+          PLAYWRIGHT_PATH=playwright-core BROWSER_CHANNEL=chrome node scripts/test-offline-imagery.cjs
       - name: Create native Android project
         run: npx cap add android
       - name: Register offline MDB writer
-        run: node scripts/install-android-mdb.mjs
+        run: SOLIN_TABLET_BUILD=1 node scripts/install-android-mdb.mjs
       - name: Sync complete web app
         run: npx cap sync android
       - name: Compile Android debug APK

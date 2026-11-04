@@ -7,6 +7,14 @@
  const h=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  let overlay=null,selection=null,values=[],query='',previousFocus=null;
  const dom=()=>document.querySelector('#solin-android-picker');
+ const viewport=()=>{
+  if(!overlay)return;
+  const view=window.visualViewport;
+  overlay.style.setProperty('--sap-height',(view?.height||window.innerHeight)+'px');
+  overlay.style.setProperty('--sap-top',(view?.offsetTop||0)+'px');
+ };
+ window.visualViewport?.addEventListener('resize',viewport);
+ window.visualViewport?.addEventListener('scroll',viewport);
  const visible=el=>{
   if(!el?.isConnected||el.closest('[hidden]')||el.classList.contains('solin-species-native'))return false;
   const rect=el.getBoundingClientRect(),s=getComputedStyle(el);
@@ -15,11 +23,12 @@
  const ordinary=select=>select instanceof HTMLSelectElement&&
   // These controls use the dedicated searchable original-card editor.
   !select.closest('.ce-modal #ce-form .dt-board')&&visible(select);
- function cleanup(){
+ function cleanup(restoreFocus=true){
   if(!overlay)return;
+  if(document.activeElement?.closest?.('#solin-android-picker'))document.activeElement.blur();
   overlay.remove();overlay=null;selection=null;values=[];
   document.removeEventListener('keydown',onKey,true);
-  if(previousFocus?.isConnected)previousFocus.focus({preventScroll:true});
+  if(restoreFocus&&previousFocus?.isConnected)previousFocus.focus({preventScroll:true});
   previousFocus=null;
  }
  function label(select){
@@ -40,7 +49,7 @@
   const item=values.find(v=>v.idx===index);
   if(!item||item.disabled||!selection?.isConnected)return;
   const select=selection,changed=select.value!==item.value;
-  cleanup();
+  cleanup(false);
   if(changed){
    select.value=item.value;
    select.dispatchEvent(new Event('input',{bubbles:true}));
@@ -50,7 +59,7 @@
  function onKey(e){if(e.key==='Escape'&&overlay){e.preventDefault();e.stopImmediatePropagation();cleanup();}}
  function open(select){
   if(!ordinary(select))return;
-  cleanup();
+  cleanup(false);
   selection=select;previousFocus=document.activeElement;
   values=[...select.options].map((o,i)=>({idx:i,value:o.value,text:o.textContent?.trim()||o.value,disabled:o.disabled})).filter(o=>!o.disabled);
   overlay=document.createElement('div');overlay.id='solin-android-picker';overlay.className='solin-android-picker';
@@ -62,6 +71,7 @@
     '<input id="sap-search" type="search" autocomplete="off" spellcheck="false" placeholder="Введите код или название…" aria-label="Поиск по коду или названию">')+
    '<div id="sap-count" class="sap-count"></div><div id="sap-options" class="sap-options" role="listbox"></div></section>';
   document.body.append(overlay);
+  viewport();
   overlay.querySelector('.sap-close').onclick=cleanup;
   overlay.querySelector('.sap-backdrop').onclick=cleanup;
   overlay.querySelector('.sap-options').addEventListener('click',e=>{
@@ -73,7 +83,10 @@
    input.oninput=()=>{query=input.value;draw();};
    query='';draw();
    // Called synchronously from a genuine touch event on Android WebView.
-   input.focus({preventScroll:true});
+   // Small lists are immediately tappable. Focusing search on every tap
+   // forced the keyboard over the choices on landscape Android tablets.
+   // The user can still tap search whenever it is useful.
+   if(values.length>12)input.focus({preventScroll:true});
   }else{query='';draw();}
   document.addEventListener('keydown',onKey,true);
  }

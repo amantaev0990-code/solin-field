@@ -9,7 +9,33 @@ function initFieldMap(){ensureMapFileUi();if(fieldMap||!window.L)return;fieldMap
 function openMapScreen(){show('mapScreen');document.querySelectorAll('.sectionTab').forEach(x=>x.classList.toggle('active',x.dataset.s==='mapScreen'));initFieldMap();setTimeout(()=>fieldMap?.invalidateSize(),120)}
 function setBaseMap(kind){if(!fieldMap)initFieldMap();if(!fieldMap)return;window.SolinOfflineImagery?.hide?.();if(kind==='google'){if(fieldMap.hasLayer(baseOSM))fieldMap.removeLayer(baseOSM);if(!fieldMap.hasLayer(baseGoogle))baseGoogle.addTo(fieldMap)}else{if(fieldMap.hasLayer(baseGoogle))fieldMap.removeLayer(baseGoogle);if(!fieldMap.hasLayer(baseOSM))baseOSM.addTo(fieldMap)}document.getElementById('satBtn')?.classList.toggle('active',kind==='google');document.getElementById('osmBtn')?.classList.toggle('active',kind==='osm')}
 function toggleMapLayers(){document.getElementById('mapLayerPanel')?.classList.toggle('hiddenPanel')}
-function mapLocateMe(){if(!navigator.geolocation)return toast('GPS недоступен');navigator.geolocation.getCurrentPosition(p=>{const ll=[p.coords.latitude,p.coords.longitude];if(userMarker)userMarker.setLatLng(ll);else userMarker=L.circleMarker(ll,{radius:9,weight:3,fillOpacity:1}).addTo(fieldMap).bindPopup('Моё местоположение');fieldMap.setView(ll,16);userMarker.openPopup()},()=>toast('Не удалось получить GPS'),{enableHighAccuracy:true,timeout:10000})}
+let stopMapGps=null,userAccuracy=null;
+function mapLocateMe(){
+ if(!fieldMap)initFieldMap();
+ const button=document.getElementById('mapGpsBtn'),status=document.getElementById('mapGpsStatus');
+ const showStatus=message=>{if(status)status.textContent=message;};
+ if(stopMapGps){stopMapGps();stopMapGps=null;button?.classList.remove('active');showStatus('GPS остановлен');return;}
+ button?.classList.add('active');showStatus('Ищу спутники GPS… Первый сигнал может занять до минуты.');
+ let first=true,failed=false;
+ const stop=window.SolinLocation.watch(p=>{
+  const ll=[p.coords.latitude,p.coords.longitude],acc=p.coords.accuracy;
+  gps={lat:ll[0],lon:ll[1],acc};
+  if(userMarker)userMarker.setLatLng(ll);
+  else userMarker=L.circleMarker(ll,{radius:9,weight:3,color:'#fff',fillColor:'#147ce5',fillOpacity:1}).addTo(fieldMap);
+  userMarker.bindPopup('Моё местоположение'+(Number.isFinite(acc)?' · ±'+Math.round(acc)+' м':''));
+  if(Number.isFinite(acc)){
+   if(userAccuracy)userAccuracy.setLatLng(ll).setRadius(acc);
+   else userAccuracy=L.circle(ll,{radius:acc,color:'#147ce5',weight:1,fillOpacity:.1,interactive:false}).addTo(fieldMap);
+  }
+  if(first){fieldMap.setView(ll,Math.max(fieldMap.getZoom(),16));first=false;}
+  showStatus('GPS: '+ll[0].toFixed(6)+', '+ll[1].toFixed(6)+(Number.isFinite(acc)?' · точность ±'+Math.round(acc)+' м':''));
+ },error=>{failed=true;stopMapGps?.();stopMapGps=null;button?.classList.remove('active');showStatus(error.message);toast(error.message);});
+ if(!failed)stopMapGps=stop;
+}
+document.addEventListener('visibilitychange',()=>{
+ if(document.hidden&&stopMapGps){stopMapGps();stopMapGps=null;document.getElementById('mapGpsBtn')?.classList.remove('active');
+  const status=document.getElementById('mapGpsStatus');if(status)status.textContent='GPS приостановлен. Нажмите «GPS» для продолжения.';}
+});
 function openMapFilePicker(){document.getElementById('mapFileInput')?.click()}
 function makeGeoGroup(geo){return L.geoJSON(geo,{style:styleImportedFeature,pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:5,weight:2,fillOpacity:.8}),onEachFeature:bindImportedFeature}).addTo(fieldMap)}
 function addGeoLayer(name,geo,key,format){if(!geo||geo.type!=='FeatureCollection')throw new Error('Нет векторных объектов');const group=makeGeoGroup(geo);const entry={key,name,layer:group,count:(geo.features||[]).length,visible:true,format};importedMapLayers.push(entry);return entry}

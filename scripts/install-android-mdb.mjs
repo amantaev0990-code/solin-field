@@ -16,6 +16,23 @@ if(!main.includes('registerPlugin(SolinMdbPlugin.class)')){
  fs.writeFileSync(activity,main);
 }
 fs.copyFileSync(path.join(root,'native/android/SolinMdbPlugin.java'),plugin);
+// Real GNSS permission + native provider. WebView geolocation alone cannot
+// request the Android runtime permission and may depend on network services.
+fs.copyFileSync(path.join(root,'native/android/SolinLocationPlugin.java'),path.join(path.dirname(activity),'SolinLocationPlugin.java'));
+main=fs.readFileSync(activity,'utf8');
+if(!main.includes('registerPlugin(SolinLocationPlugin.class)')){
+ main=main.replace('registerPlugin(SolinMdbPlugin.class);','registerPlugin(SolinMdbPlugin.class);\n    registerPlugin(SolinLocationPlugin.class);');
+ fs.writeFileSync(activity,main);
+}
+const manifestFile=path.join(app,'src/main/AndroidManifest.xml');
+let manifest=fs.readFileSync(manifestFile,'utf8');
+for(const permission of ['ACCESS_FINE_LOCATION','ACCESS_COARSE_LOCATION']){
+ if(!manifest.includes('android.permission.'+permission))manifest=manifest.replace('</manifest>',
+  '    <uses-permission android:name="android.permission.'+permission+'" />\n</manifest>');
+}
+if(!manifest.includes('android.hardware.location.gps'))manifest=manifest.replace('</manifest>',
+ '    <uses-feature android:name="android.hardware.location.gps" android:required="false" />\n</manifest>');
+fs.writeFileSync(manifestFile,manifest);
 // Install a native Android/JUnit test in the generated Capacitor project.
 // Tests exercise the same private Jackcess writer invoked by the plugin,
 // using the verified blank transfer template shipped in APK assets.
@@ -41,6 +58,8 @@ if(fs.existsSync(uiTestSource)){
  fs.mkdirSync(path.dirname(uiTestDest),{recursive:true});
  fs.copyFileSync(uiTestSource,uiTestDest);
 }
+fs.copyFileSync(path.join(root,'native/android/SolinGpsInstrumentedTest.java'),
+ path.join(app,'src/androidTest/java/kz/solin/field/SolinGpsInstrumentedTest.java'));
 let build=fs.readFileSync(gradle,'utf8');
 const dep="implementation 'com.healthmarketscience.jackcess:jackcess:4.0.12'";
 if(!build.includes(dep)){
@@ -58,4 +77,14 @@ for(const [marker,dep] of [['androidx.test.ext:junit',junitDep],['androidx.test:
  build=build.slice(0,start+14)+'\n    '+dep+build.slice(start+14);
 }
 fs.writeFileSync(gradle,build);
+if(process.env.SOLIN_TABLET_BUILD==='1'){
+ // Historical APKs used ephemeral CI debug certificates. A separate app ID
+ // allows field verification without uninstalling the old APK or its data.
+ build=build.replace(/applicationId\s+"kz\.solin\.field"/, 'applicationId "kz.solin.field.tablet"');
+ build=build.replace(/versionCode\s+\d+/, 'versionCode 10').replace(/versionName\s+"[^"]+"/,'versionName "0.3.0-tablet.10"');
+ fs.writeFileSync(gradle,build);
+ const stringsFile=path.join(app,'src/main/res/values/strings.xml');
+ const strings=fs.readFileSync(stringsFile,'utf8').replace(/(<string name="app_name">)[^<]+/, '$1SOLI-N Field V10');
+ fs.writeFileSync(stringsFile,strings);
+}
 console.log('Native Android MDB plugin and on-emulator roundtrip checks registered.');

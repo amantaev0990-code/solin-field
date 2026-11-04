@@ -3,9 +3,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'native/android/SolinMdbPlugin.java'
-      - 'native/android/SolinMdbInstrumentedTest.java'
-      - 'native/android/SolinFieldUiInstrumentedTest.java'
+      - 'native/android/**'
       - 'scripts/install-android-mdb.mjs'
       - 'scripts/build-mobile.mjs'
       - 'scripts/test-android-assets.cjs'

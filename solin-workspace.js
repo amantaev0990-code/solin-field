@@ -381,7 +381,13 @@ async function newForest(){
    ...items.map(x=>new Option(x.name+' · '+x.code,String(x.code))));
   el.disabled=!items.length;
  };
- const syncSave=()=>{save.disabled=!(region.value&&owner.value&&district.value);error.textContent='';};
+ const syncSave=(clearError=true)=>{
+  const complete=!!(region.value&&owner.value&&district.value);
+  const exists=complete&&forests.some(f=>matchCode(f.org?.POS,owner.value)&&matchCode(f.org?.LESN,district.value));
+  save.disabled=!complete;
+  save.textContent=exists?'Открыть существующее лесничество':'Создать пустое лесничество';
+  if(clearError)error.textContent='';
+ };
  region.onchange=()=>{
   const owners=catalogOwners(region.value,forests);
   setOptions(owner,owners,owners.length?'Выберите лесовладельца…':'Нет данных лесовладельцев');
@@ -395,13 +401,16 @@ async function newForest(){
   hint.textContent=owner.value&&!items.length?'Для выбранного лесовладельца справочник лесничеств ещё не загружен.':'';
   syncSave();
  };
- district.onchange=syncSave;
+ district.onchange=()=>syncSave();
  document.querySelector('#cancelForest').onclick=closeModal;
  save.onclick=async()=>{
   if(save.disabled)return;
   save.disabled=true;error.textContent='';
-  try{await create({regionCode:region.value,ownerCode:owner.value,districtCode:district.value});}
-  catch(e){error.textContent=e.message;syncSave();}
+  try{
+   const existing=forests.find(f=>matchCode(f.org?.POS,owner.value)&&matchCode(f.org?.LESN,district.value));
+   if(existing){await activate(existing.id);closeModal();}
+   else await create({regionCode:region.value,ownerCode:owner.value,districtCode:district.value});
+  }catch(e){error.textContent=e.message||'Не удалось создать лесничество';syncSave(false);}
  };
 }
 function previewTransfer(payload){const tables=payload?.tables;if(!tables||!Array.isArray(tables['Лесничество'])||!Array.isArray(tables['Выдел']))throw Error('В Transfer нужны таблицы «Лесничество» и «Выдел»');const groups=new Map();for(const raw of tables['Лесничество']){const org=codes(copy(raw));if(!org.NOS?.trim()||!org.NLX?.trim())throw Error('В Transfer отсутствует название лесничества или лесовладельца');const id=idOf(org);if(groups.has(id))throw Error('Повторяется адрес лесничества '+org.NOS);groups.set(id,{id,org,quarters:{},history:[],source:{forestDistrict:org.NOS,year:org.GodT,notes:'Загружено из Transfer'},updatedAt:new Date().toISOString()});}
