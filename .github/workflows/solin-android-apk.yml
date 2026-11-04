@@ -55,6 +55,7 @@ jobs:
         run: |
           npm install --no-save --no-package-lock playwright-core
           PLAYWRIGHT_PATH=playwright-core BROWSER_CHANNEL=chrome node scripts/test-apk-mobile-parity.cjs
+          PLAYWRIGHT_PATH=playwright-core BROWSER_CHANNEL=chrome node scripts/test-android-selects.cjs
           PLAYWRIGHT_PATH=playwright-core BROWSER_CHANNEL=chrome node scripts/test-cross-device-forest-transfer.cjs
           PLAYWRIGHT_PATH=playwright-core BROWSER_CHANNEL=chrome node scripts/test-tablet-field-fixes.cjs
           PLAYWRIGHT_PATH=playwright-core BROWSER_CHANNEL=chrome node scripts/test-offline-imagery.cjs
