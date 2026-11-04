@@ -244,8 +244,11 @@ function refreshStockPanel(){
   lines.push('<b>Макет 5 · запас всех пород живых ярусов: '+h(fmt(stock.expectedPerHa))+
    ' м³/га × '+h(fmt(stock.area))+' га = '+h(fmt(stock.expectedTotal))+
    ' м³.</b> '+h(stock.liveSpeciesCount)+' пород(ы).');
-  lines.push('По ярусам: '+h(stock.byLayer.map(x=>x.iar+': '+fmt(x.zap)+' м³/га').join('; '))+'.');
-  lines.push('По породам: '+h(stock.bySpecies.map(x=>x.por+': '+fmt(x.zap)+' м³/га').join('; '))+'.');
+  lines.push('По ярусам: '+h(stock.byLayer.map(x=>
+   '№'+x.iar+' — '+fmt(x.zap)+' м³/га (записан у '+x.por+'), состав: '+
+   x.composition.map(p=>p.por+(p.coef===null?'':' '+p.coef)).join(' + ')).join('; '))+'.');
+  lines.push('ZAP хранится у ведущих строк: '+h(stock.bySpecies.map(x=>x.por+': '+fmt(x.zap)+' м³/га').join('; '))+
+   '. Это запас ЯРУСА, а не отдельный запас каждой примесной породы.');
  }else lines.push('<b>Общий запас живого древостоя не рассчитан.</b> '+h(stock.reason)+
   (d.included.length?' Предварительная сумма заполненных строк: '+h(fmt(d.livePerHa))+
   ' м³/га, в STUR1/STUR не записывается.':''));
