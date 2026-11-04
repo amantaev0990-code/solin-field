@@ -346,8 +346,9 @@ if(m==='Макет10'&&(calculated.length||stockEdited)){
   (stock?.status==='complete'?
    'Все живые породы: STUR1 = '+h(stock.expectedPerHa)+' м³/га; STUR = '+h(stock.expectedTotal)+' м³ на выдел. Расчёт из введённых ZAP; К59 проверяется отдельно.':
    'Автоматический пересчёт STUR не выполнен: '+h(stock?.reason||'нет исходных данных'))+'</p>'+
-  (stock?.status==='complete'?'<p>По ярусам: '+h(stock.byLayer.map(x=>'№'+x.iar+' — '+x.zap).join('; '))+
-   ' м³/га. По породам: '+h(stock.bySpecies.map(x=>x.por+' — '+x.zap).join('; '))+' м³/га.</p>':'')+
+  (stock?.status==='complete'?'<p>По ярусам: '+h(stock.byLayer.map(x=>'№'+x.iar+' — '+x.zap+
+   ' м³/га; ведущая порода '+x.por+'; состав '+x.composition.map(p=>p.por+(p.coef===null?'':' '+p.coef)).join(' + ')).join('; '))+
+   '. ZAP ведущей породы описывает запас всего яруса и не повторяется на примеси.</p>':'')+
   (parts?.singleTrees?.length?'<p>Ярус 7: единичные деревья '+h(parts.singleTreesPerHa)+' м³/га, '+h(parts.singleTreesTotal)+' м³ на выдел — отдельно от STUR.</p>':'')+
   (parts?.freshDeadwood?.length?'<p>Ярус 8: свежий сухостой '+h(parts.freshDeadwoodPerHa)+' м³/га, '+h(parts.freshDeadwoodTotal)+' м³ на выдел — отдельно от живого древостоя.</p>':'')+
   (parts?.drywoodPerHa!=null?'<p>M4SS: сухостой '+h(parts.drywoodPerHa)+' м³/га, '+h(parts.drywoodTotal)+' м³ на выдел. Не суммируем с ярусом 8: возможен повторный учёт.</p>':'')+
