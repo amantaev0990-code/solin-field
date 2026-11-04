@@ -14,6 +14,7 @@ Read original files without modifying them and keep detailed outputs outside thi
 node cloud-lab/mdb-inventory.cjs /private/Solim.mdb /private/lab/solim-inventory.json PIAP СОАТО
 node cloud-lab/audit.cjs /private/lab /private/lab/reports
 python3 cloud-lab/audit-vba.py /private/recovered.zip /private/active-crosscheck.json /private/lab/vba-inventory.json
+java -cp /private/verified-exporter.jar cloud-lab/ReadOnlyMdb.java /private/Solim.mdb /private/lab/solim-jackcess.json
 node cloud-lab/build-private-references.cjs /private/lab/solim-inventory.json /private/lab/refs.bin
 SOLIN_PRIVATE_REFERENCE_PACK=/private/lab/refs.bin npm run build
 ```
@@ -21,6 +22,8 @@ SOLIN_PRIVATE_REFERENCE_PACK=/private/lab/refs.bin npm run build
 The private reference supplement restores `PIAP` and materializes `Кл_Рай` from the original `СОАТО` predicate. The additional file is optional: a public build without it reports partial reference coverage. Its historical codes do not assert current KATO equivalence.
 
 `audit.cjs` registers every discovered saved query and available form validation/expression/route, produces a field/query dependency graph, and distinguishes a parsed implementation from verified runtime behavior. It deliberately does not produce an overall completion percentage. Lexical references are not proven event dependencies.
+
+Place optional `*-jackcess.json` and `vba-inventory.json` companions beside the source inventories. The registry then includes original field defaults, required/empty-string constraints, indexes, regenerated join contracts and current VBA procedure identities. To independently re-extract the active directory, add `--source-mdb`, `--parser-archive` and `--event-inventory` to `audit-vba.py`; these reuse the existing private recovery tools and compare every module hash. Legacy-only procedures remain separate. Neither static comparison executes Access events.
 
 Confirmed kernel changes:
 

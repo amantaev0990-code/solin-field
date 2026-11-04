@@ -13,6 +13,20 @@ function ordered(attributes,kind){return attributes.filter(a=>a.Attribute===kind
 function expression(s){if(s==null)return null;return JSON.stringify(SQL.tokens(String(s)).map(t=>[t.kind,t.kind==='name'?fold(t.value):t.value]));}
 const identifier=s=>SQL.tokens(String(s??'')).filter(t=>t.kind==='name').map(t=>fold(t.value));
 const eq=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+function joinTree(ast){
+ if(!ast)return null;
+ if(ast.kind==='table')return {kind:'table',name:fold(ast.name),alias:fold(ast.alias||ast.name)};
+ if(ast.kind==='join')return {kind:'join',join:fold(ast.join),left:joinTree(ast.left),right:joinTree(ast.right),on:expression(ast.on)};
+ throw Error('Unsupported saved join node');
+}
+function compareRegeneratedSql(sql,plan){
+ try{
+  const regenerated=SQL.parse(sql),original=regenerated.select||regenerated,actual=plan.select||plan;
+  const checks={kind:regenerated.kind===plan.kind,joinTree:eq(joinTree(original.from?.ast),joinTree(actual.from?.ast))};
+  return {status:Object.values(checks).every(Boolean)?'matched':'different',checks,nativeRuntimeVerified:false,
+   scope:'Join direction, precedence, source identities and ON tokens from independently regenerated saved SQL. Native execution remains separate.'};
+ }catch(e){return {status:'unverified',reason:e.message,nativeRuntimeVerified:false};}
+}
 function projection(rows){return rows.map((a,i)=>{
  const ts=SQL.tokens(a.Expression||''),last=ts.at(-1);return {expression:expression(a.Expression),alias:a.Name1?fold(a.Name1):last?.value==='*'?null:last?.kind==='name'?fold(last.value):'EXPR'+(1000+i)};
 });}
@@ -56,4 +70,4 @@ function compare(query,plan){
  return {status:differences.length?'different':'matched',checks,differences,nativeRuntimeVerified:false,
   scope:'Ordered projections/aliases; action type/target/assignments; WHERE/HAVING/GROUP/ORDER; source tables. Join-tree runtime equivalence is separate.'};
 }
-module.exports={compare,ordered,expression};
+module.exports={compare,ordered,expression,compareRegeneratedSql};

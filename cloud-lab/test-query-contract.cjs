@@ -1,5 +1,5 @@
 'use strict';
-const assert=require('node:assert/strict'),{compare}=require('./query-contract.cjs');
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),{compare,compareRegeneratedSql}=require('./query-contract.cjs');
 const row=(Attribute,values={})=>({Attribute,Order:{data:[0,0,0,1]},...values});
 const field=(name,position)=>row(6,{Expression:'T.'+name,Order:{data:[0,0,0,position]},Name1:null});
 const attrs=[row(1,{Flag:1}),row(5,{Name1:'T'}),field('B',2),field('A',1)];
@@ -14,4 +14,11 @@ assert.equal(compare({attributes:[row(1,{Flag:3,Name1:'U'}),row(5,{Name1:'T'}),{
 assert.equal(compare({attributes:[row(1,{Flag:99})]},base).status,'unverified');
 assert.equal(compare({objectFlags:0,attributes:attrs.filter(a=>a.Attribute!==1)},base).status,'matched','SELECT type comes from MSysObjects when its type row is omitted');
 assert.equal(compare({objectFlags:48,attributes:[row(1,{Flag:5})]},base).status,'unverified','Conflicting type metadata cannot be accepted');
-console.log('QUERY_CONTRACT_OK: Jet Order, SELECT aliases, UPDATE/DELETE/INSERT targets and unsupported-type handling');
+const w={};vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../solin-access-sql.js'),'utf8'),{window:w});
+const sql='SELECT T.A FROM T LEFT JOIN U ON T.A=U.A WHERE U.B="Value"',joined=w.SolinAccessSQL.parse(sql);
+assert.equal(compareRegeneratedSql(sql.toLowerCase(),joined).status,'matched','Identifier case is insignificant');
+assert.equal(compareRegeneratedSql(sql.replace('LEFT','INNER'),joined).status,'different','Outer join direction is part of the contract');
+assert.equal(compareRegeneratedSql(sql.replace('T.A=U.A','T.B=U.A'),joined).status,'different','Changed join keys must be detected');
+assert.equal(compareRegeneratedSql('SELECT T.A FROM U LEFT JOIN T ON T.A=U.A',joined).status,'different','Preserve outer join operand order');
+assert.equal(compareRegeneratedSql('invalid SQL',joined).status,'unverified');
+console.log('QUERY_CONTRACT_OK: Jet order/actions, regenerated join precedence/direction/keys and unsupported definitions');

@@ -54,9 +54,10 @@ def package(base,reference,tools,keydir,original,output,allow_upgrade=False):
     os.chmod(align,0o755);os.chmod(aapt,0o755)
     keystore,key=signing_key(keydir);env={**os.environ,'SOLIN_LAB_KEY_PASSWORD':key['password']}
     def certificate(apk):
-        log=run(['java','-jar',signer,'verify','--print-certs',apk]);m=re.search(r'Signer #1 certificate SHA-256 digest:\s*([0-9a-fA-F]+)',log)
-        if not m:raise ValueError('Cannot verify APK certificate')
-        return m.group(1).lower()
+        log=run(['java','-jar',signer,'verify','--print-certs',apk])
+        fingerprints={v.lower() for v in re.findall(r'certificate SHA-256 digest:\s*([0-9a-fA-F]{64})',log)}
+        if len(fingerprints)!=1:raise ValueError('Expected one verified APK signing certificate')
+        return fingerprints.pop()
     def app_id(apk):
         m=re.search(r"package: name='([^']+)'",run([aapt,'dump','badging',apk]))
         if not m:raise ValueError('Cannot read Android package identity')
@@ -76,15 +77,17 @@ def package(base,reference,tools,keydir,original,output,allow_upgrade=False):
             if name in z.namelist():raise ValueError('Base already contains private references')
             z.writestr(name,reference.read_bytes())
         run([align,'-f','-P','16','4',raw,aligned])
-        run(['java','-jar',signer,'sign','--ks',keystore,'--ks-key-alias',key['alias'],'--ks-pass','env:SOLIN_LAB_KEY_PASSWORD','--key-pass','env:SOLIN_LAB_KEY_PASSWORD','--v4-signing-enabled','false','--out',output,aligned],env)
-    run([align,'-c','-P','16','4',output]);signed_fp=certificate(output)
-    if signed_fp!=key_fp:raise ValueError('Output certificate differs from the durable key')
-    with zipfile.ZipFile(output) as signed,zipfile.ZipFile(base) as src:
-        if signed.testzip():raise ValueError('Corrupted output APK')
-        if signed.read('assets/public/solin-private-refs.packed.bin')!=reference.read_bytes():raise ValueError('Private references changed')
-        for name in src.namelist():
-            if name.startswith('assets/public/') and not name.endswith('/'):
-                if signed.read(name)!=src.read(name):raise ValueError('Changed tested application asset: '+name)
+        checked=pathlib.Path(td)/'signed.apk'
+        run(['java','-jar',signer,'sign','--ks',keystore,'--ks-key-alias',key['alias'],'--ks-pass','env:SOLIN_LAB_KEY_PASSWORD','--key-pass','env:SOLIN_LAB_KEY_PASSWORD','--v4-signing-enabled','false','--out',checked,aligned],env)
+        run([align,'-c','-P','16','4',checked]);signed_fp=certificate(checked)
+        if signed_fp!=key_fp:raise ValueError('Output certificate differs from the durable key')
+        with zipfile.ZipFile(checked) as signed,zipfile.ZipFile(base) as src:
+            if signed.testzip():raise ValueError('Corrupted output APK')
+            if signed.read('assets/public/solin-private-refs.packed.bin')!=reference.read_bytes():raise ValueError('Private references changed')
+            for name in src.namelist():
+                if name.startswith('assets/public/') and not name.endswith('/'):
+                    if signed.read(name)!=src.read(name):raise ValueError('Changed tested application asset: '+name)
+        os.link(checked,output) # atomically publish only verified bytes, never overwrite
     result={'format':'SOLIN-private-apk-check-v1','package':base_id,'originalPackage':original_id,'parallelInstall':base_id!=original_id,'v14InPlaceUpdateAllowed':base_id==original_id and key_fp==original_fp,'originalCertificateSha256':original_fp,'certificateSha256':signed_fp,'apkSha256':hashlib.sha256(output.read_bytes()).hexdigest(),'referencesSha256':hashlib.sha256(reference.read_bytes()).hexdigest(),'referenceTables':{k:len(v) for k,v in ref['tables'].items()},'baseAssetsPreserved':True,'signatureVerified':True,'zipAlignmentVerified':True,'privateApkEmulatorExecuted':False}
     output.with_suffix('.verification.json').write_text(json.dumps(result,ensure_ascii=False,indent=2));return result
 

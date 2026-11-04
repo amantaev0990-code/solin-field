@@ -234,10 +234,10 @@ async function reopen(p,info){
  assert.equal(newQuarterContext.functional,'SELECT');
  assert.equal(newQuarterContext.raion,'SELECT');
  assert.equal(newQuarterContext.value,'','Do not guess a default SFZ code');
- assert(newQuarterContext.codes.includes('0')&&!newQuarterContext.codes.includes('1'),
+ assert(!newQuarterContext.codes.some(x=>/^\d+$/.test(x)),
    'Without KGLF, do not offer unrelated functional zones');
   assert(!newQuarterContext.after.split(',').includes('1'),
-   'Actual Sples KGLF=27 has no SFZ.KLF=27: do not offer unrelated zone 1');
+   'Saved Fzona SQL for KGLF 27 allows zero and excludes zone 1');
  assert(newQuarterContext.districtCodes.includes('356400000'));
  assert.match(newQuarterContext.districtHint,/Кл_Рай/);
  await p.evaluate(()=>closeModal());
