@@ -80,11 +80,24 @@ fs.writeFileSync(gradle,build);
 if(process.env.SOLIN_TABLET_BUILD==='1'){
  // Historical APKs used ephemeral CI debug certificates. A separate app ID
  // allows field verification without uninstalling the old APK or its data.
- build=build.replace(/applicationId\s+"kz\.solin\.field(?:\.tablet(?:\.v\d+)?)?"/, 'applicationId "kz.solin.field.tablet.v11"');
- build=build.replace(/versionCode\s+\d+/, 'versionCode 11').replace(/versionName\s+"[^"]+"/,'versionName "0.3.0-tablet.11"');
+ build=build.replace(/applicationId\s+"kz\.solin\.field(?:\.tablet(?:\.v\d+)?)?"/, 'applicationId "kz.solin.field.tablet.v12"');
+ build=build.replace(/versionCode\s+\d+/, 'versionCode 12').replace(/versionName\s+"[^"]+"/,'versionName "0.3.0-tablet.12"');
  fs.writeFileSync(gradle,build);
  const stringsFile=path.join(app,'src/main/res/values/strings.xml');
- const strings=fs.readFileSync(stringsFile,'utf8').replace(/(<string name="app_name">)[^<]+/, '$1SOLI-N Field V11');
+ const strings=fs.readFileSync(stringsFile,'utf8').replace(/(<string name="app_name">)[^<]+/, '$1SOLI-N Field V12');
  fs.writeFileSync(stringsFile,strings);
 }
-console.log('Native Android MDB plugin and on-emulator roundtrip checks registered.');
+// Install the approved forest/S/GPS launcher icon into every generated APK.
+// The source is checked in as base64 text so GitHub and CI preserve image bytes.
+const iconSource=path.join(root,'native/android/solin-field-launcher.b64');
+const icon=Buffer.from(fs.readFileSync(iconSource,'utf8').trim(),'base64');
+if(icon.length<1000||icon.subarray(0,8).toString('hex')!=='89504e470d0a1a0a')throw Error('Launcher icon PNG is missing or corrupt');
+const iconDest=path.join(app,'src/main/res/drawable-nodpi/solin_launcher.png');
+fs.mkdirSync(path.dirname(iconDest),{recursive:true});
+fs.writeFileSync(iconDest,icon);
+let updatedManifest=fs.readFileSync(manifestFile,'utf8');
+if(!/android:icon="[^"]+"/.test(updatedManifest))throw Error('AndroidManifest has no app icon attribute');
+updatedManifest=updatedManifest.replace(/android:icon="[^"]+"/,'android:icon="@drawable/solin_launcher"');
+updatedManifest=updatedManifest.replace(/android:roundIcon="[^"]+"/,'android:roundIcon="@drawable/solin_launcher"');
+fs.writeFileSync(manifestFile,updatedManifest);
+console.log('Native Android MDB plugin, GPS and V12 launcher icon installed.');
