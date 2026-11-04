@@ -21,6 +21,17 @@ class TransferWriterTest {
   private final ObjectMapper json = new ObjectMapper();
   private final TransferWriter writer = new TransferWriter();
 
+  @Test void floatingPointValuesMustFitTheMdbType() {
+    for (String invalid : new String[]{"1e40", "-1e40", "NaN", "Infinity", "1e-60", "-1e-60"})
+      assertThrows(IllegalArgumentException.class, () -> TransferWriter.convert(json.getNodeFactory().textNode(invalid), DataType.FLOAT), invalid);
+    for (String invalid : new String[]{"1e400", "-1e400", "NaN", "Infinity", "1e-500"})
+      assertThrows(IllegalArgumentException.class, () -> TransferWriter.convert(json.getNodeFactory().textNode(invalid), DataType.DOUBLE), invalid);
+    assertEquals(0f, TransferWriter.convert(json.getNodeFactory().numberNode(0), DataType.FLOAT));
+    assertEquals(1.25f, TransferWriter.convert(json.getNodeFactory().textNode("1.25"), DataType.FLOAT));
+    assertEquals(1.25d, TransferWriter.convert(json.getNodeFactory().textNode("1.25"), DataType.DOUBLE));
+    assertNull(TransferWriter.convert(json.getNodeFactory().nullNode(), DataType.FLOAT));
+  }
+
   private Path template() throws Exception {
     Path t = temp.resolve("Transf_213_2_2026.mdb");
     try (Database db = DatabaseBuilder.create(Database.FileFormat.V2000, t.toFile())) {

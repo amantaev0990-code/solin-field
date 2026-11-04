@@ -28,6 +28,24 @@ import java.util.Arrays;
  */
 @RunWith(AndroidJUnit4.class)
 public class SolinMdbInstrumentedTest {
+  @Test public void invalidNumbersCannotOverflowOrDisappearInMdb() throws Exception {
+    File copy=blankCopy();
+    try(Database db=DatabaseBuilder.open(copy)) {
+      Table probe=new com.healthmarketscience.jackcess.TableBuilder("RangeProbe")
+        .addColumn(new com.healthmarketscience.jackcess.ColumnBuilder("F",com.healthmarketscience.jackcess.DataType.FLOAT))
+        .addColumn(new com.healthmarketscience.jackcess.ColumnBuilder("D",com.healthmarketscience.jackcess.DataType.DOUBLE))
+        .addColumn(new com.healthmarketscience.jackcess.ColumnBuilder("B",com.healthmarketscience.jackcess.DataType.BYTE)).toTable(db);
+      Method convert=SolinMdbPlugin.class.getDeclaredMethod("convert",Object.class,com.healthmarketscience.jackcess.Column.class);
+      convert.setAccessible(true);
+      for(String[] item:new String[][]{{"F","1e40"},{"F","1e-60"},{"F","NaN"},{"D","1e400"},{"D","1e-500"},{"B","256"},{"B","-1"}}) {
+        try { convert.invoke(null,item[1],probe.getColumn(item[0]));fail("Invalid MDB number accepted: "+item[0]); }
+        catch(java.lang.reflect.InvocationTargetException e) { assertTrue(e.getCause() instanceof IllegalArgumentException); }
+      }
+      assertEquals(0f,convert.invoke(null,"0",probe.getColumn("F")));
+      assertEquals(1.25f,convert.invoke(null,"1.25",probe.getColumn("F")));
+      assertNull(convert.invoke(null,JSONObject.NULL,probe.getColumn("F")));
+    } finally { copy.delete(); }
+  }
   private static final String ASSET="public/vendor/solin-empty-transfer-v20261028-27.mdb";
   private static final int OWNER=213,FOREST=2;
   private final Context context=getInstrumentation().getTargetContext();

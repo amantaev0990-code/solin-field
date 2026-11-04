@@ -512,8 +512,18 @@ public final class TransferWriter {
           yield node.isBoolean() ? node.asBoolean() : (v.equals("1") || v.equalsIgnoreCase("true"));
         }
         case BYTE, INT, LONG, BIG_INT -> requireInt(v, type);
-        case FLOAT -> Float.parseFloat(v);
-        case DOUBLE -> Double.parseDouble(v);
+        case FLOAT -> {
+          float parsed = Float.parseFloat(v);
+          if (!Float.isFinite(parsed) || (parsed == 0f && exactDecimal(v).signum() != 0))
+            throw new IllegalArgumentException("Число вне диапазона MDB Single.");
+          yield parsed;
+        }
+        case DOUBLE -> {
+          double parsed = Double.parseDouble(v);
+          if (!Double.isFinite(parsed) || (parsed == 0d && exactDecimal(v).signum() != 0))
+            throw new IllegalArgumentException("Число вне диапазона MDB Double.");
+          yield parsed;
+        }
         case MONEY, NUMERIC -> new BigDecimal(v);
         case SHORT_DATE_TIME -> {
           if (v.matches("\\d{4}-\\d{2}-\\d{2}")) yield java.time.LocalDate.parse(v).atStartOfDay();

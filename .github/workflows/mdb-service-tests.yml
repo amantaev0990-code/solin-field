@@ -23,3 +23,9 @@ jobs:
           cache-dependency-path: mdb-service/pom.xml
       - name: Test real Jet MDB generation
         run: mvn -B -ntp -f mdb-service/pom.xml verify
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-mdb-writer-and-tests
+          path: |
+            mdb-service/target/mdb-export-service-*.jar
+            mdb-service/target/surefire-reports/*.xml

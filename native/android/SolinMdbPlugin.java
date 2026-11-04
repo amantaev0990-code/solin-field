@@ -284,12 +284,26 @@ public class SolinMdbPlugin extends Plugin {
           if(!(value.equals("0")||value.equals("1")||value.equalsIgnoreCase("true")||value.equalsIgnoreCase("false")))
             throw new IllegalArgumentException("Неверный логический тип.");
           return value.equals("1")||value.equalsIgnoreCase("true");
-        case "BYTE":return Integer.parseInt(value);
+        case "BYTE":{
+          int parsed=Integer.parseInt(value);
+          if(parsed<0||parsed>255)throw new IllegalArgumentException("Число вне диапазона MDB Byte.");
+          return parsed;
+        }
         case "INT":return Short.parseShort(value);
         case "LONG":return Integer.parseInt(value);
         case "BIG_INT":return Long.parseLong(value);
-        case "FLOAT":return Float.parseFloat(value);
-        case "DOUBLE":return Double.parseDouble(value);
+        case "FLOAT":{
+          float parsed=Float.parseFloat(value);
+          if(!Float.isFinite(parsed)||(parsed==0f&&new BigDecimal(value).signum()!=0))
+            throw new IllegalArgumentException("Число вне диапазона MDB Single.");
+          return parsed;
+        }
+        case "DOUBLE":{
+          double parsed=Double.parseDouble(value);
+          if(!Double.isFinite(parsed)||(parsed==0d&&new BigDecimal(value).signum()!=0))
+            throw new IllegalArgumentException("Число вне диапазона MDB Double.");
+          return parsed;
+        }
         case "MONEY": case "NUMERIC":return new BigDecimal(value);
         case "SHORT_DATE_TIME":
           if(value.matches("\\d{4}-\\d{2}-\\d{2}"))return java.util.Date.from(LocalDate.parse(value).atStartOfDay(ZoneId.systemDefault()).toInstant());
