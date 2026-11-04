@@ -91,17 +91,56 @@
   }else{query='';draw();}
   document.addEventListener('keydown',onKey,true);
  }
- function hit(e){
-  const select=e.target?.closest?.('select');
+ // A native Android SELECT must never receive its own pointer default.
+ // Preventing only click is too late on WebView: the OS picker has already
+ // opened on touchstart/pointerdown, producing TWO lists on the tablet.
+ // Open the custom sheet only AFTER the whole tap/click has completed.
+ let pending=null,tapSerial=0;
+ const targetSelect=e=>{
+  const t=e.target;
+  const direct=t?.closest?.('select');
+  if(direct)return direct;
+  const label=t?.closest?.('label');
+  if(!label||t?.closest?.('button,input,textarea'))return null;
+  const options=[...label.querySelectorAll('select')].filter(ordinary);
+  return options.length===1?options[0]:null;
+ };
+ function swallow(e){e.preventDefault();e.stopImmediatePropagation();}
+ function onPointerDown(e){
+  const select=targetSelect(e);
   if(!ordinary(select))return;
-  // Prevent Android's own picker; show the same codes in a searchable
-  // panel with a real keyboard. Card editor controls use SolinCardAssist.
-  e.preventDefault();e.stopImmediatePropagation();open(select);
+  swallow(e);
+  pending={select,id:e.pointerId,serial:++tapSerial};
  }
- // Open after the tap is complete, not on pointerdown: on a physical
- // Android tablet, creating the sheet under the same touch lets the
- // ensuing pointerup/click land on its backdrop and immediately close it.
- // Capturing click also cancels the native HTML select popup.
- window.addEventListener('click',hit,true);
+ function onPointerUp(e){
+  if(!pending||pending.id!==e.pointerId)return;
+  const {select,serial}=pending;swallow(e);
+  // Release the pointer before creating a new full-screen element.
+  // If the sheet exists during the same gesture, Android may send click
+  // to its backdrop and close it instantly.
+  setTimeout(()=>{
+   if(serial!==tapSerial)return;
+   pending=null;
+   if(ordinary(select))open(select);
+  },0);
+ }
+ function onPointerCancel(e){
+  if(pending&&pending.id===e.pointerId){pending=null;tapSerial++;}
+ }
+ function onClick(e){
+  const select=targetSelect(e);
+  if(!ordinary(select))return;
+  swallow(e);
+  // Pointer path already scheduled its sheet. Click can be retargeted to
+  // the new DOM by Android; it must not open a native SELECT or duplicate.
+  if(pending?.select===select)return;
+  // Keyboard / accessibility activation has no pointer sequence.
+  const serial=++tapSerial;
+  setTimeout(()=>{if(serial===tapSerial&&ordinary(select))open(select);},0);
+ }
+ window.addEventListener('pointerdown',onPointerDown,true);
+ window.addEventListener('pointerup',onPointerUp,true);
+ window.addEventListener('pointercancel',onPointerCancel,true);
+ window.addEventListener('click',onClick,true);
  window.SolinAndroidSelects={open,close:cleanup};
 })();
