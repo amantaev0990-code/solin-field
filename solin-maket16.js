@@ -46,8 +46,10 @@ function sourceRows(card,refs,org){
   groups.push({stemIndex:stem.index,outputRows:rows.length-before});
  }
  const ambiguous=groups.some(g=>g.outputRows>1);
- return state(ambiguous?'ambiguous':rows.length?'complete':'empty',
+ const incomplete=rows.some(r=>r.Ur16===null);
+ return state(ambiguous?'ambiguous':incomplete?'unverified':rows.length?'complete':'empty',
   ambiguous?'Исходные JOIN создают несколько строк для одной породы: автоматический выбор запрещён':
+   incomplete?'Урожайность не определена: в исходной строке есть пустое нормативное значение':
    rows.length?'Расчёт по сохранённому запросу Макет16Созд':'Исходные условия Макет16Созд не создают записей',
   {rows,groups,source:'Макет16Созд',verification:'saved-query-compatibility; not native Access execution'});
 }

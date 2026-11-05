@@ -394,11 +394,12 @@ async function reopen(p,info){
  // Regression for iPhone "Древостой": IAR is disabled when KU is missing,
  // but the user must be able to set KU explicitly IN THIS SAME MODAL.
  // Changing KU must be confirmed and saved atomically with Maket10.
- await p.evaluate(()=>{
+ const categoryTreeBefore=await p.evaluate(()=>{
   closeModal();
   current=D.quarters['1'].compartments[0];
+  const prior={POR:current._children.Макет10[0].POR,KOEF:current._children.Макет10[0].KOEF};
   current.KU=null;current._children.Макет10[0].IAR=null;
-  solinWorkflow.editMaket('Макет10',0);
+  solinWorkflow.editMaket('Макет10',0);return prior;
  });
  const missingLayer=await p.evaluate(()=>{
   const el=document.getElementById('wf_IAR');
@@ -444,9 +445,9 @@ async function reopen(p,info){
   'Saved forest KU should keep IAR enabled despite missing PIAP');
  assert.equal(await p.locator('#wf_IAR').inputValue(),'1');
  await p.evaluate(()=>closeModal());
- assert.equal(await p.evaluate(()=>current._children.Макет10[0].POR),'В',
+ assert.equal(await p.evaluate(()=>current._children.Макет10[0].POR),categoryTreeBefore.POR,
   'Updating category and IAR must not lose species');
- assert.equal(await p.evaluate(()=>current._children.Макет10[0].KOEF),10,
+ assert.equal(await p.evaluate(()=>current._children.Макет10[0].KOEF),categoryTreeBefore.KOEF,
   'Updating category and IAR must not lose coefficients');
  console.log('PASS Maket10 mobile layer edit: missing KU explained; choose source-backed category → original IAR options → atomic confirmed save');
  await desktop.close();

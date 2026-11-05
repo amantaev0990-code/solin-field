@@ -5,6 +5,7 @@ const refs={STL:[{Lxz:17,KTL:'КЕР',UR:80}],S16KOEF:[{KKoef:1,KKUR:80}],S16VOZ
 const snapshot=JSON.stringify(card),result=M.creationPreview(card,refs);assert.equal(result.status,'complete');assert.equal(result.rows[0].Ur16,162,'Access Round uses even midpoint, not Math.round');assert.equal(result.rows[0].Ediz,Math.fround(.3));assert.equal(result.rows[0].H16,'КЕР  ');assert.equal(result.rows[0].VD,'001');assert.equal(JSON.stringify(card),snapshot);
 assert.equal(M.creationPreview({...card,LESN:3},refs,{POS:213,LESN:2}).status,'ambiguous');assert.equal(M.creationPreview({...card,KU:10},refs).status,'not-applicable');
 assert.equal(M.creationPreview(card,{...refs,S16VOZ:undefined}).status,'unavailable');
+assert.equal(M.creationPreview(card,{...refs,STL:[{Lxz:17,KTL:'КЕР',UR:null}]}).status,'unverified','NULL norm must not be advertised as a completed yield');
 const existing={...card,_children:{...card._children,Макет16:[{Por16:'К',Koef16:8,Voz16:180,Ediz:.7,H16:'old',Neds:5,Sbor:3,Ur16:999,_extra:'keep'}]}};
 assert.equal(M.creationPreview(existing,refs).status,'conflict');const before=JSON.stringify(existing),p=M.parameterPreview(existing,refs);assert.equal(p.status,'complete');assert.equal(p.ur16Recalculated,false);assert(!Object.hasOwn(p.updates[0].values,'Ur16'));assert(!Object.hasOwn(p.updates[0].values,'Neds'));assert.equal(JSON.stringify(existing),before);
 const dupe=JSON.parse(JSON.stringify(card));dupe._children.Макет10.push({...dupe._children.Макет10[0],POL:.3});assert.equal(M.creationPreview(dupe,refs).status,'ambiguous');
