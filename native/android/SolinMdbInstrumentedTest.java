@@ -67,7 +67,7 @@ public class SolinMdbInstrumentedTest {
   }
 
   private static JSONObject address(int owner,int forest,int quarter,int glf) throws Exception {
-    return new JSONObject().put("POS",owner).put("LESN",forest).put("KV",quarter).put("KGLF",glf);
+    return new JSONObject().put("POS",owner).put("LESN",forest).put("KV",quarter).put("KGLF",glf).put("Fzona",0);
   }
 
   private static JSONObject transfer(File template,boolean crossOwner) throws Exception {
@@ -237,6 +237,22 @@ public class SolinMdbInstrumentedTest {
       }
       assertArrayEquals("Invalid quarter export must not change MDB",Files.readAllBytes(blank.toPath()),
         Files.readAllBytes(output.toPath()));
+    } finally { blank.delete();output.delete(); }
+  }
+
+  @Test public void missingFunctionalZoneCannotPassDesktopJoinPreflight() throws Exception {
+    File blank=blankCopy(),output=blankCopy();
+    try {
+      JSONObject incomplete=transfer(blank,false);
+      incomplete.getJSONObject("tables").getJSONArray("Квартал").getJSONObject(0)
+        .put("Fzona",JSONObject.NULL);
+      try {
+        writeWithRealPlugin(incomplete,output);
+        fail("Quarter without Fzona must not be exported as a successful desktop Transfer");
+      } catch (IllegalArgumentException expected) {
+        assertTrue(expected.getMessage().contains("Fzona"));
+      }
+      assertArrayEquals(Files.readAllBytes(blank.toPath()),Files.readAllBytes(output.toPath()));
     } finally { blank.delete();output.delete(); }
   }
 
