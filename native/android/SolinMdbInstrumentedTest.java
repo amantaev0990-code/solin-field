@@ -81,7 +81,7 @@ public class SolinMdbInstrumentedTest {
     tables.put("Лесничество",new JSONArray().put(
       new JSONObject().put("POS",OWNER).put("LESN",FOREST).put("GodT",2026)));
     tables.put("Квартал",new JSONArray().put(
-      address(OWNER,FOREST,1,24)));
+      address(OWNER,FOREST,1,24).put("GodT",2026)));
     tables.put("Выдел",new JSONArray().put(
       address(crossOwner?OWNER+1:OWNER,FOREST,1,24)
         .put("VD","001").put("KU",2).put("PLV",1.5)));
@@ -221,6 +221,23 @@ public class SolinMdbInstrumentedTest {
       }
       assertEquals(0,destination.length());
     } finally { empty.delete(); destination.delete(); }
+  }
+
+  @Test public void incompleteQuarterMustNeverBeExportedAsSuccess() throws Exception {
+    File blank=blankCopy(),output=blankCopy();
+    try {
+      JSONObject incomplete=transfer(blank,false);
+      incomplete.getJSONObject("tables").getJSONArray("Квартал").getJSONObject(0)
+        .put("KGLF",JSONObject.NULL);
+      try {
+        writeWithRealPlugin(incomplete,output);
+        fail("Quarter without KGLF must fail, not create invisible desktop rows");
+      } catch (IllegalArgumentException expected) {
+        assertTrue(expected.getMessage().contains("категория ГЛФ"));
+      }
+      assertArrayEquals("Invalid quarter export must not change MDB",Files.readAllBytes(blank.toPath()),
+        Files.readAllBytes(output.toPath()));
+    } finally { blank.delete();output.delete(); }
   }
 
   @Test public void wrongForestPreflightLeavesCopyUnmodified() throws Exception {
