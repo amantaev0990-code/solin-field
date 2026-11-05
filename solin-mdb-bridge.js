@@ -34,6 +34,12 @@
         for (const [field, inherited] of [['POS', identity.POS], ['LESN', identity.LESN], ['GodT', identity.GodT]]) {
           if (fullQuarter[field] == null || fullQuarter[field] === '') fullQuarter[field] = inherited;
         }
+        // The original desktop SOLI-N stores Fzona=0 for an ordinary zone.
+        // Its verified source rule excludes zero for KGLF 5, 7 and 10 only.
+        // Use the documented zero code ONLY where valid; never invent a nonzero zone.
+        if ((fullQuarter.Fzona == null || fullQuarter.Fzona === '') &&
+            Number.isFinite(Number(fullQuarter.KGLF)) &&
+            ![5, 7, 10].includes(Number(fullQuarter.KGLF))) fullQuarter.Fzona = 0;
         tables['Квартал'].push(make('Квартал', fullQuarter));
       }
       for (const r of quarter.compartments || []) {
@@ -46,6 +52,19 @@
         // quarter/category address. Inherit only from a single matching source row.
         const inheritance = window.SolinAddressContext?.inheritedStand?.(fullStand, quarter, owner);
         if (inheritance?.values) Object.assign(fullStand, inheritance.values);
+        // Export-only inheritance from the *normalized* quarter row as well.
+        // Old saved workspaces may still have Fzona=null while their Transfer row
+        // correctly contains the desktop default 0. Do not alter saved cards.
+        const linked = tables['Квартал'].filter(q =>
+          Number(q.POS) === Number(identity.POS) && Number(q.LESN) === Number(identity.LESN) &&
+          Number(q.KV) === Number(kv) && String(q.KGLF) === String(fullStand.KGLF));
+        if (linked.length === 1) {
+          const q = linked[0];
+          if ((fullStand.Fzona == null || fullStand.Fzona === '') && q.Fzona != null)
+            fullStand.Fzona = q.Fzona;
+          if ((fullStand.KlxrVD == null || fullStand.KlxrVD === '') && Number(q.Klxr)>0)
+            fullStand.KlxrVD = q.Klxr;
+        }
         tables['Выдел'].push(make('Выдел', fullStand));
         for (const [name, children] of Object.entries(r._children || {})) {
           if (!Array.isArray(schema[name])) throw new Error('Нет схемы для «' + name + '». Экспорт остановлен, чтобы не потерять данные.');
