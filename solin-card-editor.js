@@ -120,7 +120,7 @@ function input(form,field,value,scope,index){
  if(form==='Макет10'&&field==='POL'&&polRules(session?.draft?.KU).survival&&el.tagName==='SELECT'){
   // The 0.1–1.0 fullness picker cannot represent a 1–100 survival value.
   const numericInput=document.createElement('input');
-  numericInput.type='number';numericInput.value=shown??'';
+  numericInput.type='number';numericInput.value=value==null?'':String(value);
   el.replaceWith(numericInput);el=numericInput;
  }
  const caption=form==='Макет10'&&field==='POL'?polRules(session?.draft?.KU).label:
@@ -140,7 +140,7 @@ function input(form,field,value,scope,index){
  }
  else{el.placeholder=numeric.has(field)?'0':'';if(numeric.has(field))el.inputMode='decimal';}
  if(form==='Макет10'&&field==='POL'&&polRules(session?.draft?.KU).survival&&el.tagName==='INPUT'){
-  el.type='number';el.min='1';el.max='100';el.step='1';el.inputMode='numeric';el.placeholder='1–100';
+  el.type='number';el.value=value==null?'':String(value);el.min='1';el.max='100';el.step='1';el.inputMode='numeric';el.placeholder='1–100';
  }
  return label.outerHTML;
 }
