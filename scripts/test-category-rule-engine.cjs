@@ -5,7 +5,11 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
 const root=path.resolve(__dirname,'..');
-const engine=require(path.join(root,'solin-category-rules.js'));
+const vm=require('node:vm');
+const context={window:{}};
+vm.runInNewContext(fs.readFileSync(path.join(root,'solin-category-rules.js'),'utf8'),context,{filename:'solin-category-rules.js'});
+const engine=context.window.SolinCategoryRules;
+assert.ok(engine && typeof engine.profile==='function','Browser API must publish profile()');
 const sku=require(path.join(root,'refs/SKU.json'));
 assert.equal(sku.length,123,'Complete original SKU catalogue must be present');
 const unique=new Set(sku.map(x=>x.KU));
