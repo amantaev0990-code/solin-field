@@ -38,6 +38,14 @@ const full={SKU:[
 assert.equal(engine.profile(1,full).hasTreeLayers,true);
 assert.equal(engine.profile(20,full).hasTreeLayers,false);
 assert.equal(engine.profile(21,full).maketGroup,10);
+assert.equal(engine.profile(21,full).makerFlag,null);
+const metadata={SKU:[{KU:19,NKU:'Несомкнувшиеся лесные культуры',P10:4,PM:7,PN:4,P31:3,PF1:9,GrMak:9,KLF:12}]};
+const meta=engine.profile(19,metadata);
+assert.equal(meta.makerFlag,7);
+assert.equal(meta.form1,9);
+assert.equal(meta.p31,3);
+assert.equal(meta.pn,4);
+assert.equal(meta.maketGroup,9);
 assert.equal(engine.profile(60,full).forestGroup,32);
 assert.equal(engine.field(19,'Макет10','POL',full).label,'Приживаемость, %');
 assert.equal(engine.field(1,'Макет10','POL',full).kind,'fullness');
@@ -68,6 +76,9 @@ const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 assert.match(editor,/SolinCategoryRules\?\.validatePol/);
 assert.match(editor,/rerenderTable\('Макет10'\)/);
 assert.match(editor,/SolinCategoryRules\?\.guide/);
+assert.match(editor,/Смена категории угодий при заполненных макетах/);
+assert.match(editor,/category\?\.hasTreeLayers===false&&\!rs\.length/);
+
 const load=html.indexOf('src="solin-category-rules.js');
 assert.ok(load>0&&load<html.indexOf('src="solin-dependent-rules.js'),'Rule engine must load before editor');
 console.log('CATEGORY_POLICY_OK: 123 SKU codes; known/unknown source states; survival 1–100; 26–100 Access range; KU1/2/20/21/60 controls');
