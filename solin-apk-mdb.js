@@ -91,13 +91,18 @@
       if(!transfer||transfer.format!=='SOLIN-MDB-Bridge-v1')throw Error('Не удалось собрать карточки Transfer.');
       const blank = await packagedTemplate();
       modal('Экспорт MDB','<p>Создаю MDB на телефоне. После проверки откроется выбор папки для сохранения.</p>');
-      await plugin().export({
+      const result = await plugin().export({
         templateBase64:base64(blank),
         transferJson:JSON.stringify(transfer)
       });
+      if(result?.saved !== true || result?.verified !== true ||
+         !Number.isSafeInteger(result?.bytes) || result.bytes < 2048)
+        throw Error('Android не подтвердил размер и целостность MDB. Не используйте полученный файл.');
+      const size = (result.bytes / 1024).toFixed(1);
       modal('Экспорт завершён',
         '<p>Файл <b>Transf_'+esc(transfer.identity.POS)+'_'+esc(transfer.identity.LESN)+'_'+
         esc(transfer.identity.GodT)+'.mdb</b> сохранён в выбранной папке.</p>'+
+        '<p><b>Размер: '+size+' КБ.</b> Файл повторно считан и проверен.</p>'+
         '<p>Перед использованием в работе откройте его на настольном SOLI-N в тестовой базе.</p>'+
         '<button type="button" onclick="closeModal()">Готово</button>');
     }catch(e){
