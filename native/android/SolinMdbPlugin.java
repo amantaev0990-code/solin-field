@@ -331,17 +331,20 @@ public class SolinMdbPlugin extends Plugin {
          row.isNull("GodT") || row.optInt("GodT",0)<1900)
         throw new IllegalArgumentException("Квартал "+row.optString("KV","?")+
           ": отсутствуют номер, категория ГЛФ или год таксации.");
+      if(row.isNull("Fzona") || row.optInt("Fzona",-1)<0)
+        throw new IllegalArgumentException("Квартал "+row.optString("KV","?")+
+          ": не заполнена функциональная зона (Fzona).");
       quarters.add(key(row.opt("POS"),row.opt("LESN"),row.opt("KV")));
-      quarterCategories.add(key(row.opt("POS"),row.opt("LESN"),row.opt("KV"),row.opt("KGLF")));
+      quarterCategories.add(key(row.opt("POS"),row.opt("LESN"),row.opt("KV"),row.opt("KGLF"),row.opt("Fzona")));
     }
     for(int i=0;i<vrows.length();i++){
       JSONObject row=vrows.getJSONObject(i);
       if(row.optInt("POS",-1)!=pos || row.optInt("LESN",-1)!=lesn)
         throw new IllegalArgumentException("Строка другого лесничества: Выдел");
-      String quarterKey=key(row.opt("POS"),row.opt("LESN"),row.opt("KV"),row.opt("KGLF"));
+      String quarterKey=key(row.opt("POS"),row.opt("LESN"),row.opt("KV"),row.opt("KGLF"),row.opt("Fzona"));
       if(!quarterCategories.contains(quarterKey))
         throw new IllegalArgumentException("Выдел "+row.optString("VD","?")+
-          " не связан с кварталом той же категории ГЛФ.");
+          " не связан с кварталом той же категории ГЛФ и функциональной зоны.");
       stands.add(key(row.opt("POS"),row.opt("LESN"),row.opt("KV"),row.opt("VD")));
       standsWithKglf.add(key(row.opt("POS"),row.opt("LESN"),row.opt("KV"),row.opt("KGLF"),row.opt("VD")));
     }
