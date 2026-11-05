@@ -148,6 +148,54 @@ public class SolinMdbInstrumentedTest {
     }finally{original.delete();copy.delete();}
   }
 
+  /** One field card, two species: 6 ОС + 4 Б.  Only main tree stores POL and ZAP. */
+  @Test public void twoSpeciesSingleStandExportsAndReopensWithSharedStock() throws Exception {
+    File prepared=blankCopy();
+    try {
+      JSONObject payload=transfer(prepared,false);
+      JSONArray rows=new JSONArray();
+      rows.put(address(OWNER,FOREST,1,24).put("VD","001")
+        .put("IAR",1).put("KOEF",6).put("POR","ОС")
+        .put("LET",35).put("PH",10).put("PD2",18)
+        .put("KT",1).put("PROI",1).put("POL",0.7).put("ZAP",77));
+      rows.put(address(OWNER,FOREST,1,24).put("VD","001")
+        .put("IAR",1).put("KOEF",4).put("POR","Б")
+        .put("LET",35).put("PH",10).put("PD2",18)
+        .put("KT",2).put("PROI",1)
+        .put("POL",JSONObject.NULL).put("ZAP",JSONObject.NULL));
+      payload.getJSONObject("tables").put("Макет10",rows);
+      writeWithRealPlugin(payload,prepared);
+      try (Database db=DatabaseBuilder.open(prepared)) {
+        assertEquals(29,db.getTableNames().size());
+        assertEquals(1,db.getTable("Лесничество").getRowCount());
+        assertEquals(1,db.getTable("Квартал").getRowCount());
+        assertEquals(1,db.getTable("Выдел").getRowCount());
+        assertEquals(2,db.getTable("Макет10").getRowCount());
+        int coeff=0,hasStock=0,hasDensity=0;
+        boolean os=false,b=false;
+        for (Row tree:db.getTable("Макет10")) {
+          assertEquals("001",String.valueOf(tree.get("VD")));
+          assertEquals(1,((Number)tree.get("IAR")).intValue());
+          coeff+=((Number)tree.get("KOEF")).intValue();
+          if (tree.get("ZAP")!=null)hasStock++;
+          if (tree.get("POL")!=null)hasDensity++;
+          if ("ОС".equals(tree.get("POR"))) {
+            os=true;assertEquals(6,((Number)tree.get("KOEF")).intValue());
+            assertEquals(77,((Number)tree.get("ZAP")).intValue());
+            assertEquals(0.7,((Number)tree.get("POL")).doubleValue(),0.00001);
+          } else if ("Б".equals(tree.get("POR"))) {
+            b=true;assertEquals(4,((Number)tree.get("KOEF")).intValue());
+            assertNull(tree.get("ZAP"));assertNull(tree.get("POL"));
+          } else fail("Unexpected tree species: "+tree.get("POR"));
+        }
+        assertTrue(os && b);
+        assertEquals(10,coeff);
+        assertEquals(1,hasStock);
+        assertEquals(1,hasDensity);
+      }
+    } finally { prepared.delete(); }
+  }
+
   @Test public void androidDocumentSaveReopensSameMdbWithStand() throws Exception {
     File prepared=blankCopy();
     File destination=File.createTempFile("solin-saf-output-", ".mdb", context.getCacheDir());
