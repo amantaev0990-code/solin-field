@@ -130,13 +130,9 @@ fs.copyFileSync(path.join(root,'native/android/solin-launcher-LICENSE.txt'),path
 // Remove only the superseded generated bitmap to avoid duplicate resource IDs.
 const previousBitmap=path.join(dest,'drawable-nodpi/solin_launcher.png');
 if(fs.existsSync(previousBitmap))fs.rmSync(previousBitmap);
-fs.mkdirSync(path.join(dest,'mipmap-anydpi-v26'),{recursive:true});
-const adaptive='<?xml version="1.0" encoding="utf-8"?>'+
- '<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">'+
- '<background android:drawable="@android:color/transparent"/>'+
- '<foreground android:drawable="@drawable/solin_launcher"/>'+
- '</adaptive-icon>';
-for(const name of ['ic_launcher.xml','ic_launcher_round.xml'])fs.writeFileSync(path.join(dest,'mipmap-anydpi-v26',name),adaptive);
+// Avoid Android adaptive-icon black backing: keep true-alpha legacy icons.
+for(const name of ['ic_launcher.xml','ic_launcher_round.xml'])
+ fs.rmSync(path.join(dest,'mipmap-anydpi-v26',name),{force:true});
 let updatedManifest=fs.readFileSync(manifestFile,'utf8');
 if(!/android:icon="[^"]+"/.test(updatedManifest))throw Error('AndroidManifest icon attribute not found');
 updatedManifest=updatedManifest.replace(/android:icon="[^"]+"/,'android:icon="@mipmap/ic_launcher"');
