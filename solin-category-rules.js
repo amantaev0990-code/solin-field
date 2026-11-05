@@ -27,8 +27,13 @@
   if(!row)return {status:source.SKU?'unknown':'unavailable',code:id,
    reason:source.SKU?'Код не найден в исходном SKU':'Не загружен справочник SKU'};
   const group=code(row.P10),maketGroup=code(row.GrMak),forestGroup=code(row.KLF);
+  // Exact original KU RowSource columns:
+  // KU,NKU,KLF,PN,P31,P10,PM,GrMak,PF1. These flags are exposed as
+  // metadata, never treated as a decoded mandatory-maket list.
+  const makerFlag=code(row.PM),form1=code(row.PF1),p31=code(row.P31),pn=code(row.PN);
   return {status:group==null?'partial':'verified-reference',
    code:id,name:String(row.NKU||''),group,maketGroup,forestGroup,
+   makerFlag,form1,p31,pn,
    hasTreeLayers:group==null?null:group!==0,
    reason:group==null?'Из SKU известна категория, но не загружена исходная группа ярусов P10':
      'Источник: SKU.P10; возможные ярусы уточняются через SIAR/PIAP'};
@@ -76,7 +81,9 @@
    return {status:'warning',rule,message:'Макет 10 не предусмотрен исходной группой ярусов SKU.P10=0; сохранённые записи не удаляются.'};
   // Unclassified category: warn, not make up a wrong 0.1..1.0 rule.
   // The generic original Access POL validation is still available to control.
-  if(n<0||n>100||n>1&&n<=25)
+  if(n<0||n>100)
+   return {status:'error',rule,message:'Значение POL выходит за исходный допустимый диапазон 0–100.'};
+  if(n>1&&n<=25)
    return {status:'warning',rule,message:'Значение POL может не пройти оригинальный контроль (допустимо 0–1 либо 26–100); назначение поля для этой категории не подтверждено.'};
   return {status:'unverified',rule,message:'Требуется проверка назначения POL по оригинальной форме выбранной категории.'};
  }
