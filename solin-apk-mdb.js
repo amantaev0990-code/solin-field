@@ -84,7 +84,7 @@
     if(actualQuarters!==qs.length||actualStands!==stands.length)
       throw Error('Экспорт подготовил не все кварталы или выделы: '+actualQuarters+'/'+actualStands+
         ' в Field, '+qs.length+'/'+stands.length+' в Transfer.');
-    const key=(r)=>[Number(r.POS),Number(r.LESN),Number(r.KV),Number(r.KGLF)].join(':');
+    const key=(r)=>[Number(r.POS),Number(r.LESN),Number(r.KV),Number(r.KGLF),Number(r.Fzona)].join(':');
     const addresses=new Set();
     for(const q of qs){
       if(Number(q.POS)!==Number(owner.POS)||Number(q.LESN)!==Number(owner.LESN)||
@@ -94,13 +94,17 @@
         throw Error('Квартал '+q.KV+': не указана категория ГЛФ. Укажите её в карточке квартала и повторите экспорт.');
       if(!Number.isSafeInteger(Number(q.GodT))||Number(q.GodT)<1900)
         throw Error('Квартал '+q.KV+': не указан год таксации.');
+      if(q.Fzona == null || q.Fzona === '' ||
+         !Number.isSafeInteger(Number(q.Fzona)) || Number(q.Fzona)<0)
+        throw Error('Квартал '+q.KV+': отсутствует функциональная зона (Fzona). '+
+          'Она обязательна для связей в настольном SOLI-N; укажите код из справочника.');
       addresses.add(key(q));
     }
     for(const stand of stands){
       if(!addresses.has(key(stand))||!Number.isSafeInteger(Number(stand.VD))||
          Number(stand.VD)<1||!(Number(stand.PLV)>0))
         throw Error('Выдел '+(stand.VD??'?')+' в квартале '+(stand.KV??'?')+
-          ' не связан с корректной строкой квартала (категория ГЛФ/адрес/площадь).');
+          ' не связан с корректной строкой квартала (КГЛФ/Fzona/адрес/площадь).');
     }
     return {quarters:qs.length,stands:stands.length};
   }
