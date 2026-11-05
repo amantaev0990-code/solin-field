@@ -70,6 +70,40 @@
       throw Error('Встроенный MDB-шаблон повреждён.');
     return bytes;
   }
+  // Check the REAL selected forest, not only the Jet binary header.
+  // A desktop SOLI-N query can silently hide a quarter whose address is incomplete.
+  function validateTransferRows(transfer){
+    const tables=transfer?.tables||{}, owner=transfer.identity||{};
+    const qs=tables['Квартал'], stands=tables['Выдел'], forests=tables['Лесничество'];
+    if(!Array.isArray(qs)||!Array.isArray(stands)||!Array.isArray(forests)||forests.length!==1)
+      throw Error('В MDB отсутствуют данные лесничества, кварталов или выделов.');
+    if(typeof D==='undefined'||!D?.quarters||!D?.lesnichestvo?.length)
+      throw Error('Лесничество не открыто для экспорта.');
+    const actualQuarters=Object.values(D.quarters).reduce((n,q)=>n+(q.quarterRows?.length||1),0);
+    const actualStands=Object.values(D.quarters).reduce((n,q)=>n+(q.compartments?.length||0),0);
+    if(actualQuarters!==qs.length||actualStands!==stands.length)
+      throw Error('Экспорт подготовил не все кварталы или выделы: '+actualQuarters+'/'+actualStands+
+        ' в Field, '+qs.length+'/'+stands.length+' в Transfer.');
+    const key=(r)=>[Number(r.POS),Number(r.LESN),Number(r.KV),Number(r.KGLF)].join(':');
+    const addresses=new Set();
+    for(const q of qs){
+      if(Number(q.POS)!==Number(owner.POS)||Number(q.LESN)!==Number(owner.LESN)||
+         !Number.isSafeInteger(Number(q.KV))||Number(q.KV)<1)
+        throw Error('Квартал имеет неверный адрес лесничества.');
+      if(!Number.isSafeInteger(Number(q.KGLF))||Number(q.KGLF)<1)
+        throw Error('Квартал '+q.KV+': не указана категория ГЛФ. Укажите её в карточке квартала и повторите экспорт.');
+      if(!Number.isSafeInteger(Number(q.GodT))||Number(q.GodT)<1900)
+        throw Error('Квартал '+q.KV+': не указан год таксации.');
+      addresses.add(key(q));
+    }
+    for(const stand of stands){
+      if(!addresses.has(key(stand))||!Number.isSafeInteger(Number(stand.VD))||
+         Number(stand.VD)<1||!(Number(stand.PLV)>0))
+        throw Error('Выдел '+(stand.VD??'?')+' в квартале '+(stand.KV??'?')+
+          ' не связан с корректной строкой квартала (категория ГЛФ/адрес/площадь).');
+    }
+    return {quarters:qs.length,stands:stands.length};
+  }
   async function exportMDB(){
     const b=button();
     if(b)b.disabled=true;
@@ -89,6 +123,7 @@
       await window.SolinWorkspace?.persist?.();
       const transfer=window.SolinMDBBridge?.snapshot?.();
       if(!transfer||transfer.format!=='SOLIN-MDB-Bridge-v1')throw Error('Не удалось собрать карточки Transfer.');
+      const counts = validateTransferRows(transfer);
       const blank = await packagedTemplate();
       modal('Экспорт MDB','<p>Создаю и проверяю MDB. На Android 10+ файл будет сохранён в «Загрузки/SOLI-N Field».</p>');
       const result = await plugin().export({
@@ -104,6 +139,7 @@
       modal('Экспорт завершён',
         '<p>Файл <b>'+esc(actualName)+'</b> сохранён в '+esc(result.folder||'выбранной папке')+'.</p>'+
         '<p><b>Размер: '+size+' КБ.</b> Файл повторно считан и проверен.</p>'+
+        '<p><b>Записи:</b> '+counts.quarters+' кварталов, '+counts.stands+' выделов.</p>'+
         '<p>Перед использованием в работе откройте его на настольном SOLI-N в тестовой базе.</p>'+
         '<button type="button" onclick="closeModal()">Готово</button>');
     }catch(e){
