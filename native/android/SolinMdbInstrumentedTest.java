@@ -170,6 +170,44 @@ public class SolinMdbInstrumentedTest {
     } finally { prepared.delete(); destination.delete(); }
   }
 
+  @Test public void androidDownloadsPublishesOnlyVerifiedMdb() throws Exception {
+    if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) return;
+    File prepared=blankCopy();
+    String fileName="Transf_213_2_2098.mdb";
+    android.net.Uri published=null;
+    try {
+      writeWithRealPlugin(transfer(prepared,false),prepared);
+      com.getcapacitor.JSObject result=SolinMdbPlugin.saveVerifiedToDownloads(
+        context,prepared,fileName);
+      assertTrue(result.getBoolean("saved"));
+      assertTrue(result.getBoolean("verified"));
+      assertEquals(prepared.length(),result.getLong("bytes"));
+      assertEquals("Загрузки/SOLI-N Field",result.getString("folder"));
+      android.content.ContentResolver resolver=context.getContentResolver();
+      try (android.database.Cursor rows=resolver.query(
+          android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+          new String[]{android.provider.MediaStore.MediaColumns._ID,
+            android.provider.MediaStore.MediaColumns.SIZE,
+            android.provider.MediaStore.MediaColumns.IS_PENDING},
+          android.provider.MediaStore.MediaColumns.DISPLAY_NAME+"=?",
+          new String[]{fileName},null)) {
+        assertNotNull("Downloads provider did not return the saved MDB",rows);
+        assertTrue("MDB should be visible in Downloads after publishing",rows.moveToFirst());
+        assertEquals(prepared.length(),rows.getLong(1));
+        assertEquals("Finished MDB must not remain pending",0,rows.getInt(2));
+        published=android.content.ContentUris.withAppendedId(
+          android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,rows.getLong(0));
+      }
+      try (InputStream in=resolver.openInputStream(published)) {
+        assertNotNull(in);
+        assertEquals(prepared.length(),in.readAllBytes().length);
+      }
+    } finally {
+      if (published != null) context.getContentResolver().delete(published,null,null);
+      prepared.delete();
+    }
+  }
+
   @Test public void androidDocumentSaveRejectsEmptyPreparedMdb() throws Exception {
     File empty=File.createTempFile("solin-saf-invalid-", ".mdb",context.getCacheDir());
     File destination=File.createTempFile("solin-saf-untouched-", ".mdb",context.getCacheDir());
