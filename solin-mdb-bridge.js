@@ -28,7 +28,13 @@
     for (const [kv, quarter] of Object.entries(D.quarters)) {
       const rows = quarter.quarterRows?.length ? quarter.quarterRows : [quarter.meta || {}];
       for (const qr of rows) {
-        tables['Квартал'].push(make('Квартал', { ...owner, ...quarter.meta, ...qr, KV: Number(kv) }));
+        const fullQuarter = { ...owner, ...quarter.meta, ...qr, KV: Number(kv) };
+        // A saved blank edit must not erase mandatory inherited identity/year.
+        // Quarter rows are matched by the original desktop SOLI-N on these keys.
+        for (const [field, inherited] of [['POS', identity.POS], ['LESN', identity.LESN], ['GodT', identity.GodT]]) {
+          if (fullQuarter[field] == null || fullQuarter[field] === '') fullQuarter[field] = inherited;
+        }
+        tables['Квартал'].push(make('Квартал', fullQuarter));
       }
       for (const r of quarter.compartments || []) {
         const address = Object.fromEntries(KEYS.map(k => [k, r[k] ?? quarter.meta?.[k] ?? owner[k] ?? null]));
