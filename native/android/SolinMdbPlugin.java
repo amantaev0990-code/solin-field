@@ -3,6 +3,8 @@ package kz.solin.field;
 import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
+import android.provider.DocumentsContract;
+import android.util.Log;
 import androidx.activity.result.ActivityResult;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -24,6 +26,7 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.math.BigDecimal;
+import java.security.MessageDigest;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -48,6 +51,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class SolinMdbPlugin extends Plugin {
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
   private final AtomicBoolean busy = new AtomicBoolean(false);
+  private static final String TAG = "SolinMdb";
   private File pendingFile;
 
   @PluginMethod
@@ -78,16 +82,27 @@ public class SolinMdbPlugin extends Plugin {
         try (FileOutputStream out = new FileOutputStream(output)) { out.write(bytes); }
         configureJackcess();
         replaceTables(transfer, pos, lesn, output);
-        if (!isJet(readFirst32(output))) throw new IllegalStateException("Полученный файл не MDB.");
+        if (output.length() < 2048 || !isJet(readFirst32(output)))
+          throw new IllegalStateException("Подготовленный MDB пустой или повреждён.");
+        Activity activity = getActivity();
+        if (activity == null) throw new IllegalStateException("Окно приложения недоступно.");
         File safe = output; output = null;
         String filename = "Transf_" + pos + "_" + lesn + "_" + year + ".mdb";
-        getActivity().runOnUiThread(() -> {
-          pendingFile = safe;
-          Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
-          intent.addCategory(Intent.CATEGORY_OPENABLE);
-          intent.setType("application/vnd.ms-access");
-          intent.putExtra(Intent.EXTRA_TITLE, filename);
-          startActivityForResult(call, intent, "saveComplete");
+        activity.runOnUiThread(() -> {
+          try {
+            pendingFile = safe;
+            Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType("application/vnd.ms-access");
+            intent.putExtra(Intent.EXTRA_TITLE, filename);
+            startActivityForResult(call, intent, "saveComplete");
+          } catch (Exception e) {
+            pendingFile = null;
+            safe.delete();
+            busy.set(false);
+            Log.e(TAG, "Android document picker failed", e);
+            call.reject("Не удалось открыть сохранение MDB: " + e.getMessage());
+          }
         });
       } catch (Exception e) {
         call.reject("MDB не создан: " + e.getMessage());
@@ -101,31 +116,96 @@ public class SolinMdbPlugin extends Plugin {
 
   @ActivityCallback
   private void saveComplete(PluginCall call, ActivityResult result) {
-    File ready = pendingFile; pendingFile = null;
+    File ready = pendingFile;
+    pendingFile = null;
     if (call == null || ready == null) {
       if (ready != null) ready.delete();
       busy.set(false);
+      Log.e(TAG, "Save callback lost its pending MDB; Android may have recreated the activity");
+      if (call != null) call.reject("MDB не сохранён: потерян подготовленный файл.");
       return;
     }
     if (result.getResultCode() != Activity.RESULT_OK ||
         result.getData() == null || result.getData().getData() == null) {
-      ready.delete(); busy.set(false); call.reject("Сохранение MDB отменено."); return;
+      ready.delete();
+      busy.set(false);
+      call.reject("Сохранение MDB отменено.");
+      return;
     }
     Uri uri = result.getData().getData();
     executor.execute(() -> {
-      try (InputStream in = new FileInputStream(ready);
-           OutputStream out = getContext().getContentResolver().openOutputStream(uri, "w")) {
-        if (out == null) throw new IllegalStateException("Нет доступа для сохранения файла.");
-        byte[] buffer = new byte[16384];
-        int n;
-        while ((n = in.read(buffer)) != -1) out.write(buffer,0,n);
-        out.flush();
-        JSObject resultData = new JSObject();
-        resultData.put("saved", true);
-        call.resolve(resultData);
-      } catch (Exception e) { call.reject("Ошибка сохранения: " + e.getMessage()); }
-      finally { ready.delete(); busy.set(false); }
+      boolean verified = false;
+      try {
+        long size = writeVerifiedDocument(getContext(), ready, uri);
+        verified = true;
+        JSObject data = new JSObject();
+        data.put("saved", true);
+        data.put("verified", true);
+        data.put("bytes", size);
+        // Resolve only after both streams have closed and the saved URI was read back.
+        call.resolve(data);
+      } catch (Exception e) {
+        Log.e(TAG, "MDB SAF write/read-back failed", e);
+        call.reject("Ошибка сохранения MDB: " + e.getMessage());
+      } finally {
+        if (!verified) {
+          // ACTION_CREATE_DOCUMENT already created a placeholder. Remove it
+          // if writing failed, instead of leaving a misleading 0-byte MDB.
+          try { DocumentsContract.deleteDocument(getContext().getContentResolver(), uri); }
+          catch (Exception cleanupError) { Log.w(TAG, "Could not remove incomplete MDB document", cleanupError); }
+        }
+        ready.delete();
+        busy.set(false);
+      }
     });
+  }
+
+  /** SAF document providers may create 0-byte placeholders before writing.
+   * Write the entire prepared MDB, CLOSE the stream, and read it back.
+   * Never report success until both size and SHA-256 match the original. */
+  static long writeVerifiedDocument(android.content.Context context, File prepared, Uri uri) throws Exception {
+    long expected = prepared.length();
+    if (expected < 2048 || !isJet(readFirst32(prepared)))
+      throw new IllegalStateException("Подготовленный MDB пустой или повреждён.");
+    MessageDigest expectedDigest = MessageDigest.getInstance("SHA-256");
+    long written = 0;
+    try (InputStream input = new FileInputStream(prepared);
+         OutputStream output = context.getContentResolver().openOutputStream(uri, "w")) {
+      if (output == null) throw new IllegalStateException("Нет доступа для записи MDB.");
+      byte[] buffer = new byte[32768];
+      int count;
+      while ((count = input.read(buffer)) != -1) {
+        output.write(buffer, 0, count);
+        expectedDigest.update(buffer, 0, count);
+        written += count;
+      }
+      output.flush();
+    }
+    if (written != expected)
+      throw new IllegalStateException("MDB записан не полностью: " + written + " из " + expected + " байт.");
+    MessageDigest actualDigest = MessageDigest.getInstance("SHA-256");
+    byte[] header = new byte[32];
+    int headerRead = 0;
+    long readBack = 0;
+    try (InputStream saved = context.getContentResolver().openInputStream(uri)) {
+      if (saved == null) throw new IllegalStateException("Невозможно повторно открыть сохранённый MDB.");
+      byte[] buffer = new byte[32768];
+      int count;
+      while ((count = saved.read(buffer)) != -1) {
+        if (headerRead < header.length) {
+          int needed = Math.min(count, header.length - headerRead);
+          System.arraycopy(buffer, 0, header, headerRead, needed);
+          headerRead += needed;
+        }
+        actualDigest.update(buffer, 0, count);
+        readBack += count;
+      }
+    }
+    if (readBack != expected || headerRead < header.length ||
+        !isJet(header) || !MessageDigest.isEqual(expectedDigest.digest(), actualDigest.digest()))
+      throw new IllegalStateException("Проверка файла после сохранения не пройдена: получено " +
+        readBack + " из " + expected + " байт. Повторите экспорт.");
+    return readBack;
   }
 
   private static void configureJackcess() {
