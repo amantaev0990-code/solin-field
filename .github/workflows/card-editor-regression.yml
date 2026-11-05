@@ -3,6 +3,10 @@ on:
   push:
     paths:
       - 'solin-card-editor.js'
+      - 'solin-category-rules.js'
+      - 'refs/SKU.json'
+      - 'scripts/test-category-rule-engine.cjs'
+      - 'scripts/test-category-layer-dependencies.cjs'
       - 'solin-card-editor.css'
       - 'solin-card-assist.js'
       - 'solin-card-assist.css'
@@ -20,7 +24,12 @@ jobs:
           node-version: '22'
       - name: Check exact original quarter rows and navigator
         run: node scripts/card-editor-quarter-test.cjs
+      - name: Verify all 123 category profiles and original KU to IAR dependencies
+        run: |
+          node scripts/test-category-rule-engine.cjs
+          node scripts/test-category-layer-dependencies.cjs
       - name: Check card JavaScript syntax
         run: |
+          node --check solin-category-rules.js
           node --check solin-card-editor.js
           node --check solin-card-assist.js
