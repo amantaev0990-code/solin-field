@@ -67,7 +67,7 @@ public class SolinMdbInstrumentedTest {
   }
 
   private static JSONObject address(int owner,int forest,int quarter,int glf) throws Exception {
-    return new JSONObject().put("POS",owner).put("LESN",forest).put("KV",quarter).put("KGLF",glf).put("Fzona",0);
+    return new JSONObject().put("POS",owner).put("LESN",forest).put("KV",quarter).put("KGLF",glf);
   }
 
   private static JSONObject transfer(File template,boolean crossOwner) throws Exception {
@@ -81,10 +81,10 @@ public class SolinMdbInstrumentedTest {
     tables.put("Лесничество",new JSONArray().put(
       new JSONObject().put("POS",OWNER).put("LESN",FOREST).put("GodT",2026)));
     tables.put("Квартал",new JSONArray().put(
-      address(OWNER,FOREST,1,24).put("GodT",2026)));
+      address(OWNER,FOREST,1,24).put("GodT",2026).put("Fzona",0)));
     tables.put("Выдел",new JSONArray().put(
       address(crossOwner?OWNER+1:OWNER,FOREST,1,24)
-        .put("VD","001").put("KU",2).put("PLV",1.5)));
+        .put("VD","001").put("KU",2).put("PLV",1.5).put("Fzona",0)));
     tables.put("Макет10",new JSONArray().put(
       address(OWNER,FOREST,1,24)
         .put("VD","001").put("IAR",1).put("POR","В").put("ZAP",40)));
