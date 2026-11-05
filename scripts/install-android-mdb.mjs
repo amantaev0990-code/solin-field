@@ -91,7 +91,7 @@ if(process.env.SOLIN_CLOUD_LAB_BUILD==='1'){
  // Parallel package protects every installed V14 and its sandbox. Never
  // masquerade as an in-place upgrade without the original signing key.
  build=build.replace(/applicationId\s+"[^"]+"/,'applicationId "kz.solin.field.cloudlab"');
- build=build.replace(/versionCode\s+\d+/,'versionCode 18').replace(/versionName\s+"[^"]+"/,'versionName "0.3.0-cloudlab.17.0"');
+ build=build.replace(/versionCode\s+\d+/,'versionCode 23').replace(/versionName\s+"[^"]+"/,'versionName "0.3.0-cloudlab.20.0"');
  fs.writeFileSync(gradle,build);
  const stringsFile=path.join(app,'src/main/res/values/strings.xml');
  fs.writeFileSync(stringsFile,fs.readFileSync(stringsFile,'utf8').replace(/(<string name="app_name">)[^<]+/,'$1SOLI-N Field Lab'));
