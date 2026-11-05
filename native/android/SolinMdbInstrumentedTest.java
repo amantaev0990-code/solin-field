@@ -148,6 +148,43 @@ public class SolinMdbInstrumentedTest {
     }finally{original.delete();copy.delete();}
   }
 
+  @Test public void androidDocumentSaveReopensSameMdbWithStand() throws Exception {
+    File prepared=blankCopy();
+    File destination=File.createTempFile("solin-saf-output-", ".mdb", context.getCacheDir());
+    try {
+      // Mirrors ACTION_CREATE_DOCUMENT: the destination exists with size 0 first.
+      assertEquals(0, destination.length());
+      writeWithRealPlugin(transfer(prepared,false),prepared);
+      long written=SolinMdbPlugin.writeVerifiedDocument(context,prepared,
+        android.net.Uri.fromFile(destination));
+      assertTrue("Save must not leave a 0-byte MDB",written>2048);
+      assertEquals(prepared.length(),written);
+      assertArrayEquals(Files.readAllBytes(prepared.toPath()),
+        Files.readAllBytes(destination.toPath()));
+      try (Database db=DatabaseBuilder.open(destination)) {
+        assertEquals(1,db.getTable("Лесничество").getRowCount());
+        assertEquals(1,db.getTable("Квартал").getRowCount());
+        assertEquals(1,db.getTable("Выдел").getRowCount());
+        assertEquals("001",String.valueOf(db.getTable("Выдел").iterator().next().get("VD")));
+      }
+    } finally { prepared.delete(); destination.delete(); }
+  }
+
+  @Test public void androidDocumentSaveRejectsEmptyPreparedMdb() throws Exception {
+    File empty=File.createTempFile("solin-saf-invalid-", ".mdb",context.getCacheDir());
+    File destination=File.createTempFile("solin-saf-untouched-", ".mdb",context.getCacheDir());
+    try {
+      assertEquals(0,destination.length());
+      try {
+        SolinMdbPlugin.writeVerifiedDocument(context,empty,android.net.Uri.fromFile(destination));
+        fail("Must reject zero-byte MDB before writing a destination");
+      } catch (IllegalStateException expected) {
+        assertTrue(expected.getMessage().contains("пустой"));
+      }
+      assertEquals(0,destination.length());
+    } finally { empty.delete(); destination.delete(); }
+  }
+
   @Test public void wrongForestPreflightLeavesCopyUnmodified() throws Exception {
     File copy=blankCopy();
     try{
