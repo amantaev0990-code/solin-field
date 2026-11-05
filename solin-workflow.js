@@ -70,7 +70,7 @@ function fieldInput(name,value='',prefix='wf',form='ВыделВ'){
  return '<label class="wf-field"><span>'+h(label)+' <small>'+h('')+'</small></span><input id="'+h(id)+'" data-wffield="'+h(name)+'" '+(numeric?'inputmode="decimal"':'')+' autocomplete="off" value="'+h(str)+'" placeholder="—"></label>';
 }
 function humanInputs(fields,values,prefix,form){const isTech=f=>window.SolinHuman?.isTechnical(form,f);const main=fields.filter(f=>!isTech(f)).map(f=>fieldInput(f,values[f]??'',prefix,form)).join('');const technical=fields.filter(isTech).map(f=>fieldInput(f,values[f]??'',prefix,form)).join('');return main+(technical?'<details class="human-technical"><summary>Служебные поля · значения сохранены</summary><div class="formGrid">'+technical+'</div></details>':'');}
-function bindInputs(root,schema,prefix,values){const obj={};for(const key of schema){const el=root.querySelector('#'+prefix+'_'+key);if(!el)continue;const raw=el.value.trim();if(raw===''){obj[key]=null;continue;}
+function bindInputs(root,schema,prefix,values){const obj={};for(const key of schema){const el=root.querySelector('#'+prefix+'_'+key);if(!el)continue;const typed=window.SolinFieldTypes?.read(el,values?.[key],el.dataset.solinForm||'ВыделВ',key);if(typed!==undefined){obj[key]=typed;continue;}const raw=el.value.trim();if(raw===''){obj[key]=null;continue;}
 if((DECIMAL.has(key)||['IAR','LET','VNUM','PRA','PRkol','MTC','G15','GZ','PH','PD2','ZAP','POL'].includes(key))&&!Number.isFinite(Number(raw.replace(',','.'))))throw Error('Проверь число: '+(LABELS[key]||key));
 obj[key]=DECIMAL.has(key)||['IAR','LET','VNUM','PRA','PRkol','MTC','G15','GZ','PH','PD2','ZAP','POL'].includes(key)?Number(raw.replace(',','.')):raw;
 }return obj;}

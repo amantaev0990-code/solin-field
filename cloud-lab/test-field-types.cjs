@@ -1,0 +1,14 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');const window={};vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../solin-field-types.js'),'utf8'),{window});const T=window.SolinFieldTypes;
+assert.equal(Object.keys(T.tables).length,29);
+assert.equal(T.type('Макет16','H16'),'text');assert.equal(T.type('Макет16','Ediz'),'double');assert.equal(T.type('ВыделВ','VD'),'text');
+assert.equal(T.parse('Макет16','H16','КТ  '),'КТ  ');assert.equal(T.parse('ВыделВ','VD','001'),'001');assert.equal(T.parse('Макет16','Ediz','0,6'),.6);
+for(const field of ['Koef16','Voz16','Neds','Sbor'])assert.throws(()=>T.parse('Макет16',field,'1.5'));
+for(const value of ['Infinity','NaN','1e999','1e-999','1 2'])assert.throws(()=>T.parse('Макет16','Ediz',value));
+assert.throws(()=>T.parse('ВыделВ','KV','32768'));assert.throws(()=>T.parse('Макет16','Koef16','2147483648'));
+assert.equal(T.parse('ВыделВ','PRH','.1'),Math.fround(.1));assert.throws(()=>T.parse('ВыделВ','PRH','1e-50'));assert.throws(()=>T.parse('ВыделВ','PRH','1e50'));
+const untouched=(v,old,f='Ediz')=>T.read({value:v,dataset:{solinInitial:v}},old,'Макет16',f);
+assert.equal(untouched('0,123457',.123456789012345),.123456789012345);assert.equal(untouched('',null),null);assert.equal(untouched('','', 'H16'),'');assert.equal(untouched('КТ  ','КТ  ','H16'),'КТ  ');
+assert.equal(T.read({value:'0,2',dataset:{solinInitial:'0,1'}},.1,'Макет16','Ediz'),.2);
+assert.equal(T.parse('Макет16','Ediz','0'),0);assert.equal(T.parse('Макет16','Ediz',''),null);
+console.log('FIELD_TYPES_OK: 29-table source schema; text codes, NULL/empty, integer/range validation and untouched Double precision');

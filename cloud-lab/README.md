@@ -37,3 +37,16 @@ Confirmed kernel changes:
 The resumed stage restores four Fzona profiles (Solim/Database, create/edit) and verifies them against saved predicates. `query-contract.cjs` compares Jet query types, ordered columns, action targets, assignments, grouping and sorting; it keeps native Access execution separate. `package-private-apk.py` packages the private references locally, verifies signatures and preserves the tested assets. It refuses an in-place V14 update without the original certificate and key. Cloud Lab uses the separate `kz.solin.field.cloudlab` identity and a durable private key.
 
 Unverified: full form-event equivalence, all macros and special layers, current national classifiers, full source DB decoding with the browser MDB reader, physical Android field behavior, and reopening in desktop SOLI-N. Test success is not a production certification. Keep signing backups private and outside this repository.
+
+The resumed M16 stage adds source-specific cedar selection, a read-only append preview and a five-parameter refresh preview. Applying these is an explicit draft action; existing rows and stored Ur16 are retained by the parameter refresh. Overlapping age windows and other many-row joins remain ambiguous rather than choosing the first row.
+
+`solin-field-types.js` maps all 383 fields of the verified 29-table Transfer schema. Both editors preserve untouched scalar values (including text padding, empty string vs NULL and full Double precision); edited fields use the confirmed numeric/text types and integer/range checks. This is independent of the rendered decimal precision.
+
+Private differential commands:
+
+```sh
+node cloud-lab/verify-maket16.cjs /private/lab/solim-jackcess.json /private/lab/m16-results.json
+node cloud-lab/verify-field-types.cjs /private/lab/transfer-inventory.json /private/lab/types-results.json
+```
+
+These compare recovered source definitions on isolated SQLite/WASM and original schema metadata. They do not certify live Access macro/event execution or original Access target-field coercion.

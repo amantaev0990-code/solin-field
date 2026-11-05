@@ -46,10 +46,10 @@ for(const [form,field] of [['Макет17','P17'],['Макет19','ZP']]){
  assert(audit.warnings.some(x=>x.form===form&&x.field===field),
    'Incomplete Maket RowSource must be flagged as not fully verified');
 }
-const trees={_children:{Макет10:[{POR:'В'},{POR:'Б'}]}};
+const trees={_children:{Макет10:[{POR:'К',IAR:1,KOEF:3,LET:100,POL:.6},{POR:'Б'}]}};
 const p16=engine.options('Макет16','Por16',{},trees,{KTO:350000000},tables);
 assert.equal(p16.status,'complete');
-assert.deepEqual(Array.from(p16.items,x=>x.value),['В','Б']);
+assert.deepEqual(Array.from(p16.items,x=>x.value),['К']);
 assert.equal(engine.currentIsAllowed('С',p16),false);
 // SKU/SIAR/PIAP may be unavailable in compact refs-audit; test its exact
 // Access group join with a transparent independent fixture.

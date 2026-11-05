@@ -103,9 +103,10 @@ if(typeof document!=='undefined'){
 const title=(form,f)=>aliases[f]||SolinHuman.label(form,f);
 const DESKTOP_WIDTH=1200,DESKTOP_HEIGHT=704;
 const desktopLabels={IAR:'Ярус',KOEF:'Коэфф.',POR:'Порода',LET:'А, лет',PH:'Н, м',PD2:'Д, см',KT:'Класс',PROI:'Происхождение',POL:'Полнота',SPS:'Сумма',ZAP:'Запас'};
+function isNumeric(form,field){const t=window.SolinFieldTypes;return t?.type(form,field)?t.numeric(form,field):numeric.has(field);}
 function input(form,field,value,scope,index){
  const id='ce_'+scope+'_'+(index??'base')+'_'+field,fragment=document.createElement('div');
- const shown=numeric.has(field)&&typeof value==='number'?value.toLocaleString('ru-RU',{useGrouping:false,maximumFractionDigits:6}):value;
+ const shown=isNumeric(form,field)&&typeof value==='number'?value.toLocaleString('ru-RU',{useGrouping:false,maximumFractionDigits:6}):value;
  fragment.innerHTML=SolinHuman.input(field,shown??'',id,form);
  const label=fragment.firstElementChild,el=label.querySelector('input,select');
  const caption=SolinHuman.isTechnical(form,field)?D.fieldLabels?.[field]||field:title(form,field);
@@ -122,7 +123,7 @@ function input(form,field,value,scope,index){
       ? (description===option.value||description.startsWith(option.value+' — ')?description:option.value+' — '+description)
       : '—';
  }
- else{el.placeholder=numeric.has(field)?'0':'';if(numeric.has(field))el.inputMode='decimal';}
+ else{el.placeholder=isNumeric(form,field)?'0':'';if(isNumeric(form,field))el.inputMode='decimal';}
  return label.outerHTML;
 }
 function fields(form,names,values,scope){return names.map(f=>cell(f,values[f],scope,form,{label:SolinHuman.isTechnical(form,f)?D.fieldLabels?.[f]||f:title(form,f),split:!!SolinHuman.lookup(form,f)})).join('');}
@@ -139,7 +140,7 @@ function newTableRow(form){
  return Object.fromEntries((D.transfSchema[form]||[]).map(f=>[f,
   keys.includes(f)?session.draft[f]??null:
   form==='Макет10'?(f==='IAR'?Number(window.SolinDependentRules?.allowedLayers(session.draft,window.SOLIN_REFS?.tables)?.items?.[0]?.value??0)||null:null):
-  numeric.has(f)?0:null]));
+  form==='Макет16'?null:isNumeric(form,f)?0:null]));
 }
 function table(form){const rs=session.draft._children[form]||[],schema=(D.transfSchema[form]||[]).filter(f=>!keys.includes(f)),shown=rs.length?rs:[newTableRow(form)];
  const m10=form==='Макет10';
@@ -170,6 +171,8 @@ function markup(){const s=session,r=s.draft,o=D.lesnichestvo?.find(x=>same(x.POS
 }
 
 function readValue(el,old){const raw=el.__solinQuarterPicker?el.__solinQuarterPicker.value():el.tagName==='SELECT'?el.value:el.value.trim(),field=el.dataset.ceField;
+ const typed=window.SolinFieldTypes?.read(el,old,el.dataset.ceForm,field);
+ if(typed!==undefined&&!el.__solinQuarterPicker)return typed;
  if(raw==='')return null;
  if(['Fzona','Raion'].includes(field)&&!/^\d+$/.test(raw))throw Error('Укажите числовой код для '+field);
  if(['Fzona','Raion'].includes(field))return Number(raw);
@@ -538,9 +541,43 @@ function showMain(jump){document.querySelector('#ce-main').hidden=false;document
 }
 function showExtra(form){const root=document.querySelector('#ce-extra');
  document.querySelector('#ce-main').hidden=false;document.querySelector('#ce-action-panel').hidden=true;root.hidden=false;
- if(root.dataset.form!==form){root.dataset.form=form;root.innerHTML='<div class="dt-subtitle"><span>Макет '+h(form.replace('Макет',''))+' — '+h(SolinHuman.formName(form))+'</span><button type="button" data-ce-main aria-label="Закрыть макет">×</button></div><div class="dt-subbody"><div id="ce-table-'+h(form)+'">'+table(form)+'</div></div>';}
+ if(root.dataset.form!==form){root.dataset.form=form;root.innerHTML='<div class="dt-subtitle"><span>Макет '+h(form.replace('Макет',''))+' — '+h(SolinHuman.formName(form))+'</span><button type="button" data-ce-main aria-label="Закрыть макет">×</button></div><div class="dt-subbody">'+(form==='Макет16'?'<p>Параметры и урожайность можно рассчитать по древостою. Сначала проверьте предлагаемые изменения.</p><button type="button" data-ce-m16="create">Создать по древостою</button> <button type="button" data-ce-m16="parameters">Обновить параметры</button>':'')+'<div id="ce-table-'+h(form)+'">'+table(form)+'</div></div>';}
  document.querySelectorAll('[data-ce-extra]').forEach(b=>{if(b.dataset.ceExtra===form)b.setAttribute('aria-current','true');else b.removeAttribute('aria-current')});
  refreshLinked();root.scrollIntoView({block:'nearest',inline:'nearest'});
+}
+function previewMaket16(kind){
+ const invalid=document.querySelector('#ce-form [aria-invalid="true"]');if(invalid){error('Исправьте введённое значение перед расчётом',invalid);return;}
+ const engine=window.SolinMaket16;if(!engine)return;
+ const result=kind==='create'?engine.creationPreview(session.draft,window.SOLIN_REFS?.tables,linkedOrg()):engine.parameterPreview(session.draft,window.SOLIN_REFS?.tables,linkedOrg());
+ session.m16Preview={kind,result,signature:JSON.stringify(session.draft)};
+ const changes=kind==='create'?(result.rows||[]).flatMap((row,index)=>Object.entries(row).filter(([k])=>!keys.includes(k)).map(([field,value])=>({index,field,value,previous:null}))):
+  (result.updates||[]).flatMap(u=>u.changes.map(c=>({...c,index:u.index})));
+ panel('Макет 16 · предлагаемые изменения','<p>'+h(result.reason)+'</p>'+
+  (kind==='parameters'?'<p>Ur16, Neds и Sbor сохраняются. Обновление параметров само по себе не подтверждает прежнюю урожайность.</p>':'<p>Предварительный расчёт по исходным нормативным справочникам. Существующие записи не заменяются.</p>')+
+  ((result.unresolved||[]).map(x=>'<p>Строка '+(x.index+1)+': '+h(x.reason)+'</p>').join(''))+
+  (changes.length?'<table><thead><tr><th>Строка</th><th>Поле</th><th>Было</th><th>Стало</th></tr></thead><tbody>'+changes.map(c=>'<tr><td>'+(c.index+1)+'</td><td>'+h(title('Макет16',c.field))+'</td><td>'+h(c.previous??'—')+'</td><td>'+h(c.value??'—')+'</td></tr>').join('')+'</tbody></table>':'')+
+  (result.status==='complete'?'<button type="button" data-ce-m16-apply>Применить к черновику</button>':'')+
+  '<button type="button" data-ce-m16="back">Вернуться к Макету 16</button>');
+}
+function applyMaket16(){
+ const invalid=document.querySelector('#ce-form [aria-invalid="true"]');if(invalid){error('Исправьте введённое значение перед применением расчёта',invalid);return;}
+ const p=session.m16Preview;if(!p||p.result.status!=='complete')return;
+ if(p.signature!==JSON.stringify(session.draft)){error('Карточка изменилась после расчёта. Повторите расчёт Макета 16.');return;}
+ const rows=(session.draft._children.Макет16||[]).map(row=>({...row}));
+ if(p.kind==='create')for(const source of p.result.rows)rows.push({...source});
+ else for(const update of p.result.updates)Object.assign(rows[update.index],update.values);
+ try{for(const row of rows)for(const field of Object.keys(row)){
+  if(!window.SolinFieldTypes?.type('Макет16',field))continue;
+  // Revalidate only values introduced by this action; retain unrelated scalars.
+  const edited=p.kind==='create'||p.result.updates.some(u=>rows[u.index]===row&&Object.hasOwn(u.values,field));
+  if(edited)row[field]=window.SolinFieldTypes.parse('Макет16',field,row[field]);
+ }}catch(e){error(e.message);return;}
+ const next={...session.draft,_children:{...session.draft._children,Макет16:rows}};
+ const check=window.SolinDependentRules?.validateTransition(session.draft,next,linkedOrg(),window.SOLIN_REFS?.tables);
+ if(check?.errors.length){error(check.errors[0].reason);return;}
+ for(const [index,row]of (session.draft._children.Макет16||[]).entries())session.baselines.set(rows[index],session.baselines.get(row)||row);
+ session.draft._children.Макет16=rows;session.changedMakets.add('Макет16');session.dirty=true;session.m16Preview=null;
+ document.querySelector('#ce-extra').dataset.form='';showExtra('Макет16');updateBadges('Макет16');draftStatus('Макет 16 рассчитан · изменения в черновике');scheduleDraft();
 }
 function setZoom(value){const viewport=document.querySelector('.dt-viewport'),fit=viewport.clientWidth/DESKTOP_WIDTH;
  let scale=value==='fit'?fit:value==='actual'?1:value==='in'?(session.zoom||1)+.15:value==='out'?(session.zoom||1)-.15:Number(value);
@@ -636,6 +673,8 @@ function save(e){e?.preventDefault();if(!session||session.pendingRecovery)return
  discardRecovery(s);current=s.record;close();renderComp();refresh();toast('Карточка сохранена'+(recap?' · изменения: '+recap:''));return true;
 }
 function click(e){const b=e.target.closest('button');if(!b)return;
+ if(b.hasAttribute('data-ce-m16-apply')){applyMaket16();return;}
+ if(b.dataset.ceM16){if(b.dataset.ceM16==='back')showExtra('Макет16');else previewMaket16(b.dataset.ceM16);return;}
  if(b.dataset.ceZoom){setZoom(b.dataset.ceZoom);return;}
  if(b.hasAttribute('data-ce-support')){showSupport();return;}
  if(b.hasAttribute('data-ce-makets')){showMaketNavigator();return;}

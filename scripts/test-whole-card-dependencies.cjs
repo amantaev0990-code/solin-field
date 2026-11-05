@@ -8,7 +8,7 @@ const refs={
  SKU:[{KU:2,NKU:'Лесные культуры',P10:5}],
  SIAR:[{Ia:5,KIAR:1,NIAR:'Ярус I'},{Ia:5,KIAR:8,NIAR:'Ярус VIII'}],
  PIAP:[{KIAR:1},{KIAR:8}],
- SDP:[{KPC:'В',NDP:'Вяз',DKP2:202500,ОбПор:'В'},{KPC:'Б',NDP:'Берёза',DKP2:302600,ОбПор:'Б'},
+ SDP:[{KPC:'К',NDP:'Кедр',DKP2:101000},{KPC:'В',NDP:'Вяз',DKP2:202500,ОбПор:'В'},{KPC:'Б',NDP:'Берёза',DKP2:302600,ОбПор:'Б'},
       {KPC:'ТВ',NDP:'Таволга',DKP2:825500,ОбПор:'КУСТ'}],
  SDP_Tip:[{KPC:'В',NDP:'Вяз',DKP2:202500},{KPC:'Б',NDP:'Берёза',DKP2:302600},
           {KPC:'ТВ',NDP:'Таволга',DKP2:825500}],
@@ -52,7 +52,8 @@ reject(old,next,'Макет16','Por16');
 next=clone(old);next._children.Макет10=[];
 reject(old,next,'Макет16','Por16');
 next=clone(old);next._children.Макет10[0].POR='Б';
-next._children.Макет16[0].Por16='Б';
+next._children.Макет10[0]={IAR:1,POR:'К',KOEF:3,LET:100,POL:.6};
+next._children.Макет16[0].Por16='К';
 assert.equal(audit(old,next).errors.length,0,'Simultaneous consistent two-maket update allowed');
 next=clone(old);next._children.Макет12[0].KTP=3;
 reject(old,next,'Макет12','SV');

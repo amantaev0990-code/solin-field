@@ -204,10 +204,15 @@ function options(form,field,row,card,org,refs=ref()){
    reason:'Оригинальный SQL: SDP.DKP2 = 0 OR SDP.DKP2 > 70…; конец порога не сохранился. Список предварительный, соответствие настольному SOLI-N не подтверждено.'};
  }
  if(form==='Макет16'&&field==='Por16'){
-  // Original RowSource reads Maket10Выд.POR for this same stand.
-  const stems=card?._children?.['Макет10']||[],used=new Set(stems.map(r=>code(r.POR)).filter(Boolean));
-  if(!used.size)return {status:'waiting',reason:'Сначала укажите состав древостоя в макете 10',items:[]};
-  return {status:'complete',reason:'Породы макета 16 берутся из древостоя этого выдела',items:[...used].map(k=>({value:k,label:refs.SDP?.find(r=>same(r.KPC,k))?.NDP||k}))};
+  if(!Array.isArray(refs.SDP))return {status:'unavailable',reason:'Нет исходного справочника SDP',items:[]};
+  const sameStand=r=>['POS','LESN','KV','KGLF','VD'].every(k=>!filled(r[k])||same(r[k],card?.[k]));
+  const stems=(card?._children?.Макет10||[]).filter(sameStand);
+  const hasDensity=stems.some(r=>num(r.IAR)===1&&num(r.POL)>0);
+  const cedar=refs.SDP.find(r=>String(r.KPC).trim().toLocaleUpperCase('ru-RU')==='К');
+  const eligible=stems.some(r=>String(r.POR??'').trim().toLocaleUpperCase('ru-RU')==='К'&&num(r.KOEF)>0&&num(r.LET)>80&&num(r.IAR)===1);
+  return {status:hasDensity&&eligible&&cedar?'complete':stems.length?'empty':'waiting',
+   reason:'Исходный выбор: кедр К, ярус 1, возраст > 80, коэффициент > 0 и положительная полнота первого яруса',
+   zeroIsValue:true,items:hasDensity&&eligible&&cedar?[{value:'К',label:cedar.NDP||'К'}]:[]};
  }
  if(form==='Макет12'&&['SV','SB'].includes(field)){
   if(!refs?.SSP?.length)
@@ -290,9 +295,9 @@ function treeDependencies(card,refs=ref()){
   for(let i=0;i<material.length;i++){
    const value=material[i]?.Por16;
    if(!filled(value)||code(value)==='0')continue;
-   if(allowed?.status==='waiting'||currentIsAllowed(value,allowed)===false)issues.push({
+   if(String(value).trim().toLocaleUpperCase('ru-RU')!=='К'||allowed?.status==='waiting'||currentIsAllowed(value,allowed)===false)issues.push({
     form:'Макет16',field:'Por16',index:i,value:code(value),
-    reason:'Порода '+code(value)+' из макета 16 отсутствует в составе макета 10 текущего выдела'
+    reason:'Для породы '+code(value)+' из макета 16 не выполнены условия исходного выбора. '+(allowed?.reason||'Проверьте древостой Макета 10')
    });
   }
  }
@@ -335,6 +340,9 @@ function validateTransition(before,after,org,refs=ref(),opts={}){
   const result=options(form,field,row,after,org,refs);
   if(!result)return; // No source-backed RowSource for this field yet.
   const valid=currentIsAllowed(row[field],result);
+  if(form==='Макет16'&&field==='Por16'&&result.status==='waiting'){
+   issue(form,field,index,row[field],'Для сохранения Макета 16 нужен исходный древостой Макета 10');return;
+  }
   if(valid===false&&['complete','empty'].includes(result.status))
    issue(form,field,index,row[field],
     form+'.'+field+': код '+code(row[field])+' не входит в разрешённые значения. '+(result.reason||''));
@@ -349,11 +357,9 @@ function validateTransition(before,after,org,refs=ref(),opts={}){
  const beforeChildren=before?._children||{},children=after._children||{};
  const maket10Changed=JSON.stringify(beforeChildren.Макет10||[])!==
    JSON.stringify(children.Макет10||[]);
- // Stock ZAP, height and density changes do not change the pool of
- // available Por16 species. Only the actual composition should retrigger
- // a previously imported Maket16 species value.
- const speciesSignature=rows=>[...new Set((rows||[]).map(r=>code(r.POR)).filter(Boolean))]
-   .sort().join('|');
+ // Source Por16 choices depend on first-tier fullness, age, coefficient and
+ // address as well as species. Height and ZAP alone do not change this list.
+ const speciesSignature=rows=>JSON.stringify((rows||[]).map(r=>['POS','LESN','KV','KGLF','VD','POR','IAR','KOEF','LET','POL'].map(k=>code(r[k]))));
  const maket10SpeciesChanged=speciesSignature(beforeChildren.Макет10)!==
    speciesSignature(children.Макет10);
  const kuChanged=baseDirty(['KU']);

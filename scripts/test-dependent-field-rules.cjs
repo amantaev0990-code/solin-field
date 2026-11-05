@@ -58,7 +58,7 @@ assert.deepEqual(values('Макет12','SV',{KTP:84}),['0','2']);
 assert.deepEqual(values('Макет12','SV',{KTP:3}),['0','1']);
 assert.deepEqual(values('Макет12','SB',{KTP:84}),['0','1']);
 const stand={_children:{Макет10:[{POR:'В'},{POR:'Б'}]}};
-assert.deepEqual(values('Макет16','Por16',{},stand),['В','Б']);
+assert.deepEqual(values('Макет16','Por16',{},stand),[]);
 assert.equal(rule.options('Макет16','Por16',{}, {_children:{Макет10:[]}},org,ref).status,'waiting');
 assert.equal(rule.suggestedOrigin('Б',ref),null);
 ref.SLM.push({KM:51,PM2R:null,NMR:'NULL must not match zero'});

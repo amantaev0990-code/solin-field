@@ -164,7 +164,12 @@ public class SolinFieldUiInstrumentedTest {
         "const special=SolinCardCalculations.bonitet({...r,M3Pr:'БРК',GodT1:2026},refs);"+
         "const edit=SolinDependentRules.functionalZones({KGLF:5},refs,{form:'Квартал'});"+
         "const create=SolinDependentRules.functionalZones({KGLF:5},refs,{scenario:'create'});"+
+        "const cedar={POS:213,LESN:2,KV:1,KGLF:27,VD:'001',KU:1,KlxrVD:17,M3TLU:'КЕР',"+
+        "_children:{Макет10:[{IAR:1,POR:'К',KOEF:1,LET:202,POL:.3,ZAP:40}]}};"+
+        "const material=SolinMaket16.creationPreview(cedar,refs);"+
         "return {early:early.expected,later:later.expected,special:special.scaleOrigin,"+
+        "m16:material.rows?.[0]?.Ur16,m16Type:SolinFieldTypes.type('Макет16','H16'),"+
+        "precision:String(SolinFieldTypes.read({value:'0,123457',dataset:{solinInitial:'0,123457'}},.123456789012345,'Макет16','Ediz')),"+
         "edit:edit.items.map(x=>x.value).join(','),create:create.items.map(x=>x.value).join(','),preserved:before===JSON.stringify(r)};"+
         "})())"));
       assertEquals("Pre-2017 low-height K58 branch", "4",sourceRules.getString("early"));
@@ -172,6 +177,9 @@ public class SolinFieldUiInstrumentedTest {
       assertEquals("Second SSHB join uses substituted origin",9,sourceRules.getInt("special"));
       assertEquals("1,2,3,4,12,13,14,15",sourceRules.getString("edit"));
       assertEquals("1,2,3,4",sourceRules.getString("create"));
+      assertEquals("Original M16 yield uses even midpoint rounding",162,sourceRules.getInt("m16"));
+      assertEquals("H16 stores a forest type code", "text",sourceRules.getString("m16Type"));
+      assertEquals("Untouched display must preserve source Double precision", "0.123456789012345",sourceRules.getString("precision"));
       assertTrue("Source-backed previews must not mutate inputs",sourceRules.getBoolean("preserved"));
     } finally {
       getInstrumentation().runOnMainSync(activity::finish);

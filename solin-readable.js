@@ -29,7 +29,7 @@ function lookup(form,field){form=canonical(form);const key=form+'.'+field;if(loc
  const values=new Map();for(const row of rows){let code=member(row,src.code),name=member(row,src.label);if(name==null&&src.table==='SDP_Tip'){const match=tables?.SDP?.find(r=>normalize(r.KPC)===normalize(code));name=match?.NDP;}if(code==null)continue;const k=normalize(code);if(!values.has(k))values.set(k,new Set());if(name!=null&&clean(name)!=='')values.get(k).add(text(name));}
  const out={};for(const [k,names] of values)out[k]=names.size===1?[...names][0]:names.size>1?'Неоднозначное значение (код '+k+')':'Не указано'+(k?' (код '+k+')':'');cache.set(key,out);return out;
 }
-function label(form,field){form=canonical(form);return dict.fields[form]?.[field]||dict.fields['ВыделВ']?.[field]||'Служебное поле';}
+function label(form,field){if(form==='Макет16'&&field==='H16')return 'Тип леса';if(form==='Макет16'&&field==='Ediz')return 'Полнота 1-го яруса';form=canonical(form);return dict.fields[form]?.[field]||dict.fields['ВыделВ']?.[field]||'Служебное поле';}
 function isTechnical(form,field){form=canonical(form);return (dict.unresolved?.[form]||[]).includes(field)||!dict.fields[form]?.[field]&&!dict.fields['ВыделВ']?.[field];}
 function value(form,field,v,row){if(v==null||v==='')return 'Не указано';const list=lookup(form,field);if(list){const k=normalize(v);return list[k]??'Неизвестное значение (код '+String(v)+')';}if(isTechnical(form,field))return String(v);if(typeof v==='number'||/^[-+]?\d+(\.\d+)?$/.test(String(v)))return Number(v).toLocaleString('ru-RU',{maximumFractionDigits:3});return text(v);}
 function codeLabel(code,label){
@@ -52,6 +52,7 @@ function input(name,v='',prefix='wf',form='ВыделВ'){
   control='<input id="'+h(id)+'" data-wffield="'+h(name)+'"'+(phantom?' data-phantom-zero="1" inputmode="decimal"':'')+
     ' autocomplete="off" value="'+h(str)+'" placeholder="'+(phantom?'0':'Не указано')+'">';
  }
+ control=control.replace(/<(input|select)\b/,m=>m+' data-solin-form="'+h(form)+'" data-solin-initial="'+h(str)+'"');
  return '<label class="wf-field'+(isTechnical(form,name)?' human-technical-field':'')+'" title="Поле исходной базы: '+h(name)+'"><span>'+h(label(form,name))+(isTechnical(form,name)?' <small>'+h(name)+' · назначение не подтверждено</small>':'')+'</span>'+control+'</label>';
 }
 // An actual saved 0 remains a valid value (e.g. origin 0 means seed-grown).

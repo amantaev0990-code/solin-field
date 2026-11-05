@@ -68,6 +68,7 @@ jobs:
           PLAYWRIGHT_PATH=playwright-core BROWSER_CHANNEL=chrome node scripts/test-tablet-field-fixes.cjs
           PLAYWRIGHT_PATH=playwright-core BROWSER_CHANNEL=chrome node scripts/test-offline-imagery.cjs
           PLAYWRIGHT_PATH=playwright-core BROWSER_CHANNEL=chrome node scripts/test-functional-zones-ui.cjs
+          PLAYWRIGHT_PATH=playwright-core BROWSER_CHANNEL=chrome node scripts/test-maket16-ui.cjs
       - name: Create native Android project
         run: npx cap add android
       - name: Register offline MDB writer
