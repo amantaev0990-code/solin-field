@@ -206,6 +206,13 @@ public class SolinMdbPlugin extends Plugin {
       result.put("verified", true);
       result.put("bytes", size);
       result.put("folder", "Загрузки/SOLI-N Field");
+      // MediaStore may append (1), (2), ... when an export already exists.
+      // Return the real name, not an invented destination filename.
+      try (android.database.Cursor c = resolver.query(uri,
+          new String[]{MediaStore.MediaColumns.DISPLAY_NAME}, null, null, null)) {
+        if (c != null && c.moveToFirst()) result.put("name", c.getString(0));
+        else result.put("name", filename);
+      }
       return result;
     } finally {
       if (!published && uri != null) {
