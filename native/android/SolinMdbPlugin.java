@@ -1,6 +1,11 @@
 package kz.solin.field;
 
 import android.app.Activity;
+import android.content.ContentResolver;
+import android.content.ContentValues;
+import android.os.Build;
+import android.os.Environment;
+import android.provider.MediaStore;
 import android.content.Intent;
 import android.net.Uri;
 import android.provider.DocumentsContract;
@@ -88,6 +93,14 @@ public class SolinMdbPlugin extends Plugin {
         if (activity == null) throw new IllegalStateException("Окно приложения недоступно.");
         File safe = output; output = null;
         String filename = "Transf_" + pos + "_" + lesn + "_" + year + ".mdb";
+        // Android 10+: save directly to Downloads. No external picker Activity
+        // can suspend/kill the WebView between preparing and writing the MDB.
+        // IS_PENDING keeps partial/zero-byte files hidden until verification.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+          try { call.resolve(saveVerifiedToDownloads(getContext(), safe, filename)); }
+          finally { safe.delete(); busy.set(false); }
+          return;
+        }
         activity.runOnUiThread(() -> {
           try {
             pendingFile = safe;
@@ -142,6 +155,7 @@ public class SolinMdbPlugin extends Plugin {
         data.put("saved", true);
         data.put("verified", true);
         data.put("bytes", size);
+        data.put("folder", "выбранной папке");
         // Resolve only after both streams have closed and the saved URI was read back.
         call.resolve(data);
       } catch (Exception e) {
@@ -158,6 +172,47 @@ public class SolinMdbPlugin extends Plugin {
         busy.set(false);
       }
     });
+  }
+
+  /** Android 10+ scoped storage, no picker round-trip or storage permission.
+   * IS_PENDING ensures a crash never exposes a misleading zero-byte .mdb.
+   * Publish only after successful byte-for-byte read-back. */
+  static JSObject saveVerifiedToDownloads(android.content.Context context, File prepared, String filename) throws Exception {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q)
+      throw new IllegalStateException("Системное сохранение поддерживается с Android 10.");
+    if (!filename.matches("Transf_[1-9][0-9]*_[1-9][0-9]*_[0-9]{4}\\.mdb"))
+      throw new IllegalArgumentException("Некорректное имя MDB.");
+    ContentResolver resolver = context.getContentResolver();
+    ContentValues values = new ContentValues();
+    values.put(MediaStore.MediaColumns.DISPLAY_NAME, filename);
+    values.put(MediaStore.MediaColumns.MIME_TYPE, "application/vnd.ms-access");
+    values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/SOLI-N Field/");
+    values.put(MediaStore.MediaColumns.IS_PENDING, 1);
+    Uri uri = null;
+    boolean published = false;
+    try {
+      if (prepared.length() < 2048 || !isJet(readFirst32(prepared)))
+        throw new IllegalStateException("Нельзя сохранять пустой или повреждённый MDB.");
+      uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+      if (uri == null) throw new IllegalStateException("Android не создал документ в Загрузках.");
+      long size = writeVerifiedDocument(context, prepared, uri);
+      ContentValues commit = new ContentValues();
+      commit.put(MediaStore.MediaColumns.IS_PENDING, 0);
+      if (resolver.update(uri, commit, null, null) < 1)
+        throw new IllegalStateException("Android не подтвердил завершение сохранения.");
+      published = true;
+      JSObject result = new JSObject();
+      result.put("saved", true);
+      result.put("verified", true);
+      result.put("bytes", size);
+      result.put("folder", "Загрузки/SOLI-N Field");
+      return result;
+    } finally {
+      if (!published && uri != null) {
+        try { resolver.delete(uri, null, null); }
+        catch (Exception e) { Log.w(TAG, "Unable to remove pending MDB export", e); }
+      }
+    }
   }
 
   /** SAF document providers may create 0-byte placeholders before writing.
