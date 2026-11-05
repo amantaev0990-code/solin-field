@@ -90,7 +90,7 @@
       const transfer=window.SolinMDBBridge?.snapshot?.();
       if(!transfer||transfer.format!=='SOLIN-MDB-Bridge-v1')throw Error('Не удалось собрать карточки Transfer.');
       const blank = await packagedTemplate();
-      modal('Экспорт MDB','<p>Создаю MDB на телефоне. После проверки откроется выбор папки для сохранения.</p>');
+      modal('Экспорт MDB','<p>Создаю и проверяю MDB. На Android 10+ файл будет сохранён в «Загрузки/SOLI-N Field».</p>');
       const result = await plugin().export({
         templateBase64:base64(blank),
         transferJson:JSON.stringify(transfer)
@@ -101,7 +101,7 @@
       const size = (result.bytes / 1024).toFixed(1);
       modal('Экспорт завершён',
         '<p>Файл <b>Transf_'+esc(transfer.identity.POS)+'_'+esc(transfer.identity.LESN)+'_'+
-        esc(transfer.identity.GodT)+'.mdb</b> сохранён в выбранной папке.</p>'+
+        esc(transfer.identity.GodT)+'.mdb</b> сохранён в '+esc(result.folder||'выбранной папке')+'.</p>'+
         '<p><b>Размер: '+size+' КБ.</b> Файл повторно считан и проверен.</p>'+
         '<p>Перед использованием в работе откройте его на настольном SOLI-N в тестовой базе.</p>'+
         '<button type="button" onclick="closeModal()">Готово</button>');
