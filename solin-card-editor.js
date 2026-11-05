@@ -244,7 +244,11 @@ function refreshLinked(){
   const layerGuide=info.status==='complete'&&info.items.length?
    ' Допустимые ярусы: '+info.items.map(x=>x.value+' '+x.label).join('; ')+'.':
    info.reason?' '+info.reason:'';
-  guide.textContent=categoryGuide+layerGuide;
+  const reclassified=!session.isNew&&String(session.original.KU??'')!==String(session.draft.KU??'');
+  const hasOldMakets=Object.values(session.original._children||{}).some(rows=>Array.isArray(rows)&&rows.length>0);
+  guide.textContent=categoryGuide+layerGuide+
+   (reclassified&&hasOldMakets?
+    ' Внимание: категория изменена. В оригинальном SOLI-N требуется удалить и заново ввести такой выдел, чтобы старые макеты не попали в новую категорию. Сохранение прежних макетов заблокировано.':'');
   guide.dataset.ceCategoryStatus=info.status;
  }
 
@@ -401,6 +405,13 @@ function linkedIssues(){
  const engine=window.SolinDependentRules;
  if(!engine||!session)return null;
  const base=session.draft,before=session.original;
+ // Original SOLI-N manual: changing KU/GLF category with populated dependent
+ // makets requires deleting/re-entering the allotment. Do not silently attach
+ // obsolete makets to a new land category in the same saved record.
+ if(!session.isNew&&String(base.KU??'')!==String(before.KU??'')&&
+    Object.values(before._children||{}).some(rows=>Array.isArray(rows)&&rows.length))
+  return {message:'Смена категории угодий при заполненных макетах требует создания нового выдела по правилам оригинального SOLI-N. Старые макеты не будут перенесены автоматически; сохранение текущей переклассификации остановлено.',
+    form:'ВыделВ',scope:'base',field:'KU'};
  const audit=engine.validateTransition?.(before,base,linkedOrg(),window.SOLIN_REFS?.tables,
    {isNew:!!session.isNew});
  if(audit?.errors.length){
