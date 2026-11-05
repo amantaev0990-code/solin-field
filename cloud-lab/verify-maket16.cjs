@@ -2,9 +2,9 @@
 // Private differential replay. Source SQL is read from an existing read-only
 // Jackcess inventory and is never embedded into public test fixtures.
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),z=require('node:zlib'),assert=require('node:assert/strict');
-const [inventoryFile,output]=process.argv.slice(2),root=path.resolve(__dirname,'..');if(!output)throw Error('Usage: PRIVATE_JACKCESS.json PRIVATE_REPORT.json');if(path.resolve(output).startsWith(root+path.sep))throw Error('Keep detailed source evidence outside git');
+const [inventoryFile,output,selectorFile]=process.argv.slice(2),root=path.resolve(__dirname,'..');if(!output)throw Error('Usage: PRIVATE_JACKCESS.json PRIVATE_REPORT.json [PRIVATE_SELECTOR_REPORT.json]');if(path.resolve(output).startsWith(root+path.sep))throw Error('Keep detailed source evidence outside git');
 const inventory=JSON.parse(fs.readFileSync(inventoryFile));assert.equal(inventory.source.sha256,'f49dbcc449294e89632bbc6d6935dc2dcda8fa1732cd9b1f8e9378ca4bc42dcf');assert.equal(inventory.originalUnchanged,true);
-const window={};for(const f of ['solin-field-types.js','solin-maket16.js','solin-access-expression.js','solin-access-sql.js','solin-native-control-data.js','solin-native-control-runtime.js'])vm.runInNewContext(fs.readFileSync(path.join(root,f),'utf8'),{window});
+const window={};for(const f of ['solin-field-types.js','solin-maket16.js','solin-dependent-rules.js','solin-access-expression.js','solin-access-sql.js','solin-native-control-data.js','solin-native-control-runtime.js'])vm.runInNewContext(fs.readFileSync(path.join(root,f),'utf8'),{window});
 const M=window.SolinMaket16,N=JSON.parse(JSON.stringify(window.SOLIN_NATIVE_CONTROL_DATA)),refs=JSON.parse(z.gunzipSync(fs.readFileSync(path.join(root,'refs-audit.json.gz')))).tables;
 const wanted=['Макет16Созд','Макет16Пересчет','Макет10Пол1ЯрЛ'];for(const name of wanted){const q=inventory.queries.find(q=>q.name===name);assert(q);N.queries[name]=window.SolinAccessSQL.parse(q.sql);}
 const kinds={integer:3,long:4,text:10,double:7,float:6};N.schemas.Макет16=Object.fromEntries(Object.entries(window.SolinFieldTypes.tables.Макет16).map(([k,t])=>[k,{type:kinds[t]}]));
@@ -33,6 +33,17 @@ const fields=Object.keys(N.schemas.Макет16),key=r=>JSON.stringify(['POS','L
  const rt2=new window.SolinNativeControlRuntime.Runtime(SQL,N,{'ВыделВыб':recalcCards,'Макет10Выб':trees.slice(0,40),'Макет10':trees.slice(0,40),'Макет16':oldRows},{POS:213,LESN:2});let updated;
  try{rt2.action('Макет16Пересчет');updated=rt2.read('Макет16');}finally{rt2.close();}
  for(const [i,r]of recalcCards.entries()){const input={...r,_children:{Макет10:[trees[i]],Макет16:[oldRows[i]]}},actual=M.parameterPreview(input,refs);assert.equal(actual.status,'complete');assert.equal(canon({...oldRows[i],...actual.updates[0].values}),canon(updated.find(v=>key(v)===key(r))));assert.equal(updated.find(v=>key(v)===key(r)).Ur16,999);}
- const report={sourceSha256:inventory.source.sha256,sourceQueries:wanted,nativeAccessExecuted:false,scope:'Original saved action SQL on isolated SQLite/WASM vs Field; original Access target coercion and macros are separate',stringCaseIgnoredInSqlComparison:true,normativeDomainCards:fullDomain,boundaryAndNegativeCards:cards.length-fullDomain,projectionCasesMatched:matched,waitingCases:waiting,ambiguousJoinCasesPreserved:ambiguous,originalAppendRows:expected.length,recalcCasesMatched:recalcCards.length,sourceUpdatePreservesUr16:true,failures};
+ let selectorCases=0;
+ if(selectorFile){
+  const report=JSON.parse(fs.readFileSync(selectorFile)),sql=report.creation_vs_dropdown.dropdown_sql.replace(/\\"/g,'"');
+  N.queries.__m16selector=window.SolinAccessSQL.parse(sql);N.schemas.Макет10Выд=N.schemas.Макет10;N.schemas.Выдел_выдел=N.schemas.Выдел;
+  N.schemas.Макет10Пол1Яр=N.schemas.Макет10;
+  for(const age of [80,80.000001,81,100])for(const coef of [0,1,10])for(const pol of [0,1e-50,.6])for(const iar of [1,2])for(const por of ['К','Б']){
+   const r={POS:213,LESN:2,KV:1,KGLF:27,VD:'000001',M3TLU:'КЕР'},child={...r,POR:por,IAR:iar,KOEF:coef,LET:age,POL:pol};r._children={Макет10:[child]};
+   const source=new window.SolinNativeControlRuntime.Runtime(SQL,N,{'Выдел_выдел':[r],'Макет10Выд':[child],'Макет10Пол1Яр':iar===1&&Math.fround(pol)>0?[child]:[],SDP:refs.SDP},{POS:213,LESN:2});
+   try{const expected=[...new Set(source.query('__m16selector').map(r=>r.POR))].sort();const actual=window.SolinDependentRules.options('Макет16','Por16',{},r,null,refs).items.map(x=>x.value).sort();assert.equal(JSON.stringify(actual),JSON.stringify(expected));selectorCases++;}finally{source.close();}
+  }
+ }
+ const report={sourceSha256:inventory.source.sha256,sourceQueries:wanted,nativeAccessExecuted:false,scope:'Original saved action SQL on isolated SQLite/WASM vs Field; original Access target coercion and macros are separate',stringCaseIgnoredInSqlComparison:true,normativeDomainCards:fullDomain,boundaryAndNegativeCards:cards.length-fullDomain,projectionCasesMatched:matched,waitingCases:waiting,ambiguousJoinCasesPreserved:ambiguous,originalAppendRows:expected.length,recalcCasesMatched:recalcCards.length,selectorCasesMatched:selectorCases,sourceUpdatePreservesUr16:true,failures};
  fs.writeFileSync(output,JSON.stringify(report,null,2));console.log(JSON.stringify(report));
 })().catch(e=>{console.error(e.stack);process.exitCode=1});

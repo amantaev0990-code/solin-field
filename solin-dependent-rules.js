@@ -207,9 +207,9 @@ function options(form,field,row,card,org,refs=ref()){
   if(!Array.isArray(refs.SDP))return {status:'unavailable',reason:'Нет исходного справочника SDP',items:[]};
   const sameStand=r=>['POS','LESN','KV','KGLF','VD'].every(k=>!filled(r[k])||same(r[k],card?.[k]));
   const stems=(card?._children?.Макет10||[]).filter(sameStand);
-  const hasDensity=stems.some(r=>num(r.IAR)===1&&num(r.POL)>0);
+  const hasDensity=stems.some(r=>num(r.IAR)===1&&Math.fround(num(r.POL))>0);
   const cedar=refs.SDP.find(r=>String(r.KPC).trim().toLocaleUpperCase('ru-RU')==='К');
-  const eligible=stems.some(r=>String(r.POR??'').trim().toLocaleUpperCase('ru-RU')==='К'&&num(r.KOEF)>0&&num(r.LET)>80&&num(r.IAR)===1);
+  const eligible=stems.some(r=>String(r.POR??'').trim().toLocaleUpperCase('ru-RU')==='К'&&num(r.KOEF)>0&&Math.fround(num(r.LET))>80&&num(r.IAR)===1);
   return {status:hasDensity&&eligible&&cedar?'complete':stems.length?'empty':'waiting',
    reason:'Исходный выбор: кедр К, ярус 1, возраст > 80, коэффициент > 0 и положительная полнота первого яруса',
    zeroIsValue:true,items:hasDensity&&eligible&&cedar?[{value:'К',label:cedar.NDP||'К'}]:[]};

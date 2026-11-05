@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('node:fs'),http=require('node:http'),path=require('node:path'),assert=require('node:assert/strict');
 const {chromium}=require(process.env.PLAYWRIGHT_PATH||'playwright'),root=path.resolve(__dirname,'..');
-const server=http.createServer((req,res)=>{try{let f=path.resolve(root,'.'+decodeURIComponent(req.url.split('?')[0]));if(!f.startsWith(root+path.sep))throw Error('path');if(fs.statSync(f).isDirectory())f=path.join(f,'index.html');res.setHeader('Content-Type',({'.js':'text/javascript','.html':'text/html','.wasm':'application/wasm','.css':'text/css'})[path.extname(f)]||'application/octet-stream');res.end(fs.readFileSync(f));}catch{res.writeHead(404);res.end();}});
+const server=http.createServer((req,res)=>{try{let f=path.resolve(root,'.'+decodeURIComponent(req.url.split('?')[0]));if(f!==root&&!f.startsWith(root+path.sep))throw Error('path');if(fs.statSync(f).isDirectory())f=path.join(f,'index.html');res.setHeader('Content-Type',({'.js':'text/javascript','.html':'text/html','.wasm':'application/wasm','.css':'text/css'})[path.extname(f)]||'application/octet-stream');res.end(fs.readFileSync(f));}catch{res.writeHead(404);res.end();}});
 (async()=>{let browser;try{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));browser=await chromium.launch({...(process.env.BROWSER_CHANNEL==='bundled'?{}:{channel:process.env.BROWSER_CHANNEL||'chrome'}),headless:true});
  for(const prefix of ['/','/www/']){

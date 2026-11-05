@@ -10,6 +10,6 @@ assert.equal(M.creationPreview(existing,refs).status,'conflict');const before=JS
 const dupe=JSON.parse(JSON.stringify(card));dupe._children.Макет10.push({...dupe._children.Макет10[0],POL:.3});assert.equal(M.creationPreview(dupe,refs).status,'ambiguous');
 const overlap={...refs,S16VOZ:[...refs.S16VOZ,{NVoz:162,UrYOZ:1}]};assert.equal(M.creationPreview(card,overlap).status,'ambiguous','Inclusive source age window may create two rows');
 assert.equal(D.options('Макет16','Por16',{},card,null,refs).items[0].value,'К');
-for(const [field,value]of [['LET',80],['KOEF',0],['IAR',2],['POL',0],['POR','Б']]){const bad=JSON.parse(JSON.stringify(card));bad._children.Макет10[0][field]=value;assert.equal(D.options('Макет16','Por16',{},bad,null,refs).items.length,0,field+' must restrict selector');}
+for(const [field,value]of [['LET',80],['LET',80.000001],['POL',1e-50],['KOEF',0],['IAR',2],['POL',0],['POR','Б']]){const bad=JSON.parse(JSON.stringify(card));bad._children.Макет10[0][field]=value;assert.equal(D.options('Макет16','Por16',{},bad,null,refs).items.length,0,field+' must restrict selector');}
 const foreign=JSON.parse(JSON.stringify(card));foreign._children.Макет10[0].KGLF=24;assert.equal(D.options('Макет16','Por16',{},foreign,null,refs).items.length,0);assert.equal(M.sourceRows(foreign,refs).rows.length,0);
 console.log('MAKET16_OK: cedar selector, original append, even rounding, duplicate JOIN guards, immutable five-field refresh and preserved yield');

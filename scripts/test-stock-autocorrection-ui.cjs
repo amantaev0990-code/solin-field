@@ -296,8 +296,10 @@ async function reopen(p,info){
  });
  assert.equal(await p.locator('#wf_Por16').evaluate(el=>el.tagName),'SELECT');
  const species16=await p.locator('#wf_Por16 option').evaluateAll(xs=>xs.filter(x=>x.value&&!x.disabled).map(x=>x.value));
- assert.deepEqual(species16,['В'],'Maket16 must offer only species present in this stand Maket10');
- console.log('PASS Maket16.Por16 choices follow this stand Maket10 species');
+ assert.deepEqual(species16,[],'Maket16 must not offer non-cedar species, even when present in Maket10');
+ await p.evaluate(()=>{closeModal();Object.assign(current._children.Макет10[0],{POR:'К',IAR:1,KOEF:10,LET:100,POL:.6});current._children.Макет16=[{Por16:'К'}];solinWorkflow.editMaket('Макет16',0);});
+ assert.deepEqual(await p.locator('#wf_Por16 option').evaluateAll(xs=>xs.filter(x=>x.value&&!x.disabled).map(x=>x.value)),['К']);
+ console.log('PASS Maket16.Por16 excludes non-cedar and accepts eligible first-tier cedar');
  // Editing a Maket10 species in the narrow standalone popup must not
  // silently orphan the linked Maket16 species. Full-card edit remains the
  // path for a simultaneous change of both original Access forms.
@@ -309,8 +311,8 @@ async function reopen(p,info){
   else await maket10Species.evaluate(el=>{el.add(new Option('Берёза','Б'));el.value='Б'});
  }else await maket10Species.fill('Б');
  await p.locator('#wfSaveMaket').click();
- assert.equal(await p.evaluate(()=>current._children.Макет10[0].POR),'В',
-  'Standalone tree species change must be refused while Maket16 still refers to В');
+ assert.equal(await p.evaluate(()=>current._children.Макет10[0].POR),'К',
+  'Standalone tree species change must be refused while Maket16 still refers to К');
  console.log('PASS standalone Maket10 Save cannot orphan Maket16 species');
  // The DELETE path must also preserve linked species, not just Edit/Save.
  await p.evaluate(()=>{closeModal();solinWorkflow.openMaket('Макет10')});
