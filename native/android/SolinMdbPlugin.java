@@ -89,8 +89,6 @@ public class SolinMdbPlugin extends Plugin {
         replaceTables(transfer, pos, lesn, output);
         if (output.length() < 2048 || !isJet(readFirst32(output)))
           throw new IllegalStateException("Подготовленный MDB пустой или повреждён.");
-        Activity activity = getActivity();
-        if (activity == null) throw new IllegalStateException("Окно приложения недоступно.");
         File safe = output; output = null;
         String filename = "Transf_" + pos + "_" + lesn + "_" + year + ".mdb";
         // Android 10+: save directly to Downloads. No external picker Activity
@@ -101,6 +99,8 @@ public class SolinMdbPlugin extends Plugin {
           finally { safe.delete(); busy.set(false); }
           return;
         }
+        Activity activity = getActivity();
+        if (activity == null) { safe.delete(); throw new IllegalStateException("Окно приложения недоступно."); }
         activity.runOnUiThread(() -> {
           try {
             pendingFile = safe;
