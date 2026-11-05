@@ -15,9 +15,13 @@ unrelated forestry systems.
   available, `PIAP.KIAR` in `SolinDependentRules.allowedLayers()`.
   If `P10=0`, an **empty** Макет 10 input is replaced with an explanation.
   Existing Макет 10 records are never deleted or overwritten.
-- **Group of forms:** the original `SKU.GrMak` is exposed as factual
-  metadata; its correspondence to required individual макеты has NOT yet
-  been fully verified. Do not treat `GrMak` as a list of macros.
+- **Group of forms and hidden original form flags:** the original
+  `SKU.GrMak`, `SKU.PN`, `SKU.P31`, `SKU.PM`, `SKU.PF1` and
+  `SKU.KLF` are exposed as factual metadata if present. Their exact
+  correspondence to required individual макеты has NOT yet been fully
+  verified. Do not treat `GrMak` as a list of макеты or assume
+  `P31` means Макет 31. The original KU RowSource has physical column
+  order `KU,NKU,KLF,PN,P31,P10,PM,GrMak,PF1`.
 - **KU 19 (несомкнувшиеся лесные культуры):** Макет 10 `POL`
   represents survival percentage in the field editor, integer `1..100`,
   not fractional density `0.1..1.0`. The audited original Access rule
@@ -31,9 +35,15 @@ unrelated forestry systems.
   input says `POL — значение уточняется`. It allows preserving the
   original raw numeric MDB value, without invented ranges or silent changes.
   The generic Access validation remains a separate check.
-- **Preserving data:** changing `KU` rebuilds only controls in the
-  active draft. Legacy records, existing children and source MDB fields
-  retain their original values.
+- **Preserving data and reclassification:** changing `KU` rebuilds
+  only controls in the active draft. Legacy records, existing children
+  and source MDB fields retain their original values. The original
+  desktop manual explicitly requires re-entering an allotment when
+  changing an already populated KU/GLF classification because prior
+  category-specific макеты can persist. The field editor therefore
+  blocks saving a reclassified existing allotment with child-макеты
+  and explains how to create a fresh record; it never deletes rows
+  automatically.
 
 ## What still requires the original Access SOLI-N
 
