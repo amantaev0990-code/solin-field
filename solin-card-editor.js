@@ -168,6 +168,13 @@ function newTableRow(form){
 }
 function table(form){const rs=session.draft._children[form]||[],schema=(D.transfSchema[form]||[]).filter(f=>!keys.includes(f)),shown=rs.length?rs:[newTableRow(form)];
  const m10=form==='Макет10';
+ // Source SKU.P10=0 means no tree strata. Do not delete any historical rows.
+ // Hide only the EMPTY Maket10 editor to prevent accidental tree creation.
+ const category=window.SolinCategoryRules?.profile(session.draft.KU,window.SOLIN_REFS?.tables);
+ if(m10&&category?.hasTreeLayers===false&&!rs.length)
+  return '<div class="ce-category-no-trees" role="status">Для категории '+h(category.code)+
+   ' «'+h(category.name)+'» оригинальный SKU.P10 не предусматривает ярусы древостоя.'+
+   ' Макет 10 здесь не заполняется; существующие записи других категорий не изменены.</div>';
  return '<div class="ce-table-wrap" tabindex="0" aria-label="Таблица '+h(form)+'"><table class="ce-table"><caption class="ce-sr-only">'+h(form)+' — '+h(SolinHuman.formName(form))+'</caption><colgroup><col style="width:24px">'+schema.map(f=>'<col'+(m10?' style="width:'+({IAR:145,KOEF:85,POR:190,LET:55,PH:55,PD2:55,KT:70,PROI:160,POL:80,SPS:75,ZAP:110}[f]||90)+'px"':'')+'>').join('')+'</colgroup><thead><tr><th scope="col"></th>'+schema.map(f=>'<th scope="col">'+h(m10&&f==='POL'?polRules(session.draft.KU).label:m10?desktopLabels[f]:SolinHuman.label(form,f))+'</th>').join('')+'</tr></thead><tbody>'+shown.map((row,i)=>'<tr'+(!rs.length?' data-ce-placeholder="true"':'')+'><th scope="row" tabindex="0" data-ce-select="'+i+'" data-ce-select-form="'+h(form)+'" aria-label="Запись '+(i+1)+'">'+(i===0?'►':'')+'</th>'+schema.map(f=>'<td>'+input(form,f,row[f],form,i)+'</td>').join('')+'</tr>').join('')+'</tbody></table></div><div class="dt-record-nav"><span>Запись: </span><button type="button" data-ce-record="first" data-ce-table="'+form+'" aria-label="Первая запись">|◀</button><button type="button" data-ce-record="previous" data-ce-table="'+form+'" aria-label="Предыдущая запись">◀</button><span data-ce-count="'+form+'">'+(rs.length?'1 из '+rs.length:'Новая')+'</span><button type="button" data-ce-record="next" data-ce-table="'+form+'" aria-label="Следующая запись">▶</button><button type="button" data-ce-record="last" data-ce-table="'+form+'" aria-label="Последняя запись">▶|</button><button type="button" data-ce-add="'+form+'" aria-label="Добавить запись">▶*</button><button type="button" data-ce-delete="'+form+'" data-ce-index="0" aria-label="Удалить выбранную запись">×</button></div>';
 }
 function footer(){const routes=SOLIN_AUDIT.routes['ВыделВ']||[],buttons=routes.filter(x=>/^\d+$/.test(x.caption)).sort((a,b)=>Number(a.left)-Number(b.left));
