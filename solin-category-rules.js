@@ -33,7 +33,8 @@
   const makerFlag=code(row.PM),form1=code(row.PF1),p31=code(row.P31),pn=code(row.PN);
   return {status:group==null?'partial':'verified-reference',
    code:id,name:String(row.NKU||''),group,maketGroup,forestGroup,
-   makerFlag,form1,p31,pn,
+   makerFlag,form1,p31,pn,fireCategory:code(row.Kpoj),
+   kpol:code(row.KPOL),landscape:code(row.Land),
    hasTreeLayers:group==null?null:group!==0,
    reason:group==null?'Из SKU известна категория, но не загружена исходная группа ярусов P10':
      'Источник: SKU.P10; возможные ярусы уточняются через SIAR/PIAP'};
@@ -91,6 +92,20 @@
    return {status:'warning',rule,message:'Значение POL может не пройти оригинальный контроль (допустимо 0–1 либо 26–100); назначение поля для этой категории не подтверждено.'};
   return {status:'unverified',rule,message:'Требуется проверка назначения POL по оригинальной форме выбранной категории.'};
  }
+ // Original Access expressions select [PjN] for particular Klxr=N.
+ // The numeric Pj value's user-facing meaning is NOT decoded yet, so return
+ // the raw source attribute only. Never automatically set a control from it.
+ function zoneAttribute(ku,klxr,given){
+  const zone=code(klxr),p=profile(ku,given);
+  if(zone==null||p.code==null)return {status:'waiting',source:null};
+  const name='Pj'+zone;
+  const row=(refs(given).SKU||[]).find(x=>code(x.KU)===p.code);
+  if(!row||!Object.prototype.hasOwnProperty.call(row,name))
+   return {status:'unavailable',source:name,reason:'Зональный признак не найден в исходном SKU'};
+  return {status:'source-value',source:'SKU.'+name,value:code(row[name]),
+   baseline:code(row.Kpoj),category:p.code,zone,
+   verifiedMeaning:false,reason:'Исходное выражение Access использует PjN для Klxr=N; назначение числового кода требует подтверждения'};
+ }
  function guide(ku,given){
   const p=profile(ku,given);
   if(p.status==='waiting'||p.status==='unknown'||p.status==='unavailable')return p.reason;
@@ -105,5 +120,5 @@
   return 'Категория '+p.code+' — '+p.name+'. '+layers+'; '+makets+'. '+meaning+
    '. Другие обязательные макеты и поля проверяются по оригинальному SOLI-N.';
  }
- return Object.freeze({profile,field,validatePol,guide});
+ return Object.freeze({profile,field,validatePol,guide,zoneAttribute});
 });
