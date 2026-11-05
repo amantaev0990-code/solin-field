@@ -57,6 +57,14 @@ assert.equal(engine.field(20,'Макет10','POL',full).kind,'not-applicable');
 assert.equal(engine.field(60,'Макет10','POL',full).kind,'not-applicable');
 assert.equal(engine.field(21,'Макет10','POL',full).kind,'unverified','No imagined hayfield POL range');
 assert.equal(engine.field(21,'Макет10','POR',full).kind,'unspecified');
+const zoned={SKU:[{KU:22,NKU:'Пастбище, выгон',P10:2,Kpoj:3,Pj4:2,Pj16:3}]};
+const overridden=engine.zoneAttribute(22,4,zoned);
+assert.equal(overridden.status,'source-value');
+assert.equal(overridden.source,'SKU.Pj4');
+assert.equal(overridden.value,2);
+assert.equal(overridden.baseline,3);
+assert.equal(overridden.verifiedMeaning,false,'Never invent what Pj code means');
+assert.equal(engine.zoneAttribute(22,8,zoned).status,'unavailable');
 for(let v=1;v<=100;v++){
  const result=engine.validatePol(19,v,full);
  assert.equal(result.status,v<26?'warning':'ok','Percentage '+v);
