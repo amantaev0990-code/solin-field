@@ -163,11 +163,20 @@ function newTableRow(form){
  // selected/suggested and preserve existing saved zeros without coercion.
  return Object.fromEntries((D.transfSchema[form]||[]).map(f=>[f,
   keys.includes(f)?session.draft[f]??null:
-  form==='Макет10'?(f==='IAR'?Number(window.SolinDependentRules?.allowedLayers(session.draft,window.SOLIN_REFS?.tables)?.items?.[0]?.value??0)||null:null):
+  form==='Макет10'?(f==='IAR'?Number(window.SolinDependentRules?.allowedLayers(session.draft,window.SOLIN_REFS?.tables)?.items?.[0]?.value??0)||null:
+   f==='ZAP'&&Number(session.draft.KU)===19?0:null):
   numeric.has(f)?0:null]));
 }
-function table(form){const rs=session.draft._children[form]||[],schema=(D.transfSchema[form]||[]).filter(f=>!keys.includes(f)),shown=rs.length?rs:[newTableRow(form)];
- const m10=form==='Макет10';
+function table(form){
+ const m10=form==='Макет10',rs=session.draft._children[form]||[];
+ // Hide obsolete SPS input for all new cards. Original columns stay in MDB.
+ // KU19 has NO stock; if imported legacy ZAP is nonzero keep it visible for audit.
+ const legacyNonzeroStock=m10&&Number(session.draft.KU)===19&&
+  rs.some(row=>row.ZAP!=null&&Number(row.ZAP)!==0);
+ const schema=(D.transfSchema[form]||[]).filter(f=>!keys.includes(f)&&
+  !(m10&&f==='SPS')&&
+  !(m10&&Number(session.draft.KU)===19&&f==='ZAP'&&!legacyNonzeroStock));
+ const shown=rs.length?rs:[newTableRow(form)];
  // Source SKU.P10=0 means no tree strata. Do not delete any historical rows.
  // Hide only the EMPTY Maket10 editor to prevent accidental tree creation.
  const category=window.SolinCategoryRules?.profile(session.draft.KU,window.SOLIN_REFS?.tables);
@@ -569,6 +578,11 @@ function refreshEntryChecks(){
    const result=window.SolinCategoryRules?.validatePol(r.KU,row.POL,window.SOLIN_REFS?.tables);
    if(result?.status==='warning')add('Макет10','POL',result.message,index);
   });
+ if(Number(r.KU)===19)
+  (r._children?.Макет10||[]).forEach((row,index)=>{
+   if(row.ZAP!=null&&Number(row.ZAP)!==0)
+    add('Макет10','ZAP','Для категории 19 запас не указывается. В исходном Transfer ZAP=0; проверьте старую строку.',index);
+  });
  if(touched('Макет10','KOEF'))(r._children?.Макет10||[]).forEach((row,index)=>{
   if(n(row.KOEF)>10)add('Макет10','KOEF','Коэффициент превышает значение 10.',index);
  });
@@ -666,6 +680,10 @@ function validate(){
  });if(failed.length){const field=failed[0].split(':')[0],scope=form==='ВыделВ'?'base':form==='Квартал'?'quarter':form,index=form.startsWith('Макет')?session.draft._children[form].indexOf(row):null;throw {message:'Проверьте поле «'+title(form,field)+'»'+(form.startsWith('Макет')?' в макете '+form.replace('Макет',''):'')+'.',form,scope,field,index};}};
  check('ВыделВ',session.draft,session.original);check('Квартал',session.quarter,session.originalQuarter);
  for(const [index,row]of(session.draft._children.Макет10||[]).entries())if(!session.baselines.has(row)&&(!row.POR||!row.IAR))throw {message:'Укажите породу и ярус в новой строке макета 10.',form:'Макет10',scope:'Макет10',field:row.POR?'IAR':'POR',index};
+ if(Number(session.draft.KU)===19&&(session.isNew||session.changedMakets.has('Макет10')))
+  for(const [index,row] of (session.draft._children.Макет10||[]).entries())
+   if(row.ZAP!=null&&Number(row.ZAP)!==0)
+    throw {message:'Для несомкнувшихся лесных культур (KU 19) запас не проставляется: проверьте Макет 10, ZAP должен быть 0.',form:'Макет10',scope:'Макет10',field:'ZAP',index};
  for(const form of session.changedMakets)for(const row of session.draft._children[form]||[])check(form,row,session.baselines.get(row));
 }
 function cleanup(){if(!session)return;clearTimeout(draftTimer);const s=session;session=null;const modal=document.querySelector('#modal');modal.classList.remove('ce-modal');modal.removeAttribute('role');modal.removeAttribute('aria-modal');modal.removeAttribute('aria-labelledby');
