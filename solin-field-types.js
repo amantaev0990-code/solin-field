@@ -18,14 +18,18 @@ function parse(form,field,value){
  if(kind==='float'){const single=Math.fround(number);if(!Number.isFinite(single)||number!==0&&single===0)throw Error('Число вне диапазона Single: '+field);return single;}
  return number;
 }
+const initialValues=new WeakMap();
+function bind(el,value){initialValues.set(el,{raw:el.dataset?.solinInitial,value});}
 function read(el,previous,form,field){
  const raw=el.value??'';
+ if(!initialValues.has(el))bind(el,previous);
+ const initial=initialValues.get(el);
  // Keep the original scalar when its displayed representation was untouched.
  // This preserves NULL/empty string, text padding and full Double precision.
- if(el.dataset?.solinInitial===raw&&previous!==undefined)return previous;
+ if(initial.raw===raw&&initial.value!==undefined)return initial.value;
  if(type(form,field))return parse(form,field,raw);
  return undefined; // Let the existing editor handle fields without a schema.
 }
-window.SolinFieldTypes={type,numeric,parse,read,tables,sourceSha256:'4fb9076b63a17c7b94c3ec2c5f6313ba3325566224a4b284a7f18f61c7fb24df'};
+window.SolinFieldTypes={type,numeric,parse,bind,read,tables,sourceSha256:'4fb9076b63a17c7b94c3ec2c5f6313ba3325566224a4b284a7f18f61c7fb24df'};
 })();
 

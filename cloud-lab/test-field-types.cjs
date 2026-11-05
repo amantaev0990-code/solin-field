@@ -11,4 +11,11 @@ const untouched=(v,old,f='Ediz')=>T.read({value:v,dataset:{solinInitial:v}},old,
 assert.equal(untouched('0,123457',.123456789012345),.123456789012345);assert.equal(untouched('',null),null);assert.equal(untouched('','', 'H16'),'');assert.equal(untouched('КТ  ','КТ  ','H16'),'КТ  ');
 assert.equal(T.read({value:'0,2',dataset:{solinInitial:'0,1'}},.1,'Макет16','Ediz'),.2);
 assert.equal(T.parse('Макет16','Ediz','0'),0);assert.equal(T.parse('Макет16','Ediz',''),null);
+for(const original of [null,'',.123456789012345]){
+ const shown=original==null?'':String(original).slice(0,8),el={value:shown,dataset:{solinInitial:shown}};
+ T.bind(el,original);el.value='3120';const changed=T.read(el,original,'Макет16','Ediz');assert.equal(changed,3120);
+ el.value=shown;assert.equal(T.read(el,changed,'Макет16','Ediz'),original,'Returning to the initial display restores its scalar, never the last edited number');
+}
+const calculated={value:'0,123457',dataset:{solinInitial:'0,123457'}};T.bind(calculated,.123456789012345);
+calculated.value='1';assert.equal(T.read(calculated,1,'Макет16','Ediz'),1);calculated.value='0,123457';assert.equal(T.read(calculated,1,'Макет16','Ediz'),.123456789012345);
 console.log('FIELD_TYPES_OK: 29-table source schema; text codes, NULL/empty, integer/range validation and untouched Double precision');

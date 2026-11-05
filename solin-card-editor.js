@@ -109,6 +109,7 @@ function input(form,field,value,scope,index){
  const shown=isNumeric(form,field)&&typeof value==='number'?value.toLocaleString('ru-RU',{useGrouping:false,maximumFractionDigits:6}):value;
  fragment.innerHTML=SolinHuman.input(field,shown??'',id,form);
  const label=fragment.firstElementChild,el=label.querySelector('input,select');
+ window.SolinFieldTypes?.bind(el,value);
  const caption=SolinHuman.isTechnical(form,field)?D.fieldLabels?.[field]||field:title(form,field);
  label.className='ce-field';label.querySelector('span').textContent=caption;
  el.id=id;el.dataset.ceField=field;el.dataset.ceScope=scope;el.dataset.ceForm=form;
