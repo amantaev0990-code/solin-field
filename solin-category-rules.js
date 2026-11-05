@@ -43,6 +43,10 @@
  // The other 122 categories must NOT inherit a guessed "survival" semantics.
  function field(ku,form,name,given){
   const p=profile(ku,given);
+  if(form==='Макет10'&&name==='ZAP'&&p.code===19)
+   return {kind:'not-applicable',status:'confirmed',
+    label:'Запас — не заполняется для KU 19',valueForNewRecord:0,profile:p,
+    evidence:'Руководство SOLI-N, Макет 10: для несомкнувшихся лесных культур запас не проставляется; исходные Transfer KU19 ZAP=0'};
   if(form!=='Макет10'||name!=='POL')return {kind:'unspecified',status:'unverified',label:name,profile:p};
   if(p.code===19)return {kind:'survival',status:'confirmed',
    label:'Приживаемость, %',min:1,max:100,step:1,
