@@ -103,12 +103,28 @@ if(typeof document!=='undefined'){
 const title=(form,f)=>aliases[f]||SolinHuman.label(form,f);
 const DESKTOP_WIDTH=1200,DESKTOP_HEIGHT=704;
 const desktopLabels={IAR:'Ярус',KOEF:'Коэфф.',POR:'Порода',LET:'А, лет',PH:'Н, м',PD2:'Д, см',KT:'Класс',PROI:'Происхождение',POL:'Полнота',SPS:'Сумма',ZAP:'Запас'};
+// POL is a shared MDB column with category-dependent meaning. Never convert
+// historical values between relative fullness and survival percentage.
+const categoryPolRules={
+  19:{label:'Приживаемость, %',survival:true,min:1,max:100,step:1}
+};
+function polRules(category){
+ return categoryPolRules[Number(category)]||{label:'Полнота',survival:false,min:0.1,max:1,step:0.1};
+}
 function input(form,field,value,scope,index){
  const id='ce_'+scope+'_'+(index??'base')+'_'+field,fragment=document.createElement('div');
  const shown=numeric.has(field)&&typeof value==='number'?value.toLocaleString('ru-RU',{useGrouping:false,maximumFractionDigits:6}):value;
  fragment.innerHTML=SolinHuman.input(field,shown??'',id,form);
- const label=fragment.firstElementChild,el=label.querySelector('input,select');
- const caption=SolinHuman.isTechnical(form,field)?D.fieldLabels?.[field]||field:title(form,field);
+ const label=fragment.firstElementChild;
+ let el=label.querySelector('input,select');
+ if(form==='Макет10'&&field==='POL'&&polRules(session?.draft?.KU).survival&&el.tagName==='SELECT'){
+  // The 0.1–1.0 fullness picker cannot represent a 1–100 survival value.
+  const numericInput=document.createElement('input');
+  numericInput.type='number';numericInput.value=shown??'';
+  el.replaceWith(numericInput);el=numericInput;
+ }
+ const caption=form==='Макет10'&&field==='POL'?polRules(session?.draft?.KU).label:
+  (SolinHuman.isTechnical(form,field)?D.fieldLabels?.[field]||field:title(form,field));
  label.className='ce-field';label.querySelector('span').textContent=caption;
  el.id=id;el.dataset.ceField=field;el.dataset.ceScope=scope;el.dataset.ceForm=form;
  el.setAttribute('aria-label',caption);el.removeAttribute('data-wffield');
@@ -123,6 +139,9 @@ function input(form,field,value,scope,index){
       : '—';
  }
  else{el.placeholder=numeric.has(field)?'0':'';if(numeric.has(field))el.inputMode='decimal';}
+ if(form==='Макет10'&&field==='POL'&&polRules(session?.draft?.KU).survival&&el.tagName==='INPUT'){
+  el.type='number';el.min='1';el.max='100';el.step='1';el.inputMode='numeric';el.placeholder='1–100';
+ }
  return label.outerHTML;
 }
 function fields(form,names,values,scope){return names.map(f=>cell(f,values[f],scope,form,{label:SolinHuman.isTechnical(form,f)?D.fieldLabels?.[f]||f:title(form,f),split:!!SolinHuman.lookup(form,f)})).join('');}
@@ -143,7 +162,7 @@ function newTableRow(form){
 }
 function table(form){const rs=session.draft._children[form]||[],schema=(D.transfSchema[form]||[]).filter(f=>!keys.includes(f)),shown=rs.length?rs:[newTableRow(form)];
  const m10=form==='Макет10';
- return '<div class="ce-table-wrap" tabindex="0" aria-label="Таблица '+h(form)+'"><table class="ce-table"><caption class="ce-sr-only">'+h(form)+' — '+h(SolinHuman.formName(form))+'</caption><colgroup><col style="width:24px">'+schema.map(f=>'<col'+(m10?' style="width:'+({IAR:145,KOEF:85,POR:190,LET:55,PH:55,PD2:55,KT:70,PROI:160,POL:80,SPS:75,ZAP:110}[f]||90)+'px"':'')+'>').join('')+'</colgroup><thead><tr><th scope="col"></th>'+schema.map(f=>'<th scope="col">'+h(m10?desktopLabels[f]:SolinHuman.label(form,f))+'</th>').join('')+'</tr></thead><tbody>'+shown.map((row,i)=>'<tr'+(!rs.length?' data-ce-placeholder="true"':'')+'><th scope="row" tabindex="0" data-ce-select="'+i+'" data-ce-select-form="'+h(form)+'" aria-label="Запись '+(i+1)+'">'+(i===0?'►':'')+'</th>'+schema.map(f=>'<td>'+input(form,f,row[f],form,i)+'</td>').join('')+'</tr>').join('')+'</tbody></table></div><div class="dt-record-nav"><span>Запись: </span><button type="button" data-ce-record="first" data-ce-table="'+form+'" aria-label="Первая запись">|◀</button><button type="button" data-ce-record="previous" data-ce-table="'+form+'" aria-label="Предыдущая запись">◀</button><span data-ce-count="'+form+'">'+(rs.length?'1 из '+rs.length:'Новая')+'</span><button type="button" data-ce-record="next" data-ce-table="'+form+'" aria-label="Следующая запись">▶</button><button type="button" data-ce-record="last" data-ce-table="'+form+'" aria-label="Последняя запись">▶|</button><button type="button" data-ce-add="'+form+'" aria-label="Добавить запись">▶*</button><button type="button" data-ce-delete="'+form+'" data-ce-index="0" aria-label="Удалить выбранную запись">×</button></div>';
+ return '<div class="ce-table-wrap" tabindex="0" aria-label="Таблица '+h(form)+'"><table class="ce-table"><caption class="ce-sr-only">'+h(form)+' — '+h(SolinHuman.formName(form))+'</caption><colgroup><col style="width:24px">'+schema.map(f=>'<col'+(m10?' style="width:'+({IAR:145,KOEF:85,POR:190,LET:55,PH:55,PD2:55,KT:70,PROI:160,POL:80,SPS:75,ZAP:110}[f]||90)+'px"':'')+'>').join('')+'</colgroup><thead><tr><th scope="col"></th>'+schema.map(f=>'<th scope="col">'+h(m10&&f==='POL'?polRules(session.draft.KU).label:m10?desktopLabels[f]:SolinHuman.label(form,f))+'</th>').join('')+'</tr></thead><tbody>'+shown.map((row,i)=>'<tr'+(!rs.length?' data-ce-placeholder="true"':'')+'><th scope="row" tabindex="0" data-ce-select="'+i+'" data-ce-select-form="'+h(form)+'" aria-label="Запись '+(i+1)+'">'+(i===0?'►':'')+'</th>'+schema.map(f=>'<td>'+input(form,f,row[f],form,i)+'</td>').join('')+'</tr>').join('')+'</tbody></table></div><div class="dt-record-nav"><span>Запись: </span><button type="button" data-ce-record="first" data-ce-table="'+form+'" aria-label="Первая запись">|◀</button><button type="button" data-ce-record="previous" data-ce-table="'+form+'" aria-label="Предыдущая запись">◀</button><span data-ce-count="'+form+'">'+(rs.length?'1 из '+rs.length:'Новая')+'</span><button type="button" data-ce-record="next" data-ce-table="'+form+'" aria-label="Следующая запись">▶</button><button type="button" data-ce-record="last" data-ce-table="'+form+'" aria-label="Последняя запись">▶|</button><button type="button" data-ce-add="'+form+'" aria-label="Добавить запись">▶*</button><button type="button" data-ce-delete="'+form+'" data-ce-index="0" aria-label="Удалить выбранную запись">×</button></div>';
 }
 function footer(){const routes=SOLIN_AUDIT.routes['ВыделВ']||[],buttons=routes.filter(x=>/^\d+$/.test(x.caption)).sort((a,b)=>Number(a.left)-Number(b.left));
  return '<footer class="dt-footer"><span class="dt-footer-label">Макет</span>'+buttons.map(b=>'<button type="button" data-ce-extra="Макет'+h(b.caption)+'" style="left:'+(Number(b.left)*.08)+'px;width:'+(Number(b.width)*.08)+'px" title="'+h(SolinHuman.formName('Макет'+b.caption))+'" aria-label="Макет '+b.caption+' — '+h(SolinHuman.formName('Макет'+b.caption))+'">'+b.caption+'</button>').join('')+'<select class="dt-maket-select" aria-label="Дополнительные макеты"><option value=""></option>'+[10,...extras,31,32].map(n=>'<option value="'+n+'">Макет '+n+' — '+h(SolinHuman.formName('Макет'+n))+'</option>').join('')+'</select><button type="button" class="dt-kt" data-ce-preview>КТ</button><button type="button" class="dt-print" data-ce-print>Печать</button><button type="button" class="dt-control" data-ce-controls="6">Конт. рубок</button><button type="button" class="dt-new" data-ce-new>Новая</button><button type="submit" class="dt-exit" id="ce-exit">Выход</button></footer>';
@@ -173,7 +192,19 @@ function readValue(el,old){const raw=el.__solinQuarterPicker?el.__solinQuarterPi
  if(raw==='')return null;
  if(['Fzona','Raion'].includes(field)&&!/^\d+$/.test(raw))throw Error('Укажите числовой код для '+field);
  if(['Fzona','Raion'].includes(field))return Number(raw);
- if(numeric.has(field)){const n=Number(raw.trim().replace(',','.'));if(!Number.isFinite(n))throw Error('Проверьте число: '+el.getAttribute('aria-label'));return n;}
+ if(numeric.has(field)){
+  const n=Number(raw.trim().replace(',','.'));
+  if(!Number.isFinite(n))throw Error('Проверьте число: '+el.getAttribute('aria-label'));
+  if(field==='POL'){
+   const category=polRules(session?.draft?.KU);
+   if(category.survival){
+    if(!Number.isInteger(n)||n<1||n>100)throw Error('Приживаемость: целое число от 1 до 100 %.');
+   }else if(n<0.1||n>1){
+    throw Error('Полнота: значение от 0,1 до 1,0.');
+   }
+  }
+  return n;
+ }
  if(old!=null&&raw===String(old))return old;
  // Access TEXT keys (STL.KTL in particular) may have significant whitespace.
  // Never trim a selected original reference code.
@@ -465,7 +496,9 @@ function capture(el){if(!el.matches('[data-ce-field]'))return;
  try{target[field]=readValue(el,target[field]);
   if(field==='PLV'&&!(Number(target[field])>0))throw Error('Не задана площадь выдела. Введите значение больше нуля.');
   if(scope==='Макет10'&&field==='POL'&&(solinCore.validateRow('Макет10',target,session.draft)||[]).some(x=>x.startsWith('POL:')))
-   throw Error('Полнота или процент приживаемости не входит в диапазон значений. Пустое значение недопустимо — введите ноль (0).');
+   throw Error(polRules(session.draft.KU).survival?
+    'Приживаемость ниже 26 % не соответствует правилам контроля категории 19. Проверьте категорию угодий.':
+    'Полнота должна быть от 0,1 до 1,0.');
   el.removeAttribute('aria-invalid');el.setCustomValidity('');}
  catch(e){el.setAttribute('aria-invalid','true');el.setCustomValidity(e.message);}
  if(!document.querySelector('#ce-form [aria-invalid="true"]'))document.querySelector('#ce-error').textContent='';
@@ -485,7 +518,9 @@ function capture(el){if(!el.matches('[data-ce-field]'))return;
  }
  const output=document.querySelector('[data-ce-display-for="'+el.id+'"]');if(output)output.textContent=description(el.dataset.ceForm,field,target[field]);
  session.dirty=true;scheduleDraft();document.querySelector('#ce-status').textContent='Изменено';
- refreshLinked();
+ if(scope==='base'&&field==='KU'&&document.getElementById('ce-table-Макет10'))
+  rerenderTable('Макет10');
+ else refreshLinked();
 }
 // Observed Access OnExit messages: informative cross-field checks, not Save rules.
 // Never change a value or run the desktop cleanup from this panel.
