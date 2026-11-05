@@ -336,6 +336,8 @@ public class SolinMdbPlugin extends Plugin {
     }
     for(int i=0;i<vrows.length();i++){
       JSONObject row=vrows.getJSONObject(i);
+      if(row.optInt("POS",-1)!=pos || row.optInt("LESN",-1)!=lesn)
+        throw new IllegalArgumentException("Строка другого лесничества: Выдел");
       String quarterKey=key(row.opt("POS"),row.opt("LESN"),row.opt("KV"),row.opt("KGLF"));
       if(!quarterCategories.contains(quarterKey))
         throw new IllegalArgumentException("Выдел "+row.optString("VD","?")+
