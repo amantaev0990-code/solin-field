@@ -41,7 +41,12 @@
         address.KV = Number(kv);
         if (address.POS != identity.POS || address.LESN != identity.LESN) throw new Error('В квартале ' + kv + ' обнаружен адрес другого лесничества.');
         if (!Number.isFinite(Number(r.PLV)) || Number(r.PLV) <= 0) throw new Error('У выдела ' + kv + '/' + r.VD + ' некорректная площадь.');
-        tables['Выдел'].push(make('Выдел', { ...r, ...address }));
+        const fullStand = { ...r, ...address };
+        // The legacy desktop quarter queries join on Fzona as well as the
+        // quarter/category address. Inherit only from a single matching source row.
+        const inheritance = window.SolinAddressContext?.inheritedStand?.(fullStand, quarter, owner);
+        if (inheritance?.values) Object.assign(fullStand, inheritance.values);
+        tables['Выдел'].push(make('Выдел', fullStand));
         for (const [name, children] of Object.entries(r._children || {})) {
           if (!Array.isArray(schema[name])) throw new Error('Нет схемы для «' + name + '». Экспорт остановлен, чтобы не потерять данные.');
           if (!Array.isArray(children)) throw new Error('Некорректный раздел карточки «' + name + '».');
