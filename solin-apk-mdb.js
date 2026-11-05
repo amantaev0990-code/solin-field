@@ -99,9 +99,10 @@
          !Number.isSafeInteger(result?.bytes) || result.bytes < 2048)
         throw Error('Android не подтвердил размер и целостность MDB. Не используйте полученный файл.');
       const size = (result.bytes / 1024).toFixed(1);
+      const expectedName = 'Transf_'+transfer.identity.POS+'_'+transfer.identity.LESN+'_'+transfer.identity.GodT+'.mdb';
+      const actualName = result.name || expectedName;
       modal('Экспорт завершён',
-        '<p>Файл <b>Transf_'+esc(transfer.identity.POS)+'_'+esc(transfer.identity.LESN)+'_'+
-        esc(transfer.identity.GodT)+'.mdb</b> сохранён в '+esc(result.folder||'выбранной папке')+'.</p>'+
+        '<p>Файл <b>'+esc(actualName)+'</b> сохранён в '+esc(result.folder||'выбранной папке')+'.</p>'+
         '<p><b>Размер: '+size+' КБ.</b> Файл повторно считан и проверен.</p>'+
         '<p>Перед использованием в работе откройте его на настольном SOLI-N в тестовой базе.</p>'+
         '<button type="button" onclick="closeModal()">Готово</button>');
