@@ -323,11 +323,26 @@ public class SolinMdbPlugin extends Plugin {
       throw new IllegalArgumentException("Экспорт должен содержать одно лесничество.");
     Set<String> quarters = new HashSet<>(), stands = new HashSet<>(), standsWithKglf = new HashSet<>();
     JSONArray qrows = records.getJSONArray("Квартал"), vrows = records.getJSONArray("Выдел");
-    for(int i=0;i<qrows.length();i++){ JSONObject row=qrows.getJSONObject(i);
-      quarters.add(key(row.opt("POS"),row.opt("LESN"),row.opt("KV"))); }
-    for(int i=0;i<vrows.length();i++){ JSONObject row=vrows.getJSONObject(i);
+    Set<String> quarterCategories=new HashSet<>();
+    for(int i=0;i<qrows.length();i++){
+      JSONObject row=qrows.getJSONObject(i);
+      if(row.isNull("KV") || row.optInt("KV",0)<=0 ||
+         row.isNull("KGLF") || row.optInt("KGLF",0)<=0 ||
+         row.isNull("GodT") || row.optInt("GodT",0)<1900)
+        throw new IllegalArgumentException("Квартал "+row.optString("KV","?")+
+          ": отсутствуют номер, категория ГЛФ или год таксации.");
+      quarters.add(key(row.opt("POS"),row.opt("LESN"),row.opt("KV")));
+      quarterCategories.add(key(row.opt("POS"),row.opt("LESN"),row.opt("KV"),row.opt("KGLF")));
+    }
+    for(int i=0;i<vrows.length();i++){
+      JSONObject row=vrows.getJSONObject(i);
+      String quarterKey=key(row.opt("POS"),row.opt("LESN"),row.opt("KV"),row.opt("KGLF"));
+      if(!quarterCategories.contains(quarterKey))
+        throw new IllegalArgumentException("Выдел "+row.optString("VD","?")+
+          " не связан с кварталом той же категории ГЛФ.");
       stands.add(key(row.opt("POS"),row.opt("LESN"),row.opt("KV"),row.opt("VD")));
-      standsWithKglf.add(key(row.opt("POS"),row.opt("LESN"),row.opt("KV"),row.opt("KGLF"),row.opt("VD"))); }
+      standsWithKglf.add(key(row.opt("POS"),row.opt("LESN"),row.opt("KV"),row.opt("KGLF"),row.opt("VD")));
+    }
 
     try (Database db=DatabaseBuilder.open(output)) {
       // Preflight: reject mismatched owner, missing columns and unrepresentable values
