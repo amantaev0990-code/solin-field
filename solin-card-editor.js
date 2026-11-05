@@ -105,11 +105,10 @@ const DESKTOP_WIDTH=1200,DESKTOP_HEIGHT=704;
 const desktopLabels={IAR:'Ярус',KOEF:'Коэфф.',POR:'Порода',LET:'А, лет',PH:'Н, м',PD2:'Д, см',KT:'Класс',PROI:'Происхождение',POL:'Полнота',SPS:'Сумма',ZAP:'Запас'};
 // POL is a shared MDB column with category-dependent meaning. Never convert
 // historical values between relative fullness and survival percentage.
-const categoryPolRules={
-  19:{label:'Приживаемость, %',survival:true,min:1,max:100,step:1}
-};
 function polRules(category){
- return categoryPolRules[Number(category)]||{label:'Полнота',survival:false,min:0.1,max:1,step:0.1};
+ const rule=window.SolinCategoryRules?.field(category,'Макет10','POL',window.SOLIN_REFS?.tables);
+ return rule?{...rule,survival:rule.kind==='survival'}:
+  {kind:'unverified',label:'POL — значение уточняется',survival:false};
 }
 function input(form,field,value,scope,index){
  const id='ce_'+scope+'_'+(index??'base')+'_'+field,fragment=document.createElement('div');
@@ -117,7 +116,7 @@ function input(form,field,value,scope,index){
  fragment.innerHTML=SolinHuman.input(field,shown??'',id,form);
  const label=fragment.firstElementChild;
  let el=label.querySelector('input,select');
- if(form==='Макет10'&&field==='POL'&&polRules(session?.draft?.KU).survival&&el.tagName==='SELECT'){
+ if(form==='Макет10'&&field==='POL'&&polRules(session?.draft?.KU).kind!=='fullness'&&el.tagName==='SELECT'){
   // The 0.1–1.0 fullness picker cannot represent a 1–100 survival value.
   const numericInput=document.createElement('input');
   numericInput.type='number';numericInput.value=value==null?'':String(value);
@@ -139,8 +138,15 @@ function input(form,field,value,scope,index){
       : '—';
  }
  else{el.placeholder=numeric.has(field)?'0':'';if(numeric.has(field))el.inputMode='decimal';}
- if(form==='Макет10'&&field==='POL'&&polRules(session?.draft?.KU).survival&&el.tagName==='INPUT'){
-  el.type='number';el.value=value==null?'':String(value);el.min='1';el.max='100';el.step='1';el.inputMode='numeric';el.placeholder='1–100';
+ if(form==='Макет10'&&field==='POL'&&el.tagName==='INPUT'){
+  const rule=polRules(session?.draft?.KU);
+  if(rule.kind!=='fullness'){
+   el.type='number';el.value=value==null?'':String(value);
+   el.min=rule.kind==='survival'?'1':'0';el.max='100';
+   el.step=rule.kind==='survival'?'1':'any';
+   el.inputMode=rule.kind==='survival'?'numeric':'decimal';
+   el.placeholder=rule.kind==='survival'?'1–100 %':'Исходное значение POL';
+  }
  }
  return label.outerHTML;
 }
@@ -227,11 +233,11 @@ function refreshLinked(){
  const guide=document.getElementById('ce-category-guidance');
  if(guide){
   const info=window.SolinDependentRules.allowedLayers(session.draft,window.SOLIN_REFS?.tables);
-  guide.textContent=info.status==='complete'?
-   'Категория «'+(info.categoryName||session.draft.KU)+'»: '+(info.items.length?
-    'допустимые ярусы — '+info.items.map(x=>x.value+' '+x.label).join('; '):
-    'для этой категории ярусы древостоя не предусмотрены'):
-   (info.reason||'Не удалось определить допустимые ярусы');
+  const categoryGuide=window.SolinCategoryRules?.guide(session.draft.KU,window.SOLIN_REFS?.tables)||'';
+  const layerGuide=info.status==='complete'&&info.items.length?
+   ' Допустимые ярусы: '+info.items.map(x=>x.value+' '+x.label).join('; ')+'.':
+   info.reason?' '+info.reason:'';
+  guide.textContent=categoryGuide+layerGuide;
   guide.dataset.ceCategoryStatus=info.status;
  }
 
@@ -495,10 +501,10 @@ function capture(el){if(!el.matches('[data-ce-field]'))return;
  const previous=target[field];
  try{target[field]=readValue(el,target[field]);
   if(field==='PLV'&&!(Number(target[field])>0))throw Error('Не задана площадь выдела. Введите значение больше нуля.');
-  if(scope==='Макет10'&&field==='POL'&&(solinCore.validateRow('Макет10',target,session.draft)||[]).some(x=>x.startsWith('POL:')))
-   throw Error(polRules(session.draft.KU).survival?
-    'Приживаемость ниже 26 % не соответствует правилам контроля категории 19. Проверьте категорию угодий.':
-    'Полнота должна быть от 0,1 до 1,0.');
+  if(scope==='Макет10'&&field==='POL'){
+   const check=window.SolinCategoryRules?.validatePol(session.draft.KU,target[field],window.SOLIN_REFS?.tables);
+   if(check?.status==='error')throw Error(check.message);
+  }
   el.removeAttribute('aria-invalid');el.setCustomValidity('');}
  catch(e){el.setAttribute('aria-invalid','true');el.setCustomValidity(e.message);}
  if(!document.querySelector('#ce-form [aria-invalid="true"]'))document.querySelector('#ce-error').textContent='';
@@ -540,6 +546,11 @@ function refreshEntryChecks(){
  // Only the missing-quantity branch was exercised; do not infer an age limit.
  if(touched('base','PRkol','PRA')&&n(r.PRA)>0&&n(r.PRkol)===0)
   add('base','PRkol','Не задано количество подроста при заданном возрасте.');
+ if(touched('Макет10','POL')||touched('base','KU'))
+  (r._children?.Макет10||[]).forEach((row,index)=>{
+   const result=window.SolinCategoryRules?.validatePol(r.KU,row.POL,window.SOLIN_REFS?.tables);
+   if(result?.status==='warning')add('Макет10','POL',result.message,index);
+  });
  if(touched('Макет10','KOEF'))(r._children?.Макет10||[]).forEach((row,index)=>{
   if(n(row.KOEF)>10)add('Макет10','KOEF','Коэффициент превышает значение 10.',index);
  });
@@ -627,7 +638,14 @@ function validate(){
  if(!(Number(session.draft.PLV)>0))throw {message:'Площадь выдела должна быть больше нуля.',el:document.querySelector('[data-ce-field="PLV"]')};
  if(session.isNew){if(!Number.isInteger(Number(session.draft.VD))||Number(session.draft.VD)<1)throw {message:'Номер выдела должен быть положительным целым.',el:document.querySelector('[data-ce-field="VD"]')};if(D.quarters[session.draft.KV].compartments.some(r=>keys.every(k=>same(r[k],session.draft[k]))))throw {message:'Выдел с таким номером и категорией ГЛФ уже есть.',el:document.querySelector('[data-ce-field="VD"]')};if(session.draft.KU==null||Number(session.draft.KU)===0)throw {message:'Выберите категорию угодий.',el:document.querySelector('[data-ce-field="KU"]')};}
  const year=session.quarter.GodT;if(year!=null&&(!Number.isInteger(Number(year))||Number(year)<1900||Number(year)>2200))throw {message:'Укажите год таксации от 1900 до 2200.',el:document.querySelector('[data-ce-field="GodT"]')};
- const check=(form,row,before)=>{const failed=(solinCore.validateRow(form,row,session.draft)||[]).filter(m=>{const f=m.split(':')[0];return !before||!same(row[f],before[f]);});if(failed.length){const field=failed[0].split(':')[0],scope=form==='ВыделВ'?'base':form==='Квартал'?'quarter':form,index=form.startsWith('Макет')?session.draft._children[form].indexOf(row):null;throw {message:'Проверьте поле «'+title(form,field)+'»'+(form.startsWith('Макет')?' в макете '+form.replace('Макет',''):'')+'.',form,scope,field,index};}};
+ const check=(form,row,before)=>{const failed=(solinCore.validateRow(form,row,session.draft)||[]).filter(m=>{
+  const f=m.split(':')[0];
+  if(form==='Макет10'&&f==='POL'){
+   const policy=window.SolinCategoryRules?.validatePol(session.draft.KU,row.POL,window.SOLIN_REFS?.tables);
+   if(policy&&policy.status!=='error')return false; // warnings remain visible; no auto-rewrite
+  }
+  return !before||!same(row[f],before[f]);
+ });if(failed.length){const field=failed[0].split(':')[0],scope=form==='ВыделВ'?'base':form==='Квартал'?'quarter':form,index=form.startsWith('Макет')?session.draft._children[form].indexOf(row):null;throw {message:'Проверьте поле «'+title(form,field)+'»'+(form.startsWith('Макет')?' в макете '+form.replace('Макет',''):'')+'.',form,scope,field,index};}};
  check('ВыделВ',session.draft,session.original);check('Квартал',session.quarter,session.originalQuarter);
  for(const [index,row]of(session.draft._children.Макет10||[]).entries())if(!session.baselines.has(row)&&(!row.POR||!row.IAR))throw {message:'Укажите породу и ярус в новой строке макета 10.',form:'Макет10',scope:'Макет10',field:row.POR?'IAR':'POR',index};
  for(const form of session.changedMakets)for(const row of session.draft._children[form]||[])check(form,row,session.baselines.get(row));
@@ -741,6 +759,10 @@ function open(record,options={}){if(!record)return;
  form.addEventListener('change',e=>{
   if(e.target.matches('.dt-maket-select')){const n=e.target.value;e.target.value='';if(n==='10'||n==='31'||n==='32')showMain(n);else if(n)showExtra('Макет'+n);return;}
   capture(e.target);
+  if(e.target.dataset.ceScope==='base'&&e.target.dataset.ceField==='KU'){
+   // Only the DOM is rebuilt; raw draft records and original MDB values persist.
+   rerenderTable('Макет10');
+  }
   if(e.target.dataset.ceScope?.startsWith('Макет'))session.changedMakets.add(e.target.dataset.ceScope);
   recalculateEditedField(e.target);
   if(e.target.matches('[data-ce-field]'))(session.entryTouched??=new Set()).add(e.target.dataset.ceScope+':'+e.target.dataset.ceField);
