@@ -73,7 +73,7 @@ public class SolinMdbInstrumentedTest {
   private static JSONObject transfer(File template,boolean crossOwner) throws Exception {
     JSONObject schema=new JSONObject(),tables=new JSONObject();
     try(Database db=DatabaseBuilder.open(template)){
-      for(String name:new String[]{"Лесничество","Квартал","Выдел","Макет10"}){
+      for(String name:new String[]{"Лесничество","Квартал","Выдел","Макет10","Макет16"}){
         assertNotNull("Missing template table: "+name,db.getTable(name));
         schema.put(name,schema(db,name));
       }
@@ -88,6 +88,11 @@ public class SolinMdbInstrumentedTest {
     tables.put("Макет10",new JSONArray().put(
       address(OWNER,FOREST,1,24)
         .put("VD","001").put("IAR",1).put("POR","В").put("ZAP",40)));
+    tables.put("Макет16",new JSONArray().put(
+      address(OWNER,FOREST,1,24).put("VD","001").put("Por16","К")
+        .put("Koef16",1).put("Voz16",202).put("H16","КЕР  ")
+        .put("Ediz",0.30000001192092896).put("Ur16",123.1234567890123)
+        .put("Neds",1).put("Sbor",1)));
     return new JSONObject().put("schema",schema).put("tables",tables);
   }
 
@@ -115,6 +120,7 @@ public class SolinMdbInstrumentedTest {
         assertEquals(1,db.getTable("Квартал").getRowCount());
         assertEquals(1,db.getTable("Выдел").getRowCount());
         assertEquals(1,db.getTable("Макет10").getRowCount());
+        assertEquals(1,db.getTable("Макет16").getRowCount());
         Row stand=db.getTable("Выдел").iterator().next();
         assertEquals(OWNER,((Number)stand.get("POS")).intValue());
         assertEquals(FOREST,((Number)stand.get("LESN")).intValue());
@@ -124,7 +130,21 @@ public class SolinMdbInstrumentedTest {
         Row tree=db.getTable("Макет10").iterator().next();
         assertEquals("В",tree.get("POR"));
         assertEquals(40,((Number)tree.get("ZAP")).intValue());
+        Row material=db.getTable("Макет16").iterator().next();
+        assertEquals("001",material.get("VD"));assertEquals("КЕР  ",material.get("H16"));
+        assertEquals(0.30000001192092896,((Number)material.get("Ediz")).doubleValue(),0.0);
+        assertEquals(123.1234567890123,((Number)material.get("Ur16")).doubleValue(),0.0);
       }
+      JSONObject zeroAndNull=transfer(copy,false);
+      JSONObject row=zeroAndNull.getJSONObject("tables").getJSONArray("Макет16").getJSONObject(0);
+      row.put("H16",JSONObject.NULL).put("Ediz",0).put("Ur16",JSONObject.NULL);
+      writeWithRealPlugin(zeroAndNull,copy);
+      try(Database db=DatabaseBuilder.open(copy)){
+        Row material=db.getTable("Макет16").iterator().next();
+        assertNull(material.get("H16"));assertNull(material.get("Ur16"));
+        assertEquals(0.0,((Number)material.get("Ediz")).doubleValue(),0.0);
+      }
+      assertArrayEquals(untouched,Files.readAllBytes(original.toPath()));
     }finally{original.delete();copy.delete();}
   }
 
