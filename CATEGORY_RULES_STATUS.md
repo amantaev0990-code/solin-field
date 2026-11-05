@@ -9,6 +9,11 @@ unrelated forestry systems.
 - **123 SKU category codes and names:** original compact `refs/SKU.json`.
   Every code is recognized by `SolinCategoryRules.profile()`; category
   recognition **is not** proof that all 123 individual forms have been decoded.
+  A read-only extraction of the original 124-row SKU includes one service
+  record KU=0 and **123 active categories**. Of these, **99 have P10=0**
+  and **24 have a nonzero group**. The original 38-field SKU remains private:
+  do not publish the original database or entire proprietary catalogue in
+  this public GitHub repository.
 - **Category-dependent stratum group:** the original `SKU.P10` column,
   when included in the full runtime `SOLIN_REFS.tables.SKU`. Valid `IAR`
   choices are independently filtered through `SIAR.Ia` and, where
@@ -22,6 +27,17 @@ unrelated forestry systems.
   verified. Do not treat `GrMak` as a list of макеты or assume
   `P31` means Макет 31. The original KU RowSource has physical column
   order `KU,NKU,KLF,PN,P31,P10,PM,GrMak,PF1`.
+- **KU 19 / no stock:** the original manual states that stock is not
+  entered for unclosed forest cultures. All six KU19 rows in the preserved
+  Transfer sample have `ZAP=0`. New rows default to numeric zero without
+  showing a stock entry. Legacy imported nonzero ZAP remains visible for
+  correction instead of being silently overwritten. The obsolete `SPS`
+  field is hidden only from the editor and stays in the MDB schema.
+- **Original zone attributes:** the source SKU contains `PjN` values and
+  the original expression uses `PjN` for forestry zone `Klxr=N`.
+  In the recovered sample 14 categories have zone-specific differences.
+  `zoneAttribute()` exposes the raw source code, but never asserts its
+  unverified forestry meaning or auto-writes other fields.
 - **KU 19 (несомкнувшиеся лесные культуры):** Макет 10 `POL`
   represents survival percentage in the field editor, integer `1..100`,
   not fractional density `0.1..1.0`. The audited original Access rule
