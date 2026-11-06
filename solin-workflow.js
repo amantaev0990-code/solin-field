@@ -161,7 +161,10 @@ function editComposition(){
  const ref=window.SOLIN_REFS?.tables,rules=window.SolinDependentRules;
  const forestSelect=root.querySelector('#wfQuickForestType');
  const forestHint=root.querySelector('#wfQuickForestHint');
- forestSelect.value=String(r.M3TLU??'');
+ if(r.M3TLU!==null&&r.M3TLU!==undefined&&String(r.M3TLU)!==''){
+  const stored=new Option('Сохранённый тип леса: '+String(r.M3TLU),String(r.M3TLU));
+  forestSelect.add(stored);forestSelect.value=String(r.M3TLU);
+ }
  let pendingQuickAction=null;
  const categories=new Map();
  for(const entry of ref?.SKU||[]){const val=String(entry.KU??'');if(!val||categories.has(val))continue;
