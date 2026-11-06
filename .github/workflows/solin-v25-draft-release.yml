@@ -1,0 +1,35 @@
+name: SOLI-N Field — prepare V25 draft for manual APK upload
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/solin-v25-draft-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  create-draft:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Prepare private release draft — NEVER auto-publish without the signed APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG='solin-field-v230005'
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo 'Release already exists; leaving files and publication state unchanged.'
+            exit 0
+          fi
+          gh release create "$TAG" \
+            --target ca32d438df382466a7b691e9309b3682b3f9cbd3 \
+            --draft \
+            --title 'SOLI-N Field V25 — новый интерфейс' \
+            --notes 'SOLI-N Field V25. Android package: kz.solin.field.v23build; versionCode: 230005; pinned signing certificate SHA-256 5A1C2E2BF2EFE5AA7382674B651533A11D2B93C802A1C09ADC72656C5A29ED7E. ВАЖНО: перед публикацией прикрепить только подписанный APK с именем SOLIN-Field-update.apk, размером около 24 МБ, и контрольной суммой SHA-256 8e37353a4a85a01520e3c708331ff0c1e38ef96e793f6affcb296f444f53fe1f. Не публиковать пустой релиз. Перед установкой сделать резервный экспорт полевых данных. Реальные полевые испытания ещё не завершены.'
+          gh release view "$TAG" --json tagName,isDraft --jq '{tag: .tagName, draft: .isDraft}'
