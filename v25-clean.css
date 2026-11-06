@@ -61,10 +61,10 @@ body.solin-v25 .wf-rowhead .wf-danger{color:#9b3340}
 body.solin-v25 .wf-grid{gap:8px}
 
 /* Stand composition uses ONE form, one save action, and a single Maket selector. */
-body.solin-v25 #modal:not(.ce-modal) .modalCard:has(#wfCompRows){width:min(980px,96vw);max-height:96dvh;padding:0;border-radius:19px;background:#f7faf7;display:flex;flex-direction:column;overflow:hidden}
-body.solin-v25 #modal:not(.ce-modal) .modalCard:has(#wfCompRows) .modalHead{background:#fff;margin:0;padding:18px 21px;border-bottom:1px solid var(--v25-border);align-items:center}
-body.solin-v25 #modal:not(.ce-modal) .modalCard:has(#wfCompRows) .modalHead h2{font-size:21px;color:#173e2a;margin:0}
-body.solin-v25 #modal:not(.ce-modal) .modalCard:has(#wfCompRows) #modalBody{flex:1;min-height:0;overflow:auto;padding:16px 18px;background:#f7faf7}
+body.solin-v25 #modal.v25-stand-modal .modalCard{width:min(980px,96vw);max-height:96dvh;padding:0;border-radius:19px;background:#f7faf7;display:flex;flex-direction:column;overflow:hidden}
+body.solin-v25 #modal.v25-stand-modal .modalCard .modalHead{background:#fff;margin:0;padding:18px 21px;border-bottom:1px solid var(--v25-border);align-items:center}
+body.solin-v25 #modal.v25-stand-modal .modalCard .modalHead h2{font-size:21px;color:#173e2a;margin:0}
+body.solin-v25 #modal.v25-stand-modal .modalCard #modalBody{flex:1;min-height:0;overflow:auto;padding:16px 18px;background:#f7faf7}
 body.solin-v25 .v25-stand-basics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;background:#fff;padding:14px;border:1px solid var(--v25-border);border-radius:14px;margin-bottom:14px}
 body.solin-v25 .v25-stand-basics .wf-field span{color:#3c6249;font-size:13px;font-weight:700}
 body.solin-v25 .v25-stand-basics select{background:#fff;border:1px solid #b9d3c2;color:#1d462e;border-radius:9px;min-height:47px;width:100%;padding:10px;font-size:15px}
@@ -187,3 +187,8 @@ body.solin-v25 .ce-modal .ce-assist-actions button{background:var(--v25-green);b
 }
 @media(max-width:380px){body.solin-v25 #wfCompRows .wf-formgrid{grid-template-columns:1fr}}
 @media print{body.solin-v25 .sectionTabs,body.solin-v25 .v25-card-tabs,body.solin-v25 .v25-stand-list,body.solin-v25 .v25-stand-command{display:none!important}body.solin-v25 .ce-modal .dt-footer{display:block!important}}
+
+/* Hidden state wins over legacy display:flex rules. */
+body.solin-v25 .ce-modal #ce-extra[hidden],body.solin-v25 .ce-modal #ce-action-panel[hidden],body.solin-v25 .ce-modal .ce-assist-overlay[hidden]{display:none!important;pointer-events:none!important}
+body.solin-v25 #modal.v25-stand-modal[hidden],body.solin-v25 #modal.v25-stand-modal.hidden{display:none!important}
+body.solin-v25 .ce-modal .v25-stand-empty{font-size:13px;color:#718073;padding:11px}
