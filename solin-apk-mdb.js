@@ -108,6 +108,48 @@
     }
     return {quarters:qs.length,stands:stands.length};
   }
+  // K82 in the original desktop SOLI-N validates previous taxation year
+  // in the FOREST record, not in an individual quarter. Never invent a year.
+  async function ensurePreviousTaxationYear(){
+    const owner=typeof D!=='undefined'?D?.lesnichestvo?.[0]:null;
+    if(!owner)throw Error('Не выбрано лесничество.');
+    const current=Number(owner.GodT),prior=Number(owner.GodPU);
+    if(Number.isInteger(prior)&&prior>=1900&&prior<current)return;
+    await new Promise((resolve,reject)=>{
+      modal('Контроль К82 · год предыдущей таксации',
+       '<p>В оригинальном SOLI-N необходим год <b>предыдущей таксации</b> лесничества. '+
+       'Он не совпадает с годом создания новой карточки. Укажите фактический год из исходных документов; программа не будет его угадывать.</p>'+
+       '<label class="wf-field"><span>Предыдущий год таксации (GodPU)</span><input type="number" id="wfPreviousTaxYear" min="1900" max="'+(current-1)+'" placeholder="Например, 2015"></label>'+
+       '<div class="formActions"><button type="button" id="wfPrevCancel">Отмена</button><button type="button" class="primary" id="wfPrevSave">Сохранить и экспортировать</button></div>'+
+       '<p id="wfPrevError" role="alert"></p>');
+      const el=document.getElementById('wfPreviousTaxYear'),msg=document.getElementById('wfPrevError');
+      const closeIcon=document.querySelector('#modal .modalHead .close');
+      const cancel=()=>{closeIcon?.removeEventListener('click',cancel);closeModal();reject(Error('Экспорт отменён: не задан фактический год предыдущей таксации (К82).'));};
+      closeIcon?.addEventListener('click',cancel,{once:true});
+      document.getElementById('wfPrevCancel').onclick=cancel;
+      document.getElementById('wfPrevSave').onclick=async()=>{
+        const val=Number(el.value);
+        if(!Number.isInteger(val)||val<1900||val>=current){msg.textContent='Укажите фактический год от 1900 до '+(current-1);return;}
+        const old=owner.GodPU;owner.GodPU=val;
+        try{await window.SolinWorkspace?.persist?.();closeIcon?.removeEventListener('click',cancel);closeModal();resolve();}
+        catch(e){owner.GodPU=old;msg.textContent='Не удалось сохранить год: '+e.message;}
+      };
+    });
+  }
+  function validateDesktopControls(transfer){
+    const stands=transfer.tables?.['Выдел']||[];
+    const withTimber=new Set((transfer.tables?.['Макет10']||[]).map(r=>
+      [r.POS,r.LESN,r.KV,r.KGLF,r.VD].map(String).join(':')));
+    const incomplete=v=>v==null||String(v).trim()===''||String(v).trim()==='0';
+    const missing=stands.filter(r=>withTimber.has([r.POS,r.LESN,r.KV,r.KGLF,r.VD].map(String).join(':'))&&
+      (incomplete(r.M3Pr)||incomplete(r.M3B)||incomplete(r.M3TLU)));
+    if(missing.length){const s=missing[0],fields=[];
+      if(incomplete(s.M3Pr))fields.push('главная порода (M3Pr)');
+      if(incomplete(s.M3B))fields.push('бонитет (M3B)');
+      if(incomplete(s.M3TLU))fields.push('тип леса (M3TLU)');
+      throw Error('Контроль К16: квартал '+s.KV+', выдел '+s.VD+': не заполнено: '+fields.join(', ')+'. '+
+       'Откройте карточку таксации → Макет 3, заполните поля по справочникам и повторите экспорт.');}
+  }
   async function exportMDB(){
     const b=button();
     if(b)b.disabled=true;
@@ -124,10 +166,12 @@
         throw Error('Нативный модуль MDB отсутствует в этой сборке APK.');
       }
       await window.SolinWorkspace?.ready;
+      await ensurePreviousTaxationYear();
       await window.SolinWorkspace?.persist?.();
       const transfer=window.SolinMDBBridge?.snapshot?.();
       if(!transfer||transfer.format!=='SOLIN-MDB-Bridge-v1')throw Error('Не удалось собрать карточки Transfer.');
       const counts = validateTransferRows(transfer);
+      validateDesktopControls(transfer);
       const blank = await packagedTemplate();
       modal('Экспорт MDB','<p>Создаю и проверяю MDB. На Android 10+ файл будет сохранён в «Загрузки/SOLI-N Field».</p>');
       const result = await plugin().export({
