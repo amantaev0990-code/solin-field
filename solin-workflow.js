@@ -152,10 +152,17 @@ function editComposition(){
  openModal('Основные данные · состав древостоя',
   '<p class="wf-form-note">Заполняйте все породы за один раз: например, 6 ОС + 4 Б — две строки одного яруса с коэффициентами 6 и 4. Только у ведущей породы каждого яруса выбираются полнота и запас; у дополнительных пород эти поля скрыты. Расчёт по всем породам выполняется после сохранения.</p>'+
   '<div class="wf-form-note"><label class="wf-field"><span>Категория угодий всего выдела</span><select id="wfCompKU"></select></label><small>Для проверки ярусов по SKU, SIAR и PIAP.</small></div>'+
-  '<p id="wfCompPolicy" class="wf-form-note" role="status" aria-live="polite"></p><div id="wfCompRows"></div><div class="wf-composition-actions"><button type="button" id="wfCompAdd" class="secondary">＋ Добавить породу</button><output id="wfCompTotal" role="status" aria-live="polite"></output></div>'+
+  '<p id="wfCompPolicy" class="wf-form-note" role="status" aria-live="polite"></p>'+
+  '<div class="wf-quick-forest"><label class="wf-field"><span>Характеристика типа леса (M3TLU) · выбранного выдела</span><select id="wfQuickForestType"><option value="">— Не указано —</option></select></label><p id="wfQuickForestHint" role="status" aria-live="polite">Список зависит от главной породы, зоны и области. Сохраняется вместе с древостоем.</p></div>'+
+  '<div id="wfCompRows"></div><div class="wf-composition-actions"><button type="button" id="wfCompAdd" class="secondary">＋ Добавить породу</button><output id="wfCompTotal" role="status" aria-live="polite"></output></div>'+
+  '<details id="wfQuickMakets" class="wf-quick-makets"><summary>Макеты · быстрый доступ к разделам под М32</summary><p>Чтобы не потерять ввод, сначала сохраняется состав древостоя и тип леса; затем открывается выбранный макет.</p><div class="wf-quick-makets-grid">'+CORE.filter(m=>m!=='Макет10').map(m=>'<button type="button" data-wf-quick-maket="'+h(m)+'">'+h(m.replace('Макет','М'))+' · '+h(window.SolinHuman?.formName(m)||NAMES[m])+'</button>').join('')+'<button type="button" data-wf-quick-action="print">Печать КТ</button><button type="button" data-wf-quick-action="control">Контроль</button></div></details>'+
   '<div class="formActions"><button type="button" class="secondary" id="wfCompCancel">Отмена</button><button type="button" class="primary" id="wfCompSave">Сохранить весь состав</button></div>');
  const root=document.getElementById('modalBody'),host=root.querySelector('#wfCompRows'),cat=root.querySelector('#wfCompKU');
  const ref=window.SOLIN_REFS?.tables,rules=window.SolinDependentRules;
+ const forestSelect=root.querySelector('#wfQuickForestType');
+ const forestHint=root.querySelector('#wfQuickForestHint');
+ forestSelect.value=String(r.M3TLU??'');
+ let pendingQuickAction=null;
  const categories=new Map();
  for(const entry of ref?.SKU||[]){const val=String(entry.KU??'');if(!val||categories.has(val))continue;
   const layers=rules?.allowedLayers?.({KU:entry.KU},ref);
@@ -210,6 +217,18 @@ function editComposition(){
     por:String(item.card.querySelector('#'+item.prefix+'_POR')?.value||item.original.POR||'')});
   }
   const mainSpecies=String(r.M3Pr??'');
+  const primary=states.filter(x=>x.iar==='1').sort((a,b)=>b.coef-a.coef||a.index-b.index)[0]||states[0];
+  const candidateSpecies=primary?.por||mainSpecies;
+  const org=db()?.lesnichestvo?.find(x=>String(x.POS)===String(r.POS)&&String(x.LESN)===String(r.LESN));
+  const forestResult=rules?.options?.('ВыделВ','M3TLU',{...r,M3Pr:candidateSpecies},{...r,M3Pr:candidateSpecies},org,ref);
+  if(forestResult){
+   const previous=String(forestSelect.value??'');
+   rules.applySelect(forestSelect,forestResult,{current:previous});
+   forestHint.textContent=forestResult.reason||'Тип леса связан с главной породой и лесохозяйственной зоной';
+  }else{
+   forestSelect.disabled=true;
+   forestHint.textContent='Исходный справочник характеристики типа леса не загружен. Сохранённый код остаётся без изменений.';
+  }
   for(const state of states){
    const leader=states.filter(x=>x.iar===state.iar).sort((a,b)=>b.coef-a.coef||
       Number(b.por===mainSpecies)-Number(a.por===mainSpecies)||a.index-b.index)[0];
@@ -248,6 +267,10 @@ function editComposition(){
   renderOne({IAR:layer,KOEF:null,POR:null,LET:null,PH:null,PD2:null,KT:null,PROI:null,POL:null,ZAP:null});
   const target=cards[cards.length-1].card.querySelector('[data-wffield="POR"]');target?.focus();};
  root.querySelector('#wfCompCancel').onclick=closeModal;
+ root.querySelectorAll('[data-wf-quick-maket],[data-wf-quick-action]').forEach(button=>button.onclick=()=>{
+  pendingQuickAction=button.dataset.wfQuickMaket||button.dataset.wfQuickAction;
+  root.querySelector('#wfCompSave').click();
+ });
  root.querySelector('#wfCompSave').onclick=()=>{
   let rows;try{rows=readRows();}catch(e){notify(e.message);return;}
   const desiredKU=cat.value.trim();if(!desiredKU){notify('Выберите категорию угодий выдела');return;}
@@ -267,13 +290,27 @@ function editComposition(){
    if(issues.length){notify('Порода '+(i+1)+': '+issues[0]);return;}
   }
   for(const [layer,total]of layerCoefficients){if(total!==10){notify('Ярус '+layer+': сумма коэффициентов должна составлять 10, сейчас '+total);return;}}
-  const candidate={...r,KU:Number(desiredKU),_children:{...r._children,Макет10:rows}};
+  const main=rows.filter(x=>Number(x.IAR)===1).sort((a,b)=>Number(b.KOEF)-Number(a.KOEF))[0]||rows[0];
+  const proposedSpecies=main?.POR||r.M3Pr;
+  const chosenForest=String(forestSelect.value??'');
+  const currentForest=String(r.M3TLU??'');
+  const forestChanged=!forestSelect.disabled&&chosenForest!==currentForest;
+  const forestRules=rules?.options?.('ВыделВ','M3TLU',{...r,M3Pr:proposedSpecies},
+     {...r,M3Pr:proposedSpecies},db()?.lesnichestvo?.find(x=>String(x.POS)===String(r.POS)&&String(x.LESN)===String(r.LESN)),ref);
+  if(forestChanged&&chosenForest&&(
+     !['complete','partial'].includes(forestRules?.status)||
+     !forestRules.items.some(item=>String(item.value)===chosenForest)
+  )){notify('Характеристика типа леса не соответствует выбранной породе и зоне. Данные не изменены.');return;}
+  const candidate={...r,KU:Number(desiredKU),M3Pr:r.M3Pr||proposedSpecies,
+    M3TLU:forestChanged?(chosenForest||null):r.M3TLU,
+    _children:{...r._children,Макет10:rows}};
   const layerCheck=rules?.allowedLayers?.(candidate,ref);
   if(layerCheck?.status==='complete')for(const row of rows){if(rules.currentIsAllowed(row.IAR,layerCheck)===false){notify('Ярус '+row.IAR+' недопустим для выбранной категории угодий');return;}}
   const transition=rules?.validateTransition?.(r,candidate,db()?.lesnichestvo?.[0],ref);
   if(transition?.errors?.length){notify('Не сохранено: '+transition.errors[0].reason);return;}
-  const before=JSON.stringify(r);const main=rows.filter(x=>Number(x.IAR)===1).sort((a,b)=>Number(b.KOEF)-Number(a.KOEF))[0]||rows[0];
+  const before=JSON.stringify(r);
   r.KU=Number(desiredKU);r._children={...r._children,Макет10:rows};
+  if(forestChanged)r.M3TLU=chosenForest||null;
   if(main?.POR&&(r.M3Pr==null||r.M3Pr===''||r.M3Pr===0))r.M3Pr=main.POR;
   if(window.SolinCardCalculations){
    const org=db()?.lesnichestvo?.find(x=>String(x.POS)===String(r.POS)&&String(x.LESN)===String(r.LESN));
@@ -287,7 +324,12 @@ function editComposition(){
   }
   try{saveAll(r);}catch(e){Object.assign(r,JSON.parse(before));notify('Не удалось сохранить состав: '+e.message);return;}
   closeModal();if(typeof renderComp==='function')renderComp();
-  notify('Сохранено '+rows.length+' пород. Проверьте тип леса (К16) и запас Макета 5.');
+  const destination=pendingQuickAction;
+  pendingQuickAction=null;
+  if(CORE.includes(destination))openMaket(destination);
+  else if(destination==='print')printCard();
+  else if(destination==='control')checkData(r,true);
+  notify('Сохранено '+rows.length+' пород. Характеристика типа леса сохраняется в карточке выдела.');
  };
  for(const row of drafts)renderOne(row);
 }
