@@ -235,22 +235,14 @@ function closeModal(){
  modal.removeAttribute('aria-modal');
  modal.removeAttribute('aria-labelledby');
 }
-// Always route backdrop and Escape through the current close button, since
-// the card editor may have replaced it with a confirm-unsaved-changes guard.
-document.addEventListener('click',event=>{
- const modal=$('#modal');
- if(!modal||modal.classList.contains('hidden')||event.target!==modal)return;
- modal.querySelector('.modalHead .close')?.click();
-});
+// V23: tapping outside the form never dismisses any editor.
+// Escape is ignored here; the taxation card independently handles its dialogs.
 document.addEventListener('keydown',event=>{
  const modal=$('#modal');
- if(event.key!=='Escape'||event.defaultPrevented||!modal||modal.classList.contains('hidden'))return;
- const overlay=modal.querySelector('#ce-assist');
- if(overlay&&!overlay.hidden)return; // card assistant handles its own Escape
+ if(event.key!=='Escape'||!modal||modal.classList.contains('hidden'))return;
  event.preventDefault();
  event.stopImmediatePropagation();
- modal.querySelector('.modalHead .close')?.click();
-});
+},true);
 function toggleQuarterSearch(){$('#qSearch').classList.toggle('hidden')}function toggleCompSearch(){$('#vSearch').classList.toggle('hidden')}
 function renderFriendlyRefs(q=''){q=q.trim().toLowerCase();const box=$('#friendlyRefs');if(!D)return;const wanted=Object.entries(refNames).filter(([code,name])=>!q||code.toLowerCase().includes(q)||name.toLowerCase().includes(q));box.innerHTML=wanted.map(([code,name])=>{const lookupKey=code==='SKU'?'KU':code==='SDP'?'POR':code==='SIAR'?'IAR':code==='SBon'?'M3B':code==='STB'?'TB':null;const rows=lookupKey?Object.entries(D.fieldLookups?.[lookupKey]||{}).filter(([c,n])=>c&&n):[];return `<details class="refCard"><summary><b>${name}</b><small>${rows.length?rows.length+' значений':'внутренний справочник SOLI-N'}</small></summary>${rows.length?`<div class="refRows">${rows.slice(0,250).map(([c,n])=>`<div class="refRow"><span class="refCode">${esc(c)}</span><span>${esc(n)}</span></div>`).join('')}</div>`:''}</details>`}).join('')}
 function renderDb(){const box=$('#dbTables');if(!box||!D)return;box.innerHTML=Object.entries(D.transfSchema||{}).map(([n,cols])=>`<div class="dbRow"><b>${childNames[n]||n.replace('Макет','Макет ')}</b><small>${cols.length} полей</small></div>`).join('')}
