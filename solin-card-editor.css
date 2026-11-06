@@ -74,3 +74,14 @@
 .dt-board .dt-category .quarter-code-manual:not([hidden]){position:absolute;z-index:4;top:100%;left:0;right:0;width:100%;min-width:120px;background:white;opacity:1}
 .dt-board .dt-category [data-quarter-picker="Fzona"]{position:static!important;width:100%!important;opacity:1!important;min-width:0!important;cursor:pointer}
 @media(max-width:620px){.ce-modal .ce-stock-audit{max-height:92px;padding:5px 8px;font-size:11px}}
+
+/* V21.1: additional species have no editable POL/ZAP cells. */
+.dt-board .ce-table td.ce-companion-cell{background:#e0e4e1;color:#58625b;text-align:center;font:12px Arial,sans-serif;padding:1px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-board .ce-table td.ce-companion-cell span{display:block;overflow:hidden;text-overflow:ellipsis}
+
+/* V23: forestry type selection belongs visually to the stand input area. */
+.ce-v23-species{display:flex;align-items:stretch;flex-wrap:wrap;gap:8px;padding:9px 12px;border-bottom:1px solid #c8d4ca;background:#f2f7f2;color:#24402d}
+.ce-v23-species>span{flex:0 0 100%;font-size:12px;line-height:1.3}
+.ce-v23-species>.dt-cell{flex:1 1 280px!important;min-width:210px;min-height:40px}
+.ce-v23-species .dt-input{width:100%;min-width:0}
+.ce-v23-species input,.ce-v23-species select{max-width:100%;min-height:34px}
