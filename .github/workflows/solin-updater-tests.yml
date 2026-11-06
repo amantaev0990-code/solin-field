@@ -1,0 +1,30 @@
+name: SOLI-N safe updater regression
+on:
+  push:
+    branches:
+      - fix/v23-update-center-2026-11-06
+    paths:
+      - 'solin-update*.js'
+      - 'index.html'
+      - 'native/android/SolinUpdatePlugin.java'
+      - 'scripts/install-android-mdb.mjs'
+      - 'scripts/test-safe-updater.cjs'
+      - '.github/workflows/solin-updater-tests.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check updater JavaScript syntax
+        run: |
+          node --check solin-update-policy.js
+          node --check solin-updates.js
+          node --check scripts/install-android-mdb.mjs
+      - name: Verify release metadata rejects bad updates and MDB modules are unchanged
+        run: node scripts/test-safe-updater.cjs
