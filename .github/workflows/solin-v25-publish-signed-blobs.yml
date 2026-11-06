@@ -80,7 +80,7 @@ jobs:
           APK=release/SOLIN-Field-update.apk
           TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
           "$TOOLS/apksigner" verify --verbose --print-certs "$APK"
-          CERT="$("$TOOLS/apksigner" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | tr '[:lower:]' '[:upper:]')"
+          CERT="$("$TOOLS/apksigner" verify --print-certs "$APK" | awk '/certificate SHA-256 digest:/ {print $NF; exit}' | tr '[:lower:]' '[:upper:]')"
           [[ "$CERT" == '5A1C2E2BF2EFE5AA7382674B651533A11D2B93C802A1C09ADC72656C5A29ED7E' ]] || { echo "::error::Wrong V23/V25 signing certificate"; exit 1; }
           PACKAGE="$("$TOOLS/aapt" dump badging "$APK" | head -1)"
           [[ "$PACKAGE" == *"package: name='kz.solin.field.v23build'"* ]] || { echo "::error::Android package differs from installed V23/V24"; exit 1; }
