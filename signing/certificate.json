@@ -1,0 +1,10 @@
+{
+  "format": "solin-v23-signing-v1",
+  "applicationId": "kz.solin.field.v23build",
+  "certificateSha256": "5A1C2E2BF2EFE5AA7382674B651533A11D2B93C802A1C09ADC72656C5A29ED7E",
+  "alias": "solin-cloud-lab",
+  "keystoreEncrypted": true,
+  "keystoreSha256": "f713032491bb4c054948a1788088ddcfe1b0f2310723e5086a7000286a5e007f",
+  "passwordSecret": "SOLIN_V23_KEYSTORE_PASSWORD",
+  "v23VersionName": "0.3.0-field-v23.1"
+}
