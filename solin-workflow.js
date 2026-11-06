@@ -58,7 +58,15 @@ function findLookups(field,form){
  const database=db();let mapping={POR:'POR',P15:'POR',PORP:'POR',M3Pr:'POR',PRP1:'POR',KU:'KU',KU_St:'KU',TB:'TB',TR:'TR',IAR:'IAR',M3B:'M3B',M2PM1:'M2PM1'}[field];
  return mapping?database?.fieldLookups?.[mapping]:null;
 }
-function fieldInput(name,value='',prefix='wf',form='ВыделВ'){
+function fieldInput(name,value='',prefix='wf',form='ВыделВ',context=record()){
+ const policy=window.SolinCategoryRules?.field(context?.KU,form,name,window.SOLIN_REFS?.tables);
+ if(form==='Макет10'&&name==='POL'&&policy&&policy.kind!=='fullness'){
+  const survival=policy.kind==='survival',raw=String(value??'');
+  return '<label class="wf-field"><span>'+h(policy.label)+'</span><input type="number" id="'+h(prefix+'_'+name)+
+   '" data-wffield="POL" data-solin-form="Макет10" data-solin-initial="'+h(raw)+'" value="'+h(raw)+
+   '" inputmode="'+(survival?'numeric':'decimal')+'" step="'+(survival?'1':'any')+'"'+
+   (survival?' min="1" max="100"':'')+'></label>';
+ }
  if(window.SolinHuman?.input)return SolinHuman.input(name,value,prefix,form);
  const label=window.SolinHuman?.label(form,name)||LABELS[name]||FORM_LABELS[name]||db()?.fieldLabels?.[name]||name;
  const id=prefix+'_'+name,lookup=findLookups(name,form),str=String(value??'');
@@ -69,7 +77,7 @@ function fieldInput(name,value='',prefix='wf',form='ВыделВ'){
  const numeric=DECIMAL.has(name)||['IAR','LET','VNUM','PRA','PRkol','KOEF','PH','PD2','ZAP','POL','MTC','G15','GZ'].includes(name);
  return '<label class="wf-field"><span>'+h(label)+' <small>'+h('')+'</small></span><input id="'+h(id)+'" data-wffield="'+h(name)+'" '+(numeric?'inputmode="decimal"':'')+' autocomplete="off" value="'+h(str)+'" placeholder="—"></label>';
 }
-function humanInputs(fields,values,prefix,form){const isTech=f=>window.SolinHuman?.isTechnical(form,f);const main=fields.filter(f=>!isTech(f)).map(f=>fieldInput(f,values[f]??'',prefix,form)).join('');const technical=fields.filter(isTech).map(f=>fieldInput(f,values[f]??'',prefix,form)).join('');return main+(technical?'<details class="human-technical"><summary>Служебные поля · значения сохранены</summary><div class="formGrid">'+technical+'</div></details>':'');}
+function humanInputs(fields,values,prefix,form,context=record()){const isTech=f=>window.SolinHuman?.isTechnical(form,f);fields=fields.filter(f=>!(form==='Макет10'&&f==='SPS'));const main=fields.filter(f=>!isTech(f)).map(f=>fieldInput(f,values[f]??'',prefix,form,context)).join('');const technical=fields.filter(isTech).map(f=>fieldInput(f,values[f]??'',prefix,form,context)).join('');return main+(technical?'<details class="human-technical"><summary>Служебные поля · значения сохранены</summary><div class="formGrid">'+technical+'</div></details>':'');}
 function bindInputs(root,schema,prefix,values){const obj={};for(const key of schema){const el=root.querySelector('#'+prefix+'_'+key);if(!el)continue;const typed=window.SolinFieldTypes?.read(el,values?.[key],el.dataset.solinForm||'ВыделВ',key);if(typed!==undefined){obj[key]=typed;continue;}const raw=el.value.trim();if(raw===''){obj[key]=null;continue;}
 if((DECIMAL.has(key)||['IAR','LET','VNUM','PRA','PRkol','MTC','G15','GZ','PH','PD2','ZAP','POL'].includes(key))&&!Number.isFinite(Number(raw.replace(',','.'))))throw Error('Проверь число: '+(LABELS[key]||key));
 obj[key]=DECIMAL.has(key)||['IAR','LET','VNUM','PRA','PRkol','MTC','G15','GZ','PH','PD2','ZAP','POL'].includes(key)?Number(raw.replace(',','.')):raw;
@@ -90,7 +98,18 @@ if(oldBar)oldBar.style.display='none';
 const content=document.querySelector('#humanContent');
 if(content&&!content.querySelector('#wfCardActions')){
 const bar=document.createElement('div');bar.id='wfCardActions';bar.className='wf-toolbar';
-bar.innerHTML='<button class="wf-primary" id="wfEditBase">✎ Редактировать выдел</button><button id="wfCardCheck">✓ Контроль</button><button id="wfCardRelations">Связи полей</button><button id="wfCardPrint">⎙ Печать КТ</button><button id="wfCardExit">↩ Выход</button>';
+bar.innerHTML='<button class="wf-primary" id="wfEditBase">✎ Изменить карточку</button><button id="wfCardCheck">✓ Контроль</button><button id="wfCardRelations">Связи полей</button><button id="wfCardPrint">⎙ Печать КТ</button><button id="wfCardExit">↩ Выход</button>';
+// An uncommitted stand must not run reports/checks or edit Makets as if it
+// existed in the persistent forest. The operator may edit or discard it.
+if(!db()?.quarters?.[String(record().KV)]?.compartments?.includes(record())){
+ for(const id of ['wfCardCheck','wfCardRelations','wfCardPrint']){
+  const button=bar.querySelector('#'+id);
+  if(button){button.disabled=true;button.title='Сначала сохраните новую карточку';}
+ }
+ host.querySelectorAll('button').forEach(button=>{
+  button.disabled=true;button.title='Сначала сохраните новую карточку';
+ });
+}
 content.prepend(bar);
 bar.querySelector('#wfEditBase').onclick=editBase;bar.querySelector('#wfCardCheck').onclick=()=>SolinControlUI.open({records:[record()],caption:'Карточка · квартал '+record().KV+' · выдел '+record().VD});
 bar.querySelector('#wfCardRelations').onclick=()=>window.SolinDependencyAudit?.open([record()],{caption:'Выдел '+record().KV+'/'+record().VD});
@@ -99,7 +118,7 @@ bar.querySelector('#wfCardPrint').onclick=printCard;bar.querySelector('#wfCardEx
 function showWholeCard(){const r=record();if(!r)return;document.querySelector('#childContent').innerHTML='<div class="wf-maket-view"><h3>Краткая карточка таксации · КТ</h3><p class="wf-muted">Аналог сводного просмотра ВыделКрат. Данные отображаются без расчёта исходных Access-отчётов.</p>'+CORE.map(m=>'<div class="wf-summary-row"><b>'+m.replace('Макет','')+' · '+h(window.SolinHuman?.formName(m)||NAMES[m])+'</b><span>'+h(maketSummary(r,m))+'</span><button data-cardmak="'+m+'">Открыть →</button></div>').join('')+'</div>';
 document.querySelectorAll('[data-cardmak]').forEach(b=>b.onclick=()=>openMaket(b.dataset.cardmak));}
 function openMaket(m){const r=record();if(!r||!CORE.includes(m))return;currentMaket=m;cardToolbar();
-const rs=rowsOf(r,m),fields=(db()?.transfSchema?.[m]||[]).filter(n=>!KEY_FIELDS.includes(n));
+const rs=rowsOf(r,m),fields=(db()?.transfSchema?.[m]||[]).filter(n=>!KEY_FIELDS.includes(n)&&!(m==='Макет10'&&n==='SPS'));
 const wrap=document.querySelector('#childContent');if(!wrap)return;
 let html='<div class="wf-maket-view"><div class="wf-section-head"><div><div class="wf-eyebrow">'+rs.length+' записей</div><h3>'+h(window.SolinHuman?.formName(m)||NAMES[m])+'</h3></div><button class="wf-primary" id="wfAddRow">＋ Строка</button></div>';
 html+='<p class="wf-muted">Выберите запись для изменения или добавьте новую.</p>';
@@ -122,7 +141,158 @@ wrap.querySelector('#wfAddRow').onclick=()=>editMaket(m,rs.length);
 wrap.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editMaket(m,Number(b.dataset.edit)));
 wrap.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>deleteMaket(m,Number(b.dataset.del)));
 }
-function editMaket(m,index){const r=record();if(!r)return;
+// V20: edit an entire mixed-species stand in one transaction. Each species is
+// stored as its own original Maket10 row, never concatenated into a fake code.
+function editComposition(){
+ const r=record();if(!r)return;
+ const name='Макет10';
+ const fields=['IAR','KOEF','POR','LET','PH','PD2','KT','PROI','POL','ZAP'];
+ const existing=rowsOf(r,name).map(x=>({...x}));
+ const drafts=existing.length?existing:[{IAR:1,KOEF:10,POR:null,LET:null,PH:null,PD2:null,KT:null,PROI:null,POL:null,ZAP:0}];
+ openModal('Основные данные · состав древостоя',
+  '<p class="wf-form-note">Заполняйте все породы за один раз: например, 6 ОС + 4 Б — две строки одного яруса с коэффициентами 6 и 4. Только у ведущей породы каждого яруса выбираются полнота и запас; у дополнительных пород эти поля скрыты. Расчёт по всем породам выполняется после сохранения.</p>'+
+  '<div class="wf-form-note"><label class="wf-field"><span>Категория угодий всего выдела</span><select id="wfCompKU"></select></label><small>Для проверки ярусов по SKU, SIAR и PIAP.</small></div>'+
+  '<p id="wfCompPolicy" class="wf-form-note" role="status" aria-live="polite"></p><div id="wfCompRows"></div><div class="wf-composition-actions"><button type="button" id="wfCompAdd" class="secondary">＋ Добавить породу</button><output id="wfCompTotal" role="status" aria-live="polite"></output></div>'+
+  '<div class="formActions"><button type="button" class="secondary" id="wfCompCancel">Отмена</button><button type="button" class="primary" id="wfCompSave">Сохранить весь состав</button></div>');
+ const root=document.getElementById('modalBody'),host=root.querySelector('#wfCompRows'),cat=root.querySelector('#wfCompKU');
+ const ref=window.SOLIN_REFS?.tables,rules=window.SolinDependentRules;
+ const categories=new Map();
+ for(const entry of ref?.SKU||[]){const val=String(entry.KU??'');if(!val||categories.has(val))continue;
+  const layers=rules?.allowedLayers?.({KU:entry.KU},ref);
+  if(!layers?.items?.length)continue;
+  categories.set(val,String(entry.NKU||''));}
+ cat.replaceChildren(new Option('— Выберите категорию угодий —',''),
+  ...[...categories].map(([val,label])=>new Option(val+' — '+label,val)));
+ if(r.KU!=null&&!categories.has(String(r.KU)))cat.add(new Option(String(r.KU)+' — текущее значение',String(r.KU)));
+ cat.value=String(r.KU??'');
+ let serial=0;
+ const nextId=()=>++serial;
+ const cards=[];
+ const renderOne=(original)=>{
+  const token=nextId();const prefix='wf20_'+token;
+  const card=document.createElement('section');card.className='wf-composition-card';card.dataset.compToken=String(token);
+  card.innerHTML='<div class="wf-rowhead"><b>Порода '+(cards.length+1)+'</b><button type="button" class="wf-danger" data-wf-remove>Удалить породу</button></div>'+
+   '<div class="formGrid wf-formgrid">'+humanInputs(fields,original,prefix,name,{...r,KU:cat.value||r.KU})+'</div>';
+  host.append(card);const item={token,prefix,card,original};cards.push(item);
+  card.querySelector('[data-wf-remove]').onclick=()=>{if(cards.length===1)return notify('Оставьте хотя бы одну породу');
+   const pos=cards.indexOf(item);if(pos>=0)cards.splice(pos,1);card.remove();renumber();refresh();};
+  for(const field of fields){const el=card.querySelector('#'+prefix+'_'+field);if(!el)continue;
+   el.addEventListener('input',refresh);el.addEventListener('change',refresh);}
+  setupRowOptions(item);renumber();refresh();
+ };
+ const renumber=()=>cards.forEach((x,i)=>{const title=x.card.querySelector('.wf-rowhead b');if(title)title.textContent='Порода '+(i+1)});
+ const setupRowOptions=(item)=>{
+  if(!rules)return;
+  const candidate={...item.original};for(const field of fields){const el=item.card.querySelector('#'+item.prefix+'_'+field);
+   if(el)candidate[field]=el.value===''?null:el.value;}
+  for(const field of ['IAR','POR','PROI']){
+   const el=item.card.querySelector('#'+item.prefix+'_'+field);if(!el||el.tagName!=='SELECT')continue;
+   const res=rules.options(name,field,candidate,{...r,KU:cat.value||r.KU},db()?.lesnichestvo?.[0]);
+   if(res)rules.applySelect(el,res,{current:candidate[field]});
+  }
+ };
+ function readRows(){return cards.map(item=>{
+  const values=bindInputs(item.card,fields,item.prefix,item.original);
+  const row={...item.original,...values};
+  for(const k of KEY_FIELDS)row[k]=r[k]??null;
+  if(row.POR!=null&&row.PROI==null){const suggested=rules?.suggestedOrigin?.(row.POR,ref);if(suggested!=null)row.PROI=suggested;}
+  return row;
+ });}
+ function refresh(){
+  const totals=new Map(),states=[];
+  for(const [index,item] of cards.entries()){
+   const el=item.card.querySelector('#'+item.prefix+'_KOEF'),layer=item.card.querySelector('#'+item.prefix+'_IAR');
+   const raw=String(el?.value??'').replace(',','.');
+   const val=raw===''?null:Number(raw);
+   if(val!==null&&Number.isFinite(val))totals.set(layer?.value||'?',(totals.get(layer?.value||'?')||0)+val);
+   states.push({index,item,iar:String(layer?.value||item.original.IAR||''),
+    coef:val!==null&&Number.isFinite(val)?val:-1,
+    por:String(item.card.querySelector('#'+item.prefix+'_POR')?.value||item.original.POR||'')});
+  }
+  const mainSpecies=String(r.M3Pr??'');
+  for(const state of states){
+   const leader=states.filter(x=>x.iar===state.iar).sort((a,b)=>b.coef-a.coef||
+      Number(b.por===mainSpecies)-Number(a.por===mainSpecies)||a.index-b.index)[0];
+   const isMain=leader?.index===state.index;
+   for(const field of ['POL','ZAP']){
+    const el=state.item.card.querySelector('#'+state.item.prefix+'_'+field);
+    const noStock=field==='ZAP'&&Number(cat.value)===19&&
+      (el?.value==null||el.value===''||Number(el.value)===0);
+    if(el?.closest('label'))el.closest('label').hidden=!isMain||noStock;
+   }
+   const heading=state.item.card.querySelector('.wf-rowhead b');
+   if(heading)heading.textContent='Порода '+(state.index+1)+(isMain?' · ведущая':' · дополнительная');
+  }
+  root.querySelector('#wfCompTotal').textContent=[...totals].map(([layer,total])=>'Ярус '+layer+': '+Number(total.toFixed(2))+' / 10').join(' · ');
+  const warnings=cards.map(item=>{
+   const el=item.card.querySelector('#'+item.prefix+'_POL');
+   return window.SolinCategoryRules?.validatePol(cat.value,el?.value,ref);
+  }).filter(x=>x?.status==='warning').map(x=>x.message);
+  root.querySelector('#wfCompPolicy').textContent=[window.SolinCategoryRules?.guide(cat.value,ref),...new Set(warnings)].filter(Boolean).join(' ');
+ }
+ cat.addEventListener('change',()=>{
+  for(const item of cards){
+   const old=item.card.querySelector('#'+item.prefix+'_POL');
+   if(old){
+    const container=document.createElement('div');
+    container.innerHTML=fieldInput('POL',old.value,item.prefix,name,{...r,KU:cat.value});
+    const label=container.firstElementChild;old.closest('label').replaceWith(label);
+    for(const type of ['input','change'])label.querySelector('input,select').addEventListener(type,refresh);
+   }
+   setupRowOptions(item);
+  }
+  refresh();
+ });
+ root.querySelector('#wfCompAdd').onclick=()=>{if(cards.length>=12)return notify('Максимум 12 пород за одно редактирование');
+  const last=cards[cards.length-1],layer=last?.card.querySelector('#'+last.prefix+'_IAR')?.value||'1';
+  renderOne({IAR:layer,KOEF:null,POR:null,LET:null,PH:null,PD2:null,KT:null,PROI:null,POL:null,ZAP:null});
+  const target=cards[cards.length-1].card.querySelector('[data-wffield="POR"]');target?.focus();};
+ root.querySelector('#wfCompCancel').onclick=closeModal;
+ root.querySelector('#wfCompSave').onclick=()=>{
+  let rows;try{rows=readRows();}catch(e){notify(e.message);return;}
+  const desiredKU=cat.value.trim();if(!desiredKU){notify('Выберите категорию угодий выдела');return;}
+  if(String(r.KU??'')!==desiredKU&&Object.values(r._children||{}).some(x=>Array.isArray(x)&&x.length)){
+   notify('Смена категории угодий при заполненных макетах: создайте новый выдел с нужной категорией. Исходные записи не изменены.');return;
+  }
+  const layerCoefficients=new Map();
+  for(const [i,row]of rows.entries()){
+   if(!row.POR||!Number(row.IAR)||!Number(row.KOEF)){notify('Порода '+(i+1)+': выберите ярус, породу и коэффициент');return;}
+   if(!Number.isInteger(Number(row.KOEF))||Number(row.KOEF)<1||Number(row.KOEF)>10){notify('Порода '+(i+1)+': коэффициент должен быть от 1 до 10');return;}
+   const layer=String(row.IAR),total=(layerCoefficients.get(layer)||0)+Number(row.KOEF);
+   layerCoefficients.set(layer,total);
+   const policy=window.SolinCategoryRules?.validatePol(desiredKU,row.POL,ref);
+   if(policy?.status==='error'){notify('Порода '+(i+1)+': '+policy.message);return;}
+   if(Number(desiredKU)===19&&row.ZAP==null)row.ZAP=0;
+   const issues=window.solinCore?.validateRow?.(name,row,{...r,KU:Number(desiredKU)})||[];
+   if(issues.length){notify('Порода '+(i+1)+': '+issues[0]);return;}
+  }
+  for(const [layer,total]of layerCoefficients){if(total!==10){notify('Ярус '+layer+': сумма коэффициентов должна составлять 10, сейчас '+total);return;}}
+  const candidate={...r,KU:Number(desiredKU),_children:{...r._children,Макет10:rows}};
+  const layerCheck=rules?.allowedLayers?.(candidate,ref);
+  if(layerCheck?.status==='complete')for(const row of rows){if(rules.currentIsAllowed(row.IAR,layerCheck)===false){notify('Ярус '+row.IAR+' недопустим для выбранной категории угодий');return;}}
+  const transition=rules?.validateTransition?.(r,candidate,db()?.lesnichestvo?.[0],ref);
+  if(transition?.errors?.length){notify('Не сохранено: '+transition.errors[0].reason);return;}
+  const before=JSON.stringify(r);const main=rows.filter(x=>Number(x.IAR)===1).sort((a,b)=>Number(b.KOEF)-Number(a.KOEF))[0]||rows[0];
+  r.KU=Number(desiredKU);r._children={...r._children,Макет10:rows};
+  if(main?.POR&&(r.M3Pr==null||r.M3Pr===''||r.M3Pr===0))r.M3Pr=main.POR;
+  if(window.SolinCardCalculations){
+   const org=db()?.lesnichestvo?.find(x=>String(x.POS)===String(r.POS)&&String(x.LESN)===String(r.LESN));
+   const quarter=window.SolinAddressContext?.resolveQuarter?.(r,db()?.quarters?.[String(r.KV)]);
+   const audit=window.SolinCardCalculations.corrections(r,ref,org,quarter);
+   for(const issue of audit.issues||[]){
+    if(issue.field==='ZAP'&&Number.isInteger(issue.index)){if(r._children.Макет10[issue.index])r._children.Макет10[issue.index].ZAP=Number(issue.expected);}
+    else if(issue.field==='M3B')r.M3B=issue.expected==null?null:String(issue.expected);
+    else if(issue.field in r)r[issue.field]=issue.expected==null?null:Number(issue.expected);
+   }
+  }
+  try{saveAll(r);}catch(e){Object.assign(r,JSON.parse(before));notify('Не удалось сохранить состав: '+e.message);return;}
+  closeModal();if(typeof renderComp==='function')renderComp();
+  notify('Сохранено '+rows.length+' пород. Проверьте тип леса (К16) и запас Макета 5.');
+ };
+ for(const row of drafts)renderOne(row);
+}
+
+function editMaket(m,index){const r=record();if(!r)return;if(m==='Макет10')return editComposition();
 const fields=(db()?.transfSchema?.[m]||[]).filter(n=>!KEY_FIELDS.includes(n)),existing=rowsOf(r,m)[index]||{};
 if(typeof openModal!=='function')return;
 openModal((index===rowsOf(r,m).length?'Новая запись · ':'Изменение · ')+(window.SolinHuman?.formName(m)||NAMES[m]),
@@ -405,7 +575,11 @@ function deleteMaket(m,index){const r=record();if(!r)return;
  catch(e){Object.assign(r,JSON.parse(before));notify(e.message);}
 }
 function editBase(){const r=record();if(!r)return;
-if(window.SolinCardEditor)return window.SolinCardEditor.open(r);
+// An unsaved preview must still be committed as a NEW stand. Once the
+// editor saves it into q.compartments, subsequent edits are normal edits.
+const q=db()?.quarters?.[String(r.KV)];
+const isNew=!!q&&!q.compartments?.includes(r);
+if(window.SolinCardEditor)return window.SolinCardEditor.open(r,{isNew});
 openModal('Выдел '+r.VD+' · квартал '+r.KV,'<div class="wf-form-note">Редактирование основной таблицы «Выдел»; состав макетов редактируется в отдельных разделах.</div><div class="formGrid wf-formgrid">'+humanInputs(EDIT_FIELDS,r,'wfb','ВыделВ')+'</div><div class="formActions"><button class="secondary" onclick="closeModal()">Отмена</button><button class="primary" id="wfSaveBase">Сохранить выдел</button></div>');
 document.querySelector('#wfSaveBase').onclick=()=>{
  let fields;try{fields=bindInputs(document.querySelector('#modalBody'),EDIT_FIELDS,'wfb',r);}catch(e){notify(e.message);return;}
@@ -441,6 +615,8 @@ const seen=new Map();for(const m of CORE){for(const [i,row]of rowsOf(r,m).entrie
  if(m==='Макет23'){for(let k=1;k<=8;k++){const v=row['K'+k];if(v!==''&&v!==null&&v!==undefined){seen.set(String(v), (seen.get(String(v))||0)+1)}}}
  }}
  for(const [code,count]of seen)if(count>1)msgs.push({status:'warn',message:'Макет 23: код особенности '+code+' встречается '+count+' раза'});
+ const audit=window.SolinCardCalculations?.cardIntegrity?.(r);
+ if(audit?.issues?.length)for(const item of audit.issues)msgs.push({status:item.status==='bad'?'bad':'warn',message:item.message});
  const stock=window.SolinCardCalculations?.standStock(r);
  const parts=window.SolinCardCalculations?.stockBreakdown?.(r);
  const html='<div class="wf-form-note">Локальная предварительная проверка, не замена 142 контрольных форм оригинальной SOLI-N.</div><p><b>Найдено замечаний:</b> '+msgs.length+'</p>'+
