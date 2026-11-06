@@ -161,14 +161,20 @@ function editComposition(){
  const fields=['IAR','KOEF','POR','LET','PH','PD2','KT','PROI','POL','ZAP'];
  const existing=rowsOf(r,name).map(x=>({...x}));
  const drafts=existing.length?existing:[{IAR:1,KOEF:10,POR:null,LET:null,PH:null,PD2:null,KT:null,PROI:null,POL:null,ZAP:0}];
- openModal('Основные данные · состав древостоя',
-  '<p class="wf-form-note">Заполняйте все породы за один раз: например, 6 ОС + 4 Б — две строки одного яруса с коэффициентами 6 и 4. Только у ведущей породы каждого яруса выбираются полнота и запас; у дополнительных пород эти поля скрыты. Расчёт по всем породам выполняется после сохранения.</p>'+
-  '<div class="wf-form-note"><label class="wf-field"><span>Категория угодий всего выдела</span><select id="wfCompKU"></select></label><small>Для проверки ярусов по SKU, SIAR и PIAP.</small></div>'+
-  '<p id="wfCompPolicy" class="wf-form-note" role="status" aria-live="polite"></p>'+
-  '<div class="wf-quick-forest"><label class="wf-field"><span>Характеристика типа леса (M3TLU) · выбранного выдела</span><select id="wfQuickForestType"><option value="">— Не указано —</option></select></label><p id="wfQuickForestHint" role="status" aria-live="polite">Список зависит от главной породы, зоны и области. Сохраняется вместе с древостоем.</p></div>'+
-  '<div id="wfCompRows"></div><div class="wf-composition-actions"><button type="button" id="wfCompAdd" class="secondary">＋ Добавить породу</button><output id="wfCompTotal" role="status" aria-live="polite"></output></div>'+
-  '<details id="wfQuickMakets" class="wf-quick-makets"><summary>Макеты · быстрый доступ к разделам под М32</summary><p>Чтобы не потерять ввод, сначала сохраняется состав древостоя и тип леса; затем открывается выбранный макет.</p><div class="wf-quick-makets-grid">'+CORE.filter(m=>m!=='Макет10').map(m=>'<button type="button" data-wf-quick-maket="'+h(m)+'">'+h(m.replace('Макет','М'))+' · '+h(window.SolinHuman?.formName(m)||NAMES[m])+'</button>').join('')+'<button type="button" data-wf-quick-action="31">М31 · Подрост</button><button type="button" data-wf-quick-action="32">М32 · Подлесок</button><button type="button" data-wf-quick-action="kt">КТ · Просмотр</button><button type="button" data-wf-quick-action="print">Печать КТ</button><button type="button" data-wf-quick-action="cut">Контроль рубок</button><button type="button" data-wf-quick-action="control">Общий контроль</button></div></details>'+
-  '<div class="formActions"><button type="button" class="secondary" id="wfCompCancel">Отмена</button><button type="button" class="primary" id="wfCompSave">Сохранить весь состав</button></div>');
+ openModal('Древостой',
+  '<div class="v25-stand-basics">'+
+   '<label class="wf-field"><span>Категория угодий</span><select id="wfCompKU"></select></label>'+
+   '<label class="wf-field"><span>Характеристика типа леса</span><select id="wfQuickForestType"><option value="">Не указано</option></select></label>'+
+  '</div>'+
+  '<details class="v25-stand-rules"><summary>Проверка связей</summary><p id="wfCompPolicy" role="status" aria-live="polite"></p><p id="wfQuickForestHint" role="status" aria-live="polite"></p></details>'+
+  '<div id="wfCompRows"></div>'+
+  '<div class="wf-composition-actions"><button type="button" id="wfCompAdd" class="secondary">＋ Порода</button><output id="wfCompTotal" role="status" aria-live="polite"></output></div>'+
+  '<details id="wfQuickMakets" class="v25-stand-makets"><summary>Другие макеты</summary><div class="v25-stand-makets-actions">'+
+   '<select id="wfQuickDestination" aria-label="Выберите макет"><option value="">Выбрать раздел…</option>'+
+    CORE.filter(m=>m!=='Макет10').map(m=>'<option value="'+h(m)+'">'+h(m.replace('Макет','М'))+' · '+h(window.SolinHuman?.formName(m)||NAMES[m])+'</option>').join('')+
+    '<option value="31">М31 · Подрост</option><option value="32">М32 · Подлесок</option><option value="kt">КТ · Просмотр</option><option value="print">Печать КТ</option><option value="cut">Контроль рубок</option><option value="control">Контроль</option></select>'+
+   '<button type="button" id="wfQuickNavigate">Открыть</button></div></details>'+
+  '<div class="formActions v25-stand-save"><button type="button" class="secondary" id="wfCompCancel">Отмена</button><button type="button" class="primary" id="wfCompSave">Сохранить</button></div>');
  const root=document.getElementById('modalBody'),host=root.querySelector('#wfCompRows'),cat=root.querySelector('#wfCompKU');
  const ref=window.SOLIN_REFS?.tables,rules=window.SolinDependentRules;
  const forestSelect=root.querySelector('#wfQuickForestType');
@@ -282,10 +288,12 @@ function editComposition(){
   renderOne({IAR:layer,KOEF:null,POR:null,LET:null,PH:null,PD2:null,KT:null,PROI:null,POL:null,ZAP:null});
   const target=cards[cards.length-1].card.querySelector('[data-wffield="POR"]');target?.focus();};
  root.querySelector('#wfCompCancel').onclick=closeModal;
- root.querySelectorAll('[data-wf-quick-maket],[data-wf-quick-action]').forEach(button=>button.onclick=()=>{
-  pendingQuickAction=button.dataset.wfQuickMaket||button.dataset.wfQuickAction;
+ root.querySelector('#wfQuickNavigate').onclick=()=>{
+  const choice=root.querySelector('#wfQuickDestination').value;
+  if(!choice)return notify('Выберите макет');
+  pendingQuickAction=choice;
   root.querySelector('#wfCompSave').click();
- });
+ };
  root.querySelector('#wfCompSave').onclick=()=>{
   let rows;try{rows=readRows();}catch(e){notify(e.message);return;}
   const desiredKU=cat.value.trim();if(!desiredKU){notify('Выберите категорию угодий выдела');return;}
