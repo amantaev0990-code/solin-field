@@ -45,3 +45,18 @@
 .wf-bonitet-status p{margin:4px 0 0;font-size:13px;line-height:1.45;overflow-wrap:break-word}
 .wf-bonitet-status[data-status="waiting"],.wf-bonitet-status[data-status="ambiguous"],.wf-bonitet-status[data-status="unavailable"],.wf-bonitet-status[data-status="not-applicable"],
 .wf-bonitet-status[data-wf-bonitet-status="waiting"],.wf-bonitet-status[data-wf-bonitet-status="ambiguous"],.wf-bonitet-status[data-wf-bonitet-status="unavailable"],.wf-bonitet-status[data-wf-bonitet-status="not-applicable"]{background:#fff8ed;border-color:#e7d9b9;color:#64512e}
+
+
+/* V24: compact forest-type picker and direct Maket navigation in stand editor. */
+.wf-quick-forest{padding:12px;margin:12px 0;border:1px solid #83af90;border-radius:12px;background:#f5faf6;color:#183d29}
+.wf-quick-forest .wf-field span{font-size:14px;font-weight:700;color:#16432a}
+.wf-quick-forest select{width:100%;min-height:48px;font-size:16px;background:white;color:#183a29;border:1px solid #8baa99;border-radius:8px;padding:9px}
+.wf-quick-forest select:disabled{opacity:.7}
+.wf-quick-forest p{font-size:12px;margin:7px 0 0;color:#4e6757;line-height:1.45}
+.wf-quick-makets{margin:12px 0;border:1px solid #93b7a0;border-radius:12px;background:#f6faf7;color:#234432}
+.wf-quick-makets summary{font-size:15px;font-weight:700;min-height:48px;cursor:pointer;padding:13px 15px}
+.wf-quick-makets>p{margin:0 14px 12px;font-size:12px;line-height:1.5}
+.wf-quick-makets-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,205px),1fr));gap:8px;padding:0 12px 14px}
+.wf-quick-makets-grid button{min-height:44px;background:#e7f4ea;color:#154c2b;border:1px solid #a5c9b0;border-radius:9px;padding:8px 11px;font-size:13px;font-weight:600;text-align:left;cursor:pointer}
+.wf-quick-makets-grid button:focus-visible{outline:3px solid #137e41;outline-offset:2px}
+@media(max-width:540px){.wf-quick-makets-grid{grid-template-columns:1fr 1fr}.wf-quick-makets-grid button{font-size:12px}}
