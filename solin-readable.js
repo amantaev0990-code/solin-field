@@ -40,6 +40,20 @@ function codeLabel(code,label){
 }
 function input(name,v='',prefix='wf',form='ВыделВ'){
  const id=prefix+'_'+name,list=lookup(form,name),str=String(v??'');
+ // A fixed range avoids float typing errors in field tablets. Keep non-standard
+ // historical values available unaltered until the operator explicitly edits.
+ if(form==='Макет10'&&name==='POL'){
+  const current=Number(str.replace(',','.'));
+  const matches=Number.isFinite(current)&&current>=0.1-1e-6&&current<=1+1e-6&&
+    Math.abs(current*10-Math.round(current*10))<0.00001;
+  const selected=matches?(Math.round(current*10)/10).toFixed(1):str;
+  const opts=Array.from({length:10},(_,i)=>((i+1)/10).toFixed(1));
+  const choices='<option value="">— Выберите полноту —</option>'+
+   (str&&!matches?'<option value="'+h(str)+'" selected>Сохранено: '+h(str)+' — выберите 0.1–1.0</option>':'')+
+   opts.map(x=>'<option value="'+x+'"'+(selected===x?' selected':'')+'>'+x+'</option>').join('');
+  return '<label class="wf-field" title="Поле исходной базы: POL"><span>Полнота</span>'+
+   '<select id="'+h(id)+'" data-wffield="POL" data-solin-form="Макет10" data-solin-initial="'+h(str)+'" inputmode="none">'+choices+'</select></label>';
+ }
  const phantom=form==='Макет10'&&['KOEF','LET','PH','PD2','KT','POL','SPS','ZAP'].includes(name);
  let control;
  if(list){
