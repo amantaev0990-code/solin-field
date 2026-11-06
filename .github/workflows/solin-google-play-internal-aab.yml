@@ -1,0 +1,109 @@
+name: SOLI-N Field — Google Play internal testing AAB
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: 'New unique Android versionCode, higher than the last Play release'
+        required: true
+        default: '230003'
+
+permissions:
+  contents: read
+
+jobs:
+  build-internal-aab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - name: Require configured permanent V23 key
+        env:
+          V23_PASSWORD: ${{ secrets.SOLIN_V23_KEYSTORE_PASSWORD }}
+        shell: bash
+        run: |
+          if [[ -z "$V23_PASSWORD" ]]; then
+            echo 'Add repository secret SOLIN_V23_KEYSTORE_PASSWORD first. No new key will be generated.' >&2
+            exit 1
+          fi
+      - name: Checkout reviewed V23 field-test sources
+        uses: actions/checkout@v4
+        with:
+          ref: fix/v23-field-test-2026-11-06
+          path: app
+      - name: Checkout trusted signing and Google Play build configuration
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: release-config
+          sparse-checkout: |
+            signing
+            scripts/prepare-v23-release.mjs
+            scripts/prepare-google-play-bundle.mjs
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Build PWA, preserve original MDB workflow, and stage Android project
+        working-directory: app
+        env:
+          SOLIN_RELEASE_VERSION_CODE: ${{ inputs.version_code }}
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund
+          npm run build
+          node scripts/test-v23-keyboard-and-modal.cjs
+          node scripts/test-card-calculations.cjs
+          node scripts/test-quarter-geography-selects.cjs
+          npx cap add android
+          node scripts/install-android-mdb.mjs
+          npx cap sync android
+          node ../release-config/scripts/prepare-v23-release.mjs
+          node ../release-config/scripts/prepare-google-play-bundle.mjs
+      - name: Assemble Android App Bundle (AAB)
+        working-directory: app/android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon bundleRelease
+      - name: Verify and sign bundle with original V23 upload key
+        working-directory: app
+        shell: bash
+        env:
+          SOLIN_V23_KEYSTORE_PASSWORD: ${{ secrets.SOLIN_V23_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          base64 --decode ../release-config/signing/solin-v23-encrypted.p12.b64 > "$RUNNER_TEMP/v23.p12"
+          chmod 600 "$RUNNER_TEMP/v23.p12"
+          ACTUAL_SHA="$(sha256sum "$RUNNER_TEMP/v23.p12" | cut -d' ' -f1)"
+          EXPECTED_SHA="$(node -p 'require("../release-config/signing/certificate.json").keystoreSha256')"
+          [[ "$ACTUAL_SHA" == "$EXPECTED_SHA" ]] || { echo 'Keystore SHA mismatch'; exit 1; }
+          CERT="$(keytool -list -v -storetype PKCS12 -keystore "$RUNNER_TEMP/v23.p12" -alias solin-cloud-lab -storepass:env SOLIN_V23_KEYSTORE_PASSWORD | sed -n 's/.*SHA256: //p' | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          [[ "$CERT" == '5A1C2E2BF2EFE5AA7382674B651533A11D2B93C802A1C09ADC72656C5A29ED7E' ]] || { echo 'Wrong V23 key'; exit 1; }
+          BUNDLE='android/app/build/outputs/bundle/release/app-release.aab'
+          test -s "$BUNDLE" || { echo 'Unsigned Android App Bundle not produced'; exit 1; }
+          mkdir -p release
+          jarsigner -keystore "$RUNNER_TEMP/v23.p12" -storetype PKCS12 \
+            -storepass:env SOLIN_V23_KEYSTORE_PASSWORD -keypass:env SOLIN_V23_KEYSTORE_PASSWORD \
+            -sigalg SHA256withRSA -digestalg SHA-256 \
+            -signedjar release/SOLIN-Field-Play.aab "$BUNDLE" solin-cloud-lab
+          jarsigner -verify -verbose -certs release/SOLIN-Field-Play.aab > "$RUNNER_TEMP/aab-verify.log" || {
+            cat "$RUNNER_TEMP/aab-verify.log"
+            exit 1
+          }
+          grep -q 'jar verified' "$RUNNER_TEMP/aab-verify.log" || { echo 'AAB signature verification failed'; exit 1; }
+          BUNDLE_CERT="$(keytool -printcert -jarfile release/SOLIN-Field-Play.aab | sed -n 's/.*SHA256: //p' | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          [[ "$BUNDLE_CERT" == "$CERT" ]] || { echo 'Signed AAB certificate mismatch'; exit 1; }
+          echo 'Signed Google Play App Bundle verified against pinned V23 certificate.'
+          rm -f "$RUNNER_TEMP/v23.p12"
+      - name: Save AAB ready for Play Console internal testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: SOLIN-Field-Google-Play-AAB-${{ inputs.version_code }}
+          path: app/release/SOLIN-Field-Play.aab
+          if-no-files-found: error
+          retention-days: 30
