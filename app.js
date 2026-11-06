@@ -187,7 +187,38 @@ function createQuarter(){const raw=$('#newKV').value.trim();if(!/^\d+$/.test(raw
  const resolvedFzona=fzona===''?0:Number(fzona);
  D.quarters[k]={meta:{POS:D.lesnichestvo?.[0]?.POS,LESN:D.lesnichestvo?.[0]?.LESN,KV:+k||k,KGLF:$('#newKGLF').value||null,Kpz:$('#newKpz').value||null,Klxr:$('#newKlxr').value||null,
  Fzona:resolvedFzona,Raion:raion===''?null:Number(raion),Rel:$('#newRel').value||null,Dost:$('#newDost').value||null,Udal:$('#newUdal').value||null,GodT:$('#newGodT').value||D.lesnichestvo?.[0]?.GodT||null,Tax:$('#newTax').value.trim()||null,Prin:$('#newPrin').value.trim()||null,Korr:$('#newKorr').value.trim()||null},compartments:[],_local:true};saveLocal();closeModal();refresh();show('quartersScreen');toast('Квартал создан')}
-function openCompForm(k='',selectedKGLF=null){if(!D?.quarters)return;const quarterIds=Object.keys(D.quarters).sort((a,b)=>+a-+b);if(!quarterIds.length)return toast('Сначала создайте квартал');if(!D.quarters[k])k=quarterIds[0];const opts=quarterIds.map(x=>`<option value="${esc(x)}" ${String(x)===String(k)?'selected':''}>Квартал ${esc(x)}</option>`).join('');const ku=Object.entries(D.fieldLookups?.KU||{}).filter(([c,n])=>c&&n).map(([c,n])=>`<option value="${esc(c)}">${esc(n)} · ${esc(c)}</option>`).join('');openModal('Новый выдел',`<div class="formGrid"><label><span>Квартал</span><select id="newCompKV" onchange="updateNewCompQuarter(this.value)">${opts}</select></label><label><span>Категория ГЛФ</span><select id="newCompKGLF">${(D.quarters[k]?.quarterRows||[D.quarters[k]?.meta||{}]).map(x=>`<option value="${esc(x.KGLF??'')}" ${selectedKGLF!=null&&String(x.KGLF)===String(selectedKGLF)?'selected':''}>${esc(x.KGLF)}</option>`).join('')}</select></label><label><span>Номер выдела</span><input id="newVD" inputmode="numeric" placeholder="Например, 12"></label><label><span>Площадь, га</span><input id="newPLV" inputmode="decimal" value="1.0" aria-describedby="newAreaHelp"><small id="newAreaHelp">Можно оставить 1.0 до переноса точных площадей: MapInfo → Excel → SOLI-N.</small></label><label><span>Категория угодий</span><select id="newKU"><option value="">Выбрать…</option>${ku}</select></label><label><span>Преобладающая порода</span><input id="newPOR" autocomplete="off" placeholder="Например, В или ОС"><small>Введите код или название. Бонитет рассчитается после макета 10.</small></label></div><div class="formActions"><button class="secondary" onclick="closeModal()">Отмена</button><button class="primary" onclick="createComp()">Создать</button></div>`);window.SolinSpeciesEntry?.mountAll?.();}
+function openCompForm(k='',selectedKGLF=null){
+ // V20.1: open the stand OVERVIEW first (same screen as an existing stand).
+ // Do not create an incomplete record until the operator edits and saves.
+ if(!D?.quarters)return;
+ const ids=Object.keys(D.quarters).sort((a,b)=>Number(a)-Number(b));
+ if(!ids.length)return toast('Сначала создайте квартал');
+ if(!D.quarters[k])k=ids[0];
+ const quarter=D.quarters[k],org=D.lesnichestvo?.[0]||{};
+ const rows=quarter.quarterRows?.length?quarter.quarterRows:[quarter.meta||{}];
+ const source=selectedKGLF==null?rows[0]:rows.find(x=>String(x.KGLF)===String(selectedKGLF));
+ if(!source)return toast('Не найдена выбранная категория ГЛФ в квартале');
+ const existing=(quarter.compartments||[]).filter(x=>String(x.KGLF)===String(source.KGLF));
+ const next=Math.max(0,...existing.map(x=>Number(x.VD)||0))+1;
+ const schema=D.transfSchema?.['Выдел']||[];
+ const r=Object.fromEntries(schema.map(field=>[field,null]));
+ Object.assign(r,{POS:org.POS,LESN:org.LESN,KV:Number(k),KGLF:source.KGLF,
+  Fzona:source.Fzona,KlxrVD:source.Klxr,VD:next,PLV:1,KU:null,M3B:0,
+  _children:{},_local:true});
+ window.SolinAddressContext?.enrichStand?.(r,quarter,org);
+ if(!window.SolinCardEditor?.open)return toast('Редактор карточки не загружен');
+ // This unsaved stand is a preview, not a forest database entry. The
+ // "Изменить карточку" action opens SolinCardEditor with isNew:true.
+ current=r;renderComp();show('card');
+ const content=document.querySelector('#humanContent');
+ if(content){
+  const notice=document.createElement('p');notice.className='solin-new-stand-notice';
+  notice.setAttribute('role','status');
+  notice.textContent='Новый выдел ещё не сохранён. Нажмите «Изменить карточку», заполните данные и сохраните.';
+  content.prepend(notice);
+ }
+}
+
 // The native iOS <select> is still finishing its change event here.
 // Rebuilding the entire modal in that event can strand an invisible picker
 // above the form, blocking every tap. Update only the dependent KGLF list.
@@ -248,4 +279,4 @@ function renderFriendlyRefs(q=''){q=q.trim().toLowerCase();const box=$('#friendl
 function renderDb(){const box=$('#dbTables');if(!box||!D)return;box.innerHTML=Object.entries(D.transfSchema||{}).map(([n,cols])=>`<div class="dbRow"><b>${childNames[n]||n.replace('Макет','Макет ')}</b><small>${cols.length} полей</small></div>`).join('')}
 async function locate(){toast('Ищу спутники GPS…');try{const p=await SolinLocation.current();gps={lat:p.coords.latitude,lon:p.coords.longitude,acc:p.coords.accuracy};toast(`GPS: ${gps.lat.toFixed(5)}, ${gps.lon.toFixed(5)}`)}catch(e){toast(e.message)}}
 function exportLocal(){const s=localStorage.getItem('solin_user_data_v1')||'{}';const blob=new Blob([s],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='solin-field-local.json';a.click();URL.revokeObjectURL(a.href);toast('Экспорт готов')}
-window.addEventListener('DOMContentLoaded',()=>boot());if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+window.addEventListener('DOMContentLoaded',()=>boot());if(!window.Capacitor?.isNativePlatform?.() && 'serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
