@@ -926,5 +926,13 @@ function open(record,options={}){if(!record)return;
  }else{const pending=readRecovery(session);if(pending)recoveryPrompt(session,pending);}
 }
 window.addEventListener('solin-refs-ready',()=>{if(session){refreshLinked();window.SolinSpeciesEntry?.mountAll?.();}});
-window.SolinCardEditor={open,resolveQuarter:quarterForRecord,refreshDependencies:refreshLinked,refreshDrafts:renderDraftResume};
+function openQuick(record,kind){
+ open(record);
+ if(!session||session.pendingRecovery)return;
+ if(kind==='31'||kind==='32')showMain(kind);
+ else if(kind==='kt')preview(false);
+ else if(kind==='print')preview(true);
+ else if(kind==='cut')showChecks('6');
+}
+window.SolinCardEditor={open,openQuick,resolveQuarter:quarterForRecord,refreshDependencies:refreshLinked,refreshDrafts:renderDraftResume};
 })();
