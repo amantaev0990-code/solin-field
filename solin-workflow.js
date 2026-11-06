@@ -155,7 +155,7 @@ function editComposition(){
   '<p id="wfCompPolicy" class="wf-form-note" role="status" aria-live="polite"></p>'+
   '<div class="wf-quick-forest"><label class="wf-field"><span>Характеристика типа леса (M3TLU) · выбранного выдела</span><select id="wfQuickForestType"><option value="">— Не указано —</option></select></label><p id="wfQuickForestHint" role="status" aria-live="polite">Список зависит от главной породы, зоны и области. Сохраняется вместе с древостоем.</p></div>'+
   '<div id="wfCompRows"></div><div class="wf-composition-actions"><button type="button" id="wfCompAdd" class="secondary">＋ Добавить породу</button><output id="wfCompTotal" role="status" aria-live="polite"></output></div>'+
-  '<details id="wfQuickMakets" class="wf-quick-makets"><summary>Макеты · быстрый доступ к разделам под М32</summary><p>Чтобы не потерять ввод, сначала сохраняется состав древостоя и тип леса; затем открывается выбранный макет.</p><div class="wf-quick-makets-grid">'+CORE.filter(m=>m!=='Макет10').map(m=>'<button type="button" data-wf-quick-maket="'+h(m)+'">'+h(m.replace('Макет','М'))+' · '+h(window.SolinHuman?.formName(m)||NAMES[m])+'</button>').join('')+'<button type="button" data-wf-quick-action="print">Печать КТ</button><button type="button" data-wf-quick-action="control">Контроль</button></div></details>'+
+  '<details id="wfQuickMakets" class="wf-quick-makets"><summary>Макеты · быстрый доступ к разделам под М32</summary><p>Чтобы не потерять ввод, сначала сохраняется состав древостоя и тип леса; затем открывается выбранный макет.</p><div class="wf-quick-makets-grid">'+CORE.filter(m=>m!=='Макет10').map(m=>'<button type="button" data-wf-quick-maket="'+h(m)+'">'+h(m.replace('Макет','М'))+' · '+h(window.SolinHuman?.formName(m)||NAMES[m])+'</button>').join('')+'<button type="button" data-wf-quick-action="31">М31 · Подрост</button><button type="button" data-wf-quick-action="32">М32 · Подлесок</button><button type="button" data-wf-quick-action="kt">КТ · Просмотр</button><button type="button" data-wf-quick-action="print">Печать КТ</button><button type="button" data-wf-quick-action="cut">Контроль рубок</button><button type="button" data-wf-quick-action="control">Общий контроль</button></div></details>'+
   '<div class="formActions"><button type="button" class="secondary" id="wfCompCancel">Отмена</button><button type="button" class="primary" id="wfCompSave">Сохранить весь состав</button></div>');
  const root=document.getElementById('modalBody'),host=root.querySelector('#wfCompRows'),cat=root.querySelector('#wfCompKU');
  const ref=window.SOLIN_REFS?.tables,rules=window.SolinDependentRules;
@@ -330,7 +330,9 @@ function editComposition(){
   const destination=pendingQuickAction;
   pendingQuickAction=null;
   if(CORE.includes(destination))openMaket(destination);
-  else if(destination==='print')printCard();
+  else if(['31','32','kt','print','cut'].includes(destination)&&window.SolinCardEditor?.openQuick){
+   window.SolinCardEditor.openQuick(r,destination);
+  }else if(destination==='print')printCard();
   else if(destination==='control')checkData(r,true);
   notify('Сохранено '+rows.length+' пород. Характеристика типа леса сохраняется в карточке выдела.');
  };
