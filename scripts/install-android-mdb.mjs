@@ -138,4 +138,37 @@ if(!/android:icon="[^"]+"/.test(updatedManifest))throw Error('AndroidManifest ic
 updatedManifest=updatedManifest.replace(/android:icon="[^"]+"/,'android:icon="@mipmap/ic_launcher"');
 updatedManifest=updatedManifest.replace(/android:roundIcon="[^"]+"/,'android:roundIcon="@mipmap/ic_launcher_round"');
 fs.writeFileSync(manifestFile,updatedManifest);
+// Optional GitHub release updater. It is excluded from Google Play builds,
+// whose policies restrict REQUEST_INSTALL_PACKAGES.
+if (process.env.SOLIN_GITHUB_UPDATES === '1') {
+ const updateSrc=path.join(root,'native/android/SolinUpdatePlugin.java');
+ if(!fs.existsSync(updateSrc))throw Error('Native update plugin source missing');
+ fs.copyFileSync(updateSrc,path.join(path.dirname(activity),'SolinUpdatePlugin.java'));
+ main=fs.readFileSync(activity,'utf8');
+ if(!main.includes('registerPlugin(SolinUpdatePlugin.class)')){
+   if(!main.includes('registerPlugin(SolinMdbPlugin.class);'))throw Error('Native MDB registration missing');
+   main=main.replace('registerPlugin(SolinMdbPlugin.class);',
+      'registerPlugin(SolinMdbPlugin.class);\\n    registerPlugin(SolinUpdatePlugin.class);'.replace('\\n','\n'));
+   fs.writeFileSync(activity,main);
+ }
+ manifest=fs.readFileSync(manifestFile,'utf8');
+ if(!manifest.includes('android.permission.REQUEST_INSTALL_PACKAGES')){
+   manifest=manifest.replace('</manifest>',
+     '    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />\n</manifest>');
+ }
+ const provider='<provider android:name="androidx.core.content.FileProvider" '+
+     'android:authorities="${applicationId}.updater" android:exported="false" '+
+     'android:grantUriPermissions="true"><meta-data android:name="android.support.FILE_PROVIDER_PATHS" '+
+     'android:resource="@xml/solin_update_paths" /></provider>';
+ if(!manifest.includes('android:authorities="${applicationId}.updater"')){
+   if(!manifest.includes('</application>'))throw Error('AndroidManifest application node missing');
+   manifest=manifest.replace('</application>', '    '+provider+'\n    </application>');
+ }
+ fs.writeFileSync(manifestFile,manifest);
+ const xmlDir=path.join(app,'src/main/res/xml');
+ fs.mkdirSync(xmlDir,{recursive:true});
+ fs.writeFileSync(path.join(xmlDir,'solin_update_paths.xml'),
+   '<?xml version="1.0" encoding="utf-8"?><paths xmlns:android="http://schemas.android.com/apk/res/android"><cache-path name="updates" path="updates/" /></paths>\n');
+ console.log('Opt-in GitHub APK updater registered; pinned V23 identity and installer protections active.');
+}
 console.log('Native Android MDB, GPS and plain dark-green S launcher installed.');
