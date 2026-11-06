@@ -7,6 +7,9 @@ on:
       - feature/v23-one-tap-updates-2026-11-06
     paths:
       - 'solin-updates.js'
+      - 'solin-workflow.js'
+      - 'solin-workflow.css'
+      - 'scripts/test-stand-quick-makets.cjs'
       - 'index.html'
       - 'scripts/test-github-updates.cjs'
       - 'scripts/install-android-mdb.mjs'
@@ -35,6 +38,9 @@ jobs:
           node --check solin-updates.js
           node --check scripts/install-android-mdb.mjs
           node scripts/test-github-updates.cjs
+          node scripts/test-stand-quick-makets.cjs
+          node scripts/test-card-calculations.cjs
+          node scripts/test-quarter-geography-selects.cjs
       - name: Stage production PWA resources without touching original MDB files
         run: npm run build
       - name: Generate native Android app and register updater only in test
