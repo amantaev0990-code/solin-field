@@ -24,6 +24,19 @@ if(!main.includes('registerPlugin(SolinLocationPlugin.class)')){
  main=main.replace('registerPlugin(SolinMdbPlugin.class);','registerPlugin(SolinMdbPlugin.class);\n    registerPlugin(SolinLocationPlugin.class);');
  fs.writeFileSync(activity,main);
 }
+// Optional V23+ updater: registers separately, does not modify forest data.
+const updatePluginSource=path.join(root,'native/android/SolinUpdatePlugin.java');
+if(fs.existsSync(updatePluginSource)){
+ fs.copyFileSync(updatePluginSource,path.join(path.dirname(activity),'SolinUpdatePlugin.java'));
+ main=fs.readFileSync(activity,'utf8');
+ if(!main.includes('registerPlugin(SolinUpdatePlugin.class)')){
+  if(!main.includes('registerPlugin(SolinMdbPlugin.class);'))
+   throw Error('Unknown MainActivity; refusing to change native registration');
+  main=main.replace('registerPlugin(SolinMdbPlugin.class);',
+    'registerPlugin(SolinMdbPlugin.class);\n    registerPlugin(SolinUpdatePlugin.class);');
+  fs.writeFileSync(activity,main);
+ }
+}
 const manifestFile=path.join(app,'src/main/AndroidManifest.xml');
 let manifest=fs.readFileSync(manifestFile,'utf8');
 for(const permission of ['ACCESS_FINE_LOCATION','ACCESS_COARSE_LOCATION']){
@@ -32,6 +45,24 @@ for(const permission of ['ACCESS_FINE_LOCATION','ACCESS_COARSE_LOCATION']){
 }
 if(!manifest.includes('android.hardware.location.gps'))manifest=manifest.replace('</manifest>',
  '    <uses-feature android:name="android.hardware.location.gps" android:required="false" />\n</manifest>');
+// Verified updates are handed to Android through an app-private cache FileProvider.
+if(!manifest.includes('android.permission.REQUEST_INSTALL_PACKAGES'))
+ manifest=manifest.replace('</manifest>',
+ '    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />\n</manifest>');
+if(!manifest.includes('androidx.core.content.FileProvider')){
+ if(!manifest.includes('</application>'))throw Error('Unknown AndroidManifest application layout');
+ manifest=manifest.replace('</application>',
+ '    <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.solinupdates" android:exported="false" android:grantUriPermissions="true">\n'+
+ '      <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/solin_update_filepaths" />\n'+
+ '    </provider>\n  </application>');
+}
+const updatePaths=path.join(app,'src/main/res/xml/solin_update_filepaths.xml');
+fs.mkdirSync(path.dirname(updatePaths),{recursive:true});
+fs.writeFileSync(updatePaths,
+ '<?xml version="1.0" encoding="utf-8"?>\n'+
+ '<paths xmlns:android="http://schemas.android.com/apk/res/android">\n'+
+ '  <cache-path name="updates" path="updates/" />\n'+
+ '</paths>\n');
 fs.writeFileSync(manifestFile,manifest);
 // Install a native Android/JUnit test in the generated Capacitor project.
 // Tests exercise the same private Jackcess writer invoked by the plugin,
