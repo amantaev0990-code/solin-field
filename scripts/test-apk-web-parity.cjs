@@ -13,7 +13,8 @@ const expectedHTML=sourceHTML.includes('solin-apk-mdb.js')?sourceHTML:
 assert.equal(androidHTML,expectedHTML,'APK HTML MUST match exactly the approved GitHub Pages UI; only optional native bridge may be added.');
 const swCall="if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});";
 const nativeSwCall="if(!window.Capacitor?.isNativePlatform?.() && 'serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});";
-assert(sourceApp.includes(swCall),'Expected current app.js service worker initialization; review build script if changed.');
+assert(sourceApp.includes(swCall)||sourceApp.includes(nativeSwCall),
+ 'Expected approved app.js service worker initialization; review build script if changed.');
 assert.equal(nativeApp,sourceApp.replace(swCall,nativeSwCall),
  'APK runtime app.js MUST be byte-identical apart from disabling SW in native WebView.');
 // Check every same-origin HTML asset. Never silently ship an obsolete CSS,
