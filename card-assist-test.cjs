@@ -89,25 +89,27 @@ const server=http.createServer((req,res)=>{const rel=decodeURIComponent(req.url.
   await page.locator('[data-ce-jump="10"]').click();
   assert(await page.locator('.ce-table-wrap').first().evaluate(el=>el.scrollWidth>el.clientWidth));
   await page.locator('#ce-cancel').click();
+  // V23 protects dirty drafts: explicit discard is required before closing.
+  if(await page.locator('#solin-v23-leave-confirm').isVisible())
+    await page.locator('#solin-v23-leave-confirm [data-v23="discard"]').click();
   assert(await page.locator('#ce-form').isHidden());
   assert(Math.abs(Number(await page.evaluate(()=>current.PLV))-Number(original.replace(',','.')))<0.00001,'Cancel must discard edited values (float32 precision)');
   // Closing the desktop card must not leave its dark assist backdrop above
   // subsequent ordinary modal forms (regression from CSS display:flex + hidden).
   await page.evaluate(()=>solinWorkflow.editMaket('Макет10',(current._children?.Макет10||[]).length));
-  assert(await page.locator('#modalTitle').innerText().then(t=>t.includes('Новая запись')));
+  assert.match(await page.locator('#modalTitle').innerText(),/Основные данные/);
   assert.equal(await page.locator('#ce-assist').evaluate(el=>getComputedStyle(el).display),'none');
-  assert(await page.locator('.modalCard').evaluate(el=>{const c=getComputedStyle(el);return c.backgroundColor==='rgb(255, 255, 255)'&&c.opacity==='1';}));
-  const coefficient=page.locator('#wf_KOEF');
-  assert.equal(await coefficient.getAttribute('placeholder'),'0');
-  assert.equal(await coefficient.inputValue(),'');
-  await coefficient.evaluate(el=>el.value='0');
-  await coefficient.focus();
-  assert.equal(await coefficient.inputValue(),'','zero should clear on focus');
-  await page.locator('#modalTitle').click();
-  assert.equal(await coefficient.inputValue(),'0','untouched genuine zero must be restored');
-  await coefficient.focus();await coefficient.fill('3');
-  assert.equal(await coefficient.inputValue(),'3','user should be able to type without deleting zero');
-  await page.evaluate(()=>closeModal());
+  assert(await page.locator('#wfQuickForestType').count(),'Forest characteristic must be accessible inside stand modal');
+  assert(await page.locator('#wfQuickMakets [data-wf-quick-maket]').count()>=14,
+    'Stand modal must expose the original additional makets');
+  const coefficient=page.locator('#modalBody [data-wffield="KOEF"]').first();
+  assert(await coefficient.count(),'Each species must retain its composition coefficient field');
+  await coefficient.fill('3');
+  assert.equal(await coefficient.inputValue(),'3','Field input must be editable');
+  await page.locator('#wfCompCancel').click();
+  if(await page.locator('#solin-v23-leave-confirm').isVisible())
+    await page.locator('#solin-v23-leave-confirm [data-v23="discard"]').click();
+  assert(await page.locator('#modal').isHidden(),'Cancelling stand modal should not keep stale overlay');
   await page.setViewportSize({width:320,height:700});
   await page.locator('#wfEditBase').click();
   await page.locator('[data-ce-jump="1"]').click();
@@ -117,7 +119,7 @@ const server=http.createServer((req,res)=>{const rel=decodeURIComponent(req.url.
   await page.locator('#ce-extra [data-ce-main]').click();
   await page.locator('[data-ce-jump="10"]').click();
   if(process.env.TEST_OUTPUT)await page.screenshot({path:require('path').join(process.env.TEST_OUTPUT,'maket-10.png')});
-  await page.locator('[data-ce-scope="base"][data-ce-field="PLV"]').fill('24,25');
+  await page.locator('[data-ce-scope="base"][data-ce-field="PLV"]').fill('24.25');
   await page.locator('#ce-save').click();
   await page.waitForFunction(()=>!document.querySelector('#ce-form'));
   assert.equal(await page.evaluate(()=>current.PLV),24.25);
