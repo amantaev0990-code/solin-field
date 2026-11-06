@@ -103,15 +103,55 @@ if(typeof document!=='undefined'){
 const title=(form,f)=>aliases[f]||SolinHuman.label(form,f);
 const DESKTOP_WIDTH=1200,DESKTOP_HEIGHT=704;
 const desktopLabels={IAR:'Ярус',KOEF:'Коэфф.',POR:'Порода',LET:'А, лет',PH:'Н, м',PD2:'Д, см',KT:'Класс',PROI:'Происхождение',POL:'Полнота',SPS:'Сумма',ZAP:'Запас'};
+// POL is a shared MDB column with category-dependent meaning. Never convert
+// historical values between relative fullness and survival percentage.
+function polRules(category){
+ const rule=window.SolinCategoryRules?.field(category,'Макет10','POL',window.SOLIN_REFS?.tables);
+ return rule?{...rule,survival:rule.kind==='survival'}:
+  {kind:'unverified',label:'POL — значение уточняется',survival:false};
+}
+
+// One leading species carries whole-layer POL and ZAP; accessory species
+// only record IAR/KOEF/POR/LET/PH/PD2/KT/PROI.  Use the same rank
+// (KOEF, main-species, row order) as original stock calculations.
+function leadingMaket10Row(rows,index,card){
+ const target=rows[index];if(!target)return false;
+ const layer=String(target.IAR??'');
+ const sorted=rows.map((row,i)=>({row,i})).filter(x=>String(x.row.IAR??'')===layer);
+ if(!sorted.length)return false;
+ const weight=row=>{const n=Number(row.KOEF);return row.KOEF==null||row.KOEF===''||!Number.isFinite(n)?-1:n;};
+ sorted.sort((a,b)=>weight(b.row)-weight(a.row)||
+   Number(String(b.row.POR??'')===String(card?.M3Pr??''))-
+   Number(String(a.row.POR??'')===String(card?.M3Pr??''))||a.i-b.i);
+ return sorted[0].i===index;
+}
+function maket10InputCell(form,field,row,index,rows){
+ if(form==='Макет10'&&['POL','ZAP'].includes(field)&&!leadingMaket10Row(rows,index,session.draft)){
+  // Do not clear legacy original rows: visual-only restriction, no MDB mutation.
+  const legacy=row[field]!=null&&row[field]!==''&&Number(row[field])!==0;
+  return '<td class="ce-companion-cell" title="Полнота и общий запас — только у ведущей породы">'+
+   (legacy?'<span title="Сохранённое значение не изменено: '+h(row[field])+'">Ранее: '+h(row[field])+'</span>':'<span>—</span>')+'</td>';
+ }
+ return '<td>'+input(form,field,row[field],form,index)+'</td>';
+}
+
 function isNumeric(form,field){const t=window.SolinFieldTypes;return t?.type(form,field)?t.numeric(form,field):numeric.has(field);}
 function input(form,field,value,scope,index){
  const id='ce_'+scope+'_'+(index??'base')+'_'+field,fragment=document.createElement('div');
  const shown=isNumeric(form,field)&&typeof value==='number'?value.toLocaleString('ru-RU',{useGrouping:false,maximumFractionDigits:6}):value;
  fragment.innerHTML=SolinHuman.input(field,shown??'',id,form);
- const label=fragment.firstElementChild,el=label.querySelector('input,select');
+ const label=fragment.firstElementChild;
+ let el=label.querySelector('input,select');
+ if(form==='Макет10'&&field==='POL'&&polRules(session?.draft?.KU).kind!=='fullness'&&el.tagName==='SELECT'){
+  // The 0.1–1.0 fullness picker cannot represent a 1–100 survival value.
+  const numericInput=document.createElement('input');
+  numericInput.type='number';numericInput.setAttribute('value',value==null?'':String(value));
+  el.replaceWith(numericInput);el=numericInput;
+ }
  window.SolinFieldTypes?.bind(el,value);
- const caption=SolinHuman.isTechnical(form,field)?D.fieldLabels?.[field]||field:title(form,field);
- label.className='ce-field';label.querySelector('span').textContent=caption;
+ const caption=form==='Макет10'&&field==='POL'?polRules(session?.draft?.KU).label:
+  (SolinHuman.isTechnical(form,field)?D.fieldLabels?.[field]||field:title(form,field));
+ label.className='ce-field';label.querySelector('span').textContent=caption+(session?.isNew&&scope==='base'&&['KU','M3Pr','M3TLU'].includes(field)?' *':'');
  el.id=id;el.dataset.ceField=field;el.dataset.ceScope=scope;el.dataset.ceForm=form;
  el.setAttribute('aria-label',caption);el.removeAttribute('data-wffield');
  if(index!=null)el.dataset.ceRow=index;
@@ -125,6 +165,16 @@ function input(form,field,value,scope,index){
       : '—';
  }
  else{el.placeholder=isNumeric(form,field)?'0':'';if(isNumeric(form,field))el.inputMode='decimal';}
+ if(form==='Макет10'&&field==='POL'&&el.tagName==='INPUT'){
+  const rule=polRules(session?.draft?.KU);
+  if(rule.kind!=='fullness'){
+   el.type='number';el.setAttribute('value',value==null?'':String(value));
+   el.min=rule.kind==='survival'?'1':'0';el.max='100';
+   el.step=rule.kind==='survival'?'1':'any';
+   el.inputMode=rule.kind==='survival'?'numeric':'decimal';
+   el.placeholder=rule.kind==='survival'?'1–100 %':'Исходное значение POL';
+  }
+ }
  return label.outerHTML;
 }
 function fields(form,names,values,scope){return names.map(f=>cell(f,values[f],scope,form,{label:SolinHuman.isTechnical(form,f)?D.fieldLabels?.[f]||f:title(form,f),split:!!SolinHuman.lookup(form,f)})).join('');}
@@ -140,12 +190,28 @@ function newTableRow(form){
  // selected/suggested and preserve existing saved zeros without coercion.
  return Object.fromEntries((D.transfSchema[form]||[]).map(f=>[f,
   keys.includes(f)?session.draft[f]??null:
-  form==='Макет10'?(f==='IAR'?Number(window.SolinDependentRules?.allowedLayers(session.draft,window.SOLIN_REFS?.tables)?.items?.[0]?.value??0)||null:null):
+  form==='Макет10'?(f==='IAR'?Number(window.SolinDependentRules?.allowedLayers(session.draft,window.SOLIN_REFS?.tables)?.items?.[0]?.value??0)||null:
+   f==='ZAP'&&Number(session.draft.KU)===19?0:null):
   form==='Макет16'?null:isNumeric(form,f)?0:null]));
 }
-function table(form){const rs=session.draft._children[form]||[],schema=(D.transfSchema[form]||[]).filter(f=>!keys.includes(f)),shown=rs.length?rs:[newTableRow(form)];
- const m10=form==='Макет10';
- return '<div class="ce-table-wrap" tabindex="0" aria-label="Таблица '+h(form)+'"><table class="ce-table"><caption class="ce-sr-only">'+h(form)+' — '+h(SolinHuman.formName(form))+'</caption><colgroup><col style="width:24px">'+schema.map(f=>'<col'+(m10?' style="width:'+({IAR:145,KOEF:85,POR:190,LET:55,PH:55,PD2:55,KT:70,PROI:160,POL:80,SPS:75,ZAP:110}[f]||90)+'px"':'')+'>').join('')+'</colgroup><thead><tr><th scope="col"></th>'+schema.map(f=>'<th scope="col">'+h(m10?desktopLabels[f]:SolinHuman.label(form,f))+'</th>').join('')+'</tr></thead><tbody>'+shown.map((row,i)=>'<tr'+(!rs.length?' data-ce-placeholder="true"':'')+'><th scope="row" tabindex="0" data-ce-select="'+i+'" data-ce-select-form="'+h(form)+'" aria-label="Запись '+(i+1)+'">'+(i===0?'►':'')+'</th>'+schema.map(f=>'<td>'+input(form,f,row[f],form,i)+'</td>').join('')+'</tr>').join('')+'</tbody></table></div><div class="dt-record-nav"><span>Запись: </span><button type="button" data-ce-record="first" data-ce-table="'+form+'" aria-label="Первая запись">|◀</button><button type="button" data-ce-record="previous" data-ce-table="'+form+'" aria-label="Предыдущая запись">◀</button><span data-ce-count="'+form+'">'+(rs.length?'1 из '+rs.length:'Новая')+'</span><button type="button" data-ce-record="next" data-ce-table="'+form+'" aria-label="Следующая запись">▶</button><button type="button" data-ce-record="last" data-ce-table="'+form+'" aria-label="Последняя запись">▶|</button><button type="button" data-ce-add="'+form+'" aria-label="Добавить запись">▶*</button><button type="button" data-ce-delete="'+form+'" data-ce-index="0" aria-label="Удалить выбранную запись">×</button></div>';
+function table(form){
+ const m10=form==='Макет10',rs=session.draft._children[form]||[];
+ // Hide obsolete SPS input for all new cards. Original columns stay in MDB.
+ // KU19 has NO stock; if imported legacy ZAP is nonzero keep it visible for audit.
+ const legacyNonzeroStock=m10&&Number(session.draft.KU)===19&&
+  rs.some(row=>row.ZAP!=null&&Number(row.ZAP)!==0);
+ const schema=(D.transfSchema[form]||[]).filter(f=>!keys.includes(f)&&
+  !(m10&&f==='SPS')&&
+  !(m10&&Number(session.draft.KU)===19&&f==='ZAP'&&!legacyNonzeroStock));
+ const shown=rs.length?rs:[newTableRow(form)];
+ // Source SKU.P10=0 means no tree strata. Do not delete any historical rows.
+ // Hide only the EMPTY Maket10 editor to prevent accidental tree creation.
+ const category=window.SolinCategoryRules?.profile(session.draft.KU,window.SOLIN_REFS?.tables);
+ if(m10&&category?.hasTreeLayers===false&&!rs.length)
+  return '<div class="ce-category-no-trees" role="status">Для категории '+h(category.code)+
+   ' «'+h(category.name)+'» оригинальный SKU.P10 не предусматривает ярусы древостоя.'+
+   ' Макет 10 здесь не заполняется; существующие записи других категорий не изменены.</div>';
+ return '<div class="ce-table-wrap" tabindex="0" aria-label="Таблица '+h(form)+'"><table class="ce-table"><caption class="ce-sr-only">'+h(form)+' — '+h(SolinHuman.formName(form))+'</caption><colgroup><col style="width:24px">'+schema.map(f=>'<col'+(m10?' style="width:'+({IAR:145,KOEF:85,POR:190,LET:55,PH:55,PD2:55,KT:70,PROI:160,POL:80,SPS:75,ZAP:110}[f]||90)+'px"':'')+'>').join('')+'</colgroup><thead><tr><th scope="col"></th>'+schema.map(f=>'<th scope="col">'+h(m10&&f==='POL'?polRules(session.draft.KU).label:m10?desktopLabels[f]:SolinHuman.label(form,f))+'</th>').join('')+'</tr></thead><tbody>'+shown.map((row,i)=>'<tr'+(!rs.length?' data-ce-placeholder="true"':'')+'><th scope="row" tabindex="0" data-ce-select="'+i+'" data-ce-select-form="'+h(form)+'" aria-label="Запись '+(i+1)+'">'+(i===0?'►':'')+'</th>'+schema.map(f=>maket10InputCell(form,f,row,i,shown)).join('')+'</tr>').join('')+'</tbody></table></div><div class="dt-record-nav"><span>Запись: </span><button type="button" data-ce-record="first" data-ce-table="'+form+'" aria-label="Первая запись">|◀</button><button type="button" data-ce-record="previous" data-ce-table="'+form+'" aria-label="Предыдущая запись">◀</button><span data-ce-count="'+form+'">'+(rs.length?'1 из '+rs.length:'Новая')+'</span><button type="button" data-ce-record="next" data-ce-table="'+form+'" aria-label="Следующая запись">▶</button><button type="button" data-ce-record="last" data-ce-table="'+form+'" aria-label="Последняя запись">▶|</button><button type="button" data-ce-add="'+form+'" aria-label="Добавить запись">▶*</button><button type="button" data-ce-delete="'+form+'" data-ce-index="0" aria-label="Удалить выбранную запись">×</button></div>';
 }
 function footer(){const routes=SOLIN_AUDIT.routes['ВыделВ']||[],buttons=routes.filter(x=>/^\d+$/.test(x.caption)).sort((a,b)=>Number(a.left)-Number(b.left));
  return '<footer class="dt-footer"><span class="dt-footer-label">Макет</span>'+buttons.map(b=>'<button type="button" data-ce-extra="Макет'+h(b.caption)+'" style="left:'+(Number(b.left)*.08)+'px;width:'+(Number(b.width)*.08)+'px" title="'+h(SolinHuman.formName('Макет'+b.caption))+'" aria-label="Макет '+b.caption+' — '+h(SolinHuman.formName('Макет'+b.caption))+'">'+b.caption+'</button>').join('')+'<select class="dt-maket-select" aria-label="Дополнительные макеты"><option value=""></option>'+[10,...extras,31,32].map(n=>'<option value="'+n+'">Макет '+n+' — '+h(SolinHuman.formName('Макет'+n))+'</option>').join('')+'</select><button type="button" class="dt-kt" data-ce-preview>КТ</button><button type="button" class="dt-print" data-ce-print>Печать</button><button type="button" class="dt-control" data-ce-controls="6">Конт. рубок</button><button type="button" class="dt-new" data-ce-new>Новая</button><button type="submit" class="dt-exit" id="ce-exit">Выход</button></footer>';
@@ -160,24 +226,44 @@ function markup(){const s=session,r=s.draft,o=D.lesnichestvo?.find(x=>same(x.POS
  '<div id="ce-category-guidance" class="ce-category-guidance" role="status" aria-live="polite">Допустимые ярусы будут показаны после выбора категории угодий.</div>'+ 
  maket('1',cell('OZU',r.OZU,'base','ВыделВ',{label:'Особозащитный участок',weight:3.2,split:true})+cell('CkEk',r.CkEk,'base','ВыделВ',{label:'Склон - экспозиция',weight:1.7,split:true})+cell('CkKr',r.CkKr,'base','ВыделВ',{label:'крутизна',weight:.65})+cell('VNUM',r.VNUM,'base','ВыделВ',{label:'ВНУМ',weight:.65})+cell('ErV',r.ErV,'base','ВыделВ',{label:'Эрозия - вид',weight:1.6,split:true})+cell('ErCt',r.ErCt,'base','ВыделВ',{label:'степень',weight:1.5,split:true}))+
  maket('2',cell('M2PM1',r.M2PM1,'base','ВыделВ',{label:'Первое мероприятие',weight:3.1,split:true})+cell('M2Pr',r.M2Pr,'base','ВыделВ',{label:'Процент',weight:.55})+cell('M22',r.M22,'base','ВыделВ',{label:'Второе мероприятие',weight:2.6,split:true})+cell('M23',r.M23,'base','ВыделВ',{label:'Третье мероприятие',weight:2.6,split:true})+cell('M2Cp',r.M2Cp,'base','ВыделВ',{label:'Целевая порода',weight:2.2,split:true}))+
- maket('3',cell('M3Pr',r.M3Pr,'base','ВыделВ',{label:'Главная порода',weight:3,split:true})+cell('M3B',r.M3B,'base','ВыделВ',{label:'Бонитет',weight:.6})+cell('M3TLU',r.M3TLU,'base','ВыделВ',{label:'Характеристика типа леса',weight:3.3,split:true})+cell('M3G',r.M3G,'base','ВыделВ',{label:'Год выруб.',weight:.75})+cell('M3KP',r.M3KP,'base','ВыделВ',{label:'Пней всего, шт.',weight:.9})+cell('M3KPC',r.M3KPC,'base','ВыделВ',{label:'в т.ч. хвойных',weight:.9}))+
+ maket('3',fixed('Главная порода (см. Основные данные)',description('ВыделВ','M3Pr',r.M3Pr)||r.M3Pr,210)+cell('M3B',r.M3B,'base','ВыделВ',{label:'Бонитет',weight:.6})+fixed('Тип леса (см. Основные данные)',description('ВыделВ','M3TLU',r.M3TLU)||r.M3TLU,260)+cell('M3G',r.M3G,'base','ВыделВ',{label:'Год выруб.',weight:.75})+cell('M3KP',r.M3KP,'base','ВыделВ',{label:'Пней всего, шт.',weight:.9})+cell('M3KPC',r.M3KPC,'base','ВыделВ',{label:'в т.ч. хвойных',weight:.9}))+
  maket('4',cell('M4ZO',r.M4ZO,'base','ВыделВ',{label:'Захламленность общая, м3/га',inline:true,weight:3.5})+cell('M4ZL',r.M4ZL,'base','ВыделВ',{label:'Ликвид, м3/га',inline:true,weight:2.1})+cell('M4SS',r.M4SS,'base','ВыделВ',{label:'Сухостой, м3/га',inline:true,weight:2.1}))+
  maket('5',cell('AKL',r.AKL,'base','ВыделВ',{label:'Класс возраста',inline:true,weight:1.8})+cell('AGR',r.AGR,'base','ВыделВ',{label:'Группа возраста',inline:true,weight:1.8})+cell('AGR1',r.AGR1,'base','ВыделВ',{label:'Группа возр. ТО',inline:true,weight:1.9})+cell('STUR',r.STUR,'base','ВыделВ',{label:'Запас выдела',inline:true,weight:1.9})+cell('STUR1',r.STUR1,'base','ВыделВ',{label:'Запас на гектар',inline:true,weight:2})+'<div class="dt-fixed dt-inline ce-stock-metric"><span>Все живые ярусы, м³/га</span><output id="ce-stock-live">—</output></div><div class="dt-fixed dt-inline ce-stock-metric"><span>Ед. деревья, м³/га</span><output id="ce-stock-single">—</output></div>'+
  '<div class="dt-fixed dt-inline ce-stock-metric"><span>Свежий сухостой ярус 8, м³/га</span><output id="ce-stock-fresh">—</output></div>'+
   '<div class="dt-fixed dt-inline ce-stock-metric"><span>Сухостой M4SS, м³/га</span><output id="ce-stock-drywood">—</output></div>')+
  
- '<section class="dt-stand" id="ce-section-10" aria-label="Макет 10"><b class="dt-stand-title">Макет 10</b><div id="ce-table-Макет10">'+table('Макет10')+'</div></section>'+
+ '<section class="dt-stand" id="ce-section-10" aria-label="Основные данные о древостое"><b class="dt-stand-title" title="Исходный макет 10 SOLI-N: древостой, полнота, запас">Основные данные</b><div class="ce-v23-species"><span>Главная порода и характеристика типа леса (М3). Важно: Е — ель, ЕШ — ель Шренка (разные таблицы запаса):</span>'+cell('M3Pr',r.M3Pr,'base','ВыделВ',{label:'Главная порода',weight:1,split:true})+cell('M3TLU',r.M3TLU,'base','ВыделВ',{label:'Характеристика типа леса',weight:2,split:true})+'</div><div id="ce-table-Макет10">'+table('Макет10')+'</div></section>'+
  maket('31',cell('PRkol',r.PRkol,'base','ВыделВ',{label:'К-во, тыс.шт.',weight:.65})+cell('PRH',r.PRH,'base','ВыделВ',{label:'Ср. выс.',weight:.6})+cell('PRA',r.PRA,'base','ВыделВ',{label:'Ср. возр.',weight:.6})+cell('PRK1',r.PRK1,'base','ВыделВ',{label:'коэфф. 1',weight:.55})+cell('PRP1',r.PRP1,'base','ВыделВ',{label:'1 порода',weight:2,split:true})+cell('PRK2',r.PRK2,'base','ВыделВ',{label:'коэфф. 2',weight:.55})+cell('PRP2',r.PRP2,'base','ВыделВ',{label:'2 порода',weight:2,split:true})+cell('PRK3',r.PRK3,'base','ВыделВ',{label:'коэфф. 3',weight:.55})+cell('PRP3',r.PRP3,'base','ВыделВ',{label:'3 порода',weight:2,split:true}))+
  maket('32',cell('PLG',r.PLG,'base','ВыделВ',{label:'Густота',weight:2,split:true})+cell('PLP1',r.PLP1,'base','ВыделВ',{label:'1 порода',weight:2.8,split:true})+cell('PLP2',r.PLP2,'base','ВыделВ',{label:'2 порода',weight:2.8,split:true})+cell('PLP3',r.PLP3,'base','ВыделВ',{label:'3 порода',weight:2.8,split:true}))+footer()+'</div><div id="ce-extra" hidden></div><div id="ce-action-panel" hidden></div><div class="ce-other" hidden><div class="ce-grid">'+fields('ВыделВ',rest,r,'base')+'</div></div></div></div></div><div id="ce-error" role="alert" tabindex="-1"></div></form>';
 }
 
 function readValue(el,old){const raw=el.__solinQuarterPicker?el.__solinQuarterPicker.value():el.tagName==='SELECT'?el.value:el.value.trim(),field=el.dataset.ceField;
+ // Native tablet select uses canonical fractions, not floating-point text.
+ // In particular, selecting 0.7 must never be confused with the saved 0.
+ if(el.dataset.ceForm==='Макет10'&&field==='POL'&&el.tagName==='SELECT'){
+  if(raw==='')return null;
+  if(raw==='0'&&old!=null&&Number(old)===0)return old; // historic source 0, not a new option
+  if(!/^(?:0\.[1-9]|1\.0)$/.test(raw))throw Error('Полнота выбирается от 0.1 до 1.0 с шагом 0.1');
+  return window.SolinFieldTypes?.parse('Макет10','POL',raw)??Number(raw);
+ }
  const typed=window.SolinFieldTypes?.read(el,old,el.dataset.ceForm,field);
  if(typed!==undefined&&!el.__solinQuarterPicker)return typed;
  if(raw==='')return null;
  if(['Fzona','Raion'].includes(field)&&!/^\d+$/.test(raw))throw Error('Укажите числовой код для '+field);
  if(['Fzona','Raion'].includes(field))return Number(raw);
- if(numeric.has(field)){const n=Number(raw.trim().replace(',','.'));if(!Number.isFinite(n))throw Error('Проверьте число: '+el.getAttribute('aria-label'));return n;}
+ if(numeric.has(field)){
+  const n=Number(raw.trim().replace(',','.'));
+  if(!Number.isFinite(n))throw Error('Проверьте число: '+el.getAttribute('aria-label'));
+  if(field==='POL'){
+   const category=polRules(session?.draft?.KU);
+   if(category.survival){
+    if(!Number.isInteger(n)||n<1||n>100)throw Error('Приживаемость: целое число от 1 до 100 %.');
+   }else if(n<0.1||n>1){
+    throw Error('Полнота: значение от 0,1 до 1,0.');
+   }
+  }
+  return n;
+ }
  if(old!=null&&raw===String(old))return old;
  // Access TEXT keys (STL.KTL in particular) may have significant whitespace.
  // Never trim a selected original reference code.
@@ -200,11 +286,15 @@ function refreshLinked(){
  const guide=document.getElementById('ce-category-guidance');
  if(guide){
   const info=window.SolinDependentRules.allowedLayers(session.draft,window.SOLIN_REFS?.tables);
-  guide.textContent=info.status==='complete'?
-   'Категория «'+(info.categoryName||session.draft.KU)+'»: '+(info.items.length?
-    'допустимые ярусы — '+info.items.map(x=>x.value+' '+x.label).join('; '):
-    'для этой категории ярусы древостоя не предусмотрены'):
-   (info.reason||'Не удалось определить допустимые ярусы');
+  const categoryGuide=window.SolinCategoryRules?.guide(session.draft.KU,window.SOLIN_REFS?.tables)||'';
+  const layerGuide=info.status==='complete'&&info.items.length?
+   ' Допустимые ярусы: '+info.items.map(x=>x.value+' '+x.label).join('; ')+'.':
+   info.reason?' '+info.reason:'';
+  const reclassified=!session.isNew&&String(session.original.KU??'')!==String(session.draft.KU??'');
+  const hasOldMakets=Object.values(session.original._children||{}).some(rows=>Array.isArray(rows)&&rows.length>0);
+  guide.textContent=categoryGuide+layerGuide+
+   (reclassified&&hasOldMakets?
+    ' Внимание: категория изменена. В оригинальном SOLI-N требуется удалить и заново ввести такой выдел, чтобы старые макеты не попали в новую категорию. Сохранение прежних макетов заблокировано.':'');
   guide.dataset.ceCategoryStatus=info.status;
  }
 
@@ -266,6 +356,12 @@ function refreshStockPanel(){
  if(d.singleTrees.length)
   lines.push('Единичные деревья (ярус 7): '+h(fmt(d.singleTreesPerHa))+
    ' м³/га · '+h(fmt(d.singleTreesTotal))+' м³ на выдел. Учитываются отдельно.');
+ const comp=calc.compositionAudit?.(session.draft);
+ if(comp?.issues?.length){
+  lines.push('<b>V21 · проверка состава по ярусам:</b> '+h(comp.issues.length)+' замечаний.');
+  for(const item of comp.issues.slice(0,6))lines.push(h(item.message));
+ }else if(comp?.layers?.length)
+  lines.push('<b>V21 · состав проверен:</b> '+h(comp.layers.length)+' живых яруса, сумма коэффициентов по каждому — 10.');
  lines.push('STUR1/STUR — сумма введённых ZAP живого древостоя. К59: высота яруса = Σ(коэффициент × высота всех пород) / 10. Норма ведущей породы × полнота даёт запас яруса; общий запас — сумма ярусов.');
  panel.innerHTML=lines.map(line=>'<p>'+line+'</p>').join('');
  panel.dataset.stockStatus=stock.status;
@@ -361,6 +457,13 @@ function linkedIssues(){
  const engine=window.SolinDependentRules;
  if(!engine||!session)return null;
  const base=session.draft,before=session.original;
+ // Original SOLI-N manual: changing KU/GLF category with populated dependent
+ // makets requires deleting/re-entering the allotment. Do not silently attach
+ // obsolete makets to a new land category in the same saved record.
+ if(!session.isNew&&String(base.KU??'')!==String(before.KU??'')&&
+    Object.values(before._children||{}).some(rows=>Array.isArray(rows)&&rows.length))
+  return {message:'Смена категории угодий при заполненных макетах требует создания нового выдела по правилам оригинального SOLI-N. Старые макеты не будут перенесены автоматически; сохранение текущей переклассификации остановлено.',
+    form:'ВыделВ',scope:'base',field:'KU'};
  const audit=engine.validateTransition?.(before,base,linkedOrg(),window.SOLIN_REFS?.tables,
    {isNew:!!session.isNew});
  if(audit?.errors.length){
@@ -468,11 +571,26 @@ function capture(el){if(!el.matches('[data-ce-field]'))return;
  const previous=target[field];
  try{target[field]=readValue(el,target[field]);
   if(field==='PLV'&&!(Number(target[field])>0))throw Error('Не задана площадь выдела. Введите значение больше нуля.');
-  if(scope==='Макет10'&&field==='POL'&&(solinCore.validateRow('Макет10',target,session.draft)||[]).some(x=>x.startsWith('POL:')))
-   throw Error('Полнота или процент приживаемости не входит в диапазон значений. Пустое значение недопустимо — введите ноль (0).');
+  if(scope==='Макет10'&&field==='POL'){
+   const check=window.SolinCategoryRules?.validatePol(session.draft.KU,target[field],window.SOLIN_REFS?.tables);
+   if(check?.status==='error')throw Error(check.message);
+  }
   el.removeAttribute('aria-invalid');el.setCustomValidity('');}
  catch(e){el.setAttribute('aria-invalid','true');el.setCustomValidity(e.message);}
  if(!document.querySelector('#ce-form [aria-invalid="true"]'))document.querySelector('#ce-error').textContent='';
+ // When changing a single-species stand's main code (e.g. Е -> ЕШ),
+ // keep the corresponding original Maket10.POR consistent. Never infer a
+ // change across a mixed-species stand or silently overwrite additional rows.
+ if(scope==='base'&&field==='M3Pr'&&String(previous??'')!==String(target[field]??'')){
+  const rows=session.draft._children?.Макет10||[];
+  if(rows.length===1&&String(rows[0].POR??'')===String(previous??'')){
+   rows[0].POR=target[field];
+   const origin=window.SolinDependentRules?.suggestedOrigin?.(target[field],window.SOLIN_REFS?.tables);
+   if(origin!=null)rows[0].PROI=origin;
+   rows[0].ZAP=null; // Force new K59 calculation; old species' stock cannot carry over.
+   session.changedMakets.add('Макет10');rerenderTable('Макет10');
+  }
+ }
  if(scope==='Макет10'&&field==='POR'&&window.SolinDependentRules){
   const engine=window.SolinDependentRules,refs=window.SOLIN_REFS?.tables;
   const suggested=engine.suggestedOrigin(target.POR,refs),oldSuggested=engine.suggestedOrigin(previous,refs);
@@ -489,7 +607,9 @@ function capture(el){if(!el.matches('[data-ce-field]'))return;
  }
  const output=document.querySelector('[data-ce-display-for="'+el.id+'"]');if(output)output.textContent=description(el.dataset.ceForm,field,target[field]);
  session.dirty=true;scheduleDraft();document.querySelector('#ce-status').textContent='Изменено';
- refreshLinked();
+ if(scope==='base'&&field==='KU'&&document.getElementById('ce-table-Макет10'))
+  rerenderTable('Макет10');
+ else refreshLinked();
 }
 // Observed Access OnExit messages: informative cross-field checks, not Save rules.
 // Never change a value or run the desktop cleanup from this panel.
@@ -509,6 +629,16 @@ function refreshEntryChecks(){
  // Only the missing-quantity branch was exercised; do not infer an age limit.
  if(touched('base','PRkol','PRA')&&n(r.PRA)>0&&n(r.PRkol)===0)
   add('base','PRkol','Не задано количество подроста при заданном возрасте.');
+ if(touched('Макет10','POL')||touched('base','KU'))
+  (r._children?.Макет10||[]).forEach((row,index)=>{
+   const result=window.SolinCategoryRules?.validatePol(r.KU,row.POL,window.SOLIN_REFS?.tables);
+   if(result?.status==='warning')add('Макет10','POL',result.message,index);
+  });
+ if(Number(r.KU)===19)
+  (r._children?.Макет10||[]).forEach((row,index)=>{
+   if(row.ZAP!=null&&Number(row.ZAP)!==0)
+    add('Макет10','ZAP','Для категории 19 запас не указывается. В исходном Transfer ZAP=0; проверьте старую строку.',index);
+  });
  if(touched('Макет10','KOEF'))(r._children?.Макет10||[]).forEach((row,index)=>{
   if(n(row.KOEF)>10)add('Макет10','KOEF','Коэффициент превышает значение 10.',index);
  });
@@ -628,11 +758,32 @@ function validate(){
  const linkIssue=linkedIssues();if(linkIssue)throw linkIssue;
  const invalid=document.querySelector('#ce-form [aria-invalid="true"]');if(invalid)throw {message:invalid.validationMessage,el:invalid};
  if(!(Number(session.draft.PLV)>0))throw {message:'Площадь выдела должна быть больше нуля.',el:document.querySelector('[data-ce-field="PLV"]')};
- if(session.isNew){if(!Number.isInteger(Number(session.draft.VD))||Number(session.draft.VD)<1)throw {message:'Номер выдела должен быть положительным целым.',el:document.querySelector('[data-ce-field="VD"]')};if(D.quarters[session.draft.KV].compartments.some(r=>keys.every(k=>same(r[k],session.draft[k]))))throw {message:'Выдел с таким номером и категорией ГЛФ уже есть.',el:document.querySelector('[data-ce-field="VD"]')};if(session.draft.KU==null||Number(session.draft.KU)===0)throw {message:'Выберите категорию угодий.',el:document.querySelector('[data-ce-field="KU"]')};}
+ if(session.isNew){if(!Number.isInteger(Number(session.draft.VD))||Number(session.draft.VD)<1)throw {message:'Номер выдела должен быть положительным целым.',el:document.querySelector('[data-ce-field="VD"]')};if(D.quarters[session.draft.KV].compartments.some(r=>keys.every(k=>same(r[k],session.draft[k]))))throw {message:'Выдел с таким номером и категорией ГЛФ уже есть.',el:document.querySelector('[data-ce-field="VD"]')};if(session.draft.KU==null||Number(session.draft.KU)===0)throw {message:'Выберите категорию угодий.',el:document.querySelector('[data-ce-field="KU"]')};
+ // For forested categories, a new stand without these fields cannot
+ // pass desktop controls K16/K58.  For nonforest lands, type/species may
+ // legitimately be absent; do not fabricate stand composition.
+ const sku=window.SOLIN_REFS?.tables?.SKU?.find(x=>String(x.KU)===String(session.draft.KU));
+ const forested=sku?Number(sku.P10)===1:Number(session.draft.KU)<11;
+ if(forested){
+  if(!String(session.draft.M3Pr??'').trim())throw {message:'Для нового насаждения выберите главную породу.',el:document.querySelector('[data-ce-scope="base"][data-ce-field="M3Pr"]')};
+  if(!String(session.draft.M3TLU??'').trim())throw {message:'Для нового насаждения выберите характеристику типа леса.',el:document.querySelector('[data-ce-scope="base"][data-ce-field="M3TLU"]')};
+ }
+ }
  const year=session.quarter.GodT;if(year!=null&&(!Number.isInteger(Number(year))||Number(year)<1900||Number(year)>2200))throw {message:'Укажите год таксации от 1900 до 2200.',el:document.querySelector('[data-ce-field="GodT"]')};
- const check=(form,row,before)=>{const failed=(solinCore.validateRow(form,row,session.draft)||[]).filter(m=>{const f=m.split(':')[0];return !before||!same(row[f],before[f]);});if(failed.length){const field=failed[0].split(':')[0],scope=form==='ВыделВ'?'base':form==='Квартал'?'quarter':form,index=form.startsWith('Макет')?session.draft._children[form].indexOf(row):null;throw {message:'Проверьте поле «'+title(form,field)+'»'+(form.startsWith('Макет')?' в макете '+form.replace('Макет',''):'')+'.',form,scope,field,index};}};
+ const check=(form,row,before)=>{const failed=(solinCore.validateRow(form,row,session.draft)||[]).filter(m=>{
+  const f=m.split(':')[0];
+  if(form==='Макет10'&&f==='POL'){
+   const policy=window.SolinCategoryRules?.validatePol(session.draft.KU,row.POL,window.SOLIN_REFS?.tables);
+   if(policy&&policy.status!=='error')return false; // warnings remain visible; no auto-rewrite
+  }
+  return !before||!same(row[f],before[f]);
+ });if(failed.length){const field=failed[0].split(':')[0],scope=form==='ВыделВ'?'base':form==='Квартал'?'quarter':form,index=form.startsWith('Макет')?session.draft._children[form].indexOf(row):null;throw {message:'Проверьте поле «'+title(form,field)+'»'+(form.startsWith('Макет')?' в макете '+form.replace('Макет',''):'')+'.',form,scope,field,index};}};
  check('ВыделВ',session.draft,session.original);check('Квартал',session.quarter,session.originalQuarter);
  for(const [index,row]of(session.draft._children.Макет10||[]).entries())if(!session.baselines.has(row)&&(!row.POR||!row.IAR))throw {message:'Укажите породу и ярус в новой строке макета 10.',form:'Макет10',scope:'Макет10',field:row.POR?'IAR':'POR',index};
+ if(Number(session.draft.KU)===19&&(session.isNew||session.changedMakets.has('Макет10')))
+  for(const [index,row] of (session.draft._children.Макет10||[]).entries())
+   if(row.ZAP!=null&&Number(row.ZAP)!==0)
+    throw {message:'Для несомкнувшихся лесных культур (KU 19) запас не проставляется: проверьте Макет 10, ZAP должен быть 0.',form:'Макет10',scope:'Макет10',field:'ZAP',index};
  for(const form of session.changedMakets)for(const row of session.draft._children[form]||[])check(form,row,session.baselines.get(row));
 }
 function cleanup(){if(!session)return;clearTimeout(draftTimer);const s=session;session=null;const modal=document.querySelector('#modal');modal.classList.remove('ce-modal');modal.removeAttribute('role');modal.removeAttribute('aria-modal');modal.removeAttribute('aria-labelledby');
@@ -641,9 +792,9 @@ function cleanup(){if(!session)return;clearTimeout(draftTimer);const s=session;s
  document.querySelector('#ce-form')?.remove();previousFocus?.focus();
 }
 function close(){cleanup();closeModal();}
-function cancel(){if(session?.dirty&&!confirm('Закрыть карточку без сохранения изменений?'))return;if(session&&!session.pendingRecovery)discardRecovery(session);close();}
+function cancel(){if(!session)return; if(session.dirty){window.SolinV23ModalGuard?.confirmUnsaved?.({save:()=>save(),discard:()=>{discardRecovery(session);close();},cancel:()=>{}});return;}if(!session.pendingRecovery)discardRecovery(session);close();}
 function onUnload(e){writeRecovery();if(session?.dirty){e.preventDefault();e.returnValue='';}}
-function onKey(e){if(!session)return;if(e.key==='Escape'){e.preventDefault();cancel();return;}
+function onKey(e){if(!session)return;if(e.key==='Escape'){e.preventDefault();return;}
  if(e.key==='Enter'&&e.target.matches('[data-ce-field]')&&e.target.tagName!=='SELECT'){e.preventDefault();const fields=[...document.querySelectorAll('#ce-form [data-ce-field]')].filter(el=>el.getClientRects().length&&!el.disabled&&!el.readOnly);const next=fields[fields.indexOf(e.target)+1];next?.focus();next?.select?.();return;}
  if(e.key==='Tab'){const visible=[...document.querySelectorAll('.ce-modal button,.ce-modal input,.ce-modal select,.ce-modal summary,[role="dialog"] [tabindex="0"]')].filter(el=>el.getClientRects().length&&!el.disabled&&!el.closest('[inert]')),first=visible[0],last=visible.at(-1);if(e.shiftKey&&document.activeElement===first){last?.focus();e.preventDefault();}else if(!e.shiftKey&&document.activeElement===last){first?.focus();e.preventDefault();}}
 }
@@ -746,10 +897,19 @@ function open(record,options={}){if(!record)return;
  form.addEventListener('change',e=>{
   if(e.target.matches('.dt-maket-select')){const n=e.target.value;e.target.value='';if(n==='10'||n==='31'||n==='32')showMain(n);else if(n)showExtra('Макет'+n);return;}
   capture(e.target);
+  if(e.target.dataset.ceScope==='base'&&e.target.dataset.ceField==='KU'){
+   // Only the DOM is rebuilt; raw draft records and original MDB values persist.
+   rerenderTable('Макет10');
+  }
   if(e.target.dataset.ceScope?.startsWith('Макет'))session.changedMakets.add(e.target.dataset.ceScope);
   recalculateEditedField(e.target);
   if(e.target.matches('[data-ce-field]'))(session.entryTouched??=new Set()).add(e.target.dataset.ceScope+':'+e.target.dataset.ceField);
   refreshEntryChecks();
+  // A changed layer/composition can change which species is leading.
+  // Rebuild only on the completed change event (not every keystroke),
+  // so the accessory POL/ZAP inputs appear/disappear without stealing typing.
+  if(e.target.dataset.ceScope==='Макет10'&&['IAR','KOEF','POR'].includes(e.target.dataset.ceField))
+   rerenderTable('Макет10');
  });
  form.addEventListener('click',e=>{
   const jump=e.target.closest('[data-ce-entry-issue]');
