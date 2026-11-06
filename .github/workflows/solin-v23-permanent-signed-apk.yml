@@ -6,7 +6,7 @@ on:
       source_ref:
         description: 'Reviewed V23-based source branch'
         required: true
-        default: 'fix/v23-field-test-2026-11-06'
+        default: 'feature/v23-one-tap-updates-2026-11-06'
       version_code:
         description: 'Android versionCode; increment for every new update'
         required: true
@@ -65,12 +65,17 @@ jobs:
           [[ "$KEY_FINGERPRINT" == '5A1C2E2BF2EFE5AA7382674B651533A11D2B93C802A1C09ADC72656C5A29ED7E' ]] || { echo 'V23 signing certificate mismatch: blocked'; exit 1; }
       - name: Install and stage native assets
         shell: bash
+        env:
+          SOLIN_GITHUB_UPDATES: '1'
         run: |
           set -euo pipefail
           npm install --no-audit --no-fund
           npm run build
+          node scripts/test-update-contract.cjs
           npx cap add android
           node scripts/install-android-mdb.mjs
+          test -s android/app/src/main/java/kz/solin/field/SolinUpdatePlugin.java
+          grep -q REQUEST_INSTALL_PACKAGES android/app/src/main/AndroidManifest.xml
           npx cap sync android
           node permanent-signing/scripts/prepare-v23-release.mjs
       - name: Compile unsigned release APK
