@@ -8,6 +8,7 @@ on:
       - 'solin-workflow.js'
       - 'index.html'
       - 'scripts/test-v25-clean-ui.cjs'
+      - 'scripts/test-stand-quick-makets.cjs'
       - '.github/workflows/v25-clean-interface-check.yml'
   workflow_dispatch:
 permissions:
