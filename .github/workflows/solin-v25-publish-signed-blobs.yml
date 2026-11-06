@@ -136,8 +136,10 @@ jobs:
             exit 1
           fi
           gh release upload "$TAG" "$APK" release/SHA256SUMS.txt --clobber
-          ASSET_SIZE="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '.assets[] | select(.name == "SOLIN-Field-update.apk") | .size')"
-          ASSET_DIGEST="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '.assets[] | select(.name == "SOLIN-Field-update.apk") | .digest')"
+          RELEASE_ID="$(gh api "repos/$GITHUB_REPOSITORY/releases" --jq ".[] | select(.tag_name == \"$TAG\") | .id" | head -n 1)"
+          [[ -n "$RELEASE_ID" ]] || { echo '::error::V25 draft release not found'; exit 1; }
+          ASSET_SIZE="$(gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" --jq '.assets[] | select(.name == "SOLIN-Field-update.apk") | .size')"
+          ASSET_DIGEST="$(gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" --jq '.assets[] | select(.name == "SOLIN-Field-update.apk") | .digest')"
           [[ "$ASSET_SIZE" == '23914293' ]] || { echo '::error::Uploaded APK size mismatch'; exit 1; }
           [[ "$ASSET_DIGEST" == "sha256:$EXPECTED_SHA" ]] || { echo '::error::Uploaded APK digest mismatch'; exit 1; }
           gh release edit "$TAG" --draft=false --latest
