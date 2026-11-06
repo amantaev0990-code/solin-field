@@ -122,6 +122,68 @@ function companionStockIssues(record){
  }
  return issues;
 }
+/** V21: shared, non-mutating, field-side integrity audit.  The Access
+ * QueryDef graph remains authoritative: these checks report suspicious input
+ * without overwriting original volumes or automatically filling unknown codes.
+ * One layer contributes ONE total ZAP, carried by its leading species row.
+ * Single trees (7) and fresh deadwood (8) are separate, not live composition.
+ */
+function compositionAudit(record){
+ const groups=new Map(),issues=[],layers=[];
+ for(const [index,row] of (record?._children?.Макет10||[]).entries()){
+  if(!childMatches(record,row))continue;
+  const iar=n(row.IAR);
+  if(!LIVE_LAYERS.has(iar))continue;
+  if(!groups.has(iar))groups.set(iar,[]);
+  groups.get(iar).push({index,row});
+ }
+ for(const [iar,rows] of [...groups].sort((a,b)=>a[0]-b[0])){
+  const supplied=rows.map(x=>n(x.row.KOEF));
+  const known=supplied.every(v=>v!==null),sum=known?supplied.reduce((a,b)=>a+b,0):null;
+  const named=rows.map(x=>String(x.row.POR??'').trim());
+  const lead=layerLead(rows,record);
+  if(named.some(x=>!x))issues.push({status:'bad',layer:iar,field:'POR',
+   message:'Ярус '+iar+': не указана порода в одной из строк древостоя.'});
+  if(supplied.some(v=>v!==null&&(v<=0||v>10)))issues.push({status:'bad',layer:iar,field:'KOEF',
+   message:'Ярус '+iar+': коэффициент состава каждой породы должен быть больше 0 и не превышать 10.'});
+  else if(!known)issues.push({status:'warn',layer:iar,field:'KOEF',
+   message:'Ярус '+iar+': заполните коэффициент состава у каждой породы.'});
+  else if(Math.abs(sum-10)>0.000001)issues.push({status:'warn',layer:iar,field:'KOEF',
+   message:'Ярус '+iar+': сумма коэффициентов состава равна '+sum+' вместо 10. Проверьте состав до расчёта запаса.'});
+  if(rows.length>1){
+   const companions=rows.filter(x=>x!==lead&&n(x.row.ZAP)!==null&&n(x.row.ZAP)!==0);
+   if(companions.length)issues.push({status:'warn',layer:iar,field:'ZAP',
+    message:'Ярус '+iar+': запас указан у '+companions.length+' примесных пород. Проверьте, не учтён ли запас яруса дважды.'});
+  }
+  layers.push({iar,rows:rows.length,coefficientSum:sum,leadingSpecies:lead?.row.POR??null,
+   leadingStock:n(lead?.row.ZAP),species:named});
+ }
+ return {status:issues.length?'attention':groups.size?'complete':'empty',layers,issues};
+}
+/** Validation across the same source rows used by Макет 5/10/16/31/32.
+ * Do not classify NULL optional fields as zero, or auto-edit a saved stand. */
+function cardIntegrity(record){
+ const composition=compositionAudit(record),issues=[...composition.issues];
+ for(const form of ['Макет10','Макет16','Макет31','Макет32']){
+  for(const [i,row]of (record?._children?.[form]||[]).entries()){
+   const mismatched=address.filter(k=>defined(row[k])&&!same(row[k],record[k]));
+   if(mismatched.length)issues.push({status:'bad',form,index:i,field:mismatched[0],
+    message:form+', строка '+(i+1)+': адрес ('+mismatched.join(', ')+') не соответствует выделу '+record.KV+'/'+record.VD+'.'});
+  }
+ }
+ // This is a warning only: old Access main-species stock can differ from
+ // verified Field full-layer summaries. Never silently rewrite STUR/STUR1.
+ const stock=standStock(record);
+ if(stock.status==='complete'){
+  for(const [field,expected,label] of [['STUR1',stock.expectedPerHa,'Запас на гектар'],['STUR',stock.expectedTotal,'Запас выдела']]){
+   const actual=n(record?.[field]);
+   if(actual!==null&&Math.abs(actual-expected)>0.000001)
+    issues.push({status:'warn',form:'Макет5',field,
+     message:'Макет 5: '+label+' ('+actual+') отличается от расчёта живых ярусов ('+expected+'). Не исправляйте автоматически без проверки исходной методики.'});
+  }
+ }
+ return {status:issues.some(x=>x.status==='bad')?'invalid':issues.length?'attention':'complete',issues,composition,stock};
+}
 function stockBreakdown(record){
  const out={included:[],singleTrees:[],freshDeadwood:[],other:[],missing:[],
   invalid:[],duplicates:[],conflicts:[],companions:[],unclassified:[],byLayer:[],bySpecies:[],
@@ -408,5 +470,5 @@ function corrections(record,refs,org,quarterRow=null){
   reason:stock.status==='complete'?'Живой запас подсчитан, но совпадение с исходным Макет10ЗАП1 не подтверждено. STUR1 и STUR сохранены. '+sourceStock.reason:stock.reason});
  return {issues,unknown,bonitet:b,standStock:stock,originalStandStock:sourceStock,standStockVerified,stockPerHectare:k59,layerCalculations};
 }
-window.SolinCardCalculations={bonitet,standStock,sourceStandStock,stockBreakdown,stockPerHectare,stockZoneOptions,companionStockIssues,corrections,safeRoundHalf,accessRound,k59Round};
+window.SolinCardCalculations={bonitet,standStock,sourceStandStock,stockBreakdown,stockPerHectare,stockZoneOptions,companionStockIssues,compositionAudit,cardIntegrity,corrections,safeRoundHalf,accessRound,k59Round};
 })();
