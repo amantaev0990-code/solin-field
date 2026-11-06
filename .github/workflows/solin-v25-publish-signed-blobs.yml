@@ -96,3 +96,49 @@ jobs:
           path: release/
           retention-days: 30
           if-no-files-found: error
+
+  publish:
+    name: Publish verified V25 for one-tap updates
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Download only verified APK from successful verification job
+        uses: actions/download-artifact@v4
+        with:
+          name: verified-original-signed-v25-230005
+          path: release/
+      - name: Publish signed public release — no signing secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG='solin-field-v230005'
+          APK='release/SOLIN-Field-update.apk'
+          EXPECTED_SHA='8e37353a4a85a01520e3c708331ff0c1e38ef96e793f6affcb296f444f53fe1f'
+          test -s "$APK"
+          [[ "$(sha256sum "$APK" | cut -d' ' -f1)" == "$EXPECTED_SHA" ]] || { echo '::error::Verified APK checksum changed'; exit 1; }
+          [[ "$(stat -c%s "$APK")" == '23914293' ]] || { echo '::error::Verified APK size changed'; exit 1; }
+          grep -q "$EXPECTED_SHA" release/SHA256SUMS.txt
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --draft \
+              --target ca32d438df382466a7b691e9309b3682b3f9cbd3 \
+              --title 'SOLI-N Field V25 — новый интерфейс' \
+              --notes 'V25 — проверенная подписанная Android-сборка для обновления V24 без удаления приложения. Перед обновлением сделайте резервную копию данных. Реальные полевые испытания ещё не завершены.'
+          fi
+          IS_DRAFT="$(gh release view "$TAG" --json isDraft --jq .isDraft)"
+          if [[ "$IS_DRAFT" != 'true' ]]; then
+            echo '::error::Release is already published. Refusing to overwrite a published APK.'
+            exit 1
+          fi
+          gh release upload "$TAG" "$APK" release/SHA256SUMS.txt --clobber
+          ASSET_SIZE="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '.assets[] | select(.name == "SOLIN-Field-update.apk") | .size')"
+          ASSET_DIGEST="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '.assets[] | select(.name == "SOLIN-Field-update.apk") | .digest')"
+          [[ "$ASSET_SIZE" == '23914293' ]] || { echo '::error::Uploaded APK size mismatch'; exit 1; }
+          [[ "$ASSET_DIGEST" == "sha256:$EXPECTED_SHA" ]] || { echo '::error::Uploaded APK digest mismatch'; exit 1; }
+          gh release edit "$TAG" --draft=false --latest
+          gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '{tag_name,draft,prerelease,assets:[.assets[]|{name,size,digest}]}'
