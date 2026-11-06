@@ -146,8 +146,17 @@ public class SolinUpdatePlugin extends Plugin {
         ? a.signingInfo.getApkContentsSigners() : a.signatures;
     android.content.pm.Signature[] sb = Build.VERSION.SDK_INT >= 28
         ? b.signingInfo.getApkContentsSigners() : b.signatures;
-    return sa != null && sa.length == 1 && sb != null && sb.length == 1
-        && MessageDigest.isEqual(sa[0].toByteArray(), sb[0].toByteArray());
+    if (sa == null || sa.length != 1 || sb == null || sb.length != 1) return false;
+    byte[] expected = new byte[] {
+      (byte)0x5a,(byte)0x1c,(byte)0x2e,(byte)0x2b,(byte)0xf2,(byte)0xef,(byte)0xe5,(byte)0xaa,
+      (byte)0x73,(byte)0x82,(byte)0x67,(byte)0x4b,(byte)0x65,(byte)0x15,(byte)0x33,(byte)0xa1,
+      (byte)0x1d,(byte)0x2b,(byte)0x93,(byte)0xc8,(byte)0x02,(byte)0xa1,(byte)0xc0,(byte)0x9a,
+      (byte)0xdc,(byte)0x72,(byte)0x65,(byte)0x6c,(byte)0x5a,(byte)0x29,(byte)0xed,(byte)0x7e
+    };
+    byte[] oldFingerprint = MessageDigest.getInstance("SHA-256").digest(sa[0].toByteArray());
+    byte[] newFingerprint = MessageDigest.getInstance("SHA-256").digest(sb[0].toByteArray());
+    return MessageDigest.isEqual(oldFingerprint, expected)
+        && MessageDigest.isEqual(newFingerprint, expected);
   }
   private static boolean isOriginalGitHubRelease(String link) {
     try {
