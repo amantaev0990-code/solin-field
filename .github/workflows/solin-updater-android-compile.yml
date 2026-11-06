@@ -1,0 +1,41 @@
+name: SOLI-N update center Android compile smoke
+on:
+  push:
+    branches:
+      - fix/v23-update-center-2026-11-06
+    paths:
+      - 'native/android/SolinUpdatePlugin.java'
+      - 'scripts/install-android-mdb.mjs'
+      - '.github/workflows/solin-updater-android-compile.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compile-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Compile isolated updater against the actual Capacitor Android project
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund
+          npm run build
+          npx cap add android
+          node scripts/install-android-mdb.mjs
+          npx cap sync android
+          cd android
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+      - name: Confirm binary output without publishing or installing it
+        run: test -s android/app/build/outputs/apk/debug/app-debug.apk
