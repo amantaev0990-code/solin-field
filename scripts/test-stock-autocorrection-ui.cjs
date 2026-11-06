@@ -91,7 +91,8 @@ async function reopen(p,info){
  await field(p,'Макет10','PH').press('Tab');
  assert.equal(await val(p,'Макет10','ZAP'),info.norms.height7);
  assert.equal(await val(p,'base','STUR'),info.norms.height7*2);
- await field(p,'Макет10','POL').fill('0,5');
+ // Playwright cannot fill comma in native input[type=number]; use an equivalent numeric value.
+ await field(p,'Макет10','POL').fill('0.5');
  await field(p,'Макет10','POL').press('Tab');
  assert.equal(await val(p,'Макет10','ZAP'),info.norms.half);
  assert.equal(await val(p,'base','STUR'),info.norms.half*2);
