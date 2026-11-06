@@ -1,0 +1,189 @@
+/* SOLI-N Field V25 — single visual system, no changes to forestry calculations or MDB. */
+:root{--v25-green:#176a42;--v25-dark:#123b2b;--v25-tint:#edf6ef;--v25-ink:#20392e;--v25-border:#d8e6db;--v25-radius:15px}
+body.solin-v25{background:#f6f8f5;color:var(--v25-ink);font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+body.solin-v25 .app{max-width:1150px;padding:calc(env(safe-area-inset-top,0px) + 10px) 14px calc(110px + env(safe-area-inset-bottom,0px))}
+body.solin-v25 .topbar{position:sticky;top:0;z-index:35;min-height:58px;padding:8px 12px;margin:0 0 16px;background:#fff;border:1px solid var(--v25-border);border-radius:17px;box-shadow:0 6px 22px #163e2212}
+body.solin-v25 .topactions,body.solin-v25 .forestCard,body.solin-v25 .quickActions{display:none!important}
+body.solin-v25 .brand{gap:10px}body.solin-v25 .brand .tree{background:#e6f4e9;border-radius:12px;display:grid;place-items:center;width:40px;height:40px;color:var(--v25-green);font-size:21px}
+body.solin-v25 .brand h1{font-size:18px;color:#17442e;letter-spacing:-.4px;font-weight:800}
+body.solin-v25 .brand p{font-size:11px;color:#728376;margin-top:1px}
+body.solin-v25 .sectionTabs,body.solin-v25.workspace-home .sectionTabs{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr));position:fixed;inset:auto 0 0;z-index:60;width:min(100%,1150px);margin:0 auto;min-height:72px;padding:7px max(8px,env(safe-area-inset-right)) calc(7px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left));border:1px solid #dce8df;border-bottom:0;border-radius:17px 17px 0 0;background:#fff;box-shadow:0 -8px 30px #183d2520;gap:2px}
+body.solin-v25 .sectionTab{min-width:0;min-height:54px;display:flex;align-items:center;justify-content:center;flex-direction:column;border:0;background:transparent;color:#728578;font-size:22px;border-radius:12px;padding:5px 2px}
+body.solin-v25 .sectionTab span{font-size:11px;line-height:1.3;margin-top:3px;font-weight:650}
+body.solin-v25 .sectionTab.active{background:#e6f3e9;color:var(--v25-green);border:0}
+body.solin-v25 .workspace{background:#fff;border:1px solid var(--v25-border);border-radius:17px;padding:18px;box-shadow:0 3px 18px #143c2810}
+body.solin-v25 #homeScreen .workspace{box-shadow:none;border:0;background:transparent}
+body.solin-v25 .homeHero{padding:14px 0 12px}
+body.solin-v25 .homeHero h2{font-size:clamp(23px,3.2vw,31px);letter-spacing:-.75px}
+body.solin-v25 .homeHero p{display:none}
+body.solin-v25 .home-footnote{display:none}
+body.solin-v25 .home-actions{gap:9px;margin-bottom:15px}
+body.solin-v25 .forest-option{border:1px solid var(--v25-border);border-radius:14px;background:#fff;box-shadow:0 4px 18px #194a2d0a}
+body.solin-v25 .screenHead{margin-bottom:15px}
+body.solin-v25 .screenHead h2{color:var(--v25-dark);font-size:22px}
+body.solin-v25 .screenHead p{display:none}
+body.solin-v25 .menuRow{min-height:62px;border:1px solid #dce9df;border-radius:12px;background:#f9fcf9;color:#20472e;margin:8px 0;padding:12px 14px}
+body.solin-v25 .menuRow b{font-size:15px}body.solin-v25 .menuRow small{font-size:12px;color:#728273}
+body.solin-v25 #menuScreen .workspace>h2{font-size:23px;margin:0 0 12px}
+body.solin-v25 .v25-menu-extra{margin-top:12px;border-top:1px solid #e1ebe3;padding-top:12px}
+body.solin-v25 .v25-menu-extra summary{font-size:14px;color:#37654b;font-weight:700;min-height:42px;cursor:pointer;padding:10px 2px}
+body.solin-v25 .v25-menu-extra .menuRow{background:#fff}
+body.solin-v25 #card .workspace{padding:16px}
+body.solin-v25 #card .screenHead{margin-bottom:8px}
+body.solin-v25 #card #humanContent .humanCard,body.solin-v25 #card .humanContent{box-shadow:none}
+body.solin-v25 .v25-card-actions{display:flex;align-items:center;gap:9px;margin:0 0 14px;padding:0!important}
+body.solin-v25 .v25-card-actions>button{min-height:46px;padding:11px 15px;border-radius:11px;background:#fff;border:1px solid #cddfd2;color:#205437;font-weight:700}
+body.solin-v25 .v25-card-actions>#wfEditBase{flex:1;background:var(--v25-green);border-color:var(--v25-green);color:#fff}
+body.solin-v25 .v25-card-actions>#wfCardCheck{flex:0 0 auto}
+body.solin-v25 .v25-card-actions-more{position:relative}
+body.solin-v25 .v25-card-actions-more summary{display:flex;align-items:center;justify-content:center;min-height:46px;padding:10px 14px;background:#f2f7f3;border:1px solid #d2e3d7;border-radius:11px;color:#28583c;font-weight:700;cursor:pointer}
+body.solin-v25 .v25-card-actions-more>div{position:absolute;top:calc(100% + 5px);right:0;z-index:20;display:flex;flex-direction:column;gap:5px;min-width:190px;background:#fff;padding:8px;border-radius:12px;box-shadow:0 12px 30px #193c2830;border:1px solid var(--v25-border)}
+body.solin-v25 .v25-card-actions-more button{min-height:42px;border:0;border-radius:8px;color:#294631;background:#f4f8f5;text-align:left;padding:10px}
+body.solin-v25 .v25-card-switch{display:flex;align-items:center;gap:9px;padding:8px 0 13px;flex-wrap:wrap}
+body.solin-v25 .v25-card-switch>button{min-height:46px;min-width:116px;border-radius:11px;border:1px solid #cedfd3;background:#fff;color:#275339;font-weight:750;padding:10px 14px}
+body.solin-v25 .v25-card-switch>button.active{background:#e3f2e8;color:var(--v25-green);border-color:#8ec6a3}
+body.solin-v25 .v25-maket-choice{display:flex;gap:7px;align-items:center;color:#526d59;font-size:12px;flex:1;min-width:175px}
+body.solin-v25 .v25-maket-choice select{flex:1;width:100%;min-height:46px;max-width:100%;padding:9px 12px;border-radius:11px;border:1px solid #cddfd4;background:#fff;color:#234a34;font-size:14px}
+body.solin-v25 .v25-card-more{position:relative}
+body.solin-v25 .v25-card-more summary{min-height:45px;display:flex;align-items:center;padding:8px 13px;background:#f5f9f5;border:1px solid #dae6db;border-radius:11px;cursor:pointer;color:#456d53;font-size:13px}
+body.solin-v25 .v25-card-more>div{position:absolute;z-index:17;right:0;top:100%;padding:8px;background:#fff;border:1px solid #d8e6db;border-radius:12px;min-width:150px;box-shadow:0 12px 30px #19452e28}
+body.solin-v25 .v25-card-more button{width:100%;min-height:44px;border:0;background:#f1f7f2;color:#285a3d;border-radius:9px}
+body.solin-v25 .wf-maket-view{border:1px solid #e0ebe2;border-radius:14px;padding:14px;background:#fff}
+body.solin-v25 .wf-section-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+body.solin-v25 .wf-section-head h3{font-size:18px;color:#163e2a}
+body.solin-v25 .wf-section-head #wfAddRow{background:#1b794b;border-radius:10px;min-height:43px;color:#fff;border:0}
+body.solin-v25 .wf-maket-view>.wf-muted,body.solin-v25 .wf-maket-view>.wf-form-note{display:none}
+body.solin-v25 .wf-bonitet-status{padding:10px;border:1px solid #dce7dd;border-radius:11px;background:#f7faf7}
+body.solin-v25 .wf-bonitet-status p{display:none}
+body.solin-v25 .wf-row{border:1px solid #dbe8de;border-radius:12px;margin-top:11px;background:#fff}
+body.solin-v25 .wf-rowhead{padding:10px 12px;border-bottom:1px solid #e5ede6}
+body.solin-v25 .wf-rowhead .wf-danger{color:#9b3340}
+body.solin-v25 .wf-grid{gap:8px}
+
+/* Stand composition uses ONE form, one save action, and a single Maket selector. */
+body.solin-v25 #modal:not(.ce-modal) .modalCard:has(#wfCompRows){width:min(980px,96vw);max-height:96dvh;padding:0;border-radius:19px;background:#f7faf7;display:flex;flex-direction:column;overflow:hidden}
+body.solin-v25 #modal:not(.ce-modal) .modalCard:has(#wfCompRows) .modalHead{background:#fff;margin:0;padding:18px 21px;border-bottom:1px solid var(--v25-border);align-items:center}
+body.solin-v25 #modal:not(.ce-modal) .modalCard:has(#wfCompRows) .modalHead h2{font-size:21px;color:#173e2a;margin:0}
+body.solin-v25 #modal:not(.ce-modal) .modalCard:has(#wfCompRows) #modalBody{flex:1;min-height:0;overflow:auto;padding:16px 18px;background:#f7faf7}
+body.solin-v25 .v25-stand-basics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;background:#fff;padding:14px;border:1px solid var(--v25-border);border-radius:14px;margin-bottom:14px}
+body.solin-v25 .v25-stand-basics .wf-field span{color:#3c6249;font-size:13px;font-weight:700}
+body.solin-v25 .v25-stand-basics select{background:#fff;border:1px solid #b9d3c2;color:#1d462e;border-radius:9px;min-height:47px;width:100%;padding:10px;font-size:15px}
+body.solin-v25 .v25-stand-rules{margin:0 0 14px;color:#5d7464;font-size:12px}
+body.solin-v25 .v25-stand-rules summary{cursor:pointer;padding:5px 8px;font-size:12px}
+body.solin-v25 .v25-stand-rules p{line-height:1.45;margin:8px 0;border-radius:8px;padding:9px;background:#f0f7f1}
+body.solin-v25 #wfCompRows{display:flex;flex-direction:column;gap:12px}
+body.solin-v25 #wfCompRows .wf-composition-card{padding:14px;border:1px solid var(--v25-border);border-radius:15px;background:#fff;box-shadow:none;margin:0;color:#213d2b}
+body.solin-v25 #wfCompRows .wf-rowhead{display:flex;align-items:center;justify-content:space-between;padding:0 0 12px;border-bottom:1px solid #e5eee6;margin:0 0 12px}
+body.solin-v25 #wfCompRows .wf-rowhead b{font-size:16px;color:#194a30}
+body.solin-v25 #wfCompRows .wf-rowhead button{border:0;background:#fff3f2;border-radius:9px;color:#b03e37;padding:8px;font-weight:600;min-height:38px}
+body.solin-v25 #wfCompRows .wf-formgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+body.solin-v25 #wfCompRows .wf-field span{color:#607267;font-size:12px;font-weight:650}
+body.solin-v25 #wfCompRows .wf-field input,body.solin-v25 #wfCompRows .wf-field select{background:#fff!important;color:#213d2a!important;border:1px solid #cadccf!important;border-radius:9px;min-height:47px;font-size:16px;padding:10px}
+body.solin-v25 #wfCompRows .wf-field[hidden]{display:none!important}
+body.solin-v25 #wfCompRows .human-technical{grid-column:1/-1;color:#6b796d}
+body.solin-v25 .wf-composition-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0}
+body.solin-v25 .wf-composition-actions button{background:#e5f3e9;border:1px solid #bedcc8;border-radius:10px;color:#1d6940;min-height:45px;padding:10px 15px;font-weight:700}
+body.solin-v25 .wf-composition-actions output{font-size:12px;color:#426d50}
+body.solin-v25 .v25-stand-makets{background:#fff;border:1px solid var(--v25-border);border-radius:12px;margin:14px 0}
+body.solin-v25 .v25-stand-makets summary{min-height:48px;padding:14px;font-size:14px;font-weight:700;color:#315740;cursor:pointer}
+body.solin-v25 .v25-stand-makets-actions{display:flex;gap:8px;padding:0 12px 13px}
+body.solin-v25 .v25-stand-makets-actions select{flex:1;min-width:0;min-height:44px;background:white;color:#245037;border:1px solid #c8decf;border-radius:9px;padding:8px}
+body.solin-v25 .v25-stand-makets-actions button{min-height:44px;border:0;background:var(--v25-green);color:white;border-radius:9px;padding:9px 15px}
+body.solin-v25 .v25-stand-save{position:sticky;bottom:-16px;z-index:5;background:#f7faf7;border-top:1px solid #dbe7dc;display:flex;justify-content:flex-end;gap:10px;padding:12px 3px calc(12px + env(safe-area-inset-bottom,0px));margin-top:14px}
+body.solin-v25 .v25-stand-save button{min-height:47px;padding:10px 18px;border-radius:10px;font-size:15px;font-weight:700}
+body.solin-v25 .v25-stand-save #wfCompSave{background:var(--v25-green);color:#fff;border:0}
+
+/* Full taxation card: tablet is a real responsive form, never a 1200px scaled picture. */
+body.solin-v25 .ce-modal{padding:8px;background:#13281a88}
+body.solin-v25 .ce-modal .modalCard{width:min(1080px,100%);max-width:100%;height:calc(100dvh - 16px);max-height:calc(100dvh - 16px);border-radius:16px;border:1px solid #d5e2d6;background:#f6f8f6;box-shadow:0 24px 65px #14281855;display:flex;flex-direction:column;overflow:hidden}
+body.solin-v25 .ce-modal .modalHead{display:flex;align-items:center;min-height:57px;padding:11px 16px;background:#fff;border-bottom:1px solid #dce8df;margin:0}
+body.solin-v25 .ce-modal .modalHead h2{font-size:17px;color:var(--v25-dark)}
+body.solin-v25 .ce-modal .modalHead .close{width:40px;height:40px;background:#f2f6f2;border:1px solid #dce6dd;border-radius:10px;color:#335940}
+body.solin-v25 .ce-modal #modalBody,body.solin-v25 .ce-modal #ce-form{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;overflow:hidden}
+body.solin-v25 .ce-modal .dt-toolbar{flex:none;display:flex;gap:9px;align-items:center;justify-content:flex-end;padding:9px 12px;min-height:60px;height:auto;background:#fff;border-bottom:1px solid #e1eae2;overflow:visible;white-space:normal}
+body.solin-v25 .ce-modal .dt-toolbar .dt-zoom-controls,body.solin-v25 .ce-modal .ce-assist-shortcuts,body.solin-v25 .ce-modal .ce-mobile-tabs{display:none!important}
+body.solin-v25 .ce-modal .dt-toolbar-spacer{flex:1}
+body.solin-v25 .ce-modal .dt-toolbar .dt-tools{display:flex;flex-wrap:nowrap;gap:8px;align-items:center;margin:0;width:auto}
+body.solin-v25 .ce-modal .dt-toolbar button{border:1px solid #d6e4d8;border-radius:9px;background:#f3f8f4;color:#335942;min-width:0;height:42px;min-height:42px;padding:7px 14px;font-size:14px;font-weight:700;box-shadow:none}
+body.solin-v25 .ce-modal .dt-toolbar #ce-save{background:var(--v25-green);border-color:var(--v25-green);color:white}
+body.solin-v25 .ce-modal .dt-toolbar #ce-cancel{background:#fff;color:#617c67}
+body.solin-v25 .ce-modal .dt-toolbar #ce-status{font-size:12px;color:#6b816d;display:block}
+body.solin-v25 .ce-modal .v25-card-tabs{display:flex;align-items:center;gap:7px;padding:10px 13px;background:#fff;border-bottom:1px solid #e0eae2;overflow-x:auto;flex:none;scrollbar-width:none}
+body.solin-v25 .ce-modal .v25-card-tabs button{flex:1 0 auto;min-height:43px;border:1px solid #d5e5d9;border-radius:10px;background:#f7faf7;color:#4c6b54;font-size:14px;font-weight:700;padding:8px 12px}
+body.solin-v25 .ce-modal .v25-card-tabs button[aria-selected=true]{background:#e0f1e6;color:#166a42;border-color:#8bc4a3}
+body.solin-v25 .ce-modal .dt-viewport{width:100%;flex:1;min-height:0;overflow:auto;overflow-x:hidden;background:#f6f8f6;padding:11px 12px 24px;scrollbar-gutter:auto}
+body.solin-v25 .ce-modal .dt-stage{width:100%!important;height:auto!important;min-height:0!important;position:relative;transform:none!important;left:auto!important;top:auto!important}
+body.solin-v25 .ce-modal .dt-board{position:relative!important;display:block;width:100%!important;min-width:0!important;height:auto!important;min-height:0!important;transform:none!important;overflow:visible!important;border:0!important;background:transparent!important;box-shadow:none!important;font:14px system-ui,Arial,sans-serif}
+body.solin-v25 .ce-modal .dt-board #ce-main{display:flex!important;flex-direction:column;gap:11px;padding:0;position:relative;inset:auto;width:100%}
+body.solin-v25 .ce-modal .dt-board .dt-header,body.solin-v25 .ce-modal .dt-board .dt-base,body.solin-v25 .ce-modal .dt-board .dt-section,body.solin-v25 .ce-modal .dt-board .dt-stand,body.solin-v25 .ce-modal .dt-board .dt-footer{position:relative!important;inset:auto!important;left:auto!important;right:auto!important;top:auto!important;display:block;width:100%!important;max-width:100%!important;height:auto!important;min-height:0!important;overflow:visible!important;margin:0!important;padding:15px!important;background:#fff!important;border:1px solid #dce8df!important;border-radius:14px!important;box-shadow:0 2px 9px #143b2410;box-sizing:border-box}
+body.solin-v25 .ce-modal .dt-board .dt-header{display:flex!important;flex-direction:column;gap:11px}
+body.solin-v25 .ce-modal .ce-summary,body.solin-v25 .ce-modal .dt-counters,body.solin-v25 .ce-modal .dt-owner,body.solin-v25 .ce-modal .dt-category,body.solin-v25 .ce-modal .dt-quarter{position:relative!important;inset:auto!important;height:auto!important;min-height:0!important;display:flex;flex-wrap:wrap;gap:8px;align-items:center;white-space:normal}
+body.solin-v25 .ce-modal .dt-header .ce-summary h2{font-size:19px;color:#17462e}
+body.solin-v25 .ce-modal .dt-header .dt-owner>span,body.solin-v25 .ce-modal .dt-header .dt-category>span{width:100%;font-size:12px;color:#617d68}
+body.solin-v25 .ce-modal .dt-header .dt-fixed{flex:1 1 110px;width:auto!important;min-width:0}
+body.solin-v25 .ce-modal .dt-quarter>.dt-cell,body.solin-v25 .ce-modal .dt-category>.dt-cell{flex:1 1 170px!important;min-width:170px}
+body.solin-v25 .ce-modal .dt-board .dt-base,body.solin-v25 .ce-modal .dt-board .dt-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;align-items:start}
+body.solin-v25 .ce-modal .dt-board .dt-section .dt-maket{position:static;display:block;font-size:16px!important;font-weight:800;color:#195336;line-height:1.25!important;margin:0 0 10px;padding:0;white-space:normal}
+body.solin-v25 .ce-modal .dt-board .dt-maket br{display:none}
+body.solin-v25 .ce-modal .dt-board .dt-fields>*{width:auto!important;flex:initial!important;min-width:0}
+body.solin-v25 .ce-modal .dt-board .dt-split{grid-column:span 2}
+body.solin-v25 .ce-modal .dt-board .dt-cell,body.solin-v25 .ce-modal .dt-board .dt-fixed{display:flex;flex-direction:column;gap:5px;min-width:0;width:auto!important;align-items:stretch}
+body.solin-v25 .ce-modal .dt-board .dt-cell>label,body.solin-v25 .ce-modal .dt-board .dt-fixed>span{font-size:12px!important;line-height:1.35;min-height:0!important;white-space:normal;color:#677a6c;font-weight:650;min-width:0;text-align:left}
+body.solin-v25 .ce-modal .dt-board .dt-cell .dt-input{min-width:0;width:100%}
+body.solin-v25 .ce-modal .dt-board input,body.solin-v25 .ce-modal .dt-board select{min-height:44px!important;height:44px!important;line-height:1.2!important;background:#fff!important;color:#223e2c!important;border:1px solid #bfd4c5!important;border-radius:9px!important;padding:8px 11px!important;font-size:15px!important;text-overflow:ellipsis}
+body.solin-v25 .ce-modal .dt-board input[readonly]{background:#f1f5f1!important;color:#6a796e!important}
+body.solin-v25 .ce-modal .dt-board .dt-input output{min-height:0;height:auto!important;white-space:normal!important;line-height:1.35!important;padding:5px 2px;background:transparent;border:0;font-size:12px;color:#5e7864}
+body.solin-v25 .ce-modal .dt-board .dt-stand{display:flex!important;flex-direction:column;gap:12px}
+body.solin-v25 .ce-modal .dt-stand-title{position:static!important;font-size:18px!important;color:#195335;font-weight:800;pointer-events:auto}
+body.solin-v25 .ce-modal .ce-v23-species{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;border:0;background:#f2f8f3;border-radius:11px;padding:12px}
+body.solin-v25 .ce-modal .ce-v23-species>span{display:none}
+body.solin-v25 .ce-modal .ce-v23-species>.dt-cell{min-width:0!important;width:auto!important;grid-column:auto}
+body.solin-v25 .ce-modal .dt-stand #ce-table-Макет10{min-height:0!important;height:auto!important}
+body.solin-v25 .ce-modal .dt-record-nav{position:relative;display:flex;flex-wrap:wrap;gap:6px;height:auto!important;min-height:40px;border-radius:9px;padding:6px;background:#edf5ee}
+body.solin-v25 .ce-modal .dt-record-nav button{min-height:35px;height:auto!important;border:1px solid #c9decf;background:#fff;color:#34533c;border-radius:8px}
+body.solin-v25 .ce-modal .v25-stand-list{display:grid;gap:8px}
+body.solin-v25 .ce-modal .v25-stand-item{width:100%;display:flex;flex-direction:column;gap:5px;text-align:left;padding:12px;border:1px solid #d0e4d6;border-radius:11px;background:#f8fbf8;color:#214c35;min-height:64px}
+body.solin-v25 .ce-modal .v25-stand-item strong{font-size:15px}
+body.solin-v25 .ce-modal .v25-stand-item small{color:#5d7263;font-size:12px;line-height:1.4}
+body.solin-v25 .ce-modal .v25-stand-item:focus-visible{outline:3px solid #77c398}
+body.solin-v25 .ce-modal .v25-stand-command{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 0}
+body.solin-v25 .ce-modal .v25-stand-command button{min-height:43px;border-radius:9px;border:1px solid #c6dccb;padding:9px 13px;background:#e6f3e9;color:#1d683f;font-weight:750}
+body.solin-v25 .ce-modal #ce-table-Макет10{display:none!important}
+body.solin-v25 .ce-modal #ce-form.v25-table-expanded #ce-table-Макет10{display:flex!important;flex-direction:column;max-height:410px;overflow:auto}
+body.solin-v25 .ce-modal .ce-table-wrap{max-width:100%;overflow:auto;border-radius:10px;border:1px solid #d5e3d8;background:#fff}
+body.solin-v25 .ce-modal .ce-table{min-width:950px;width:1100px;table-layout:fixed}
+body.solin-v25 .ce-modal .ce-table th{background:#e9f1ea;color:#376246}
+body.solin-v25 .ce-modal .ce-table td input,body.solin-v25 .ce-modal .ce-table td select{height:38px!important;min-height:38px!important;font-size:14px!important}
+body.solin-v25 .ce-modal .dt-board #ce-extra,body.solin-v25 .ce-modal .dt-board #ce-action-panel{position:fixed!important;z-index:35;inset:110px max(10px,calc((100vw - 1000px)/2)) 16px!important;width:auto!important;max-width:none!important;max-height:none!important;overflow:auto;background:#fff!important;border-radius:14px;border:1px solid #d6e5d9;box-shadow:0 16px 55px #21382544}
+body.solin-v25 .ce-modal .dt-subtitle{min-height:52px;background:#eaf4ec!important;border-bottom:1px solid #d4e6d9;border-radius:13px 13px 0 0;font-weight:800;color:#1b5535}
+body.solin-v25 .ce-modal .dt-subbody{min-height:0;overflow:auto;padding:12px}
+body.solin-v25 .ce-modal .dt-footer{display:none!important}
+body.solin-v25 .ce-modal #ce-form.v25-tab-site #ce-section-4,body.solin-v25 .ce-modal #ce-form.v25-tab-site #ce-section-5,body.solin-v25 .ce-modal #ce-form.v25-tab-site .dt-stand,body.solin-v25 .ce-modal #ce-form.v25-tab-site #ce-section-31,body.solin-v25 .ce-modal #ce-form.v25-tab-site #ce-section-32{display:none!important}
+body.solin-v25 .ce-modal #ce-form.v25-tab-trees .dt-header,body.solin-v25 .ce-modal #ce-form.v25-tab-trees #ce-section-1,body.solin-v25 .ce-modal #ce-form.v25-tab-trees #ce-section-2,body.solin-v25 .ce-modal #ce-form.v25-tab-trees #ce-section-3,body.solin-v25 .ce-modal #ce-form.v25-tab-trees #ce-section-31,body.solin-v25 .ce-modal #ce-form.v25-tab-trees #ce-section-32{display:none!important}
+body.solin-v25 .ce-modal #ce-form.v25-tab-makets .dt-header,body.solin-v25 .ce-modal #ce-form.v25-tab-makets .dt-base,body.solin-v25 .ce-modal #ce-form.v25-tab-makets #ce-section-1,body.solin-v25 .ce-modal #ce-form.v25-tab-makets #ce-section-2,body.solin-v25 .ce-modal #ce-form.v25-tab-makets #ce-section-3,body.solin-v25 .ce-modal #ce-form.v25-tab-makets #ce-section-4,body.solin-v25 .ce-modal #ce-form.v25-tab-makets #ce-section-5,body.solin-v25 .ce-modal #ce-form.v25-tab-makets .dt-stand{display:none!important}
+body.solin-v25 .ce-modal .v25-card-tools{display:flex;align-items:center;gap:8px;position:relative}
+body.solin-v25 .ce-modal .v25-card-tools summary{display:flex;align-items:center;justify-content:center;min-height:42px;border:1px solid #cddfd2;border-radius:9px;background:#f4f8f4;padding:9px 13px;color:#356047;font-size:13px;font-weight:700;cursor:pointer}
+body.solin-v25 .ce-modal .v25-card-tools>div{position:absolute;right:0;top:100%;z-index:40;background:white;border:1px solid #d2e1d5;border-radius:12px;box-shadow:0 14px 40px #1d422d33;padding:9px;min-width:190px;display:flex;flex-direction:column;gap:6px}
+body.solin-v25 .ce-modal .v25-card-tools>div>button{height:42px;min-height:42px;width:100%;text-align:left}
+body.solin-v25 .ce-modal .ce-assist-panel{border-radius:15px;background:#fff;border-color:#d8e4dc}
+body.solin-v25 .ce-modal .ce-assist-head{background:#eaf4ee;border-bottom-color:#d6e4d8}
+body.solin-v25 .ce-modal .ce-assist-actions button{background:var(--v25-green);border-color:var(--v25-green);color:#fff}
+@media(max-width:760px){
+ body.solin-v25 .app{padding-left:10px;padding-right:10px}
+ body.solin-v25 .workspace{padding:12px}
+ body.solin-v25 .ce-modal{padding:0}
+ body.solin-v25 .ce-modal .modalCard{height:100dvh;max-height:100dvh;border-radius:0}
+ body.solin-v25 .ce-modal .dt-board .dt-base,body.solin-v25 .ce-modal .dt-board .dt-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+ body.solin-v25 .ce-modal .dt-board .dt-split{grid-column:1/-1}
+ body.solin-v25 .ce-modal .dt-toolbar{justify-content:space-between}
+ body.solin-v25 .ce-modal .dt-toolbar #ce-status{display:none}
+ body.solin-v25 .ce-modal .v25-card-tabs button{min-width:105px}
+ body.solin-v25 .v25-card-actions{flex-wrap:wrap}
+ body.solin-v25 .v25-card-actions>#wfEditBase{flex-basis:100%}
+ body.solin-v25 .v25-stand-basics{grid-template-columns:1fr}
+ body.solin-v25 .ce-modal .ce-v23-species{grid-template-columns:1fr}
+ body.solin-v25 #wfCompRows .wf-formgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ body.solin-v25 .ce-modal .dt-board #ce-extra,body.solin-v25 .ce-modal .dt-board #ce-action-panel{inset:110px 5px 5px!important}
+}
+@media(max-width:380px){body.solin-v25 #wfCompRows .wf-formgrid{grid-template-columns:1fr}}
+@media print{body.solin-v25 .sectionTabs,body.solin-v25 .v25-card-tabs,body.solin-v25 .v25-stand-list,body.solin-v25 .v25-stand-command{display:none!important}body.solin-v25 .ce-modal .dt-footer{display:block!important}}
