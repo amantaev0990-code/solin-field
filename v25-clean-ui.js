@@ -122,6 +122,7 @@
       stop.observe(document.getElementById('modal'),{childList:true,subtree:true});
       renderStand(form);
    }
+   form.addEventListener('submit',()=>setTimeout(()=>revealInvalid(form),0),true);
    form.addEventListener('click',e=>{
       const jump=e.target.closest('[data-ce-jump],[data-ce-nav-maket],[data-ce-extra]');
       if(!jump)return;
@@ -132,6 +133,21 @@
       else if(['4','5'].includes(n))setTab(form,'trees');
    },true);
    setTab(form,'trees');
+ }
+ function enhanceStandModal(){
+   const modal=document.getElementById('modal');
+   if(!modal)return;
+   modal.classList.toggle('v25-stand-modal',Boolean(modal.querySelector('#wfCompRows')&&!modal.classList.contains('ce-modal')));
+ }
+ function revealInvalid(form){
+   if(!form.isConnected)return;
+   const invalid=form.querySelector('[aria-invalid="true"],[aria-invalid=true]');
+   if(!invalid)return;
+   const section=invalid.closest('[id^="ce-section-"]');
+   const number=section?.id.replace('ce-section-','');
+   if(number==='10'||number==='4'||number==='5')setTab(form,'trees');
+   else if(number==='31'||number==='32'||number&&Number(number)>10)setTab(form,'makets');
+   else setTab(form,'site');
  }
  function tidyMenu(){
     const host=document.querySelector('#menuScreen .workspace');
@@ -154,12 +170,13 @@
    const modal=document.getElementById('modal');
    if(modal){
       enhanceCard(modal.querySelector('#ce-form'));
-      const observer=new MutationObserver(()=>enhanceCard(modal.querySelector('#ce-form')));
+      const observer=new MutationObserver(()=>{enhanceCard(modal.querySelector('#ce-form'));enhanceStandModal();});
       observer.observe(modal,{childList:true,subtree:false});
       // #ce-form is inserted into #modalBody, not directly into #modal;
       const inner=modal.querySelector('#modalBody');
       if(inner)observer.observe(inner,{childList:true,subtree:false});
    }
+   enhanceStandModal();
    tidyMenu();
    const menu=document.querySelector('#menuScreen .workspace');
    if(menu){const observer=new MutationObserver(tidyMenu);observer.observe(menu,{childList:true,subtree:false});}
