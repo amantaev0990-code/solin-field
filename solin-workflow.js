@@ -89,32 +89,44 @@ function maketSummary(r,m){const rows=rowsOf(r,m),length=rows.length;
  return length?length+' записей':'Нет данных';
 }
 function cardToolbar(){const host=document.querySelector('#childTabs');if(!host||!record())return;
-const tabs='<div class="wf-maket-head"><div><b>Характеристики выдела</b><small>Данные и полевые наблюдения</small></div><button type="button" class="wf-action" id="wfShowComplete">Все разделы</button></div>'+
-'<div class="wf-maket-nav">'+CORE.map(m=>'<button type="button" class="wf-makbtn '+(currentMaket===m?'on':'')+'" data-maket="'+m+'"><b>'+h(window.SolinHuman?.formName(m)||NAMES[m])+'</b><i>'+rowsOf(record(),m).length+'</i></button>').join('')+'</div>';
-host.innerHTML=tabs;host.querySelectorAll('[data-maket]').forEach(b=>b.onclick=()=>openMaket(b.dataset.maket));
+const others=CORE.filter(m=>m!=='Макет10');
+const tabs='<div class="v25-card-switch" role="navigation" aria-label="Разделы карточки">'+
+ '<button type="button" class="v25-stand-switch'+(currentMaket==='Макет10'?' active':'')+'" data-maket="Макет10">Древостой</button>'+
+ '<label class="v25-maket-choice">Другие макеты<select id="v25MaketChoice" aria-label="Выбрать другой макет"><option value="">Выбрать…</option>'+
+ others.map(m=>'<option value="'+h(m)+'"'+(currentMaket===m?' selected':'')+'>'+h(m.replace('Макет','М'))+' · '+h(window.SolinHuman?.formName(m)||NAMES[m])+'</option>').join('')+
+ '</select></label>'+
+ '<details class="v25-card-more"><summary>Разделы</summary><div><button type="button" id="wfShowComplete">Вся карточка</button></div></details></div>';
+host.innerHTML=tabs;
+host.querySelectorAll('[data-maket]').forEach(b=>b.onclick=()=>openMaket(b.dataset.maket));
+host.querySelector('#v25MaketChoice').onchange=e=>{if(CORE.includes(e.target.value))openMaket(e.target.value);};
 host.querySelector('#wfShowComplete').onclick=showWholeCard;
 const oldBar=document.querySelector('#humanContent .solinEditBar');
 if(oldBar)oldBar.style.display='none';
 const content=document.querySelector('#humanContent');
 if(content&&!content.querySelector('#wfCardActions')){
-const bar=document.createElement('div');bar.id='wfCardActions';bar.className='wf-toolbar';
-bar.innerHTML='<button class="wf-primary" id="wfEditBase">✎ Изменить карточку</button><button id="wfCardCheck">✓ Контроль</button><button id="wfCardRelations">Связи полей</button><button id="wfCardPrint">⎙ Печать КТ</button><button id="wfCardExit">↩ Выход</button>';
-// An uncommitted stand must not run reports/checks or edit Makets as if it
-// existed in the persistent forest. The operator may edit or discard it.
-if(!db()?.quarters?.[String(record().KV)]?.compartments?.includes(record())){
- for(const id of ['wfCardCheck','wfCardRelations','wfCardPrint']){
-  const button=bar.querySelector('#'+id);
-  if(button){button.disabled=true;button.title='Сначала сохраните новую карточку';}
+ const bar=document.createElement('div');bar.id='wfCardActions';bar.className='wf-toolbar v25-card-actions';
+ bar.innerHTML='<button class="wf-primary" id="wfEditBase">Редактировать карточку</button>'+
+ '<button id="wfCardCheck">Контроль</button>'+
+ '<details class="v25-card-actions-more"><summary>Ещё</summary><div>'+
+ '<button id="wfCardRelations">Связи полей</button>'+
+ '<button id="wfCardPrint">Печать КТ</button>'+
+ '<button id="wfCardExit">К кварталам</button></div></details>';
+ // Never validate or report on a stand that is not committed.
+ if(!db()?.quarters?.[String(record().KV)]?.compartments?.includes(record())){
+  for(const id of ['wfCardCheck','wfCardRelations','wfCardPrint']){
+   const button=bar.querySelector('#'+id);
+   if(button){button.disabled=true;button.title='Сначала сохраните новую карточку';}
+  }
+  host.querySelectorAll('button,select').forEach(control=>{control.disabled=true;control.title='Сначала сохраните новую карточку';});
  }
- host.querySelectorAll('button').forEach(button=>{
-  button.disabled=true;button.title='Сначала сохраните новую карточку';
- });
+ content.prepend(bar);
+ bar.querySelector('#wfEditBase').onclick=editBase;
+ bar.querySelector('#wfCardCheck').onclick=()=>SolinControlUI.open({records:[record()],caption:'Карточка · квартал '+record().KV+' · выдел '+record().VD});
+ bar.querySelector('#wfCardRelations').onclick=()=>window.SolinDependencyAudit?.open([record()],{caption:'Выдел '+record().KV+'/'+record().VD});
+ bar.querySelector('#wfCardPrint').onclick=printCard;
+ bar.querySelector('#wfCardExit').onclick=exitCard;
 }
-content.prepend(bar);
-bar.querySelector('#wfEditBase').onclick=editBase;bar.querySelector('#wfCardCheck').onclick=()=>SolinControlUI.open({records:[record()],caption:'Карточка · квартал '+record().KV+' · выдел '+record().VD});
-bar.querySelector('#wfCardRelations').onclick=()=>window.SolinDependencyAudit?.open([record()],{caption:'Выдел '+record().KV+'/'+record().VD});
-bar.querySelector('#wfCardPrint').onclick=printCard;bar.querySelector('#wfCardExit').onclick=exitCard;
-}}
+}
 function showWholeCard(){const r=record();if(!r)return;document.querySelector('#childContent').innerHTML='<div class="wf-maket-view"><h3>Краткая карточка таксации · КТ</h3><p class="wf-muted">Аналог сводного просмотра ВыделКрат. Данные отображаются без расчёта исходных Access-отчётов.</p>'+CORE.map(m=>'<div class="wf-summary-row"><b>'+m.replace('Макет','')+' · '+h(window.SolinHuman?.formName(m)||NAMES[m])+'</b><span>'+h(maketSummary(r,m))+'</span><button data-cardmak="'+m+'">Открыть →</button></div>').join('')+'</div>';
 document.querySelectorAll('[data-cardmak]').forEach(b=>b.onclick=()=>openMaket(b.dataset.cardmak));}
 function openMaket(m){const r=record();if(!r||!CORE.includes(m))return;currentMaket=m;cardToolbar();
