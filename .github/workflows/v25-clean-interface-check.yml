@@ -1,0 +1,54 @@
+name: SOLI-N Field V25 — clean interface checks
+on:
+  push:
+    branches: [design/v25-clean-interface-2026-11-06]
+    paths:
+      - 'v25-clean.css'
+      - 'v25-clean-ui.js'
+      - 'solin-workflow.js'
+      - 'index.html'
+      - 'scripts/test-v25-clean-ui.cjs'
+      - '.github/workflows/v25-clean-interface-check.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ui-browser-and-native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21' }
+      - uses: android-actions/setup-android@v3
+        with: { packages: platform-tools }
+      - name: Install tools
+        run: |
+          npm install --no-audit --no-fund
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Validate V25 scripts, updater and calculations
+        run: |
+          node --check v25-clean-ui.js
+          node --check solin-workflow.js
+          node scripts/test-github-updates.cjs
+          node scripts/test-card-calculations.cjs
+          node scripts/test-quarter-geography-selects.cjs
+          node scripts/test-stand-quick-makets.cjs
+      - name: Verify redesigned cards in real tablet browser
+        run: node scripts/test-v25-clean-ui.cjs
+      - name: Stage Android code
+        run: |
+          npm run build
+          node scripts/test-apk-web-parity.cjs
+          npx cap add android
+          SOLIN_GITHUB_UPDATES=1 node scripts/install-android-mdb.mjs
+          npx cap sync android
+      - name: Compile Android without touching signing keys
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+      # No debug APK is uploaded: its ephemeral key cannot update installed V24.
