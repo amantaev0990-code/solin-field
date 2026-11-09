@@ -22,7 +22,7 @@ const speciesEnd='if(!refs)return';
 const srcC=depSrc.indexOf(speciesStart),srcD=depSrc.indexOf(speciesEnd,srcC);
 if(srcC<0||srcD<0)throw Error('Source M3Pr RowSource not found');
 dep=replaceSection(dep,speciesStart,speciesEnd,depSrc.slice(srcC,srcD),'SDP species');
-if(!dep.includes("status:verified?'complete':'partial'")||!dep.includes('const fallback=!original'))
+if(!dep.includes('const ambiguous=!groupKnown&&groups.length>1')||!dep.includes('const fallback=!original'))
  throw Error('Source-backed dependent dropdown patch failed');
 put(depFile,dep);
 const assistSrc=read('solin-card-assist.js');
