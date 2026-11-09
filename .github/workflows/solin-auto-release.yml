@@ -181,6 +181,7 @@ jobs:
           fs.writeFileSync(p,html);
           NODE
             node scripts/test-v33-ux.cjs --built
+            node scripts/test-v33-data.cjs --built
           fi
           npx cap add android
           SOLIN_GITHUB_UPDATES=1 node scripts/install-android-mdb.mjs
