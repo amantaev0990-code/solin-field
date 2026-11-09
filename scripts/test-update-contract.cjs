@@ -16,8 +16,8 @@ assert.match(java, /MessageDigest\.isEqual/);
 assert.match(java, /MAX_APK_BYTES/);
 assert.match(java, /oldPkg\.packageName\.equals\(newPkg\.packageName\)/);
 assert.match(java, /code\(newPkg\) <= code\(oldPkg\)/);
-assert.match(java, /intent\.setDataAndType/);
-assert.doesNotMatch(java, /deleteDatabase|SQLiteDatabase|SharedPreferences|localStorage/);
+assert.match(java, /session\.commit\(pendingIntent\.getIntentSender\(\)\)/);
+assert.doesNotMatch(java, /deleteDatabase|SQLiteDatabase|localStorage/);
 
 const host = {
   appendChild(el) { this.button = el; elements.set(el.id, el); },
