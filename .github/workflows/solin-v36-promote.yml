@@ -77,8 +77,8 @@ jobs:
           fi
           for spec in \
             'assets/public/solin-v35-features.js|chooseGroup(groups)' \
-            'assets/public/solin-v35-features.js|v36-screen-in' \
-            'assets/public/solin-v35-motion.css|v36-dialog-enter' \
+            'assets/public/solin-v35-features.js|v35-screen-in' \
+            'assets/public/solin-v35-motion.css|v35-dialog-enter' \
             'assets/public/solin-card-assist.js|openFieldByKey(field)' \
             'assets/public/solin-dependent-rules.js|const fallback=!original' \
             'assets/public/solin-dependent-rules.js|const ambiguous=!groupKnown&&groups.length>1' \
