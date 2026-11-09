@@ -71,7 +71,7 @@ if(process.argv.includes('--built')){
  'www/solin-dependent-rules.js','www/solin-card-assist.js'])
   assert.ok(fs.existsSync(f),'Missing V35 asset: '+f);
  const built=read('www/solin-dependent-rules.js'),helper=read('www/solin-card-assist.js');
- assert.ok(built.includes("status:verified?'complete':'partial'"));
+ assert.ok(built.includes('const ambiguous=!groupKnown&&groups.length>1'),'Original ambiguous-group guard missing');
  assert.ok(built.includes('const fallback=!original'));
  assert.ok(helper.includes('openFieldByKey(field)'));
  const html=read('www/index.html');
