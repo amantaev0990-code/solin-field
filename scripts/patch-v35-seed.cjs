@@ -30,9 +30,9 @@ const assistFile='www/solin-card-assist.js';
 let assist=read(assistFile);
 const old='window.SolinCardAssist={openFieldPicker:editPicker,openRowEditor:editSelectedRow,openSequence:editSequence};';
 const srcKey='window.SolinCardAssist={';
-const ai=assistSrc.indexOf(srcKey),aj=assistSrc.indexOf(';',ai);
+const ai=assistSrc.indexOf(srcKey),endTag='\n  };',aj=assistSrc.indexOf(endTag,ai);
 if(ai<0||aj<0||!assist.includes(old))throw Error('V35 card helper API differs; refusing unreviewed overwrite');
-assist=assist.replace(old,assistSrc.slice(ai,aj+1));
+assist=assist.replace(old,assistSrc.slice(ai,aj+endTag.length));
 if(!assist.includes('openFieldByKey(field)'))throw Error('Missing searchable species helper');
 put(assistFile,assist);
 // Overlay always keeps V34 stable menu and installed user's forest data.
