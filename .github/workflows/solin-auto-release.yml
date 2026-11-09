@@ -181,7 +181,17 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x gradlew
-          ./gradlew --no-daemon assembleRelease
+          # GitHub's Gradle distribution CDN occasionally returns HTTP 504.
+          # Retry transient downloads; fail if compilation itself is broken.
+          built=0
+          for attempt in 1 2 3; do
+            if ./gradlew --no-daemon assembleRelease; then
+              built=1
+              break
+            fi
+            if [[ "$attempt" -lt 3 ]]; then sleep 12; fi
+          done
+          [[ "$built" -eq 1 ]] || exit 1
           APK=app/build/outputs/apk/release/app-release-unsigned.apk
           test -s "$APK"
           if unzip -Z1 "$APK" | grep -q '^assets/public/solin-private-refs.packed.bin$'; then
