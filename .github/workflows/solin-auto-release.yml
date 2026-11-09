@@ -181,6 +181,11 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x gradlew
+          # Use Gradle's official CDN directly, avoiding unreliable GitHub
+          # distribution release redirects; the bin distribution is smaller.
+          sed -i 's#services.gradle.org#downloads.gradle.org#g; s#-all.zip#-bin.zip#g; s#networkTimeout=10000#networkTimeout=120000#g' \
+            gradle/wrapper/gradle-wrapper.properties
+          grep -q 'downloads.gradle.org' gradle/wrapper/gradle-wrapper.properties
           # GitHub's Gradle distribution CDN occasionally returns HTTP 504.
           # Retry transient downloads; fail if compilation itself is broken.
           built=0
