@@ -183,9 +183,13 @@ jobs:
           chmod +x gradlew
           # Use Gradle's official CDN directly, avoiding unreliable GitHub
           # distribution release redirects; the bin distribution is smaller.
-          sed -i 's#services.gradle.org#downloads.gradle.org#g; s#-all.zip#-bin.zip#g; s#networkTimeout=10000#networkTimeout=120000#g' \
+          # Download from a verified independent mirror: official Gradle
+          # 8.14.3 distribution SHA-256 is pinned by upstream AndroidX.
+          sed -i 's#distributionUrl=.*#distributionUrl=https\\://mirrors.huaweicloud.com/gradle/gradle-8.14.3-bin.zip#; s#networkTimeout=10000#networkTimeout=120000#' \
             gradle/wrapper/gradle-wrapper.properties
-          grep -q 'downloads.gradle.org' gradle/wrapper/gradle-wrapper.properties
+          printf '\ndistributionSha256Sum=bd71102213493060956ec229d946beee57158dbd89d0e62b91bca0fa2c5f3531\n' >> \
+            gradle/wrapper/gradle-wrapper.properties
+          grep -q 'mirrors.huaweicloud.com' gradle/wrapper/gradle-wrapper.properties
           # GitHub's Gradle distribution CDN occasionally returns HTTP 504.
           # Retry transient downloads; fail if compilation itself is broken.
           built=0
