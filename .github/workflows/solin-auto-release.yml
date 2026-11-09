@@ -176,7 +176,10 @@ jobs:
           ./gradlew --no-daemon assembleRelease
           APK=app/build/outputs/apk/release/app-release-unsigned.apk
           test -s "$APK"
-          ! unzip -Z1 "$APK" | grep -q '^assets/public/solin-private-refs.packed.bin$'
+          if unzip -Z1 "$APK" | grep -q '^assets/public/solin-private-refs.packed.bin$'; then
+            echo "::error::Private references must only be added during signing"
+            exit 1
+          fi
           if [[ -f ../../compat/v30-assets-overlay.txt ]]; then
             for entry in \
               'assets/public/maps/213-1.cmf2:67d30ff85d0d49efc9a467efe585f3aae345073724ae5c60aa895e93e4aa02da' \
