@@ -1,0 +1,78 @@
+name: SOLI-N Field - publish verified V31
+
+# This one-shot promotion uses an already successful signed candidate.
+# It never rebuilds the app, cannot change the signing key, or replace V30.
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/solin-v31-promote.yml']
+
+permissions: {contents: write}
+
+jobs:
+  publish-v31:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: amantaev0990-code/solin-field
+      TAG: solin-field-v230011
+      SOURCE_SHA: 33a74c42d571750160451542ce61529689e198f0
+    steps:
+      - name: Download exact successful signed candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN=42566819886
+          [[ "$(gh api "repos/$REPO/actions/runs/$RUN" --jq .conclusion)" == success ]] || exit 1
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "::error::V31 already exists; never overwrite a release APK."
+            exit 1
+          fi
+          mkdir -p release
+          gh run download "$RUN" --repo "$REPO" --name SOLIN-Field-SIGNED-230011 --dir release
+          test -s release/SOLIN-Field-update.apk
+          test -s release/SHA256SUMS.txt
+          sha256sum -c release/SHA256SUMS.txt
+
+      - uses: android-actions/setup-android@v3
+        with: {packages: platform-tools}
+
+      - name: Verify native installer, package, permanent key, maps, references
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=release/SOLIN-Field-update.apk
+          TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$TOOLS/apksigner" verify --verbose "$APK"
+          CERT="$("$TOOLS/apksigner" verify --print-certs "$APK" | sed -nE 's/^((Signer #[0-9]+)|(V[0-9.]+ Signer)): certificate SHA-256 digest: //p' | head -n 1 | tr '[:lower:]' '[:upper:]')"
+          [[ "$CERT" == '5A1C2E2BF2EFE5AA7382674B651533A11D2B93C802A1C09ADC72656C5A29ED7E' ]] || exit 1
+          BADGING="$("$TOOLS/aapt" dump badging "$APK" | head -n 1)"
+          [[ "$BADGING" == *"package: name='kz.solin.field.v23build'"* ]] || exit 1
+          [[ "$BADGING" == *"versionCode='230011'"* ]] || exit 1
+          for entry in \
+            'assets/public/maps/213-1.cmf2:67d30ff85d0d49efc9a467efe585f3aae345073724ae5c60aa895e93e4aa02da' \
+            'assets/public/maps/213-2.cmf2:74043a02e2d74f4e69bc6af8f2b9eea6a5c20a18ad93f677179075003a380076' \
+            'assets/public/solin-map-overview.geojson:15e57e7fafa470c62ddb168aadd63817304f1f60bd1f20927358ef4f0a8ccf03' \
+            'assets/public/solin-private-refs.packed.bin:c2705bf1ecfa98b007fdbecd1b8f7be908b73591ee2eccae327cf88629bb60e5'; do
+            file="${entry%%:*}"
+            expected="${entry#*:}"
+            actual="$(unzip -p "$APK" "$file" | sha256sum | cut -d' ' -f1)"
+            [[ "$actual" == "$expected" ]] || { echo "::error::Missing or changed $file"; exit 1; }
+          done
+          echo 'Signed V31 identity, forest assets and references verified.'
+
+      - name: Publish exactly the verified V31 APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          LATEST="$(gh api "repos/$REPO/releases/latest" --jq .tag_name)"
+          [[ "$LATEST" == 'solin-field-v230010' ]] || { echo "::error::Unexpected latest release: $LATEST"; exit 1; }
+          gh release create "$TAG" release/SOLIN-Field-update.apk release/SHA256SUMS.txt \
+            --repo "$REPO" --target "$SOURCE_SHA" --latest \
+            --title 'SOLI-N Field V31 — системное обновление Android' \
+            --notes 'Переход с V30 сохраняет пакет kz.solin.field.v23build, подпись и локальные данные. V31 применяет штатный Android PackageInstaller.Session с подтверждением пользователя; офлайн-карты и справочники V30 сохранены. На уже установленной V30 механизм обновления ещё старый, поэтому может потребоваться однократная ручная установка V31. Google Play Protect может показывать предупреждение; не отключайте защиту. Проверка работы на настоящем планшете ещё требуется.'
+          EXPECTED="sha256:$(sha256sum release/SOLIN-Field-update.apk | cut -d' ' -f1)"
+          ACTUAL="$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.assets[] | select(.name=="SOLIN-Field-update.apk") | .digest')"
+          [[ "$EXPECTED" == "$ACTUAL" ]] || { echo "::error::Uploaded GitHub APK digest differs"; exit 1; }
+          echo 'Public release V31 is verified and immutable by convention.'
