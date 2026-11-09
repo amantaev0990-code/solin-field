@@ -120,7 +120,7 @@
   }
   function findNextField(form,current,backwards){
     const fields=[...form.querySelectorAll('[data-ce-field]')].filter(el=>{
-      if(el.disabled||el.readOnly||el.getAttribute('aria-hidden')==='true')return false;
+      if(el.disabled||el.readOnly||el.getAttribute('aria-hidden')==='true'||el.classList.contains('solin-species-native'))return false;
       if(el.closest('[hidden]'))return false;
       if(!el.isConnected||!el.getClientRects().length)return false;
       return true;
@@ -141,9 +141,9 @@
     if(event.key!=='Enter'||!target?.matches?.('input[data-ce-field]'))return;
     if(target.closest('.solin-species-results')||event.altKey||event.ctrlKey||event.metaKey)return;
     const next=findNextField(form,target,event.shiftKey);
-    if(!next)return; // Let the normal form/validation handle the final field.
-    event.preventDefault();
+    event.preventDefault(); // Enter MUST NOT accidentally submit the card.
     target.blur(); // Validation is intentionally triggered before moving.
+    if(!next)return;
     if(target.getAttribute('aria-invalid')==='true')return;
     next.focus({preventScroll:true});
     next.scrollIntoView({block:'nearest',inline:'nearest',behavior:'auto'});
