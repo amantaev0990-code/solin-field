@@ -161,6 +161,36 @@ if (process.env.SOLIN_GITHUB_UPDATES === '1') {
       'registerPlugin(SolinMdbPlugin.class);\\n    registerPlugin(SolinUpdatePlugin.class);'.replace('\\n','\n'));
    fs.writeFileSync(activity,main);
  }
+ // Honor the established rule on physical Android Back and gesture Back:
+ // when a dialog is visible, do not dismiss it or leave its activity.
+ // Outside dialogs Android's normal navigation behavior remains unchanged.
+ main=fs.readFileSync(activity,'utf8');
+ if(!main.includes('SolinOnlyXBackDispatcher')){
+   const marker='    super.onCreate(state);';
+   if(!main.includes(marker))throw Error('Expected BridgeActivity onCreate marker missing');
+   const hook=`
+    // SolinOnlyXBackDispatcher: hold Android Back while a modal is active.
+    getOnBackPressedDispatcher().addCallback(this,
+        new androidx.activity.OnBackPressedCallback(true) {
+          @Override public void handleOnBackPressed() {
+            android.webkit.WebView w = getBridge() == null ? null : getBridge().getWebView();
+            if (w == null) { passToSystem(); return; }
+            w.evaluateJavascript(
+                "(function(){var m=document.getElementById('modal');return Boolean("
+                + "document.getElementById('solin-v23-leave-confirm')"
+                + "||(m&&!m.classList.contains('hidden')));})()",
+                response -> { if (!"true".equals(response)) passToSystem(); });
+          }
+          private void passToSystem() {
+            setEnabled(false);
+            try { getOnBackPressedDispatcher().onBackPressed(); }
+            finally { setEnabled(true); }
+          }
+        });
+`;
+   main=main.replace(marker,marker+hook);
+   fs.writeFileSync(activity,main);
+ }
  manifest=fs.readFileSync(manifestFile,'utf8');
  if(!manifest.includes('android.permission.REQUEST_INSTALL_PACKAGES')){
    manifest=manifest.replace('</manifest>',
