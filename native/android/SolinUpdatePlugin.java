@@ -349,7 +349,7 @@ public class SolinUpdatePlugin extends Plugin {
         long pauseEnd = SystemClock.elapsedRealtime() + (1500L * attempt);
         while (SystemClock.elapsedRealtime() < pauseEnd) {
           task.timeLeft();
-          Thread.sleep(Math.min(250L, pauseEnd - SystemClock.elapsedRealtime()));
+          Thread.sleep(Math.max(1L, Math.min(250L, pauseEnd - SystemClock.elapsedRealtime())));
         }
       }
     }
