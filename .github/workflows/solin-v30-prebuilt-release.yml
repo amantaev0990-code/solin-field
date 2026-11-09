@@ -1,0 +1,98 @@
+name: SOLI-N Field - V30 prebuilt APK verification
+
+# V30 was signed locally and is not recoverable from the V29 source.
+# Use this one-time controlled promotion; V31+ use solin-auto-release.yml.
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/solin-v30-prebuilt-release.yml']
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Verify uploaded V30 APK and publish the draft release'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: solin-v30-prebuilt-release
+  cancel-in-progress: false
+
+jobs:
+  prepare-draft:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Create a draft without replacing stable V25
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG='solin-field-v230010'
+          REPO='amantaev0990-code/solin-field'
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo 'Release already exists; do not replace it.'
+            exit 0
+          fi
+          gh release create "$TAG" --repo "$REPO" --draft \
+            --target "$GITHUB_SHA" \
+            --title 'SOLI-N Field V30 — офлайн-карты и обновления' \
+            --notes 'Локальная сборка V30 от 9 ноября 2026. packageId=kz.solin.field.v23build; versionCode=230010; certificate SHA-256=5A1C2E2BF2EFE5AA7382674B651533A11D2B93C802A1C09ADC72656C5A29ED7E. Exact APK SHA-256: 8e59af958899c7ed50fd9fcc7cdc4a21566bf4e0fd2b9e022077d465b041fd1d. Source of this local build is NOT preserved in the Git repository. Before publishing attach the exact SOLIN-Field-update.apk (27,695,507 bytes), then run Actions > SOLI-N Field - V30 prebuilt APK verification > Run workflow (publish=true). Do not publish an empty release. Back up field data before updating.'
+          echo 'V30 draft created; stable latest is unchanged.'
+
+  verify-and-publish:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Validate draft and verify exact V30 APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG='solin-field-v230010'
+          REPO='amantaev0990-code/solin-field'
+          IS_DRAFT="$(gh release view "$TAG" --repo "$REPO" --json isDraft --jq '.isDraft')"
+          [[ "$IS_DRAFT" == true ]] || { echo 'Not a draft; refusing to modify a published release.' >&2; exit 1; }
+          mkdir -p release
+          gh release download "$TAG" --repo "$REPO" --pattern SOLIN-Field-update.apk --dir release
+          APK=release/SOLIN-Field-update.apk
+          test -s "$APK"
+          [[ "$(stat -c %s "$APK")" -eq 27695507 ]] || { echo 'V30 APK size differs.' >&2; exit 1; }
+          EXPECTED_SHA='8e59af958899c7ed50fd9fcc7cdc4a21566bf4e0fd2b9e022077d465b041fd1d'
+          [[ "$(sha256sum "$APK" | cut -d' ' -f1)" == "$EXPECTED_SHA" ]] || { echo 'V30 APK SHA-256 differs.' >&2; exit 1; }
+          TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$TOOLS/apksigner" verify --verbose --print-certs "$APK"
+          CERT="$("$TOOLS/apksigner" verify --print-certs "$APK" | sed -nE 's/^((Signer #[0-9]+)|(V[0-9.]+ Signer)): certificate SHA-256 digest: //p' | head -n 1 | tr '[:lower:]' '[:upper:]')"
+          EXPECTED_CERT='5A1C2E2BF2EFE5AA7382674B651533A11D2B93C802A1C09ADC72656C5A29ED7E'
+          [[ "$CERT" == "$EXPECTED_CERT" ]] || { echo 'APK signed by different key.' >&2; exit 1; }
+          BADGING="$("$TOOLS/aapt" dump badging "$APK" | head -n 1)"
+          [[ "$BADGING" == *"package: name='kz.solin.field.v23build'"* ]] || { echo 'Wrong package ID.' >&2; exit 1; }
+          [[ "$BADGING" == *"versionCode='230010'"* ]] || { echo 'Wrong versionCode.' >&2; exit 1; }
+          for item in \
+            assets/public/maps/213-1.cmf2 \
+            assets/public/maps/213-2.cmf2 \
+            assets/public/solin-map-overview.geojson \
+            assets/public/solin-offline-imagery.js \
+            assets/public/solin-updates.js \
+            assets/public/solin-private-refs.packed.bin; do
+            test "$(unzip -p "$APK" "$item" | wc -c)" -gt 0 || { echo "Missing asset: $item" >&2; exit 1; }
+          done
+          REFS='c2705bf1ecfa98b007fdbecd1b8f7be908b73591ee2eccae327cf88629bb60e5'
+          [[ "$(unzip -p "$APK" assets/public/solin-private-refs.packed.bin | sha256sum | cut -d' ' -f1)" == "$REFS" ]] || { echo 'Forest references changed.' >&2; exit 1; }
+          echo 'Verified exact V30 hash, certificate, package, version, two maps, reference data.'
+      - name: Publish verified V30 for in-app upgrades
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release edit solin-field-v230010 --repo amantaev0990-code/solin-field --draft=false --latest
+          echo 'Exact V30 now discoverable by V29 in-app updater.'
