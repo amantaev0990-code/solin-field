@@ -16,6 +16,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
+      - name: Checkout automation workflow for static validation
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: automation
+          persist-credentials: false
+      - name: Validate release workflow syntax and shell scripts
+        shell: bash
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE/automation:/repo:ro" --workdir /repo \
+            rhysd/actionlint:1.7.12 .github/workflows/solin-auto-release.yml
       - name: Checkout reviewed V29 updater source
         uses: actions/checkout@v4
         with:
