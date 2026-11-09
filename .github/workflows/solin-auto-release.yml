@@ -14,7 +14,7 @@ on:
       source_ref:
         description: 'Reviewed source branch or commit'
         required: true
-        default: '064bfffdcfb23362e892206a5b744c081d9036be'
+        default: '24b2bf3c6e3974949f7b0b72e84c02bf3a5d9f15'
         type: string
       version_code:
         description: 'Android versionCode: auto or explicit numeric value'
@@ -57,7 +57,7 @@ jobs:
           if [[ "$EVENT" = push && "$TAG" = main ]]; then
             # A self-check verifies signing but cannot publish a release.
             CODE='auto'
-            SOURCE='064bfffdcfb23362e892206a5b744c081d9036be'
+            SOURCE='24b2bf3c6e3974949f7b0b72e84c02bf3a5d9f15'
           elif [[ "$EVENT" = push ]]; then
             [[ "$TAG" =~ ^solin-field-v([0-9]{6,9})$ ]] || { echo "::error::Invalid tag"; exit 1; }
             CODE="${BASH_REMATCH[1]}"
@@ -126,6 +126,7 @@ jobs:
           node scripts/test-update-contract.cjs
           if [[ -f scripts/test-v31-updater.cjs ]]; then node scripts/test-v31-updater.cjs; fi
           if [[ -f scripts/test-v33-ux.cjs ]]; then node scripts/test-v33-ux.cjs; fi
+          if [[ -f scripts/test-v34-regressions.cjs ]]; then node scripts/test-v34-regressions.cjs; fi
           node scripts/test-card-calculations.cjs
           node scripts/test-quarter-geography-selects.cjs
           node scripts/test-stand-quick-makets.cjs
@@ -182,6 +183,10 @@ jobs:
           NODE
             node scripts/test-v33-ux.cjs --built
             node scripts/test-v33-data.cjs --built
+            if [[ -f scripts/patch-v34-seed.cjs ]]; then
+              node scripts/patch-v34-seed.cjs
+              node scripts/test-v34-regressions.cjs --built
+            fi
           fi
           npx cap add android
           SOLIN_GITHUB_UPDATES=1 node scripts/install-android-mdb.mjs
@@ -194,6 +199,7 @@ jobs:
           test -s android/app/src/main/res/xml/solin_update_paths.xml
           if [[ -f scripts/test-v31-updater.cjs ]]; then node scripts/test-v31-updater.cjs --android; fi
           if [[ -f scripts/test-v33-ux.cjs ]]; then node scripts/test-v33-ux.cjs --android; fi
+          if [[ -f scripts/test-v34-regressions.cjs ]]; then node scripts/test-v34-regressions.cjs --android; fi
           grep -q 'applicationId "kz.solin.field.v23build"' android/app/build.gradle
           grep -q 'versionCode ${{ steps.meta.outputs.code }}' android/app/build.gradle
 
