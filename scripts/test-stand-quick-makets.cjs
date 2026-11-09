@@ -24,6 +24,6 @@ assert.match(workflow,/else if\(destination==='print'\)printCard\(\)/,'Print rou
 assert.match(installer,/MessageDigest\.isEqual\(oldFingerprint, expected\)/,'Installed APK must be signed with pinned V23 certificate');
 assert.match(installer,/MessageDigest\.isEqual\(newFingerprint, expected\)/,'Downloaded APK must be signed with pinned V23 certificate');
 assert.match(installer,/\bgetCacheDir\(\)/,'Download only to app cache');
-assert.match(installer,/ACTION_VIEW/,'Use Android system installer');
+assert.match(installer,/session\.commit\(pendingIntent\.getIntentSender\(\)\)/,'Use Android PackageInstaller session');
 assert.match(index,/solin-updates\.js/,'Main application must load updater');
 console.log('Stand editing, linked forest types, Maket navigation, pinned updater identity: OK');
