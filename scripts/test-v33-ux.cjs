@@ -20,6 +20,7 @@ for(const id of ['1','2','3','4','5','10','31','32'])
  assert.ok(js.includes("['"+id+"',"),'Missing native card Maket '+id);
 assert.ok(js.includes('document.addEventListener(\'keydown\''),'Missing editable field keyboard navigation');
 assert.ok(js.includes('target.blur()'),'Input blur validation must run before next field');
+assert.ok(js.includes('Enter MUST NOT accidentally submit'),'Enter must not save card unexpectedly');
 assert.ok(js.includes('requestSubmit()'),'Original card save must remain wired');
 assert.ok(!/localStorage|indexedDB|\.remove\(\)/.test(js),'UX patch must not write or remove user records');
 assert.ok(css.includes('prefers-reduced-motion'),'Respect reduced motion');
