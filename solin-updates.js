@@ -19,10 +19,25 @@
     if (!native) return null;
     return window.Capacitor?.Plugins?.SolinUpdate || null;
   }
+  // Retry GitHub API's documented transient 504 responses as well as
+  // the Android release-asset stream. Source URL and SHA-256 checks stay strict.
+  const temporaryHttp = new Set([408, 429, 500, 502, 503, 504]);
+  const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
   async function latestRelease(fetcher = window.fetch.bind(window)) {
-    const response = await fetcher(RELEASES, {
-      cache: 'no-store', headers: { Accept: 'application/vnd.github+json' }
-    });
+    let response;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        response = await fetcher(RELEASES, {
+          cache: 'no-store', headers: { Accept: 'application/vnd.github+json' }
+        });
+      } catch (error) {
+        if (attempt === 3) throw error;
+        await pause(750 * attempt);
+        continue;
+      }
+      if (!temporaryHttp.has(response.status) || attempt === 3) break;
+      await pause(750 * attempt);
+    }
     if (response.status === 404) return null; // No published releases yet.
     if (!response.ok) throw new Error('Не удалось проверить GitHub (HTTP '+response.status+').');
     const release = await response.json();
@@ -67,8 +82,34 @@
         return;
       }
       showStatus('Найдено обновление. Скачиваю и проверяю подпись…');
-      const result = await native.installRelease({ url: release.url, sha256: release.sha256 });
-      if (!result?.installerOpened) throw new Error('Установщик Android не открылся.');
+      const requestId = 'solin-'+Date.now();
+      let progressHandle = null;
+      try {
+        if (typeof native.addListener === 'function') {
+          try {
+            progressHandle = await native.addListener('updateProgress', event => {
+              if (event?.requestId !== requestId) return;
+              if (event.phase === 'retry') {
+                showStatus('GitHub временно не отвечает. Повторяю загрузку: попытка '+
+                  (Number(event.downloaded)+1)+' из '+event.total+'…');
+              } else if (event.phase === 'download' && Number(event.total) > 1024) {
+                const pct = Math.max(0, Math.min(100,
+                  Math.round(Number(event.downloaded) * 100 / Number(event.total))));
+                showStatus('Загрузка APK: '+pct+'%. Данные лесничеств не затрагиваются.');
+              } else if (event.phase === 'verify') {
+                showStatus('Проверяю подлинность и подпись APK…');
+              }
+            });
+          } catch { /* A missing progress channel must never block updating. */ }
+        }
+        const result = await native.installRelease({
+          url: release.url, sha256: release.sha256,
+          versionCode: release.versionCode, requestId
+        });
+        if (!result?.installerOpened) throw new Error('Установщик Android не открылся.');
+      } finally {
+        try { await progressHandle?.remove?.(); } catch { /* UI-only listener. */ }
+      }
       showStatus('Подтверди обновление в Android. Данные приложения сохраняются при успешном обновлении.');
     } catch (error) {
       showStatus(error?.message || 'Ошибка проверки. Попробуй позже.');
