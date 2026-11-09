@@ -14,7 +14,7 @@ on:
       source_ref:
         description: 'Reviewed source branch or commit'
         required: true
-        default: 'ee4d9ca7015c8cf716a05aa2306da93601db93b4'
+        default: '1d13b7f581e5109a8a72a5f00ec6b0c670f9a71f'
         type: string
       version_code:
         description: 'Android versionCode: auto or explicit numeric value'
@@ -57,7 +57,7 @@ jobs:
           if [[ "$EVENT" = push && "$TAG" = main ]]; then
             # A self-check verifies signing but cannot publish a release.
             CODE='auto'
-            SOURCE='ee4d9ca7015c8cf716a05aa2306da93601db93b4'
+            SOURCE='1d13b7f581e5109a8a72a5f00ec6b0c670f9a71f'
           elif [[ "$EVENT" = push ]]; then
             [[ "$TAG" =~ ^solin-field-v([0-9]{6,9})$ ]] || { echo "::error::Invalid tag"; exit 1; }
             CODE="${BASH_REMATCH[1]}"
@@ -191,6 +191,8 @@ jobs:
             if [[ -f scripts/patch-v35-seed.cjs ]]; then
               node scripts/patch-v35-seed.cjs
               node scripts/test-v35-selects.cjs --built
+              npm install --no-save --no-audit --no-fund jsdom@26.1.0
+              node scripts/test-v35-ux-dom.cjs
             fi
           fi
           npx cap add android
