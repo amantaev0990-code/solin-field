@@ -14,7 +14,7 @@ on:
       source_ref:
         description: 'Reviewed source branch or commit'
         required: true
-        default: 'fix/v31-android-package-installer'
+        default: 'feat/v33-desktop-menu-card-ux'
         type: string
       version_code:
         description: 'Android versionCode: auto or explicit numeric value'
@@ -57,7 +57,7 @@ jobs:
           if [[ "$EVENT" = push && "$TAG" = main ]]; then
             # A self-check verifies signing but cannot publish a release.
             CODE='auto'
-            SOURCE='fix/v31-android-package-installer'
+            SOURCE='feat/v33-desktop-menu-card-ux'
           elif [[ "$EVENT" = push ]]; then
             [[ "$TAG" =~ ^solin-field-v([0-9]{6,9})$ ]] || { echo "::error::Invalid tag"; exit 1; }
             CODE="${BASH_REMATCH[1]}"
@@ -125,6 +125,7 @@ jobs:
           node scripts/test-github-updates.cjs
           node scripts/test-update-contract.cjs
           if [[ -f scripts/test-v31-updater.cjs ]]; then node scripts/test-v31-updater.cjs; fi
+          if [[ -f scripts/test-v33-ux.cjs ]]; then node scripts/test-v33-ux.cjs; fi
           node scripts/test-card-calculations.cjs
           node scripts/test-quarter-geography-selects.cjs
           node scripts/test-stand-quick-makets.cjs
@@ -162,6 +163,25 @@ jobs:
             done
             echo 'V30 original UI and both field maps preserved byte-for-byte.'
           fi
+          # V33 adds tested layout and input improvements ON TOP of the exact
+          # V30 app data. Never replace existing card calculations or scripts.
+          if [[ -f solin-v33-ux.js && -f solin-v33-ux.css ]]; then
+            node - <<'NODE'
+          const fs=require('fs');
+          const p='www/index.html';
+          let html=fs.readFileSync(p,'utf8');
+          for(const [needle,tag,place] of [
+            ['solin-v33-ux.css','<link rel="stylesheet" href="solin-v33-ux.css?v=33">','</head>'],
+            ['solin-v33-ux.js','<script src="solin-v33-ux.js?v=33"></script>','</body>']
+          ]) {
+            if(html.includes(needle))throw Error('Duplicate V33 bundle '+needle);
+            if(!html.includes(place))throw Error('Missing markup anchor '+place);
+            html=html.replace(place,tag+place);
+          }
+          fs.writeFileSync(p,html);
+          NODE
+            node scripts/test-v33-ux.cjs --built
+          fi
           npx cap add android
           SOLIN_GITHUB_UPDATES=1 node scripts/install-android-mdb.mjs
           npx cap sync android
@@ -172,6 +192,7 @@ jobs:
           grep -q 'REQUEST_INSTALL_PACKAGES' android/app/src/main/AndroidManifest.xml
           test -s android/app/src/main/res/xml/solin_update_paths.xml
           if [[ -f scripts/test-v31-updater.cjs ]]; then node scripts/test-v31-updater.cjs --android; fi
+          if [[ -f scripts/test-v33-ux.cjs ]]; then node scripts/test-v33-ux.cjs --android; fi
           grep -q 'applicationId "kz.solin.field.v23build"' android/app/build.gradle
           grep -q 'versionCode ${{ steps.meta.outputs.code }}' android/app/build.gradle
 
