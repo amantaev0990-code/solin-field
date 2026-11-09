@@ -63,7 +63,7 @@ jobs:
             # Never issue a version below V31 in automatic mode.
             LATEST="$(gh api repos/amantaev0990-code/solin-field/releases/latest --jq '.tag_name' 2>/dev/null || true)"
             BASE=230010
-            if [[ "$LATEST" =~ ^solin-field-v([0-9]+)$ ]] && (( ${BASH_REMATCH[1]} > BASE )); then
+            if [[ "$LATEST" =~ ^solin-field-v([0-9]+)$ ]] && (( BASH_REMATCH[1] > BASE )); then
               BASE="${BASH_REMATCH[1]}"
             fi
             CODE="$(( BASE + 1 ))"
@@ -71,9 +71,11 @@ jobs:
           [[ "$CODE" =~ ^[1-9][0-9]{5,8}$ ]] || exit 1
           (( CODE >= 230010 && CODE <= 2100000000 )) || exit 1
           [[ -n "$SOURCE" ]] || exit 1
-          echo "code=$CODE" >> "$GITHUB_OUTPUT"
-          echo "tag=solin-field-v$CODE" >> "$GITHUB_OUTPUT"
-          echo "source=$SOURCE" >> "$GITHUB_OUTPUT"
+          {
+            echo "code=$CODE"
+            echo "tag=solin-field-v$CODE"
+            echo "source=$SOURCE"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Checkout reviewed source without secrets
         uses: actions/checkout@v4
