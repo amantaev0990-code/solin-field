@@ -164,6 +164,13 @@ if (process.env.SOLIN_GITHUB_UPDATES === '1') {
    if(!manifest.includes('</application>'))throw Error('AndroidManifest application node missing');
    manifest=manifest.replace('</application>', '    '+provider+'\n    </application>');
  }
+ // PackageInstaller reports user confirmation and final install status
+ // to a named, private component. It cannot be invoked by other apps.
+ const receiver='<receiver android:name="kz.solin.field.SolinUpdatePlugin$InstallResultReceiver" '+
+     'android:exported="false" android:enabled="true" />';
+ if(!manifest.includes('SolinUpdatePlugin$InstallResultReceiver')){
+   manifest=manifest.replace('</application>', '    '+receiver+'\n    </application>');
+ }
  fs.writeFileSync(manifestFile,manifest);
  const xmlDir=path.join(app,'src/main/res/xml');
  fs.mkdirSync(xmlDir,{recursive:true});
