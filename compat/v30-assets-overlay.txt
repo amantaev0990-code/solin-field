@@ -1,0 +1,6 @@
+# V31 uses verified original V30 web assets and maps from the immutable-by-hash
+# GitHub Release solin-field-v230010. Source is preserved in the existing APK.
+# The native Android updater is rebuilt from the reviewed V31 branch.
+SHA256=8e59af958899c7ed50fd9fcc7cdc4a21566bf4e0fd2b9e022077d465b041fd1d
+VERSION_CODE=230010
+RELEASE=solin-field-v230010
