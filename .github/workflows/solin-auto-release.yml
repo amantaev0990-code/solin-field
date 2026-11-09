@@ -132,9 +132,8 @@ jobs:
           node scripts/test-apk-web-parity.cjs
           test ! -e www/solin-private-refs.packed.bin
 
-          # V30 contains offline maps and latest UI not yet committed to the
-          # older source. Overlay the exact, SHA-pinned V30 RELEASE asset
-          # before Capacitor copies the web assets into the new native APK.
+          # V30 offline assets were never in GitHub V29 branch. Carry over
+          # precisely the known V30 release asset, pinned by SHA256.
           if [[ -f compat/v30-assets-overlay.txt ]]; then
             export GH_TOKEN="${{ github.token }}"
             mkdir -p "$RUNNER_TEMP/v30-seed" "$RUNNER_TEMP/v30-files"
@@ -144,8 +143,6 @@ jobs:
             printf '%s  %s\n' '8e59af958899c7ed50fd9fcc7cdc4a21566bf4e0fd2b9e022077d465b041fd1d' "$BASE" | sha256sum -c -
             unzip -q "$BASE" 'assets/public/*' -d "$RUNNER_TEMP/v30-files"
             cp -a "$RUNNER_TEMP/v30-files/assets/public/." www/
-            # Private refs are restored and SHA-checked in the signing job;
-            # never copy a sensitive snapshot from an APK into our source.
             rm -f www/solin-private-refs.packed.bin
             for entry in \
               'maps/213-1.cmf2:67d30ff85d0d49efc9a467efe585f3aae345073724ae5c60aa895e93e4aa02da' \
@@ -179,124 +176,7 @@ jobs:
           ./gradlew --no-daemon assembleRelease
           APK=app/build/outputs/apk/release/app-release-unsigned.apk
           test -s "$APK"
-          ! unzip -Z1 "$APK" | grep -q '^assets/public/solin-private-refs.packed.bin
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: solin-unsigned-${{ steps.meta.outputs.code }}
-          path: app/android/app/build/outputs/apk/release/app-release-unsigned.apk
-          if-no-files-found: error
-          retention-days: 7
-
-  sign-and-publish:
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions: {contents: write}
-    env:
-      SOLIN_V23_KEYSTORE_PASSWORD: ${{ secrets.SOLIN_V23_KEYSTORE_PASSWORD }}
-      CODE: ${{ needs.build.outputs.code }}
-      TAG: ${{ needs.build.outputs.tag }}
-      SOURCE_SHA: ${{ needs.build.outputs.source_sha }}
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - name: Require permanent V23 signing secret
-        shell: bash
-        run: |
-          test -n "$SOLIN_V23_KEYSTORE_PASSWORD" || {
-            echo "::error::Configure SOLIN_V23_KEYSTORE_PASSWORD once in GitHub Actions Secrets."
-            exit 1
-          }
-
-      - uses: actions/checkout@v4
-        with:
-          ref: main
-          sparse-checkout: signing
-          persist-credentials: false
-      - uses: actions/download-artifact@v4
-        with:
-          name: solin-unsigned-${{ needs.build.outputs.code }}
-          path: unsigned
-      - uses: android-actions/setup-android@v3
-        with: {packages: platform-tools}
-
-      - name: Restore original dictionary, sign and verify APK
-        shell: bash
-        run: |
-          set -euo pipefail
-          umask 077
-          KEY="$RUNNER_TEMP/solin-v23.p12"
-          base64 --decode signing/solin-v23-encrypted.p12.b64 > "$KEY"
-          EXPECTED_KEY="$(python3 -c 'import json;print(json.load(open("signing/certificate.json"))["keystoreSha256"])')"
-          [[ "$(sha256sum "$KEY" | cut -d' ' -f1)" = "$EXPECTED_KEY" ]] || exit 1
-          CERT="$(keytool -list -v -storetype PKCS12 -keystore "$KEY" -alias solin-cloud-lab -storepass:env SOLIN_V23_KEYSTORE_PASSWORD | sed -n 's/.*SHA256: //p' | tr -d ':' | tr '[:lower:]' '[:upper:]')"
-          EXPECTED_CERT='5A1C2E2BF2EFE5AA7382674B651533A11D2B93C802A1C09ADC72656C5A29ED7E'
-          [[ "$CERT" = "$EXPECTED_CERT" ]] || exit 1
-
-          base64 --decode signing/solin-v23-refs.enc.b64 > "$RUNNER_TEMP/refs.enc"
-          openssl enc -d -aes-256-cbc -pbkdf2 -iter 250000 \
-            -in "$RUNNER_TEMP/refs.enc" -out "$RUNNER_TEMP/refs.bin" \
-            -pass env:SOLIN_V23_KEYSTORE_PASSWORD
-          EXPECTED_REFS='c2705bf1ecfa98b007fdbecd1b8f7be908b73591ee2eccae327cf88629bb60e5'
-          [[ "$(sha256sum "$RUNNER_TEMP/refs.bin" | cut -d' ' -f1)" = "$EXPECTED_REFS" ]] || exit 1
-
-          mkdir -p stage/assets/public release
-          cp unsigned/app-release-unsigned.apk stage/base.apk
-          cp "$RUNNER_TEMP/refs.bin" stage/assets/public/solin-private-refs.packed.bin
-          (cd stage && zip -q -0 base.apk assets/public/solin-private-refs.packed.bin)
-          [[ "$(unzip -p stage/base.apk assets/public/solin-private-refs.packed.bin | sha256sum | cut -d' ' -f1)" = "$EXPECTED_REFS" ]] || exit 1
-          TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
-          "$TOOLS/zipalign" -f -p 4 stage/base.apk "$RUNNER_TEMP/aligned.apk"
-          APK=release/SOLIN-Field-update.apk
-          "$TOOLS/apksigner" sign --ks "$KEY" --ks-type PKCS12 \
-            --ks-key-alias solin-cloud-lab --ks-pass env:SOLIN_V23_KEYSTORE_PASSWORD \
-            --v4-signing-enabled false --out "$APK" "$RUNNER_TEMP/aligned.apk"
-          "$TOOLS/apksigner" verify --verbose --print-certs "$APK"
-          # Android build-tools may print either "Signer #1" or "V3.0 Signer".
-          # Read a single certificate digest from the verified APK.
-          ACTUAL_CERT="$("$TOOLS/apksigner" verify --print-certs "$APK" | sed -nE 's/^((Signer #[0-9]+)|(V[0-9.]+ Signer)): certificate SHA-256 digest: //p' | head -n 1 | tr '[:lower:]' '[:upper:]')"
-          [[ "$ACTUAL_CERT" = "$EXPECTED_CERT" ]] || { echo "::error::Signed APK certificate fingerprint differs"; exit 1; }
-          BADGING="$("$TOOLS/aapt" dump badging "$APK" | head -n 1)"
-          [[ "$BADGING" = *"package: name='kz.solin.field.v23build'"* ]] || exit 1
-          [[ "$BADGING" = *"versionCode='$CODE'"* ]] || exit 1
-          [[ "$(unzip -p "$APK" assets/public/solin-private-refs.packed.bin | sha256sum | cut -d' ' -f1)" = "$EXPECTED_REFS" ]] || exit 1
-          sha256sum "$APK" > release/SHA256SUMS.txt
-          rm -f "$KEY" "$RUNNER_TEMP/refs.enc" "$RUNNER_TEMP/refs.bin"
-
-      - name: Preserve signed candidate for testing
-        uses: actions/upload-artifact@v4
-        with:
-          name: SOLIN-Field-SIGNED-${{ needs.build.outputs.code }}
-          path: release/
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Publish signed update to GitHub Releases
-        if: ${{ startsWith(github.ref, 'refs/tags/solin-field-v') || (github.event_name == 'workflow_dispatch' && inputs.publish == true) }}
-        shell: bash
-        env:
-          REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          [[ "$REPO" = 'amantaev0990-code/solin-field' ]] || exit 1
-          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
-            echo "::error::Release already exists. Do not overwrite an existing APK."
-            exit 1
-          fi
-          LATEST="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name' 2>/dev/null || true)"
-          if [[ "$LATEST" =~ ^solin-field-v([0-9]+)$ ]] && (( CODE <= BASH_REMATCH[1] )); then
-            echo "::error::Version is not newer than the published release"
-            exit 1
-          fi
-          gh release create "$TAG" release/SOLIN-Field-update.apk release/SHA256SUMS.txt \
-            --repo "$REPO" --target "$SOURCE_SHA" --latest \
-            --title "SOLI-N Field - build $CODE" \
-            --notes 'Signed in-place update for SOLI-N Field V23+. Back up forest data before installing. Android installation confirmation is required.'
-          EXPECTED="sha256:$(sha256sum release/SOLIN-Field-update.apk | cut -d' ' -f1)"
-          ACTUAL="$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.assets[] | select(.name=="SOLIN-Field-update.apk") | .digest')"
-          [[ "$ACTUAL" = "$EXPECTED" ]] || { echo "::error::Published APK digest differs"; exit 1; }
-          echo 'Signed APK is discoverable by the in-app update button.'
-
+          ! unzip -Z1 "$APK" | grep -q '^assets/public/solin-private-refs.packed.bin$'
           if [[ -f ../../compat/v30-assets-overlay.txt ]]; then
             for entry in \
               'assets/public/maps/213-1.cmf2:67d30ff85d0d49efc9a467efe585f3aae345073724ae5c60aa895e93e4aa02da' \
