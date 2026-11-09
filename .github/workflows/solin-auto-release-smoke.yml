@@ -32,7 +32,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: amantaev0990-code/solin-field
-          ref: feat/v33-desktop-menu-card-ux
+          ref: fix/v34-menu-clicks-modal-only-x
           path: app
           persist-credentials: false
       - name: Checkout known release version and package-id preparation
@@ -58,6 +58,7 @@ jobs:
           node scripts/test-update-contract.cjs
           node scripts/test-v31-updater.cjs
           node scripts/test-v33-ux.cjs
+          node scripts/test-v34-regressions.cjs
           node scripts/test-card-calculations.cjs
           node scripts/test-quarter-geography-selects.cjs
           node scripts/test-stand-quick-makets.cjs
@@ -66,15 +67,16 @@ jobs:
           npx cap add android
           SOLIN_GITHUB_UPDATES=1 node scripts/install-android-mdb.mjs
           npx cap sync android
-          SOLIN_RELEASE_VERSION_CODE=230013 node ../config/scripts/prepare-v23-release.mjs
+          SOLIN_RELEASE_VERSION_CODE=230014 node ../config/scripts/prepare-v23-release.mjs
           sed -i 's#<string name="app_name">[^<]*</string>#<string name="app_name">SOLI-N Field</string>#' android/app/src/main/res/values/strings.xml
           grep -q 'registerPlugin(SolinUpdatePlugin.class)' android/app/src/main/java/kz/solin/field/MainActivity.java
           grep -q 'REQUEST_INSTALL_PACKAGES' android/app/src/main/AndroidManifest.xml
           test -s android/app/src/main/res/xml/solin_update_paths.xml
           node scripts/test-v31-updater.cjs --android
           node scripts/test-v33-ux.cjs --android
+          node scripts/test-v34-regressions.cjs --android
           grep -q 'applicationId "kz.solin.field.v23build"' android/app/build.gradle
-          grep -q 'versionCode 230013' android/app/build.gradle
+          grep -q 'versionCode 230014' android/app/build.gradle
           test ! -e www/solin-private-refs.packed.bin
       - name: Compile unsigned APK without signing secrets
         working-directory: app/android
