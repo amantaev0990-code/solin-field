@@ -28,11 +28,11 @@ jobs:
           docker run --rm \
             -v "$GITHUB_WORKSPACE/automation:/repo:ro" --workdir /repo \
             rhysd/actionlint:1.7.12 .github/workflows/solin-auto-release.yml
-      - name: Checkout reviewed V29 updater source
+      - name: Checkout latest V33 updater and UI source
         uses: actions/checkout@v4
         with:
           repository: amantaev0990-code/solin-field
-          ref: 4a47c899dd97bec4ee66e6965b30ff4943280371
+          ref: feat/v33-desktop-menu-card-ux
           path: app
           persist-credentials: false
       - name: Checkout known release version and package-id preparation
@@ -56,6 +56,8 @@ jobs:
           npm install --no-audit --no-fund
           node scripts/test-github-updates.cjs
           node scripts/test-update-contract.cjs
+          node scripts/test-v31-updater.cjs
+          node scripts/test-v33-ux.cjs
           node scripts/test-card-calculations.cjs
           node scripts/test-quarter-geography-selects.cjs
           node scripts/test-stand-quick-makets.cjs
@@ -64,13 +66,15 @@ jobs:
           npx cap add android
           SOLIN_GITHUB_UPDATES=1 node scripts/install-android-mdb.mjs
           npx cap sync android
-          SOLIN_RELEASE_VERSION_CODE=230011 node ../config/scripts/prepare-v23-release.mjs
+          SOLIN_RELEASE_VERSION_CODE=230013 node ../config/scripts/prepare-v23-release.mjs
           sed -i 's#<string name="app_name">[^<]*</string>#<string name="app_name">SOLI-N Field</string>#' android/app/src/main/res/values/strings.xml
           grep -q 'registerPlugin(SolinUpdatePlugin.class)' android/app/src/main/java/kz/solin/field/MainActivity.java
           grep -q 'REQUEST_INSTALL_PACKAGES' android/app/src/main/AndroidManifest.xml
           test -s android/app/src/main/res/xml/solin_update_paths.xml
+          node scripts/test-v31-updater.cjs --android
+          node scripts/test-v33-ux.cjs --android
           grep -q 'applicationId "kz.solin.field.v23build"' android/app/build.gradle
-          grep -q 'versionCode 230011' android/app/build.gradle
+          grep -q 'versionCode 230013' android/app/build.gradle
           test ! -e www/solin-private-refs.packed.bin
       - name: Compile unsigned APK without signing secrets
         working-directory: app/android
@@ -78,7 +82,15 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x gradlew
-          ./gradlew --no-daemon assembleRelease
+          sed -i 's#distributionUrl=.*#distributionUrl=https\\://mirrors.huaweicloud.com/gradle/gradle-8.14.3-bin.zip#; s#networkTimeout=10000#networkTimeout=120000#' \
+            gradle/wrapper/gradle-wrapper.properties
+          printf '\ndistributionSha256Sum=bd71102213493060956ec229d946beee57158dbd89d0e62b91bca0fa2c5f3531\n' >> gradle/wrapper/gradle-wrapper.properties
+          built=0
+          for attempt in 1 2 3; do
+            if ./gradlew --no-daemon assembleRelease; then built=1; break; fi
+            if [[ "$attempt" -lt 3 ]]; then sleep 10; fi
+          done
+          [[ "$built" -eq 1 ]] || exit 1
           APK=app/build/outputs/apk/release/app-release-unsigned.apk
           test -s "$APK"
           if unzip -Z1 "$APK" | grep -q '^assets/public/solin-private-refs.packed.bin$'; then
