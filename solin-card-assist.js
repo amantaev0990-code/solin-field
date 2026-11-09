@@ -145,5 +145,16 @@
  document.addEventListener('keydown',e=>{const lay=document.querySelector('#ce-assist');if(!lay||lay.hidden)return;if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();back();}if(e.key==='Enter'&&e.target?.id==='ce-assist-value'){e.preventDefault();finishField(e.target.value);}else if(e.key==='Enter'&&e.target?.id==='ce-assist-query'&&state?.mode==='field'&&state.list){e.preventDefault();const q=e.target.value.trim().toLocaleLowerCase('ru-RU'),exact=state.list.find(x=>x.value.toLocaleLowerCase('ru-RU')===q),visible=[...document.querySelectorAll('[data-ce-assist-option]')];const option=q?(exact||(visible.length===1?state.list[Number(visible[0].dataset.ceAssistOption)]:null)):null;if(option)finishField(option.value);}},true);
  const observer=new MutationObserver(()=>{enhance();const lay=document.querySelector('#ce-assist');if(lay&&!document.querySelector('.ce-modal'))dismiss();});observer.observe(document.getElementById('modal')||document.body,{subtree:true,childList:true});
  enhance();
- window.SolinCardAssist={openFieldPicker:editPicker,openRowEditor:editSelectedRow,openSequence:editSequence};
+ window.SolinCardAssist={
+    openFieldPicker:editPicker,
+    openRowEditor:editSelectedRow,
+    openSequence:editSequence,
+    openFieldByKey(field){
+      if(!['M3Pr','M3TLU'].includes(field))return false;
+      const el=board()?.querySelector('[data-ce-scope="base"][data-ce-field="'+field+'"]');
+      if(!el)return false;
+      editField(el);
+      return true;
+    }
+  };
 })();
