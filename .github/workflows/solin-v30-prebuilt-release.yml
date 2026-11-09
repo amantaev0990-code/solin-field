@@ -48,7 +48,9 @@ jobs:
           echo 'V30 draft created; stable latest is unchanged.'
 
   verify-and-publish:
-    if: (github.event_name == 'push' && github.event.head_commit.message == 'release: verify and publish exact V30 uploaded APK') || (github.event_name == 'workflow_dispatch' && inputs.publish == true)
+    if: >-
+      (github.event_name == 'push' && github.event.head_commit.message == 'release: verify and publish exact V30 uploaded APK') ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish == true)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
