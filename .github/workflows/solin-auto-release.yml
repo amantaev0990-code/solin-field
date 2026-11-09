@@ -1,0 +1,247 @@
+name: SOLI-N Field - signed automatic updates
+
+# Push a reviewed solin-field-vNNNNNN tag to build, sign and publish.
+# Manual runs create a signed candidate unless publish=true is selected.
+on:
+  push:
+    tags: ['solin-field-v*']
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: 'Reviewed source branch or commit'
+        required: true
+        default: 'fix/v29-updater-native-check'
+        type: string
+      version_code:
+        description: 'Increasing Android versionCode (first future version: 230011)'
+        required: true
+        default: '230011'
+        type: string
+      publish:
+        description: 'Publish PUBLIC release after successful checks'
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+concurrency:
+  group: solin-automatic-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    permissions: {contents: read}
+    outputs:
+      code: ${{ steps.meta.outputs.code }}
+      tag: ${{ steps.meta.outputs.tag }}
+      source_sha: ${{ steps.source.outputs.sha }}
+    steps:
+      - name: Validate release version and source
+        id: meta
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          TAG: ${{ github.ref_name }}
+          INPUT_SOURCE: ${{ inputs.source_ref }}
+          INPUT_CODE: ${{ inputs.version_code }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT" = push ]]; then
+            [[ "$TAG" =~ ^solin-field-v([0-9]{6,9})$ ]] || { echo "::error::Invalid tag"; exit 1; }
+            CODE="${BASH_REMATCH[1]}"
+            SOURCE="$TAG"
+          else
+            CODE="$INPUT_CODE"
+            SOURCE="$INPUT_SOURCE"
+          fi
+          [[ "$CODE" =~ ^[1-9][0-9]{5,8}$ ]] || exit 1
+          (( CODE >= 230010 && CODE <= 2100000000 )) || exit 1
+          [[ -n "$SOURCE" ]] || exit 1
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "tag=solin-field-v$CODE" >> "$GITHUB_OUTPUT"
+          echo "source=$SOURCE" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout reviewed source without secrets
+        uses: actions/checkout@v4
+        with:
+          repository: amantaev0990-code/solin-field
+          ref: ${{ steps.meta.outputs.source }}
+          path: app
+          persist-credentials: false
+
+      - name: Capture exact source commit
+        id: source
+        run: echo "sha=$(git -C app rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout original release preparation from main
+        uses: actions/checkout@v4
+        with:
+          repository: amantaev0990-code/solin-field
+          ref: main
+          path: release-config
+          sparse-checkout: scripts/prepare-v23-release.mjs
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '21'}
+      - uses: android-actions/setup-android@v3
+        with: {packages: platform-tools}
+
+      - name: Test updater and forest logic (no signing key in this job)
+        working-directory: app
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s solin-updates.js
+          test -s native/android/SolinUpdatePlugin.java
+          grep -q 'solin-updates.js' index.html
+          npm install --no-audit --no-fund
+          node scripts/test-github-updates.cjs
+          node scripts/test-update-contract.cjs
+          node scripts/test-card-calculations.cjs
+          node scripts/test-quarter-geography-selects.cjs
+          node scripts/test-stand-quick-makets.cjs
+          npm run build
+          node scripts/test-apk-web-parity.cjs
+          test ! -e www/solin-private-refs.packed.bin
+          npx cap add android
+          SOLIN_GITHUB_UPDATES=1 node scripts/install-android-mdb.mjs
+          npx cap sync android
+          SOLIN_RELEASE_VERSION_CODE=${{ steps.meta.outputs.code }} node ../release-config/scripts/prepare-v23-release.mjs
+          # The app label stays permanent between all versions.
+          sed -i 's#<string name="app_name">[^<]*</string>#<string name="app_name">SOLI-N Field</string>#' android/app/src/main/res/values/strings.xml
+          grep -q 'registerPlugin(SolinUpdatePlugin.class)' android/app/src/main/java/kz/solin/field/MainActivity.java
+          grep -q 'REQUEST_INSTALL_PACKAGES' android/app/src/main/AndroidManifest.xml
+          test -s android/app/src/main/res/xml/solin_update_paths.xml
+          grep -q 'applicationId "kz.solin.field.v23build"' android/app/build.gradle
+          grep -q 'versionCode ${{ steps.meta.outputs.code }}' android/app/build.gradle
+
+      - name: Compile unsigned Android APK
+        working-directory: app/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease
+          APK=app/build/outputs/apk/release/app-release-unsigned.apk
+          test -s "$APK"
+          ! unzip -Z1 "$APK" | grep -q '^assets/public/solin-private-refs.packed.bin$'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: solin-unsigned-${{ steps.meta.outputs.code }}
+          path: app/android/app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
+          retention-days: 7
+
+  sign-and-publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions: {contents: write}
+    env:
+      SOLIN_V23_KEYSTORE_PASSWORD: ${{ secrets.SOLIN_V23_KEYSTORE_PASSWORD }}
+      CODE: ${{ needs.build.outputs.code }}
+      TAG: ${{ needs.build.outputs.tag }}
+      SOURCE_SHA: ${{ needs.build.outputs.source_sha }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Require permanent V23 signing secret
+        shell: bash
+        run: |
+          test -n "$SOLIN_V23_KEYSTORE_PASSWORD" || {
+            echo "::error::Configure SOLIN_V23_KEYSTORE_PASSWORD once in GitHub Actions Secrets."
+            exit 1
+          }
+
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          sparse-checkout: signing
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: solin-unsigned-${{ needs.build.outputs.code }}
+          path: unsigned
+      - uses: android-actions/setup-android@v3
+        with: {packages: platform-tools}
+
+      - name: Restore original dictionary, sign and verify APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          KEY="$RUNNER_TEMP/solin-v23.p12"
+          base64 --decode signing/solin-v23-encrypted.p12.b64 > "$KEY"
+          EXPECTED_KEY="$(python3 -c 'import json;print(json.load(open("signing/certificate.json"))["keystoreSha256"])')"
+          [[ "$(sha256sum "$KEY" | cut -d' ' -f1)" = "$EXPECTED_KEY" ]] || exit 1
+          CERT="$(keytool -list -v -storetype PKCS12 -keystore "$KEY" -alias solin-cloud-lab -storepass:env SOLIN_V23_KEYSTORE_PASSWORD | sed -n 's/.*SHA256: //p' | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          EXPECTED_CERT='5A1C2E2BF2EFE5AA7382674B651533A11D2B93C802A1C09ADC72656C5A29ED7E'
+          [[ "$CERT" = "$EXPECTED_CERT" ]] || exit 1
+
+          base64 --decode signing/solin-v23-refs.enc.b64 > "$RUNNER_TEMP/refs.enc"
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 250000 \
+            -in "$RUNNER_TEMP/refs.enc" -out "$RUNNER_TEMP/refs.bin" \
+            -pass env:SOLIN_V23_KEYSTORE_PASSWORD
+          EXPECTED_REFS='c2705bf1ecfa98b007fdbecd1b8f7be908b73591ee2eccae327cf88629bb60e5'
+          [[ "$(sha256sum "$RUNNER_TEMP/refs.bin" | cut -d' ' -f1)" = "$EXPECTED_REFS" ]] || exit 1
+
+          mkdir -p stage/assets/public release
+          cp unsigned/app-release-unsigned.apk stage/base.apk
+          cp "$RUNNER_TEMP/refs.bin" stage/assets/public/solin-private-refs.packed.bin
+          (cd stage && zip -q -0 base.apk assets/public/solin-private-refs.packed.bin)
+          [[ "$(unzip -p stage/base.apk assets/public/solin-private-refs.packed.bin | sha256sum | cut -d' ' -f1)" = "$EXPECTED_REFS" ]] || exit 1
+          TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$TOOLS/zipalign" -f -p 4 stage/base.apk "$RUNNER_TEMP/aligned.apk"
+          APK=release/SOLIN-Field-update.apk
+          "$TOOLS/apksigner" sign --ks "$KEY" --ks-type PKCS12 \
+            --ks-key-alias solin-cloud-lab --ks-pass env:SOLIN_V23_KEYSTORE_PASSWORD \
+            --v4-signing-enabled false --out "$APK" "$RUNNER_TEMP/aligned.apk"
+          "$TOOLS/apksigner" verify --verbose --print-certs "$APK"
+          ACTUAL_CERT="$("$TOOLS/apksigner" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | tr '[:lower:]' '[:upper:]')"
+          [[ "$ACTUAL_CERT" = "$EXPECTED_CERT" ]] || exit 1
+          BADGING="$("$TOOLS/aapt" dump badging "$APK" | head -n 1)"
+          [[ "$BADGING" = *"package: name='kz.solin.field.v23build'"* ]] || exit 1
+          [[ "$BADGING" = *"versionCode='$CODE'"* ]] || exit 1
+          [[ "$(unzip -p "$APK" assets/public/solin-private-refs.packed.bin | sha256sum | cut -d' ' -f1)" = "$EXPECTED_REFS" ]] || exit 1
+          sha256sum "$APK" > release/SHA256SUMS.txt
+          rm -f "$KEY" "$RUNNER_TEMP/refs.enc" "$RUNNER_TEMP/refs.bin"
+
+      - name: Preserve signed candidate for testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: SOLIN-Field-SIGNED-${{ needs.build.outputs.code }}
+          path: release/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish signed update to GitHub Releases
+        if: ${{ github.event_name == 'push' || inputs.publish == true }}
+        shell: bash
+        env:
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          [[ "$REPO" = 'amantaev0990-code/solin-field' ]] || exit 1
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "::error::Release already exists. Do not overwrite an existing APK."
+            exit 1
+          fi
+          LATEST="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name' 2>/dev/null || true)"
+          if [[ "$LATEST" =~ ^solin-field-v([0-9]+)$ ]] && (( CODE <= BASH_REMATCH[1] )); then
+            echo "::error::Version is not newer than the published release"
+            exit 1
+          fi
+          gh release create "$TAG" release/SOLIN-Field-update.apk release/SHA256SUMS.txt \
+            --repo "$REPO" --target "$SOURCE_SHA" --latest \
+            --title "SOLI-N Field - build $CODE" \
+            --notes 'Signed in-place update for SOLI-N Field V23+. Back up forest data before installing. Android installation confirmation is required.'
+          EXPECTED="sha256:$(sha256sum release/SOLIN-Field-update.apk | cut -d' ' -f1)"
+          ACTUAL="$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.assets[] | select(.name=="SOLIN-Field-update.apk") | .digest')"
+          [[ "$ACTUAL" = "$EXPECTED" ]] || { echo "::error::Published APK digest differs"; exit 1; }
+          echo 'Signed APK is discoverable by the in-app update button.'
