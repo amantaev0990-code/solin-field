@@ -68,12 +68,86 @@
      output.title='Нажмите, чтобы открыть справочник';
    }
  }
+ function currentCard(){
+   const card={};
+   for(const el of document.querySelectorAll('#ce-form [data-ce-scope="base"][data-ce-field]')){
+     card[el.dataset.ceField]=el.value;
+   }
+   return card;
+ }
+ function originalOrg(){
+   return typeof D!=='undefined'?D?.lesnichestvo?.[0]||null:null;
+ }
+ function chooseGroup(groups){
+   const modal=document.querySelector('#modal.ce-modal');
+   if(!modal||!groups?.length)return false;
+   if(modal.querySelector('#v35-forest-group-dialog'))return true;
+   const input=modal.querySelector('#ce-form [data-ce-scope="base"][data-ce-field="NE2A"]');
+   if(!input){
+     // No matching original base field: never write an invented extra field.
+     return false;
+   }
+   const sheet=document.createElement('div');
+   sheet.id='v35-forest-group-dialog';
+   sheet.className='v35-group-overlay';
+   sheet.setAttribute('role','dialog');
+   sheet.setAttribute('aria-modal','true');
+   sheet.setAttribute('aria-label','Выбор группы типа леса');
+   const content=document.createElement('div');
+   content.className='v35-group-panel';
+   const head=document.createElement('div');
+   head.className='v35-group-head';
+   const title=document.createElement('strong');
+   title.textContent='Группа типа леса';
+   const close=document.createElement('button');
+   close.type='button';
+   close.textContent='×';
+   close.className='v35-group-close';
+   close.setAttribute('aria-label','Закрыть выбор группы');
+   close.addEventListener('click',()=>sheet.remove());
+   head.append(title,close);
+   const info=document.createElement('p');
+   info.textContent='Для этой породы в исходном STL есть разные группы. Выберите нужную — затем откроются соответствующие типы леса.';
+   const choices=document.createElement('div');
+   choices.className='v35-group-choices';
+   for(const group of groups){
+     const item=document.createElement('button');
+     item.type='button';
+     item.className='v35-group-item';
+     item.textContent='Группа '+group;
+     item.addEventListener('click',()=>{
+       // Exactly one original base field stores this explicit user choice.
+       const value=String(group);
+       if(input.value!==value){
+         input.value=value;
+         input.dispatchEvent(new Event('input',{bubbles:true}));
+         input.dispatchEvent(new Event('change',{bubbles:true}));
+       }
+       sheet.remove();
+       window.SolinCardEditor?.refreshDependencies?.();
+       window.SolinCardAssist?.openFieldByKey?.('M3TLU');
+     });
+     choices.append(item);
+   }
+   content.append(head,info,choices);
+   sheet.append(content);
+   modal.append(sheet);
+   close.focus();
+   return true;
+ }
  function openField(field){
    const el=actual(field);
    if(!el)return;
    if(field==='M3TLU'&&!detail('M3Pr')?.value){
      window.SolinCardAssist?.openFieldByKey?.('M3Pr');
      return;
+   }
+   if(field==='M3TLU'){
+     const ctx=currentCard();
+     const result=window.SolinDependentRules?.forestTypes?.(ctx,originalOrg(),window.SOLIN_REFS?.tables);
+     if(result?.status==='ambiguous'&&result.groups?.length>1){
+       if(chooseGroup(result.groups))return;
+     }
    }
    if(window.SolinCardAssist?.openFieldByKey?.(field))return;
    // Fallback remains a real select with original code values, not a new form.
