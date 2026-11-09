@@ -9,6 +9,7 @@ const refs={
  STL:[
   {KTL:'БРТЗ',NTL:'Березняк разнотравный',GPor:'7',Lxz:3,OblStl:15,GrTL:1},
   {KTL:'СВЕТ',NTL:'Светлый тип леса',GPor:'7',Lxz:4,OblStl:15,GrTL:2},
+  {KTL:'БРТ2',NTL:'Другой групповой тип',GPor:'7',Lxz:3,OblStl:15,GrTL:2},
   {KTL:'НЕЧУЖ',NTL:'Другой район',GPor:'7',Lxz:3,OblStl:35,GrTL:1},
   {KTL:'КУСТТ',NTL:'Для кустарников',GPor:'9',Lxz:3,OblStl:15,GrTL:1}
  ]};
@@ -29,26 +30,29 @@ assert.equal(r.status,'complete');
 assert.deepEqual(Array.from(r.items.map(x=>x.value)),['БРТЗ']);
 const missingZone={M3Pr:'ОС',NE2A:1};
 r=engine.options('ВыделВ','M3TLU',missingZone,missingZone,org,refs);
-assert.equal(r.status,'partial');
-assert.deepEqual(Array.from(r.items.map(x=>x.value)),['БРТЗ','НЕЧУЖ'].filter(x=>x!=='НЕЧУЖ'));
-// Without the explicit group, present verified STL candidates; NEVER invent codes.
+assert.equal(r.status,'unavailable','Unknown zone must never enable unchecked types');
+assert.equal(r.items.length,0);
 const missingGroup={M3Pr:'ОС',KlxrVD:3};
 r=engine.options('ВыделВ','M3TLU',missingGroup,missingGroup,org,refs);
-assert.equal(r.status,'partial');
-assert.deepEqual(Array.from(r.items.map(x=>x.value)),['БРТЗ']);
-// Missing region may allow region-tagged real STL candidates (warning required).
+assert.equal(r.status,'ambiguous','Multiple original groups must not be mixed');
+assert.equal(r.items.length,0);
+assert.deepEqual(Array.from(engine.forestTypes(missingGroup,org,refs).groups).sort(),['1','2'].sort());
+const oneGroup={...refs,STL:refs.STL.filter(row=>row.GrTL===1)};
+const single=engine.options('ВыделВ','M3TLU',missingGroup,missingGroup,org,oneGroup);
+assert.equal(single.status,'partial','One group without explicit NE2A is partial');
+assert.deepEqual(Array.from(single.items.map(x=>x.value)),['БРТЗ']);
 const noRegion={M3Pr:'ОС',KlxrVD:3,NE2A:1};
 r=engine.options('ВыделВ','M3TLU',noRegion,noRegion,{},refs);
-assert.equal(r.status,'partial');
-assert.deepEqual(Array.from(r.items.map(x=>x.value)).sort(),['БРТЗ','НЕЧУЖ'].sort());
+assert.equal(r.status,'unavailable','Unknown region must not leak other regions');
+assert.equal(r.items.length,0);
 const select={
  tagName:'SELECT',dataset:{},value:'',disabled:true,title:'',
  replaceChildren(...children){this.children=children;}
 };
-engine.applySelect(select,r,{current:''});
-assert.equal(select.disabled,false,'Partially verified STL must stay selectable');
+engine.applySelect(select,single,{current:''});
+assert.equal(select.disabled,false,'Partial but unique group may be selectable');
 assert.equal(select.dataset.dependentStatus,'partial');
-assert.equal(select.children.length,3);
+assert.equal(select.children.length,2);
 const tip={...refs,SDP_Tip:[{KPC:'ОС',NDP:'Осина'}, {KPC:'КУСТ',NDP:'Куст'}]};
 r=engine.options('ВыделВ','M3Pr',{}, {},org,tip);
 assert.equal(r.status,'complete','Original source should be full status');
@@ -56,6 +60,8 @@ const js=read('solin-v35-features.js'),css=read('solin-v35-motion.css'),api=read
 new Function(js);
 assert.ok(js.includes("field:'M3Pr'")&&js.includes("field:'M3TLU'"));
 assert.ok(js.includes('openFieldByKey')&&api.includes('openFieldByKey(field)'));
+assert.ok(js.includes('function chooseGroup(groups)')&&js.includes("data-ce-field=\"NE2A\""));
+assert.ok(js.includes('sheet.remove()'),'Sub-dialog requires explicit X close');
 assert.ok(js.includes('const nextLabel='));
 assert.ok(css.includes('v35-screen-in')&&css.includes('v35-dialog-enter'));
 assert.ok(css.includes('prefers-reduced-motion'));
