@@ -28,23 +28,38 @@ function speciesGroup(primary,refs){
 }
 function forestTypes(card,org,refs=ref()){
  const species=card?.M3Pr,zone=card?.KlxrVD,area=region(org),group=speciesGroup(species,refs);
- if(!refs?.STL?.length)return {status:'unavailable',reason:'Справочник STL ещё не загружен',items:[]};
+ if(!refs?.STL?.length)return {status:'unavailable',reason:'Исходный справочник STL не загружен',items:[]};
  if(!filled(species))return {status:'waiting',reason:'Сначала выберите главную породу',items:[]};
- if(group===null)return {status:'unavailable',reason:'Не найден род породы в SDP',items:[]};
- if(!filled(zone)||area===null)return {status:'unavailable',reason:'Не определена лесохозяйственная зона или код области',items:[]};
- const matches=refs.STL.filter(r=>filled(r.KTL)&&same(r.GPor,group)&&same(r.Lxz,zone)&&same(r.OblStl,area));
- if(!matches.length)return {status:'empty',reason:'Для породы, зоны и области в STL нет типов леса',items:[],group,zone,area};
- const groups=[...new Set(matches.map(r=>code(r.GrTL)))];
- // NE2A is a real additional source field; if absent, do not invent it.
- const groupKnown=filled(card.NE2A);
- const ambiguous=!groupKnown&&groups.length>1;
- const selected=ambiguous?[]:groupKnown?matches.filter(r=>same(r.GrTL,card.NE2A)):matches;
- const items=selected.map(r=>({value:String(r.KTL??''),label:name(r),group:r.GrTL,area:r.OblStl,zone:r.Lxz}));
- const status=ambiguous?'ambiguous':groupKnown?'complete':'partial';
- const reason=ambiguous?'Уточните группу типа леса NE2A: в этой зоне существуют разные группы':groupKnown?
-  'Точный фильтр SOLI-N: порода, зона, группа, область':
-  'В данном сочетании STL имеет одну группу; NE2A в карточке не заполнено';
- return {status,reason,items,group,zone,area,groups};
+ if(group===null)return {status:'unavailable',reason:'В SDP не определена группа выбранной породы — тип нельзя подставлять наугад',items:[]};
+ const zoneKnown=filled(zone),areaKnown=area!==null;
+ // A partial RowSource still contains genuine STL rows; present the filtered
+ // candidates, and warn when any missing address prevents full verification.
+ const matches=refs.STL.filter(r=>filled(r.KTL)&&same(r.GPor,group)&&
+  (!zoneKnown||same(r.Lxz,zone))&&(!areaKnown||same(r.OblStl,area)));
+ if(!matches.length)return {status:'empty',reason:
+  'В STL нет типов леса для известных значений породы/зоны/области',items:[],group,zone,area};
+ const groups=[...new Set(matches.map(r=>code(r.GrTL)))],groupKnown=filled(card?.NE2A);
+ const chosen=groupKnown?matches.filter(r=>same(r.GrTL,card.NE2A)):matches;
+ if(!chosen.length)return {status:'empty',reason:'Указанная группа NE2A не соответствует исходному STL',items:[],group,zone,area};
+ const missing=[];
+ if(!zoneKnown)missing.push('лесохозяйственную зону');
+ if(!areaKnown)missing.push('область');
+ if(!groupKnown&&groups.length>1)missing.push('группу типа леса NE2A');
+ const verified=missing.length===0,byCode=new Map();
+ for(const r of chosen){
+  const value=code(r.KTL);
+  if(!value)continue;
+  const context=verified?'':[
+    filled(r.GrTL)?'группа '+r.GrTL:null,
+    !zoneKnown&&filled(r.Lxz)?'зона '+r.Lxz:null,
+    !areaKnown&&filled(r.OblStl)?'область '+r.OblStl:null
+  ].filter(Boolean).join(', ');
+  if(!byCode.has(value))byCode.set(value,{value,label:name(r)+(context?' ('+context+')':''),
+    group:r.GrTL,area:r.OblStl,zone:r.Lxz});
+ }
+ return {status:verified?'complete':'partial',items:[...byCode.values()],group,zone,area,groups,
+  reason:verified?'Точный фильтр STL: порода, зона, группа, область':
+  'Оригинальный STL: список предварительный, уточните '+missing.join(', ')};
 }
 // Original ВыделВ.KU rowsource contains SKU.P10 (position 5) and
 // Макет10.IAR RowSource uses SIAR.Ia = Forms!ВыделВ!NM1.
@@ -136,12 +151,18 @@ function options(form,field,row,card,org,refs=ref()){
   return {status:r.status,reason:r.reason,items:r.items};
  }
  if(form==='ВыделВ'&&field==='M3Pr'){
-  if(!refs?.SDP_Tip?.length)
-   return {status:'unavailable',reason:'Исходный список пород SDP_Tip отсутствует — выбор не подтверждён',items:[]};
-  // Original ВыделВ main-species RowSource explicitly excludes "КУСТ".
-  return {status:'complete',reason:'Оригинальный список главной породы исключает КУСТ',
-   items:refs.SDP_Tip.filter(r=>filled(r.KPC)&&code(r.KPC)!=='КУСТ')
-    .map(r=>({value:String(r.KPC),label:String(r.NDP||'')}))};
+  // Original SDP_Tip is preferable; offline SDP has the original KPC codes.
+  const original=Array.isArray(refs?.SDP_Tip)&&refs.SDP_Tip.length?refs.SDP_Tip:null;
+  const fallback=!original&&Array.isArray(refs?.SDP)&&refs.SDP.length?refs.SDP:null;
+  const rows=original||fallback;
+  if(!rows)return {status:'unavailable',reason:'Нет таблиц пород SDP_Tip и SDP',items:[]};
+  const seen=new Set();
+  const items=rows.filter(r=>filled(r.KPC)&&code(r.KPC)!=='КУСТ').map(r=>({
+    value:code(r.KPC),label:String(r.NDP??refs?.SDP?.find(s=>same(s.KPC,r.KPC))?.NDP??'')
+  })).filter(o=>{if(seen.has(o.value))return false;seen.add(o.value);return true;});
+  return {status:original?'complete':'partial',items,
+    reason:original?'Оригинальный список SDP_Tip: КУСТ исключён':
+      'Коды пород из исходного SDP; отсутствие SDP_Tip обозначено как неполная проверка'};
  }
  if(!refs)return {status:'unavailable',reason:'Справочники ещё не загружены',items:[]};
  if(form==='Квартал'&&field==='Kpz'){
