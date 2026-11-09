@@ -5,6 +5,10 @@ name: SOLI-N Field - signed automatic updates
 on:
   push:
     tags: ['solin-field-v*']
+    # Changes to the release pipeline trigger a signed DRY RUN on a pinned,
+    # reviewed commit. They never publish to GitHub Releases.
+    branches: [main]
+    paths: ['.github/workflows/solin-auto-release.yml']
   workflow_dispatch:
     inputs:
       source_ref:
@@ -50,7 +54,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          if [[ "$EVENT" = push ]]; then
+          if [[ "$EVENT" = push && "$TAG" = main ]]; then
+            # A self-check verifies signing but cannot publish a release.
+            CODE='auto'
+            SOURCE='4a47c899dd97bec4ee66e6965b30ff4943280371'
+          elif [[ "$EVENT" = push ]]; then
             [[ "$TAG" =~ ^solin-field-v([0-9]{6,9})$ ]] || { echo "::error::Invalid tag"; exit 1; }
             CODE="${BASH_REMATCH[1]}"
             SOURCE="$TAG"
@@ -236,7 +244,7 @@ jobs:
           retention-days: 30
 
       - name: Publish signed update to GitHub Releases
-        if: ${{ github.event_name == 'push' || inputs.publish == true }}
+        if: ${{ startsWith(github.ref, 'refs/tags/solin-field-v') || (github.event_name == 'workflow_dispatch' && inputs.publish == true) }}
         shell: bash
         env:
           REPO: ${{ github.repository }}
