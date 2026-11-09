@@ -14,7 +14,7 @@ on:
       source_ref:
         description: 'Reviewed source branch or commit'
         required: true
-        default: '24b2bf3c6e3974949f7b0b72e84c02bf3a5d9f15'
+        default: 'd611836f50acb0a0071b80bffbf3887694f676f6'
         type: string
       version_code:
         description: 'Android versionCode: auto or explicit numeric value'
@@ -57,7 +57,7 @@ jobs:
           if [[ "$EVENT" = push && "$TAG" = main ]]; then
             # A self-check verifies signing but cannot publish a release.
             CODE='auto'
-            SOURCE='24b2bf3c6e3974949f7b0b72e84c02bf3a5d9f15'
+            SOURCE='d611836f50acb0a0071b80bffbf3887694f676f6'
           elif [[ "$EVENT" = push ]]; then
             [[ "$TAG" =~ ^solin-field-v([0-9]{6,9})$ ]] || { echo "::error::Invalid tag"; exit 1; }
             CODE="${BASH_REMATCH[1]}"
@@ -127,6 +127,7 @@ jobs:
           if [[ -f scripts/test-v31-updater.cjs ]]; then node scripts/test-v31-updater.cjs; fi
           if [[ -f scripts/test-v33-ux.cjs ]]; then node scripts/test-v33-ux.cjs; fi
           if [[ -f scripts/test-v34-regressions.cjs ]]; then node scripts/test-v34-regressions.cjs; fi
+          if [[ -f scripts/test-v35-selects.cjs ]]; then node scripts/test-v35-selects.cjs; fi
           node scripts/test-card-calculations.cjs
           node scripts/test-quarter-geography-selects.cjs
           node scripts/test-stand-quick-makets.cjs
@@ -186,6 +187,10 @@ jobs:
             if [[ -f scripts/patch-v34-seed.cjs ]]; then
               node scripts/patch-v34-seed.cjs
               node scripts/test-v34-regressions.cjs --built
+            fi
+            if [[ -f scripts/patch-v35-seed.cjs ]]; then
+              node scripts/patch-v35-seed.cjs
+              node scripts/test-v35-selects.cjs --built
             fi
           fi
           npx cap add android
