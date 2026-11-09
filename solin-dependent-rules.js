@@ -44,7 +44,7 @@ function forestTypes(card,org,refs=ref()){
  const missing=[];
  if(!zoneKnown)missing.push('лесохозяйственную зону');
  if(!areaKnown)missing.push('область');
- if(!groupKnown&&groups.length>1)missing.push('группу типа леса NE2A');
+ if(!groupKnown)missing.push('группу типа леса NE2A');
  const verified=missing.length===0,byCode=new Map();
  for(const r of chosen){
   const value=code(r.KTL);
