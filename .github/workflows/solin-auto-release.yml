@@ -270,6 +270,17 @@ jobs:
           [[ "$BADGING" = *"package: name='kz.solin.field.v23build'"* ]] || exit 1
           [[ "$BADGING" = *"versionCode='$CODE'"* ]] || exit 1
           [[ "$(unzip -p "$APK" assets/public/solin-private-refs.packed.bin | sha256sum | cut -d' ' -f1)" = "$EXPECTED_REFS" ]] || exit 1
+          # These hashes are from the V30 APK actually installed on the tablet.
+          # A V31 must preserve both offline maps; never publish a regression.
+          for entry in \
+            'assets/public/maps/213-1.cmf2:67d30ff85d0d49efc9a467efe585f3aae345073724ae5c60aa895e93e4aa02da' \
+            'assets/public/maps/213-2.cmf2:74043a02e2d74f4e69bc6af8f2b9eea6a5c20a18ad93f677179075003a380076' \
+            'assets/public/solin-map-overview.geojson:15e57e7fafa470c62ddb168aadd63817304f1f60bd1f20927358ef4f0a8ccf03'; do
+            file="${entry%%:*}"
+            expected="${entry#*:}"
+            actual="$(unzip -p "$APK" "$file" | sha256sum | cut -d' ' -f1)"
+            [[ "$actual" == "$expected" ]] || { echo "::error::Forest map asset mismatch: $file"; exit 1; }
+          done
           sha256sum "$APK" > release/SHA256SUMS.txt
           rm -f "$KEY" "$RUNNER_TEMP/refs.enc" "$RUNNER_TEMP/refs.bin"
 
