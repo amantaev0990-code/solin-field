@@ -1,0 +1,1 @@
+Verified GitHub draft asset SOLIN-Field-update.apk is 27,695,507 bytes and SHA256 8e59af958899c7ed50fd9fcc7cdc4a21566bf4e0fd2b9e022077d465b041fd1d. This commit requests a guarded verification before publication.
