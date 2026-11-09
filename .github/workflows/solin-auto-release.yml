@@ -13,9 +13,9 @@ on:
         default: 'fix/v29-updater-native-check'
         type: string
       version_code:
-        description: 'Increasing Android versionCode (first future version: 230011)'
+        description: 'Android versionCode: auto or explicit numeric value'
         required: true
-        default: '230011'
+        default: 'auto'
         type: string
       publish:
         description: 'Publish PUBLIC release after successful checks'
@@ -47,6 +47,7 @@ jobs:
           TAG: ${{ github.ref_name }}
           INPUT_SOURCE: ${{ inputs.source_ref }}
           INPUT_CODE: ${{ inputs.version_code }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if [[ "$EVENT" = push ]]; then
@@ -56,6 +57,16 @@ jobs:
           else
             CODE="$INPUT_CODE"
             SOURCE="$INPUT_SOURCE"
+          fi
+          if [[ "$CODE" == 'auto' ]]; then
+            # The tablet can have V29 / V30 while the public latest is V25.
+            # Never issue a version below V31 in automatic mode.
+            LATEST="$(gh api repos/amantaev0990-code/solin-field/releases/latest --jq '.tag_name' 2>/dev/null || true)"
+            BASE=230010
+            if [[ "$LATEST" =~ ^solin-field-v([0-9]+)$ ]] && (( ${BASH_REMATCH[1]} > BASE )); then
+              BASE="${BASH_REMATCH[1]}"
+            fi
+            CODE="$(( BASE + 1 ))"
           fi
           [[ "$CODE" =~ ^[1-9][0-9]{5,8}$ ]] || exit 1
           (( CODE >= 230010 && CODE <= 2100000000 )) || exit 1
