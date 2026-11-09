@@ -1,0 +1,125 @@
+/* V33 — original SOLI-N main menu layout, tablet-friendly editing.
+   This file is added after V30 styles without rewriting card calculation logic. */
+.field-shell.v33-app {
+  --v33-green:#174b32; --v33-accent:#246a47;
+  --v33-border:#d1dcd5; --v33-soft:#f1f6f2;
+  --v33-font:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+  background:#f1f3f1;color:#20342a;
+}
+.field-shell.v33-app .app {max-width:1450px;margin:0 auto;padding:0 clamp(8px,1.6vw,24px) 24px;}
+.field-shell.v33-app .topbar {
+ display:flex;align-items:center;justify-content:space-between;min-height:64px;
+ padding:9px 18px;margin:0 0 14px;background:#fff;border:1px solid #d9e2dc;
+ border-top:0;border-radius:0 0 10px 10px;box-shadow:0 2px 10px #1636240b;
+}
+.field-shell.v33-app .brand {display:flex;align-items:center;gap:10px;}
+.field-shell.v33-app .brand .v33-brandmark {
+ width:38px;height:38px;object-fit:contain;flex:none;display:block;
+ background:transparent;border:0;border-radius:0;
+}
+.field-shell.v33-app .brand h1 {color:var(--v33-green);font:750 19px var(--v33-font);letter-spacing:-.5px;}
+.field-shell.v33-app .field-home-button {border:1px solid var(--v33-border);border-radius:7px;background:#fff;color:var(--v33-green);}
+.field-shell.v33-app .workspace.field-main {padding:17px 22px 24px;}
+.field-shell.v33-app .field-main h2 {font:750 clamp(23px,2vw,29px) var(--v33-font);margin:0 0 15px;}
+.field-shell.v33-app .v33-main-layout {display:grid;grid-template-columns:minmax(220px,275px) minmax(0,1fr);gap:24px;align-items:start;}
+.field-shell.v33-app .v33-context-col {background:#f7f9f7;border:1px solid var(--v33-border);border-radius:10px;padding:16px;}
+.field-shell.v33-app .v33-context-col .v33-block-title {font-size:13px;font-weight:750;letter-spacing:.02em;color:var(--v33-green);margin:0 0 12px;}
+.field-shell.v33-app .field-context {display:grid;grid-template-columns:minmax(0,1fr);gap:13px;margin:0;padding:0;border:0;}
+.field-shell.v33-app .field-context > div {display:block;padding:0 0 12px;border-bottom:1px solid #e2eae4;min-width:0;}
+.field-shell.v33-app .field-context > div:last-child {border-bottom:0;padding-bottom:0;}
+.field-shell.v33-app .field-context dt {font:650 12px var(--v33-font);color:#647368;}
+.field-shell.v33-app .field-context dd {margin:4px 0 0;font:680 15px var(--v33-font);color:#203f2c;}
+.field-shell.v33-app .field-context select {min-height:47px;border-radius:7px;border-color:#a8b8ac;background:#fff;padding:8px 10px;}
+.field-shell.v33-app .v33-actions-col {min-width:0;}
+.field-shell.v33-app .field-main-actions {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;max-width:none;align-items:start;}
+.field-shell.v33-app .v33-menu-group {min-width:0;display:grid;gap:6px;align-content:start;}
+.field-shell.v33-app .v33-menu-group h3 {
+ margin:0 0 3px;font:720 13px var(--v33-font);color:#435c49;
+ letter-spacing:.02em;padding:0 2px;
+}
+.field-shell.v33-app .v33-menu-group > button,
+.field-shell.v33-app .v33-menu-group > label {
+ display:flex;align-items:center;gap:12px;min-height:56px;
+ padding:11px 13px;margin:0;width:100%;background:#fff;color:#1b3424;
+ border:1px solid var(--v33-border);border-radius:8px;
+ box-shadow:0 1px 2px #183c2510;
+ font:650 15px/1.3 var(--v33-font);
+ text-align:left;cursor:pointer;box-sizing:border-box;
+ transition:background-color .16s ease, border-color .16s ease, transform .16s ease;
+}
+.field-shell.v33-app .v33-menu-group > :is(button,label) .v33-menu-symbol {
+ display:inline-flex;align-items:center;justify-content:center;flex:none;
+ width:30px;height:30px;border-radius:7px;background:#eff5f0;
+ color:var(--v33-green);font-size:19px;font-weight:650;
+}
+.field-shell.v33-app .v33-menu-group > :is(button,label):is(:hover,:focus-visible) {
+ border-color:#72a787;background:#f7fcf9;outline-offset:2px;
+}
+.field-shell.v33-app .v33-menu-group > button.v33-primary {
+ background:var(--v33-green);border-color:var(--v33-green);color:#fff;
+}
+.field-shell.v33-app .v33-menu-group > button.v33-primary .v33-menu-symbol {background:#ffffff23;color:#fff;}
+.field-shell.v33-app .v33-menu-group > button.v33-primary:hover {background:#206442;}
+.field-shell.v33-app .v33-menu-group .field-import input {cursor:pointer;}
+.field-shell.v33-app .v33-menu-group :is(button,label):focus-visible {outline:2px solid #5ba579;}
+.field-shell.v33-app .screen.active.field-section-enter > .workspace {animation:v33-screen-enter .2s cubic-bezier(.2,.85,.3,1) both;}
+@keyframes v33-screen-enter {from{opacity:.45;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+.field-shell.v33-app #modal:not([hidden]) .modalCard {
+ animation:v33-modal-enter .18s cubic-bezier(.2,.8,.25,1) both;
+}
+@keyframes v33-modal-enter {from{opacity:.6;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+/* Retain desktop's exact order and widths of Makets 1–5, 10, 31, 32. */
+.field-shell.v33-app #modal.ce-modal .modalCard {max-width:min(1440px,100vw);}
+.field-shell.v33-app .ce-modal #ce-form {display:flex;flex-direction:column;min-height:0;min-width:0;}
+.field-shell.v33-app .ce-modal #ce-form > .dt-toolbar {
+ position:relative;z-index:4;flex:0 0 auto;border-bottom:1px solid #bac6bc;
+ background:#f7faf8;box-shadow:0 2px 4px #18362412;
+}
+.field-shell.v33-app .ce-modal .dt-viewport {flex:1;min-height:0;scrollbar-width:thin;}
+.field-shell.v33-app .ce-modal .dt-board [data-ce-field]:focus-visible,
+.field-shell.v33-app .ce-modal .dt-board [data-ce-field]:focus {
+ outline:2px solid #23784b !important;outline-offset:1px;box-shadow:0 0 0 3px #43a26a24;
+}
+.field-shell.v33-app .ce-modal .dt-board [aria-invalid="true"] {outline:2px solid #bc3838!important;}
+.field-shell.v33-app .ce-modal .dt-board :is(input,select,textarea) {scroll-margin:70px;}
+.field-shell.v33-app .ce-modal .v33-card-jump {
+ display:flex;align-items:center;gap:6px;overflow-x:auto;flex:0 0 auto;
+ padding:7px 10px;background:#eef5ef;border-bottom:1px solid #ceded2;
+ scrollbar-width:thin;white-space:nowrap;
+}
+.field-shell.v33-app .ce-modal .v33-card-jump button {
+ flex:0 0 auto;min-width:71px;min-height:38px;line-height:1.2;
+ padding:7px 10px;margin:0;background:#fff;border:1px solid #b6c9bb;
+ border-radius:7px;color:#1b4930;font:650 13px var(--v33-font);
+ cursor:pointer;
+}
+.field-shell.v33-app .ce-modal .v33-card-jump button:focus-visible,
+.field-shell.v33-app .ce-modal .v33-card-jump button:hover {border-color:#35885b;background:#e3f1e8;}
+.field-shell.v33-app .ce-modal .v33-card-jump button[aria-current="true"] {background:#245c3e;color:#fff;border-color:#245c3e;}
+.field-shell.v33-app .ce-modal .v33-card-jump .v33-check-count {margin-left:auto;font-size:12px;color:#8a3a2f;font-weight:700;}
+.field-shell.v33-app .ce-modal #ce-save {min-height:40px;border-radius:6px;background:#1f6744;color:white;font-weight:750;}
+.field-shell.v33-app .ce-modal .ce-table-wrap {scrollbar-width:thin;}
+.field-shell.v33-app #menuScreen .workspace {max-width:900px;margin:auto;}
+.field-shell.v33-app #menuScreen :is(.menuRow,#solin-update-button) {min-height:52px;}
+@media (max-width:920px) {
+ .field-shell.v33-app .v33-main-layout {grid-template-columns:minmax(0,1fr);gap:15px;}
+ .field-shell.v33-app .field-context {grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;}
+ .field-shell.v33-app .field-context > div {border-bottom:0;padding-bottom:0;}
+}
+@media (max-width:600px) {
+ .field-shell.v33-app .topbar {padding:8px 10px;}
+ .field-shell.v33-app .workspace.field-main {padding:15px 12px;}
+ .field-shell.v33-app .v33-main-layout {gap:12px;}
+ .field-shell.v33-app .field-context {grid-template-columns:1fr;}
+ .field-shell.v33-app .field-context > div {border-bottom:1px solid #e2eae4;padding-bottom:9px;}
+ .field-shell.v33-app .field-main-actions {grid-template-columns:1fr;gap:12px;}
+ .field-shell.v33-app .v33-menu-group > :is(button,label) {min-height:52px;}
+ .field-shell.v33-app .brand .v33-brandmark {width:32px;height:32px;}
+ .field-shell.v33-app .ce-modal .v33-card-jump {padding:5px 8px;}
+ .field-shell.v33-app .ce-modal .v33-card-jump button {min-height:38px;}
+}
+@media (prefers-reduced-motion:reduce) {
+ .field-shell.v33-app *, .field-shell.v33-app *::before,.field-shell.v33-app *::after {
+  animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important;
+ }
+}
