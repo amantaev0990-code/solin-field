@@ -1,0 +1,70 @@
+/* V35 flagship-style transitions: short, native-feeling, GPU-friendly.
+   Only opacity and translate/scale; no backdrop-blur, canvas or layout thrash. */
+.field-shell.v35-premium .screen.active.v35-screen-in > .workspace {
+ animation:v35-view-enter 235ms cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes v35-view-enter {
+ from {opacity:.40;transform:translate3d(0,11px,0) scale(.995);}
+ to {opacity:1;transform:translate3d(0,0,0) scale(1);}
+}
+.field-shell.v35-premium #modal.ce-modal:not(.hidden) > .modalCard {
+ animation:v35-dialog-enter 230ms cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes v35-dialog-enter {
+ from {opacity:.55;transform:translate3d(0,12px,0) scale(.99);}
+ to {opacity:1;transform:translate3d(0,0,0) scale(1);}
+}
+.field-shell.v35-premium .ce-modal #ce-assist:not([hidden]) .ce-assist-panel,
+.field-shell.v35-premium .ce-modal #ce-extra:not([hidden]),
+.field-shell.v35-premium .ce-modal #ce-action-panel:not([hidden]) {
+ animation:v35-subpanel-enter 175ms cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes v35-subpanel-enter {
+ from {opacity:.65;transform:translate3d(0,7px,0);}
+ to {opacity:1;transform:translate3d(0,0,0);}
+}
+.field-shell.v35-premium #ce-form .v35-select-button {
+ appearance:none;display:flex;align-items:center;justify-content:space-between;
+ width:100%;height:26px;max-width:100%;margin:0;padding:3px 8px;
+ border:1px solid #6e9b7a;border-radius:4px;background:#fcfffc;color:#173e29;
+ font:600 12px/1.25 system-ui,Arial,sans-serif;box-shadow:inset 0 1px 2px #1636240e;
+ cursor:pointer;touch-action:manipulation;text-align:left;
+ transition:border-color .16s ease,background-color .16s ease;
+}
+.field-shell.v35-premium #ce-form .v35-select-button:hover,
+.field-shell.v35-premium #ce-form .v35-select-button:focus-visible {
+ background:#eaf5ee;border-color:#21804a;outline:2px solid #7abc95;outline-offset:1px;
+}
+.field-shell.v35-premium #ce-form .v35-select-button .v35-value {
+ display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:calc(100% - 23px);
+}
+.field-shell.v35-premium #ce-form .v35-select-button .v35-chevron {
+ display:inline-flex;align-items:center;justify-content:center;flex:none;
+ width:20px;font-size:17px;color:#185b35;
+}
+.field-shell.v35-premium #ce-form .v35-select-button[data-v35-status="partial"] {
+ border-color:#b58b4a;background:#fffaf0;
+}
+.field-shell.v35-premium #ce-form #ce-section-10 output[data-v35-open] {
+ background:#f7fcf7;border-bottom:1px dashed #4c9d70;color:#1d5033;
+ cursor:pointer;touch-action:manipulation;
+}
+.field-shell.v35-premium #ce-form #ce-section-10 output[data-v35-open]:hover,
+.field-shell.v35-premium #ce-form #ce-section-10 output[data-v35-open]:focus-visible {
+ background:#e9f4ec;outline:2px solid #3d8f5e;
+}
+.field-shell.v35-premium .v33-card-jump button {
+ transition:background-color .15s ease,border-color .15s ease,transform .15s ease;
+}
+.field-shell.v35-premium .v33-card-jump button:active {transform:scale(.975);}
+.field-shell.v35-premium #ce-form .dt-viewport {scroll-behavior:smooth;}
+@media (prefers-reduced-motion:reduce) {
+ .field-shell.v35-premium .screen.active.v35-screen-in > .workspace,
+ .field-shell.v35-premium #modal.ce-modal:not(.hidden) > .modalCard,
+ .field-shell.v35-premium .ce-modal #ce-assist:not([hidden]) .ce-assist-panel,
+ .field-shell.v35-premium .ce-modal #ce-extra:not([hidden]),
+ .field-shell.v35-premium .ce-modal #ce-action-panel:not([hidden]) {
+ animation:none!important;transition:none!important;
+ }
+ .field-shell.v35-premium #ce-form .dt-viewport {scroll-behavior:auto;}
+}
