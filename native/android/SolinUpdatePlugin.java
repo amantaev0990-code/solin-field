@@ -183,7 +183,8 @@ public class SolinUpdatePlugin extends Plugin {
       } catch (Exception error) {
         if (apk != null) apk.delete();
         activeUpdate.compareAndSet(task, null);
-        call.reject("Обновление отменено: " + error.getMessage());
+        call.reject(task.cancelled ? "Загрузка отменена пользователем."
+            : "Обновление не удалось: " + error.getMessage());
       }
     });
   }
@@ -326,7 +327,36 @@ public class SolinUpdatePlugin extends Plugin {
        || host.equals("objects.githubusercontent.com")
        || host.endsWith(".githubusercontent.com"));
   }
+  // GitHub sometimes answers 502/503/504 for valid public release assets.
+  // Retry only transient network failures; never retry security checks,
+  // non-GitHub redirects, a wrong signature or a changed APK checksum.
   private String downloadApk(String location, File target, UpdateTask task) throws Exception {
+    IOException lastNetworkError = null;
+    final int maxAttempts = 4;
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+      task.timeLeft();
+      try {
+        return downloadApkOnce(location, target, task);
+      } catch (IOException error) {
+        lastNetworkError = error;
+        if (attempt == maxAttempts) {
+          throw new IOException("GitHub временно недоступен после " + maxAttempts
+              + " попыток (" + error.getMessage() + "). Повторите обновление.", error);
+        }
+        Log.w(LOG_TAG, "Temporary GitHub download failure, attempt " + attempt
+            + " of " + maxAttempts + ": " + error.getMessage());
+        progress(task, "retry", attempt, maxAttempts);
+        long pauseEnd = SystemClock.elapsedRealtime() + (1500L * attempt);
+        while (SystemClock.elapsedRealtime() < pauseEnd) {
+          task.timeLeft();
+          Thread.sleep(Math.min(250L, pauseEnd - SystemClock.elapsedRealtime()));
+        }
+      }
+    }
+    throw new IOException("Не удалось загрузить APK: " + lastNetworkError);
+  }
+
+  private String downloadApkOnce(String location, File target, UpdateTask task) throws Exception {
     URL url = new URL(location);
     HttpURLConnection conn = null;
     try {
@@ -348,7 +378,14 @@ public class SolinUpdatePlugin extends Plugin {
           url = redirected;
           continue;
         }
-        if (status != 200) throw new IllegalStateException("GitHub вернул HTTP " + status);
+        if (status != 200) {
+          // 404, 401 and 403 are permanent errors: don't hammer the server.
+          if (status == 408 || status == 429 || status == 500 ||
+              status == 502 || status == 503 || status == 504) {
+            throw new IOException("GitHub вернул HTTP " + status);
+          }
+          throw new IllegalStateException("GitHub вернул HTTP " + status);
+        }
         long size = conn.getContentLengthLong();
         if (size > MAX_APK_BYTES) throw new SecurityException("Файл обновления слишком большой.");
         progress(task, "download", 0, size);
