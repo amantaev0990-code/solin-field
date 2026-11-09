@@ -33,8 +33,8 @@ if(process.argv.includes('--built')){
  assert.ok(!web.includes(old),'Old V30 startup crash must be removed from web assets');
  assert.ok(web.includes(fixed),'V30 original usability must remain, only null access patched');
  const html=txt('www/index.html');
- assert.ok(html.includes('solin-v33-ux.css?v=33'));
- assert.ok(html.includes('solin-v33-ux.js?v=33'));
+ assert.ok(html.includes('solin-v33-ux.css?v=34'));
+ assert.ok(html.includes('solin-v33-ux.js?v=34'));
  assert.ok(web.length>3000,'Unexpected truncated usability module');
 }
 if(process.argv.includes('--android')){
