@@ -1,13 +1,17 @@
 package kz.solin.field;
 
 import android.content.Intent;
+import android.content.Context;
+import android.content.BroadcastReceiver;
+import android.app.PendingIntent;
+import android.content.pm.PackageInstaller;
+import android.util.Log;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.SystemClock;
 import android.provider.Settings;
-import androidx.core.content.FileProvider;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -16,6 +20,8 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.SocketTimeoutException;
@@ -36,6 +42,9 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 @CapacitorPlugin(name = "SolinUpdate")
 public class SolinUpdatePlugin extends Plugin {
+  private static final String INSTALL_PREFS = "solin-update-installer";
+  private static final String INSTALL_ERROR = "lastInstallError";
+  private static final String LOG_TAG = "SolinUpdateInstaller";
   private static final long MAX_APK_BYTES = 250L * 1024L * 1024L;
   private static final long DOWNLOAD_TIMEOUT_MS = 240_000L;
   private static final int NETWORK_TIMEOUT_MS = 15_000;
@@ -71,7 +80,8 @@ public class SolinUpdatePlugin extends Plugin {
       data.put("versionCode", code(current));
       data.put("versionName", current.versionName == null ? "" : current.versionName);
       data.put("canInstall", Build.VERSION.SDK_INT < 26 || getContext().getPackageManager().canRequestPackageInstalls());
-      data.put("updaterProtocol", 2);
+      data.put("updaterProtocol", 3);
+      data.put("lastInstallError", getContext().getSharedPreferences(INSTALL_PREFS, Context.MODE_PRIVATE).getString(INSTALL_ERROR, ""));
       call.resolve(data);
     } catch (Exception error) {
       call.reject("Не удалось определить установленную версию: " + error.getMessage());
@@ -158,38 +168,116 @@ public class SolinUpdatePlugin extends Plugin {
         if (!sameCertificate(oldPkg, newPkg)) {
           throw new SecurityException("Подпись APK отличается от постоянного ключа V23.");
         }
-        final File verifiedApk = apk;
-        final Uri uri = FileProvider.getUriForFile(getContext(),
-            getContext().getPackageName() + ".updater", apk);
-        getActivity().runOnUiThread(() -> {
-          try {
-            synchronized (task) {
-              task.timeLeft();
-              task.installerOpening = true;
-            }
-            Intent intent = new Intent(Intent.ACTION_VIEW);
-            intent.setDataAndType(uri, "application/vnd.android.package-archive");
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
-            intent.setClipData(android.content.ClipData.newRawUri("SOLI-N Field update", uri));
-            getActivity().startActivity(intent);
-            JSObject result = new JSObject();
-            result.put("installerOpened", true);
-            result.put("versionCode", code(newPkg));
-            call.resolve(result);
-          } catch (Exception e) {
-            verifiedApk.delete();
-            call.reject("Android не смог открыть установщик: " + e.getMessage());
-          } finally {
-            activeUpdate.compareAndSet(task, null);
-          }
-        });
-        // Keep cached APK until Android finishes reading it from FileProvider.
+        // PackageInstaller takes a complete COPY of the APK into its own
+        // protected staging area. This avoids parsing failures caused by a
+        // ContentProvider stream disappearing before Android has read it.
+        // Android still requires user confirmation; Play Protect still runs.
+        stageInstall(pm, apk, task, code(newPkg));
+        apk.delete();  // PackageInstaller now owns its own verified copy.
+        JSObject result = new JSObject();
+        result.put("installerOpened", true); // Legacy JS bridge result.
+        result.put("installationRequested", true);
+        result.put("versionCode", code(newPkg));
+        call.resolve(result);
+        activeUpdate.compareAndSet(task, null);
       } catch (Exception error) {
         if (apk != null) apk.delete();
         activeUpdate.compareAndSet(task, null);
         call.reject("Обновление отменено: " + error.getMessage());
       }
     });
+  }
+
+  private void stageInstall(PackageManager pm, File apk, UpdateTask task, long versionCode)
+      throws Exception {
+    PackageInstaller installer = pm.getPackageInstaller();
+    PackageInstaller.SessionParams params =
+        new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
+    params.setAppPackageName(getContext().getPackageName());
+    params.setSize(apk.length());
+    if (Build.VERSION.SDK_INT >= 31) {
+      params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_REQUIRED);
+    }
+    final int sessionId = installer.createSession(params);
+    PackageInstaller.Session session = null;
+    boolean committed = false;
+    try {
+      session = installer.openSession(sessionId);
+      try (InputStream input = new FileInputStream(apk);
+           OutputStream output = session.openWrite("base.apk", 0, apk.length())) {
+        byte[] buffer = new byte[64 * 1024];
+        int length;
+        while ((length = input.read(buffer)) >= 0) {
+          task.timeLeft();
+          if (length > 0) output.write(buffer, 0, length);
+        }
+        session.fsync(output);
+      }
+      Intent callback = new Intent(getContext(), InstallResultReceiver.class);
+      callback.setAction("kz.solin.field.UPDATE_INSTALL_RESULT");
+      callback.setPackage(getContext().getPackageName());
+      int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+      if (Build.VERSION.SDK_INT >= 31) flags |= PendingIntent.FLAG_MUTABLE;
+      PendingIntent pendingIntent = PendingIntent.getBroadcast(
+          getContext(), sessionId, callback, flags);
+      getContext().getSharedPreferences(INSTALL_PREFS, Context.MODE_PRIVATE)
+          .edit().remove(INSTALL_ERROR).apply();
+      synchronized (task) {
+        task.timeLeft();
+        task.installerOpening = true;
+      }
+      session.commit(pendingIntent.getIntentSender());
+      committed = true;
+      Log.i(LOG_TAG, "Submitted verified APK versionCode=" + versionCode
+          + " to Android PackageInstaller session " + sessionId);
+    } finally {
+      if (session != null) session.close();
+      if (!committed) installer.abandonSession(sessionId);
+    }
+  }
+
+  /**
+   * Explicit, non-exported receiver. It handles Android's confirmation UI,
+   * not a custom installer or a bypass of device security checks.
+   */
+  public static class InstallResultReceiver extends BroadcastReceiver {
+    @Override public void onReceive(Context context, Intent intent) {
+      int status = intent.getIntExtra(
+          PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE);
+      if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
+        Intent confirm;
+        if (Build.VERSION.SDK_INT >= 33) {
+          confirm = intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent.class);
+        } else {
+          confirm = intent.getParcelableExtra(Intent.EXTRA_INTENT);
+        }
+        if (confirm == null) {
+          recordError(context, "Android не передал окно подтверждения установки.");
+          return;
+        }
+        confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+          context.startActivity(confirm);
+        } catch (Exception error) {
+          recordError(context, "Android не открыл окно установки: " + error.getMessage());
+        }
+        return;
+      }
+      if (status == PackageInstaller.STATUS_SUCCESS) {
+        context.getSharedPreferences(INSTALL_PREFS, Context.MODE_PRIVATE)
+            .edit().remove(INSTALL_ERROR).apply();
+        Log.i(LOG_TAG, "Android confirmed successful APK installation");
+        return;
+      }
+      String reason = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE);
+      recordError(context, "Установка отклонена Android (код " + status
+          + "): " + (reason == null ? "нет подробностей" : reason));
+    }
+    private static void recordError(Context context, String message) {
+      Log.e(LOG_TAG, message);
+      context.getSharedPreferences(INSTALL_PREFS, Context.MODE_PRIVATE)
+          .edit().putString(INSTALL_ERROR, message).apply();
+    }
   }
 
   private PackageInfo getInstalled(PackageManager pm) throws Exception {
