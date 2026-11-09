@@ -68,3 +68,39 @@
  }
  .field-shell.v35-premium #ce-form .dt-viewport {scroll-behavior:auto;}
 }
+
+/* Explicit STL group selector. Backdrop intentionally cannot dismiss it:
+   the established SOLI-N rule is close only with X. */
+.field-shell.v35-premium #v35-forest-group-dialog.v35-group-overlay {
+ position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;
+ padding:16px;background:rgba(12,30,19,.42);
+}
+.field-shell.v35-premium .v35-group-panel {
+ width:min(450px,96vw);max-height:85dvh;overflow-y:auto;
+ background:#fff;color:#1c3727;border-radius:15px;
+ border:1px solid #a9bdaf;padding:16px 18px 20px;
+ box-shadow:0 15px 55px #0b23182e;
+ animation:v35-dialog-enter 200ms cubic-bezier(.22,1,.36,1) both;
+}
+.field-shell.v35-premium .v35-group-head {
+ display:flex;align-items:center;justify-content:space-between;gap:12px;
+}
+.field-shell.v35-premium .v35-group-head strong {font:750 18px system-ui,Arial,sans-serif;}
+.field-shell.v35-premium .v35-group-panel p {font:13px/1.45 system-ui,Arial,sans-serif;color:#556b5b;}
+.field-shell.v35-premium .v35-group-close {
+ display:grid;place-items:center;width:36px;height:36px;flex:none;
+ border:1px solid #b5c6b9;background:#fff;border-radius:9px;
+ color:#264b32;font:22px Arial;cursor:pointer;
+}
+.field-shell.v35-premium .v35-group-choices {display:grid;gap:8px;}
+.field-shell.v35-premium .v35-group-item {
+ min-height:49px;padding:10px 14px;text-align:left;background:#f4faf6;
+ border:1px solid #aecbb7;border-radius:9px;
+ font:700 15px system-ui,Arial,sans-serif;color:#1e5232;cursor:pointer;
+}
+.field-shell.v35-premium .v35-group-item:is(:hover,:focus-visible) {
+ border-color:#257d4e;background:#e5f4eb;outline-offset:2px;
+}
+@media(prefers-reduced-motion:reduce) {
+ .field-shell.v35-premium .v35-group-panel {animation:none!important;}
+}
