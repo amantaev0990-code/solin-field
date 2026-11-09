@@ -23,8 +23,9 @@
    const info=detail(field),title=quickFields.find(x=>x.field===field)?.hint||'Выбрать';
    const label=button.querySelector('.v35-value');
    if(!label)return;
-   label.textContent=info?.value?
+   const nextLabel=info?.value?
      (info.display||info.value):(field==='M3TLU'&&!detail('M3Pr')?.value?'Сначала выберите породу':title);
+   if(label.textContent!==nextLabel)label.textContent=nextLabel;
    button.title=info?.el?.title||'Поиск по коду и названию';
    const incomplete=info?.el?.dataset.dependentStatus;
    button.dataset.v35Status=incomplete||'';
