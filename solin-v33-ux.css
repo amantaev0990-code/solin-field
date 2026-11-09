@@ -61,6 +61,27 @@
 .field-shell.v33-app .v33-menu-group > button.v33-primary .v33-menu-symbol {background:#ffffff23;color:#fff;}
 .field-shell.v33-app .v33-menu-group > button.v33-primary:hover {background:#206442;}
 .field-shell.v33-app .v33-menu-group .field-import input {cursor:pointer;}
+/* V34 CRITICAL HIT-BOX FIX.
+   V30's file input has position:absolute; inset:0 and used to be inside
+   .field-main-actions > label { position:relative }. V33 moved its label
+   under .v33-menu-group so that ancestor rule stopped matching. Without a
+   new containing block the invisible file input covers the whole screen. */
+.field-shell.v33-app .v33-menu-group > label.field-import {
+ position:relative!important;isolation:isolate;overflow:hidden!important;
+ min-width:0;max-width:100%;contain:paint;
+}
+.field-shell.v33-app .v33-menu-group > label.field-import > input[type="file"] {
+ position:absolute!important;top:0!important;left:0!important;
+ right:0!important;bottom:0!important;inset:0!important;
+ width:100%!important;height:100%!important;max-width:100%!important;
+ max-height:100%!important;margin:0!important;padding:0!important;
+ opacity:0!important;z-index:1;cursor:pointer;
+}
+/* Keep every other button's hit-box independent of the import picker. */
+.field-shell.v33-app .v33-menu-group > button {
+ position:relative;isolation:isolate;
+}
+
 .field-shell.v33-app .v33-menu-group :is(button,label):focus-visible {outline:2px solid #5ba579;}
 .field-shell.v33-app .screen.active.field-section-enter > .workspace {animation:v33-screen-enter .2s cubic-bezier(.2,.85,.3,1) both;}
 @keyframes v33-screen-enter {from{opacity:.45;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
