@@ -1,0 +1,81 @@
+name: SOLI-N V29 updater native verification
+
+on:
+  push:
+    branches: [fix/v29-updater-native-check]
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21' }
+      - uses: android-actions/setup-android@v3
+        with: { packages: platform-tools }
+      - name: Prepare native shell from public source
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund
+          npm run build
+          test ! -e www/solin-private-refs.packed.bin
+          npx cap add android
+          SOLIN_GITHUB_UPDATES=1 node scripts/install-android-mdb.mjs
+          npx cap sync android
+          SOLIN_RELEASE_VERSION_CODE=230005 node --input-type=module <<'NODE'
+          // After `npx cap add android`, native plugin setup and `npx cap sync android`,
+          // make a release installable as an update of SOLI-N Field V23 (not V22).
+          import fs from 'node:fs';
+          import path from 'node:path';
+          const root = process.cwd();
+          const file = path.join(root,'android','app','build.gradle');
+          const nameFile = path.join(root,'android','app','src','main','res','values','strings.xml');
+          if (!fs.existsSync(file) || !fs.existsSync(nameFile)) throw new Error('Generate Android project first');
+          let gradle=fs.readFileSync(file,'utf8');
+          const found=gradle.match(/\bapplicationId\s+["']([^"']+)["']/);
+          if (!found || !['kz.solin.field','kz.solin.field.v23build'].includes(found[1])) {
+           throw new Error('Unexpected Android applicationId: '+(found?.[1] ?? 'missing'));
+          }
+          const raw=process.env.SOLIN_RELEASE_VERSION_CODE||'230002';
+          if (!/^\d{1,8}$/.test(raw)||Number(raw)<=23)throw new Error('Version code must be greater than the V23 baseline');
+          const versionCode=Number(raw);
+          const versionName=`0.3.0-field-${versionCode}`;
+          gradle=gradle.replace(/\bapplicationId\s+["'][^"']+["']/,'applicationId "kz.solin.field.v23build"');
+          if (!/\bversionCode\s+\d+/.test(gradle)||!/\bversionName\s+["'][^"']+["']/.test(gradle)) throw new Error('Android version fields missing');
+          gradle=gradle.replace(/\bversionCode\s+\d+/,'versionCode '+versionCode);
+          gradle=gradle.replace(/\bversionName\s+["'][^"']+["']/,'versionName "'+versionName+'"');
+          fs.writeFileSync(file,gradle);
+          let strings=fs.readFileSync(nameFile,'utf8');
+          if (!/<string name="app_name">/.test(strings)) throw new Error('Android app name missing');
+          strings=strings.replace(/(<string name="app_name">)[^<]+/,'$1SOLI-N Field V23');
+          fs.writeFileSync(nameFile,strings);
+          console.log('V23 update identity locked: kz.solin.field.v23build, versionCode '+versionCode);
+          NODE
+      - name: Compile the Android updater
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd android
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease
+      - name: Stage unsigned native shell for local signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p v29-native
+          apk=android/app/build/outputs/apk/release/app-release-unsigned.apk
+          cp "$apk" v29-native/V29-native-unsigned.apk
+          (cd v29-native && sha256sum V29-native-unsigned.apk > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SOLIN-V29-NATIVE-UNSIGNED
+          path: v29-native/
+          if-no-files-found: error
+          retention-days: 3

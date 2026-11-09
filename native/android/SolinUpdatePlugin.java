@@ -5,6 +5,7 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
+import android.os.SystemClock;
 import android.provider.Settings;
 import androidx.core.content.FileProvider;
 import com.getcapacitor.JSObject;
@@ -15,15 +16,16 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.IOException;
 import java.net.HttpURLConnection;
+import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.security.MessageDigest;
-import java.security.SignatureException;
-import java.util.Arrays;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Optional sideload updater. It is deliberately isolated from MDB, card and
@@ -35,10 +37,30 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @CapacitorPlugin(name = "SolinUpdate")
 public class SolinUpdatePlugin extends Plugin {
   private static final long MAX_APK_BYTES = 250L * 1024L * 1024L;
+  private static final long DOWNLOAD_TIMEOUT_MS = 240_000L;
+  private static final int NETWORK_TIMEOUT_MS = 15_000;
   private static final String REPO_DOWNLOAD_PREFIX =
       "/amantaev0990-code/solin-field/releases/download/";
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
-  private final AtomicBoolean running = new AtomicBoolean(false);
+  private final AtomicReference<UpdateTask> activeUpdate = new AtomicReference<>();
+
+  private static final class UpdateTask {
+    final String requestId;
+    final long deadline = SystemClock.elapsedRealtime() + DOWNLOAD_TIMEOUT_MS;
+    volatile boolean cancelled;
+    boolean installerOpening;
+
+    UpdateTask(String requestId) {
+      this.requestId = requestId;
+    }
+
+    int timeLeft() throws IOException {
+      if (cancelled) throw new IOException("Загрузка отменена.");
+      long remaining = deadline - SystemClock.elapsedRealtime();
+      if (remaining <= 0) throw new SocketTimeoutException("Время загрузки APK истекло.");
+      return (int) Math.min(remaining, NETWORK_TIMEOUT_MS);
+    }
+  }
 
   @PluginMethod
   public void getInfo(PluginCall call) {
@@ -49,6 +71,7 @@ public class SolinUpdatePlugin extends Plugin {
       data.put("versionCode", code(current));
       data.put("versionName", current.versionName == null ? "" : current.versionName);
       data.put("canInstall", Build.VERSION.SDK_INT < 26 || getContext().getPackageManager().canRequestPackageInstalls());
+      data.put("updaterProtocol", 2);
       call.resolve(data);
     } catch (Exception error) {
       call.reject("Не удалось определить установленную версию: " + error.getMessage());
@@ -56,9 +79,37 @@ public class SolinUpdatePlugin extends Plugin {
   }
 
   @PluginMethod
+  public void cancelDownload(PluginCall call) {
+    UpdateTask task = activeUpdate.get();
+    boolean cancelled = false;
+    if (task != null && Objects.equals(task.requestId, call.getString("requestId"))) {
+      synchronized (task) {
+        if (!task.installerOpening) {
+          task.cancelled = true;
+          cancelled = true;
+        }
+      }
+    }
+    JSObject result = new JSObject();
+    result.put("cancelled", cancelled);
+    call.resolve(result);
+  }
+
+  private void progress(UpdateTask task, String phase, long downloaded, long total) {
+    if (task.requestId == null || task.cancelled) return;
+    JSObject data = new JSObject();
+    data.put("requestId", task.requestId);
+    data.put("phase", phase);
+    data.put("downloaded", downloaded);
+    data.put("total", total);
+    notifyListeners("updateProgress", data);
+  }
+
+  @PluginMethod
   public void installRelease(PluginCall call) {
     final String link = call.getString("url");
     final String sha = call.getString("sha256");
+    final Integer releaseVersion = call.getInt("versionCode");
     if (link == null || !isOriginalGitHubRelease(link)
         || sha == null || !sha.matches("(?i)[0-9a-f]{64}")) {
       call.reject("Недостоверный источник обновления или отсутствует контрольная сумма.");
@@ -77,7 +128,8 @@ public class SolinUpdatePlugin extends Plugin {
       call.reject("Разрешите установку обновлений для SOLI-N Field в настройках Android, затем нажмите «Обновить» повторно.");
       return;
     }
-    if (!running.compareAndSet(false, true)) {
+    UpdateTask task = new UpdateTask(call.getString("requestId"));
+    if (!activeUpdate.compareAndSet(null, task)) {
       call.reject("Скачивание обновления уже запущено.");
       return;
     }
@@ -87,7 +139,9 @@ public class SolinUpdatePlugin extends Plugin {
         File dir = new File(getContext().getCacheDir(), "updates");
         if (!dir.isDirectory() && !dir.mkdirs()) throw new IllegalStateException("Нет папки для обновления.");
         apk = File.createTempFile("solin-update-", ".apk", dir);
-        String actualSha = downloadApk(link, apk);
+        String actualSha = downloadApk(link, apk, task);
+        task.timeLeft();
+        progress(task, "verify", 0, 0);
         if (!actualSha.equalsIgnoreCase(sha)) throw new SecurityException("Контрольная сумма APK не совпала.");
         PackageManager pm = getContext().getPackageManager();
         PackageInfo oldPkg = getInstalled(pm);
@@ -98,13 +152,21 @@ public class SolinUpdatePlugin extends Plugin {
         if (code(newPkg) <= code(oldPkg)) {
           throw new SecurityException("Версия обновления не новее установленной.");
         }
+        if (releaseVersion != null && code(newPkg) != releaseVersion) {
+          throw new SecurityException("Версия APK не совпадает с релизом GitHub.");
+        }
         if (!sameCertificate(oldPkg, newPkg)) {
           throw new SecurityException("Подпись APK отличается от постоянного ключа V23.");
         }
+        final File verifiedApk = apk;
         final Uri uri = FileProvider.getUriForFile(getContext(),
             getContext().getPackageName() + ".updater", apk);
         getActivity().runOnUiThread(() -> {
           try {
+            synchronized (task) {
+              task.timeLeft();
+              task.installerOpening = true;
+            }
             Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.setDataAndType(uri, "application/vnd.android.package-archive");
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -115,15 +177,16 @@ public class SolinUpdatePlugin extends Plugin {
             result.put("versionCode", code(newPkg));
             call.resolve(result);
           } catch (Exception e) {
+            verifiedApk.delete();
             call.reject("Android не смог открыть установщик: " + e.getMessage());
           } finally {
-            running.set(false);
+            activeUpdate.compareAndSet(task, null);
           }
         });
         // Keep cached APK until Android finishes reading it from FileProvider.
       } catch (Exception error) {
         if (apk != null) apk.delete();
-        running.set(false);
+        activeUpdate.compareAndSet(task, null);
         call.reject("Обновление отменено: " + error.getMessage());
       }
     });
@@ -170,21 +233,22 @@ public class SolinUpdatePlugin extends Plugin {
   }
   private static boolean safeRedirect(URL url) {
     String host = url.getHost().toLowerCase(Locale.ROOT);
-    return "https".equals(url.getProtocol()) &&
+    return "https".equals(url.getProtocol()) && url.getUserInfo() == null && url.getPort() == -1 &&
       (host.equals("github.com") || host.equals("release-assets.githubusercontent.com")
        || host.equals("objects.githubusercontent.com")
        || host.endsWith(".githubusercontent.com"));
   }
-  private static String downloadApk(String location, File target) throws Exception {
+  private String downloadApk(String location, File target, UpdateTask task) throws Exception {
     URL url = new URL(location);
     HttpURLConnection conn = null;
     try {
       for (int attempt = 0; attempt < 7; attempt++) {
+        int timeout = task.timeLeft();
         if (!safeRedirect(url)) throw new SecurityException("Недоверенный адрес загрузки.");
         conn = (HttpURLConnection) url.openConnection();
         conn.setInstanceFollowRedirects(false);
-        conn.setConnectTimeout(15000);
-        conn.setReadTimeout(30000);
+        conn.setConnectTimeout(timeout);
+        conn.setReadTimeout(timeout);
         conn.setRequestProperty("Accept", "application/octet-stream");
         int status = conn.getResponseCode();
         if (status == 301 || status == 302 || status == 303 || status == 307 || status == 308) {
@@ -199,19 +263,31 @@ public class SolinUpdatePlugin extends Plugin {
         if (status != 200) throw new IllegalStateException("GitHub вернул HTTP " + status);
         long size = conn.getContentLengthLong();
         if (size > MAX_APK_BYTES) throw new SecurityException("Файл обновления слишком большой.");
+        progress(task, "download", 0, size);
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         try (InputStream in = conn.getInputStream(); FileOutputStream out = new FileOutputStream(target)) {
           byte[] buf = new byte[64 * 1024];
           long written = 0;
-          int count;
-          while ((count = in.read(buf)) != -1) {
+          long nextProgress = 0;
+          while (true) {
+            task.timeLeft();
+            int count = in.read(buf);
+            if (count == -1) break;
             written += count;
             if (written > MAX_APK_BYTES) throw new SecurityException("Превышен максимальный размер APK.");
             digest.update(buf, 0, count);
             out.write(buf, 0, count);
+            long now = SystemClock.elapsedRealtime();
+            if (now >= nextProgress) {
+              progress(task, "download", written, size);
+              nextProgress = now + 500;
+            }
           }
+          task.timeLeft();
           out.getFD().sync();
           if (written < 1024) throw new IllegalStateException("Скачанный APK пустой.");
+          if (size > 0 && written != size) throw new IOException("APK скачан не полностью.");
+          progress(task, "download", written, size);
         }
         byte[] bytes = digest.digest();
         StringBuilder hex = new StringBuilder(bytes.length * 2);
@@ -222,3 +298,4 @@ public class SolinUpdatePlugin extends Plugin {
     } finally { if (conn != null) conn.disconnect(); }
   }
 }
+
