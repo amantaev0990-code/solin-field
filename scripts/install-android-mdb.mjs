@@ -100,20 +100,30 @@ if(process.env.SOLIN_CLOUD_LAB_BUILD==='1'){
 // Legacy launchers get antialiased PNGs; Adaptive Icons use the same outlined
 // letter inside Android's safe zone with a transparent background layer.
 const {PNG}=await import('pngjs');
-const iconBytes=Buffer.from(fs.readFileSync(path.join(root,'native/android/solin-field-launcher.b64'),'utf8').trim(),'base64');
+// One verified approved S-with-leaf logo, for both Android launcher and PWA.
+const iconBytes=Buffer.from(fs.readFileSync(path.join(root,'assets/solin-field-icon-v23.b64'),'utf8').trim(),'base64');
+const {createHash}=await import('node:crypto');
+if(createHash('sha256').update(iconBytes).digest('hex')!=='d9fc8e9c165044413b0c9677e9ec283ea0d87e12bd66d620099ef1a1d9f72c58')
+ throw Error('Approved S launcher baseline mismatch');
 if(iconBytes.length<1000||iconBytes.subarray(0,8).toString('hex')!=='89504e470d0a1a0a')
  throw Error('Launcher source is not a valid PNG');
 const original=PNG.sync.read(iconBytes),w=original.width,h=original.height;
 function drawIcon(size){
  const png=new PNG({width:size,height:size,filterType:4}),sx=w/size,sy=h/size;
  for(let y=0;y<size;y++)for(let x=0;x<size;x++){
-  const left=x*sx,right=(x+1)*sx,top=y*sy,bottom=(y+1)*sy;let alpha=0;
+  const left=x*sx,right=(x+1)*sx,top=y*sy,bottom=(y+1)*sy;
+  let alpha=0,red=0,green=0,blue=0;
   for(let iy=Math.floor(top);iy<Math.ceil(bottom);iy++)for(let ix=Math.floor(left);ix<Math.ceil(right);ix++){
    const weight=(Math.min(right,ix+1)-Math.max(left,ix))*(Math.min(bottom,iy+1)-Math.max(top,iy));
-   alpha+=original.data[(iy*w+ix)*4+3]*weight;
+   if(weight<=0)continue;
+   const source=(iy*w+ix)*4,opacity=original.data[source+3],factor=weight*opacity;
+   alpha+=factor;red+=original.data[source]*factor;
+   green+=original.data[source+1]*factor;blue+=original.data[source+2]*factor;
   }
   const target=(y*size+x)*4;
-  png.data[target]=11;png.data[target+1]=61;png.data[target+2]=46;
+  png.data[target]=alpha?Math.round(red/alpha):0;
+  png.data[target+1]=alpha?Math.round(green/alpha):0;
+  png.data[target+2]=alpha?Math.round(blue/alpha):0;
   png.data[target+3]=Math.round(alpha/(sx*sy));
  }
  return PNG.sync.write(png);
