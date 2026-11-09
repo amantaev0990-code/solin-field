@@ -144,6 +144,14 @@ jobs:
             unzip -q "$BASE" 'assets/public/*' -d "$RUNNER_TEMP/v30-files"
             cp -a "$RUNNER_TEMP/v30-files/assets/public/." www/
             rm -f www/solin-private-refs.packed.bin
+            # Android AAPT merges X.json.gz as X.json. The V30 APK already
+            # contains the normalized X.json, so remove duplicate .gz files
+            # from the older source to prevent Gradle asset collisions.
+            for file in www/refs-audit.json.gz \
+              www/solin-control-norms.json.gz \
+              www/solin-control-source-recovery.json.gz; do
+              if [[ -f "${file%.gz}" ]]; then rm -f "$file"; fi
+            done
             for entry in \
               'maps/213-1.cmf2:67d30ff85d0d49efc9a467efe585f3aae345073724ae5c60aa895e93e4aa02da' \
               'maps/213-2.cmf2:74043a02e2d74f4e69bc6af8f2b9eea6a5c20a18ad93f677179075003a380076' \
