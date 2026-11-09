@@ -1,0 +1,83 @@
+name: SOLI-N Field - publish verified V33
+
+# This one-shot promotion uses an already successful signed candidate.
+# It never rebuilds the app, cannot change the signing key, or replace V32.
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/solin-v33-promote.yml']
+
+permissions: {contents: write}
+
+jobs:
+  publish-v33:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: amantaev0990-code/solin-field
+      TAG: solin-field-v230013
+      SOURCE_SHA: 064bfffdcfb23362e892206a5b744c081d9036be
+    steps:
+      - name: Download exact successful signed candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN=42570165468
+          [[ "$(gh api "repos/$REPO/actions/runs/$RUN" --jq .conclusion)" == success ]] || exit 1
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "::error::V33 already exists; never overwrite a release APK."
+            exit 1
+          fi
+          mkdir -p release
+          gh run download "$RUN" --repo "$REPO" --name SOLIN-Field-SIGNED-230013 --dir release
+          test -s release/SOLIN-Field-update.apk
+          test -s release/SHA256SUMS.txt
+          sha256sum -c release/SHA256SUMS.txt
+
+      - uses: android-actions/setup-android@v3
+        with: {packages: platform-tools}
+
+      - name: Verify native installer, package, permanent key, maps, references
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=release/SOLIN-Field-update.apk
+          TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$TOOLS/apksigner" verify --verbose "$APK"
+          CERT="$("$TOOLS/apksigner" verify --print-certs "$APK" | sed -nE 's/^((Signer #[0-9]+)|(V[0-9.]+ Signer)): certificate SHA-256 digest: //p' | head -n 1 | tr '[:lower:]' '[:upper:]')"
+          [[ "$CERT" == '5A1C2E2BF2EFE5AA7382674B651533A11D2B93C802A1C09ADC72656C5A29ED7E' ]] || exit 1
+          BADGING="$("$TOOLS/aapt" dump badging "$APK" | head -n 1)"
+          [[ "$BADGING" == *"package: name='kz.solin.field.v23build'"* ]] || exit 1
+          [[ "$BADGING" == *"versionCode='230013'"* ]] || exit 1
+          for entry in \
+            'assets/public/maps/213-1.cmf2:67d30ff85d0d49efc9a467efe585f3aae345073724ae5c60aa895e93e4aa02da' \
+            'assets/public/maps/213-2.cmf2:74043a02e2d74f4e69bc6af8f2b9eea6a5c20a18ad93f677179075003a380076' \
+            'assets/public/solin-map-overview.geojson:15e57e7fafa470c62ddb168aadd63817304f1f60bd1f20927358ef4f0a8ccf03' \
+            'assets/public/solin-private-refs.packed.bin:c2705bf1ecfa98b007fdbecd1b8f7be908b73591ee2eccae327cf88629bb60e5'; do
+            file="${entry%%:*}"
+            expected="${entry#*:}"
+            actual="$(unzip -p "$APK" "$file" | sha256sum | cut -d' ' -f1)"
+            [[ "$actual" == "$expected" ]] || { echo "::error::Missing or changed $file"; exit 1; }
+          done
+          for web in 'assets/public/solin-v33-ux.css' 'assets/public/solin-v33-ux.js'; do
+            [[ "$(unzip -p "$APK" "$web" | wc -c)" -gt 1000 ]] || {
+              echo "::error::New V33 workspace asset missing: $web"; exit 1;
+            }
+          done
+          echo 'Signed V33 identity, forest assets, UI patch and references verified.'
+
+      - name: Publish exactly the verified V33 APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          LATEST="$(gh api "repos/$REPO/releases/latest" --jq .tag_name)"
+          [[ "$LATEST" == 'solin-field-v230012' ]] || { echo "::error::Unexpected latest release: $LATEST"; exit 1; }
+          gh release create "$TAG" release/SOLIN-Field-update.apk release/SHA256SUMS.txt \
+            --repo "$REPO" --target "$SOURCE_SHA" --latest \
+            --title 'SOLI-N Field V33 — меню, фирменный ярлык и карточки' \
+            --notes 'V33: новое компактное главное меню из прежних рабочих кнопок, фирменная зелёная S с листочком и прозрачным фоном, плавные переходы, быстрый переход по Макетам 1–5,10,31,32, удобный ввод и сохранение. Существующие расчёты, 154 таблицы извлечённых справочников, 28 наборов нормативов, схемы Transfer и обе CMF2-карты сохранены из V30/V32 и проверены. Размер APK не ограничен 27 МБ. Подпись и PackageInstaller для обновления V32→V33 не изменены; полную совместимость всех функций с настольным SOLI-N пока не заявляем — нужен исходный MDB/эталонные ПК-тесты. Google Play Protect не отключать. Сохраните резервную копию полевых данных до обновления.'
+          EXPECTED="sha256:$(sha256sum release/SOLIN-Field-update.apk | cut -d' ' -f1)"
+          ACTUAL="$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.assets[] | select(.name=="SOLIN-Field-update.apk") | .digest')"
+          [[ "$EXPECTED" == "$ACTUAL" ]] || { echo "::error::Uploaded GitHub APK digest differs"; exit 1; }
+          echo 'Public release V33 is verified and immutable by convention.'
