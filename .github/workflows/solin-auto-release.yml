@@ -203,6 +203,13 @@ jobs:
           [[ "$built" -eq 1 ]] || exit 1
           APK=app/build/outputs/apk/release/app-release-unsigned.apk
           test -s "$APK"
+          # Verify Android actually packaged the installer callback; otherwise
+          # the confirmation prompt could never open on the tablet.
+          TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          if [[ -f ../../compat/v30-assets-overlay.txt ]]; then
+            "$TOOLS/aapt" dump xmltree "$APK" AndroidManifest.xml | \
+              grep -F 'SolinUpdatePlugin$InstallResultReceiver'
+          fi
           if unzip -Z1 "$APK" | grep -q '^assets/public/solin-private-refs.packed.bin$'; then
             echo "::error::Private references must only be added during signing"
             exit 1
