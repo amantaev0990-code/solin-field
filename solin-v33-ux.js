@@ -162,8 +162,38 @@
     section.scrollIntoView({block:'start',inline:'nearest',behavior:
       matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
   });
+  // V34: manual dismissals are allowed only from the visible X.
+  // Save/create workflows remain able to close after successful commits.
+  function guardModalOnlyX(){
+    const modal=document.getElementById('modal');
+    if(!modal||modal.dataset.v34OnlyX)return;
+    modal.dataset.v34OnlyX='1';
+    const open=()=>!modal.classList.contains('hidden');
+    const blockOutside=event=>{
+      if(!open()||event.target!==modal)return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+    // Never dismiss when tapping the dimmed area, including touch gestures.
+    for(const type of ['pointerdown','pointerup','click','touchend'])
+      modal.addEventListener(type,blockOutside,true);
+    document.addEventListener('keydown',event=>{
+      if(!open())return;
+      if(event.key==='Escape' || (event.key==='Backspace' &&
+          !event.target.closest?.('input,textarea,[contenteditable="true"]'))){
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    },true);
+    document.addEventListener('backbutton',event=>{
+      if(!open())return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    },true);
+  }
   function init(){
     initMenu();
+    guardModalOnlyX();
     const modal=document.getElementById('modal');
     if(modal){
       const observer=new MutationObserver(enhanceCard);
