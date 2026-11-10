@@ -196,14 +196,20 @@ function openCompForm(k='',selectedKGLF=null){
  if(!D.quarters[k])k=ids[0];
  const quarter=D.quarters[k],org=D.lesnichestvo?.[0]||{};
  const rows=quarter.quarterRows?.length?quarter.quarterRows:[quarter.meta||{}];
- const source=selectedKGLF==null?rows[0]:rows.find(x=>String(x.KGLF)===String(selectedKGLF));
- if(!source)return toast('Не найдена выбранная категория ГЛФ в квартале');
- const existing=(quarter.compartments||[]).filter(x=>String(x.KGLF)===String(source.KGLF));
+ // Keep the same quarter/category as the opened stand, including older
+ // imports whose quarterRows lack a separate KGLF entry.
+ const known=(quarter.compartments||[]).find(x=>selectedKGLF!=null&&String(x.KGLF)===String(selectedKGLF));
+ const source=selectedKGLF==null?(rows[0]||known):
+   (rows.find(x=>String(x.KGLF)===String(selectedKGLF))||known);
+ if(!source)return toast('Не найдена категория ГЛФ текущего выдела');
+ // Generate the next AVAILABLE number across the full current quarter.
+ // This avoids accidentally reusing a VD from another KGLF category.
+ const existing=quarter.compartments||[];
  const next=Math.max(0,...existing.map(x=>Number(x.VD)||0))+1;
  const schema=D.transfSchema?.['Выдел']||[];
  const r=Object.fromEntries(schema.map(field=>[field,null]));
  Object.assign(r,{POS:org.POS,LESN:org.LESN,KV:Number(k),KGLF:source.KGLF,
-  Fzona:source.Fzona,KlxrVD:source.Klxr,VD:next,PLV:1,KU:null,M3B:0,
+  Fzona:source.Fzona,KlxrVD:source.Klxr??source.KlxrVD,VD:next,PLV:1,KU:null,M3B:0,
   _children:{},_local:true});
  window.SolinAddressContext?.enrichStand?.(r,quarter,org);
  if(!window.SolinCardEditor?.open)return toast('Редактор карточки не загружен');
