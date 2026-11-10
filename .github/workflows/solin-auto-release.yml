@@ -14,7 +14,7 @@ on:
       source_ref:
         description: 'Reviewed source branch or commit'
         required: true
-        default: 'd0668508fc3e9a814f610f887f19c740f29300f3'
+        default: 'e9de35c0abb3618ed65971697bc7ca63e7ef67e8'
         type: string
       version_code:
         description: 'Android versionCode: auto or explicit numeric value'
@@ -57,7 +57,7 @@ jobs:
           if [[ "$EVENT" = push && "$TAG" = main ]]; then
             # A self-check verifies signing but cannot publish a release.
             CODE='auto'
-            SOURCE='d0668508fc3e9a814f610f887f19c740f29300f3'
+            SOURCE='e9de35c0abb3618ed65971697bc7ca63e7ef67e8'
           elif [[ "$EVENT" = push ]]; then
             [[ "$TAG" =~ ^solin-field-v([0-9]{6,9})$ ]] || { echo "::error::Invalid tag"; exit 1; }
             CODE="${BASH_REMATCH[1]}"
