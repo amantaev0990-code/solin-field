@@ -401,7 +401,7 @@ function setMapImportStatus(message) {
   status = document.createElement('div');
   status.id = 'mapImportStatus';
   status.setAttribute('role', 'status');
-  document.getElementById('mapLayerList')?.before(status);
+  document.querySelector('#mapScreen .mapToolbar')?.after(status);
  }
  status.textContent = message;
 }
