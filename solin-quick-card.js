@@ -83,32 +83,30 @@
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c =>
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
   const value = (name, val) => '<label><span>' + name + '</span><output>' + escape(val) + '</output></label>';
-  const cells = (record, columns) => columns.map(([name,key]) => value(name,record[key])).join('');
+  const cells = (record, columns) => columns.map(([name,key]) => value(name,displayValue('Выдел',key,record[key]))).join('');
   const block = (id, record, columns) => '<div class="kt-block"><b>' + id + '</b>' + cells(record,columns) + '</div>';
   const stand = [['Ярус','IAR'],['Коэф.','KOEF'],['Порода','POR'],['А, лет','LET'],['Н, м','PH'],['Д, см','PD2'],['Класс товар.','KT'],['Происхожд.','PROI'],['Полнота','POL'],['Пл. сеч.','SPS'],['Запас, м³/га','ZAP']];
-  function standValue(row, key) {
-    const raw = row[key];
-    if (key !== 'POL' || raw == null || String(raw).trim() === '') return raw;
+  const decimal = new Intl.NumberFormat('en-US', {
+    useGrouping:false, minimumFractionDigits:1, maximumFractionDigits:1
+  });
+  function displayValue(form, key, raw) {
+    const kind = window.SolinFieldTypes?.type(form, key);
+    if (!['float','double','currency','numeric'].includes(kind) ||
+        raw == null || String(raw).trim() === '') return raw;
     const number = Number(String(raw).replace(',', '.'));
-    const tenth = Math.round(number * 10) / 10;
-    // Access Single imports can carry the binary approximation of a tenth.
-    // Keep actual extra precision and whole-number survival percentages.
-    if (tenth >= 0.1 && tenth <= 1 && Math.abs(number - tenth) < 1e-7) {
-      return typeof raw === 'number' && Number.isInteger(raw) ? raw : String(tenth);
-    }
-    return raw;
+    return Number.isFinite(number) ? decimal.format(number) : raw;
   }
 
   function preview(record, forest) {
     const groups = Object.entries(record._children || {}).filter(([key,rows]) =>
       /^Макет\d+$/.test(key) && key !== 'Макет10' && rows.length);
     const rows = (record._children?.Макет10 || []).map(row =>
-      '<tr>' + stand.map(([,key]) => '<td>' + escape(standValue(row, key)) + '</td>').join('') + '</tr>').join('');
+      '<tr>' + stand.map(([,key]) => '<td>' + escape(displayValue('Макет10',key,row[key])) + '</td>').join('') + '</tr>').join('');
     const additional = groups.flatMap(([key, entries]) => entries.map(row => {
       const columns = (D.transfSchema[key] || Object.keys(row)).filter(field =>
         !['POS','LESN','KV','KGLF','VD'].includes(field));
       return '<div class="kt-extra-row"><b>' + key.slice(5) + '</b>' +
-        Array.from({length:Math.max(8, columns.length)}, (_, i) => '<output>' + escape(row[columns[i]]) + '</output>').join('') + '</div>';
+        Array.from({length:Math.max(8, columns.length)}, (_, i) => '<output>' + escape(displayValue(key,columns[i],row[columns[i]])) + '</output>').join('') + '</div>';
     })).join('');
     return '<article class="kt-sheet"><header>' + value('Квартал',record.KV) +
       value('Лесничество',forest?.NOS) + '<h2>Карточка таксации</h2></header><div class="kt-grid">' +

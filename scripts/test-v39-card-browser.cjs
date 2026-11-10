@@ -58,7 +58,8 @@ const server = http.createServer(async (request, response) => {
     const card = page.locator('#card.active');
     const original = await page.evaluate(() => {
       const rows = current._children.Макет10;
-      const prior = rows.map(row => row.POL);
+      const prior = {pol:rows.map(row => row.POL), area:current.PLV};
+      current.PLV = '12.3499999999999';
       rows[0].POL = '0.699999999999999988079071';
       rows[1].POL = 65;
       return prior;
@@ -66,11 +67,13 @@ const server = http.createServer(async (request, response) => {
     await card.getByRole('button',{name:'КТ',exact:true}).click();
     const pol = page.locator('.kt-stand tbody tr td:nth-child(9)');
     assert.equal(await pol.nth(0).textContent(), '0.7');
-    assert.equal(await pol.nth(1).textContent(), '65');
+    assert.equal(await pol.nth(1).textContent(), '65.0');
+    assert.equal(await page.locator('.kt-block').first().locator('output').nth(1).textContent(), '12.3');
     await page.evaluate(prior => {
       const rows = current._children.Макет10;
       if (rows[0].POL !== '0.699999999999999988079071') throw Error('KT changed stored data');
-      prior.forEach((value, i) => { rows[i].POL = value; });
+      prior.pol.forEach((value, i) => { rows[i].POL = value; });
+      current.PLV = prior.area;
     }, original);
     await page.locator('.kt-sheet').waitFor();
     assert.equal(await page.locator('.kt-sheet .kt-block output').first().textContent(),String(context.vd));
