@@ -6,6 +6,7 @@
   'use strict';
   const REPO = 'amantaev0990-code/solin-field';
   const RELEASES = 'https://api.github.com/repos/' + REPO + '/releases/latest';
+  const FALLBACK = 'https://raw.githubusercontent.com/' + REPO + '/updater-channel/latest.json';
   const APP_ID = 'kz.solin.field.v23build';
   const ASSET_NAME = 'SOLIN-Field-update.apk';
   const PREFIX = '/'+REPO+'/releases/download/';
@@ -23,7 +24,7 @@
   // the Android release-asset stream. Source URL and SHA-256 checks stay strict.
   const temporaryHttp = new Set([408, 429, 500, 502, 503, 504]);
   const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
-  async function latestRelease(fetcher = window.fetch.bind(window)) {
+  async function latestRelease(fetcher = window.fetch.bind(window), fallbackFetcher = window.fetch.bind(window)) {
     let response;
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
@@ -39,8 +40,20 @@
       await pause(750 * attempt);
     }
     if (response.status === 404) return null; // No published releases yet.
+    if (response.status === 403 || response.status === 429) {
+      let alternate;
+      try {
+        alternate = await fallbackFetcher(FALLBACK, {cache:'no-store', redirect:'error'});
+      } catch {
+        throw new Error('GitHub ограничил проверку. Открой страницу последнего выпуска.');
+      }
+      if (!alternate.ok) throw new Error('Не удалось проверить GitHub (HTTP '+response.status+').');
+      return validateRelease(await alternate.json());
+    }
     if (!response.ok) throw new Error('Не удалось проверить GitHub (HTTP '+response.status+').');
-    const release = await response.json();
+    return validateRelease(await response.json());
+  }
+  function validateRelease(release) {
     if (release.draft || release.prerelease) return null;
     const version = /^solin-field-v(\d{2,10})$/i.exec(release.tag_name || '');
     if (!version) throw new Error('Неверное обозначение версии в GitHub Releases.');
@@ -52,8 +65,7 @@
     if (!digest) throw new Error('Релиз не содержит контрольную сумму SHA-256.');
     const url = new URL(asset.browser_download_url);
     if (url.protocol !== 'https:' || url.hostname !== 'github.com'
-      || !url.pathname.startsWith(PREFIX)
-      || !url.pathname.endsWith('/'+ASSET_NAME)
+      || url.pathname !== PREFIX + 'solin-field-v' + version[1] + '/' + ASSET_NAME
       || url.username || url.password || url.port) {
       throw new Error('Адрес APK не соответствует нашему GitHub.');
     }
