@@ -161,30 +161,25 @@ if (process.env.SOLIN_GITHUB_UPDATES === '1') {
       'registerPlugin(SolinMdbPlugin.class);\\n    registerPlugin(SolinUpdatePlugin.class);'.replace('\\n','\n'));
    fs.writeFileSync(activity,main);
  }
- // Honor the established rule on physical Android Back and gesture Back:
- // when a dialog is visible, do not dismiss it or leave its activity.
- // Outside dialogs Android's normal navigation behavior remains unchanged.
+ // V37: Android Back MUST navigate within SOLI-N Field. Never fall
+ // through to Activity.finish(), including on the root screen or during boot.
+ // The WebView handler preserves the established X-only modal rule.
  main=fs.readFileSync(activity,'utf8');
  if(!main.includes('SolinOnlyXBackDispatcher')){
    const marker='    super.onCreate(state);';
    if(!main.includes(marker))throw Error('Expected BridgeActivity onCreate marker missing');
    const hook=`
-    // SolinOnlyXBackDispatcher: hold Android Back while a modal is active.
+    // SolinOnlyXBackDispatcher: Android Back is internal navigation only.
     getOnBackPressedDispatcher().addCallback(this,
         new androidx.activity.OnBackPressedCallback(true) {
           @Override public void handleOnBackPressed() {
             android.webkit.WebView w = getBridge() == null ? null : getBridge().getWebView();
-            if (w == null) { passToSystem(); return; }
+            if (w == null) return; // Back during startup must not exit.
             w.evaluateJavascript(
-                "(function(){var m=document.getElementById('modal');return Boolean("
-                + "document.getElementById('solin-v23-leave-confirm')"
-                + "||(m&&!m.classList.contains('hidden')));})()",
-                response -> { if (!"true".equals(response)) passToSystem(); });
-          }
-          private void passToSystem() {
-            setEnabled(false);
-            try { getOnBackPressedDispatcher().onBackPressed(); }
-            finally { setEnabled(true); }
+                "(function(){try{return window.SolinV37Navigation"
+                + "&&window.SolinV37Navigation.handleBack()"
+                + "?'handled':'blocked';}catch(e){return 'blocked';}})()",
+                null);
           }
         });
 `;
