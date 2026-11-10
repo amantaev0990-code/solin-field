@@ -4,3 +4,11 @@
 .mapToolbar #offlineBtn.active{background:#176f39;color:white;border-color:#42df73}
 .offline-imagery-status{margin:7px 2px 11px;padding:9px 12px;font:13px/1.4 system-ui,Arial,sans-serif;color:#264830;border:1px solid #b8d0be;border-radius:10px;background:#f3f8f1;overflow-wrap:anywhere}
 .mapToolbar #offlineImportBtn{border-color:#719a83}
+
+.mapinfo-hide-labels .mapinfo-label {display:none}
+#mapLibrary {padding:4px 10px}
+#mapLibrary summary {cursor:pointer;padding:7px 0}
+#mapLibraryList {max-height:28vh;overflow:auto}
+#mapLibraryList .mapLayerRow {display:flex;flex-wrap:wrap;gap:6px}
+#mapLibraryList .mapLayerRow span {flex:1 1 130px}
+
