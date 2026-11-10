@@ -1,5 +1,6 @@
 name: SOLI-N Field - verify and publish V38
 
+# Preserve the published V37 source and acceptance fixtures.
 on:
   push:
     branches: [v38-screen-transitions]

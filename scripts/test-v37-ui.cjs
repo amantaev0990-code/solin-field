@@ -81,7 +81,7 @@ if(process.argv.includes('--built')){
  });
  const {window}=dom,document=window.document;
  window.__v37Fixtures={db,stand:own};
- window.eval('let D=window.__v37Fixtures.db;let current=window.__v37Fixtures.stand;');
+ window.eval('var D=window.__v37Fixtures.db;var current=window.__v37Fixtures.stand;');
  const calls=[];
  window.openCompForm=(k,kglf)=>calls.push({k,kglf});
  window.show=id=>{
