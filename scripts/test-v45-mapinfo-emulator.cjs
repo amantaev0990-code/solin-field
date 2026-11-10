@@ -43,6 +43,8 @@ async function runInWebView(url) {
   const bytes = JSON.stringify([...zip]);
   const result = await evaluate(`(async () => {
    window.openMapScreen();
+   await window.__solinMapImportPromise;
+   if (importedMapLayers.length) throw Error('Maps opened automatically');
    const input = document.querySelector('#mapFileInput');
    const file = new File([new Uint8Array(${bytes})], 'MapInfo fixture.zip', {type:'application/zip'});
    const transfer = new DataTransfer();
@@ -57,8 +59,21 @@ async function runInWebView(url) {
    toggleImportedLayer(index, false);
    const hidden = !fieldMap.hasLayer(entry.layer);
    toggleImportedLayer(index, true);
-   return {accept:input.accept, count:entry.count, lat:center.lat, lng:center.lng,
+   const result = {accept:input.accept, count:entry.count, lat:center.lat, lng:center.lng,
     visible:fieldMap.hasLayer(entry.layer), hidden, accepted:accepted.size};
+   const action = label => [...document.querySelectorAll('#mapLibraryList button')]
+    .find(button => button.textContent === label);
+   action('Закрыть').click();
+   await window.__solinMapImportPromise;
+   if (importedMapLayers.length) throw Error('Closing the map left layers visible');
+   action('Открыть').click();
+   await window.__solinMapImportPromise;
+   if (importedMapLayers.length !== 1) throw Error('Saved map did not reopen');
+   window.confirm = () => true;
+   action('Удалить').click();
+   await window.__solinMapImportPromise;
+   if (importedMapLayers.length || action('Удалить')) throw Error('Map was not removed from the library');
+   return result;
   })()`);
   assert.match(result.accept, /\.zip/);
   assert.equal(result.count, 1);
