@@ -27,7 +27,7 @@ assert.ok(usability.includes(fixed));
 assert.ok(installer.includes('SolinOnlyXBackDispatcher'));
 assert.ok(installer.includes('getOnBackPressedDispatcher().addCallback'));
 assert.ok(installer.includes('getBridge().getWebView()'));
-assert.ok(installer.includes('!m.classList.contains(\'hidden\')'));
+assert.ok(installer.includes('window.SolinV37.back()'),'V37 must delegate Android Back to safe JS X-only router');
 if(process.argv.includes('--built')){
  const web=txt('www/solin-usability.js');
  assert.ok(!web.includes(old),'Old V30 startup crash must be removed from web assets');
