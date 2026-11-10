@@ -1,0 +1,334 @@
+name: SOLI-N Field - verify and publish V45
+
+# Preserve the published V37 source and acceptance fixtures.
+on:
+  push:
+    branches: [v45-mapinfo-fix]
+    paths: ['.github/workflows/solin-v45-release.yml']
+
+permissions:
+  contents: read
+concurrency:
+  group: solin-automatic-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    permissions: {contents: read}
+    outputs:
+      code: ${{ steps.meta.outputs.code }}
+      tag: ${{ steps.meta.outputs.tag }}
+      source_sha: ${{ steps.source.outputs.sha }}
+    steps:
+      - name: Validate release version and source
+        id: meta
+        shell: bash
+        run: |
+          {
+            echo "code=230025"
+            echo "tag=solin-field-v230025"
+            echo "source=$GITHUB_SHA"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Checkout reviewed source without secrets
+        uses: actions/checkout@v4
+        with:
+          repository: amantaev0990-code/solin-field
+          ref: ${{ steps.meta.outputs.source }}
+          path: app
+          persist-credentials: false
+
+      - name: Capture exact source commit
+        id: source
+        run: echo "sha=$(git -C app rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout original release preparation from main
+        uses: actions/checkout@v4
+        with:
+          repository: amantaev0990-code/solin-field
+          ref: main
+          path: release-config
+          sparse-checkout: scripts/prepare-v23-release.mjs
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '21'}
+      - uses: android-actions/setup-android@v3
+        with: {packages: platform-tools}
+
+      - name: Test updater and forest logic (no signing key in this job)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: app
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s solin-updates.js
+          test -s native/android/SolinUpdatePlugin.java
+          grep -q 'solin-updates.js' index.html
+          npm install --no-audit --no-fund
+          node scripts/test-github-updates.cjs
+          node scripts/test-update-contract.cjs
+          if [[ -f scripts/test-v31-updater.cjs ]]; then node scripts/test-v31-updater.cjs; fi
+          if [[ -f scripts/test-v33-ux.cjs ]]; then node scripts/test-v33-ux.cjs; fi
+          if [[ -f scripts/test-v34-regressions.cjs ]]; then node scripts/test-v34-regressions.cjs; fi
+          if [[ -f scripts/test-v35-selects.cjs ]]; then node scripts/test-v35-selects.cjs; fi
+          if [[ -f scripts/test-v36-http-retry.cjs ]]; then node scripts/test-v36-http-retry.cjs; fi
+          if [[ -f scripts/test-v37-ui.cjs ]]; then node scripts/test-v37-ui.cjs; fi
+          node scripts/test-card-calculations.cjs
+          node scripts/test-quarter-geography-selects.cjs
+          node scripts/test-stand-quick-makets.cjs
+          gh release download solin-field-v230021 --repo amantaev0990-code/solin-field \
+            --pattern SOLIN-Field-update.apk --dir "$RUNNER_TEMP/v38"
+          BASE="$RUNNER_TEMP/v38/SOLIN-Field-update.apk"
+          printf '%s  %s\n' 'b5ab14838a742c413d62e1e139b728bc7583db98d2bbd51bf8baff44babfdc00' "$BASE" | sha256sum -c -
+          unzip -q "$BASE" 'assets/public/*' -d "$RUNNER_TEMP/v38"
+          mv "$RUNNER_TEMP/v38/assets/public" www
+          npm install --no-save --no-audit --no-fund playwright@1.56.1
+          cp map.js universal-import.js solin-quick-card.js www/
+          node --check www/universal-import.js
+          npm pack gdal3.js@2.8.1 --pack-destination "$RUNNER_TEMP" --silent
+          GDAL_PACKAGE="$RUNNER_TEMP/gdal3.js-2.8.1.tgz"
+          printf '%s  %s\n' 'cda53c47fcfb608a37bc400d4765e2d7d66524a6061f8b406cc767d57738096c' "$GDAL_PACKAGE" | sha256sum -c -
+          mkdir -p www/vendor/gdal
+          for asset in gdal3.js gdal3WebAssembly.data gdal3WebAssembly.wasm; do
+            tar -xOf "$GDAL_PACKAGE" "package/dist/package/$asset" > "www/vendor/gdal/$asset"
+            test -s "www/vendor/gdal/$asset"
+          done
+          tar -xOf "$GDAL_PACKAGE" package/LICENSE > www/vendor/gdal/LICENSE.txt
+          node --check www/map.js
+          grep -q 'installFieldMapTools(fieldMap)' www/map.js
+          node scripts/patch-v42-stock.cjs
+          node scripts/test-v42-stock.cjs
+          sed -i 's/solin-quick-card.js?v=41/solin-quick-card.js?v=42/; s/solin-card-editor.js?v=39-quick/solin-card-editor.js?v=42-stock/' www/index.html
+          npx playwright install --with-deps chromium
+          node scripts/test-v38-navigation-browser.cjs
+          node scripts/test-v39-card-browser.cjs
+          # This asset is reinserted byte-for-byte in the original signing stage.
+          rm www/solin-private-refs.packed.bin
+          npx cap add android
+          SOLIN_GITHUB_UPDATES=1 node scripts/install-android-mdb.mjs
+          npx cap sync android
+          SOLIN_RELEASE_VERSION_CODE=${{ steps.meta.outputs.code }} node ../release-config/scripts/prepare-v23-release.mjs
+          # The app label stays permanent between all versions.
+          sed -i 's#<string name="app_name">[^<]*</string>#<string name="app_name">SOLI-N Field</string>#' android/app/src/main/res/values/strings.xml
+          grep -q 'registerPlugin(SolinUpdatePlugin.class)' android/app/src/main/java/kz/solin/field/MainActivity.java
+          grep -q 'REQUEST_INSTALL_PACKAGES' android/app/src/main/AndroidManifest.xml
+          test -s android/app/src/main/res/xml/solin_update_paths.xml
+          if [[ -f scripts/test-v31-updater.cjs ]]; then node scripts/test-v31-updater.cjs --android; fi
+          if [[ -f scripts/test-v33-ux.cjs ]]; then node scripts/test-v33-ux.cjs --android; fi
+          if [[ -f scripts/test-v34-regressions.cjs ]]; then node scripts/test-v34-regressions.cjs --android; fi
+          if [[ -f scripts/test-v36-http-retry.cjs ]]; then node scripts/test-v36-http-retry.cjs --android; fi
+          if [[ -f scripts/test-v37-ui.cjs ]]; then node scripts/test-v37-ui.cjs --android; fi
+          grep -q 'applicationId "kz.solin.field.v23build"' android/app/build.gradle
+          grep -q 'versionCode ${{ steps.meta.outputs.code }}' android/app/build.gradle
+
+      - name: Compile unsigned Android APK
+        working-directory: app/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          # Use Gradle's official CDN directly, avoiding unreliable GitHub
+          # distribution release redirects; the bin distribution is smaller.
+          # Download from a verified independent mirror: official Gradle
+          # 8.14.3 distribution SHA-256 is pinned by upstream AndroidX.
+          sed -i 's#distributionUrl=.*#distributionUrl=https\\://mirrors.huaweicloud.com/gradle/gradle-8.14.3-bin.zip#; s#networkTimeout=10000#networkTimeout=120000#' \
+            gradle/wrapper/gradle-wrapper.properties
+          printf '\ndistributionSha256Sum=bd71102213493060956ec229d946beee57158dbd89d0e62b91bca0fa2c5f3531\n' >> \
+            gradle/wrapper/gradle-wrapper.properties
+          grep -q 'mirrors.huaweicloud.com' gradle/wrapper/gradle-wrapper.properties
+          # GitHub's Gradle distribution CDN occasionally returns HTTP 504.
+          # Retry transient downloads; fail if compilation itself is broken.
+          built=0
+          for attempt in 1 2 3; do
+            if ./gradlew --no-daemon assembleRelease; then
+              built=1
+              break
+            fi
+            if [[ "$attempt" -lt 3 ]]; then sleep 12; fi
+          done
+          [[ "$built" -eq 1 ]] || exit 1
+          APK=app/build/outputs/apk/release/app-release-unsigned.apk
+          test -s "$APK"
+          for file in app.js index.html solin-card-editor.js solin-v37-ui.js solin-quick-card.js solin-quick-card.css; do
+            unzip -p "$APK" "assets/public/$file" | cmp - "../www/$file"
+          done
+          # Verify Android actually packaged the installer callback; otherwise
+          # the confirmation prompt could never open on the tablet.
+          TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          if [[ -f ../../compat/v30-assets-overlay.txt ]]; then
+            "$TOOLS/aapt" dump xmltree "$APK" AndroidManifest.xml | \
+              grep -F 'SolinUpdatePlugin'
+          fi
+          if unzip -Z1 "$APK" | grep -q '^assets/public/solin-private-refs.packed.bin$'; then
+            echo "::error::Private references must only be added during signing"
+            exit 1
+          fi
+          if [[ -f ../../compat/v30-assets-overlay.txt ]]; then
+            for entry in \
+              'assets/public/maps/213-1.cmf2:67d30ff85d0d49efc9a467efe585f3aae345073724ae5c60aa895e93e4aa02da' \
+              'assets/public/maps/213-2.cmf2:74043a02e2d74f4e69bc6af8f2b9eea6a5c20a18ad93f677179075003a380076'; do
+              file="${entry%%:*}"
+              expected="${entry#*:}"
+              actual="$(unzip -p "$APK" "$file" | sha256sum | cut -d' ' -f1)"
+              [[ "$actual" == "$expected" ]] || exit 1
+            done
+          fi
+
+      - name: Build emulator APK with the same map assets as the release
+        working-directory: app/android
+        run: |
+          ./gradlew --no-daemon assembleDebug
+          for asset in map.js universal-import.js vendor/gdal/gdal3.js vendor/gdal/gdal3WebAssembly.data vendor/gdal/gdal3WebAssembly.wasm; do
+            unzip -p app/build/outputs/apk/debug/app-debug.apk "assets/public/$asset" | cmp - "../www/$asset"
+            unzip -p app/build/outputs/apk/release/app-release-unsigned.apk "assets/public/$asset" | cmp - "../www/$asset"
+          done
+
+      - name: Enable emulator hardware acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Verify ZIP import on Android WebView before publishing
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_2
+          disable-animations: true
+          emulator-boot-timeout: 600
+          script: cd app && node scripts/test-v45-mapinfo-emulator.cjs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: solin-unsigned-${{ steps.meta.outputs.code }}
+          path: app/android/app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
+          retention-days: 7
+
+  sign-and-publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions: {contents: write}
+    env:
+      SOLIN_V23_KEYSTORE_PASSWORD: ${{ secrets.SOLIN_V23_KEYSTORE_PASSWORD }}
+      CODE: ${{ needs.build.outputs.code }}
+      TAG: ${{ needs.build.outputs.tag }}
+      SOURCE_SHA: ${{ needs.build.outputs.source_sha }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Require permanent V23 signing secret
+        shell: bash
+        run: |
+          test -n "$SOLIN_V23_KEYSTORE_PASSWORD" || {
+            echo "::error::Configure SOLIN_V23_KEYSTORE_PASSWORD once in GitHub Actions Secrets."
+            exit 1
+          }
+
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          sparse-checkout: signing
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: solin-unsigned-${{ needs.build.outputs.code }}
+          path: unsigned
+      - uses: android-actions/setup-android@v3
+        with: {packages: platform-tools}
+
+      - name: Restore original dictionary, sign and verify APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          KEY="$RUNNER_TEMP/solin-v23.p12"
+          base64 --decode signing/solin-v23-encrypted.p12.b64 > "$KEY"
+          EXPECTED_KEY="$(python3 -c 'import json;print(json.load(open("signing/certificate.json"))["keystoreSha256"])')"
+          [[ "$(sha256sum "$KEY" | cut -d' ' -f1)" = "$EXPECTED_KEY" ]] || exit 1
+          CERT="$(keytool -list -v -storetype PKCS12 -keystore "$KEY" -alias solin-cloud-lab -storepass:env SOLIN_V23_KEYSTORE_PASSWORD | sed -n 's/.*SHA256: //p' | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          EXPECTED_CERT='5A1C2E2BF2EFE5AA7382674B651533A11D2B93C802A1C09ADC72656C5A29ED7E'
+          [[ "$CERT" = "$EXPECTED_CERT" ]] || exit 1
+
+          base64 --decode signing/solin-v23-refs.enc.b64 > "$RUNNER_TEMP/refs.enc"
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 250000 \
+            -in "$RUNNER_TEMP/refs.enc" -out "$RUNNER_TEMP/refs.bin" \
+            -pass env:SOLIN_V23_KEYSTORE_PASSWORD
+          EXPECTED_REFS='c2705bf1ecfa98b007fdbecd1b8f7be908b73591ee2eccae327cf88629bb60e5'
+          [[ "$(sha256sum "$RUNNER_TEMP/refs.bin" | cut -d' ' -f1)" = "$EXPECTED_REFS" ]] || exit 1
+
+          mkdir -p stage/assets/public release
+          cp unsigned/app-release-unsigned.apk stage/base.apk
+          cp "$RUNNER_TEMP/refs.bin" stage/assets/public/solin-private-refs.packed.bin
+          (cd stage && zip -q -0 base.apk assets/public/solin-private-refs.packed.bin)
+          [[ "$(unzip -p stage/base.apk assets/public/solin-private-refs.packed.bin | sha256sum | cut -d' ' -f1)" = "$EXPECTED_REFS" ]] || exit 1
+          TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$TOOLS/zipalign" -f -p 4 stage/base.apk "$RUNNER_TEMP/aligned.apk"
+          APK=release/SOLIN-Field-update.apk
+          "$TOOLS/apksigner" sign --ks "$KEY" --ks-type PKCS12 \
+            --ks-key-alias solin-cloud-lab --ks-pass env:SOLIN_V23_KEYSTORE_PASSWORD \
+            --v4-signing-enabled false --out "$APK" "$RUNNER_TEMP/aligned.apk"
+          "$TOOLS/apksigner" verify --verbose --print-certs "$APK"
+          # Android build-tools may print either "Signer #1" or "V3.0 Signer".
+          # Read a single certificate digest from the verified APK.
+          ACTUAL_CERT="$("$TOOLS/apksigner" verify --print-certs "$APK" | sed -nE 's/^((Signer #[0-9]+)|(V[0-9.]+ Signer)): certificate SHA-256 digest: //p' | head -n 1 | tr '[:lower:]' '[:upper:]')"
+          [[ "$ACTUAL_CERT" = "$EXPECTED_CERT" ]] || { echo "::error::Signed APK certificate fingerprint differs"; exit 1; }
+          BADGING="$("$TOOLS/aapt" dump badging "$APK" | head -n 1)"
+          [[ "$BADGING" = *"package: name='kz.solin.field.v23build'"* ]] || exit 1
+          [[ "$BADGING" = *"versionCode='$CODE'"* ]] || exit 1
+          [[ "$(unzip -p "$APK" assets/public/solin-private-refs.packed.bin | sha256sum | cut -d' ' -f1)" = "$EXPECTED_REFS" ]] || exit 1
+          # These hashes are from the V30 APK actually installed on the tablet.
+          # A V31 must preserve both offline maps; never publish a regression.
+          for entry in \
+            'assets/public/maps/213-1.cmf2:67d30ff85d0d49efc9a467efe585f3aae345073724ae5c60aa895e93e4aa02da' \
+            'assets/public/maps/213-2.cmf2:74043a02e2d74f4e69bc6af8f2b9eea6a5c20a18ad93f677179075003a380076' \
+            'assets/public/solin-map-overview.geojson:15e57e7fafa470c62ddb168aadd63817304f1f60bd1f20927358ef4f0a8ccf03'; do
+            file="${entry%%:*}"
+            expected="${entry#*:}"
+            actual="$(unzip -p "$APK" "$file" | sha256sum | cut -d' ' -f1)"
+            [[ "$actual" == "$expected" ]] || { echo "::error::Forest map asset mismatch: $file"; exit 1; }
+          done
+          sha256sum "$APK" > release/SHA256SUMS.txt
+          rm -f "$KEY" "$RUNNER_TEMP/refs.enc" "$RUNNER_TEMP/refs.bin"
+
+      - name: Preserve signed candidate for testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: SOLIN-Field-SIGNED-${{ needs.build.outputs.code }}
+          path: release/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish signed update to GitHub Releases
+        shell: bash
+        env:
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          [[ "$REPO" = 'amantaev0990-code/solin-field' ]] || exit 1
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "::error::Release already exists. Do not overwrite an existing APK."
+            exit 1
+          fi
+          LATEST="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name' 2>/dev/null || true)"
+          if [[ "$LATEST" != "solin-field-v230024" ]]; then
+            echo "::error::Expected the published V44 as latest release"
+            exit 1
+          fi
+          gh release create "$TAG" release/SOLIN-Field-update.apk release/SHA256SUMS.txt \
+            --repo "$REPO" --target "$SOURCE_SHA" --latest \
+            --title "SOLI-N Field V45 — исправление импорта ZIP MapInfo" \
+            --notes 'Исправлено открытие ZIP MapInfo из выбора файла. Восстановлено сохранение карт для работы офлайн.'
+          EXPECTED="sha256:$(sha256sum release/SOLIN-Field-update.apk | cut -d' ' -f1)"
+          ACTUAL="$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.assets[] | select(.name=="SOLIN-Field-update.apk") | .digest')"
+          [[ "$ACTUAL" = "$EXPECTED" ]] || { echo "::error::Published APK digest differs"; exit 1; }
+          echo 'Signed APK is discoverable by the in-app update button.'
+
