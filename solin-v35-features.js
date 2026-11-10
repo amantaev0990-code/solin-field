@@ -9,7 +9,7 @@
  ];
  const reduce=()=>window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
  function actual(field){
-   return document.querySelector('#ce-form #ce-section-10 [data-ce-scope="base"][data-ce-field="'+field+'"]');
+   return document.querySelector('#ce-form [data-ce-scope="base"][data-ce-field="'+field+'"]');
  }
  function detail(field){
    const el=actual(field);
