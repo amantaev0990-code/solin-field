@@ -26,9 +26,68 @@ document.getElementById("solinGetCompGPS").onclick=window.solinSaveGPS;
 let photos=document.createElement('div');photos.id='solinPhotoList';container.appendChild(photos);window.solinRenderPhotos().catch(()=>{});
 };}
 const mapOpenOld=window.openMapScreen;
-if(typeof mapOpenOld==="function"){window.openMapScreen=function(){mapOpenOld();const openBtn=[...document.querySelectorAll('#mapScreen .mapToolbar button')].find(b=>b.textContent.includes('Открыть файл'));if(openBtn)openBtn.textContent='📂 Открыть CMF2 / КМФ2';const placeholder=document.querySelector('#mapLayerList .mapLayerRow:not(label)');if(placeholder&&!window.importedMapLayers?.length){placeholder.style.cursor='pointer';placeholder.onclick=window.openMapFilePicker;}if(!window.__solinMapRestored){window.__solinMapRestored=true;setTimeout(()=>window.solinRestoreMaps().catch(console.warn),1100);}}}
 const handleOld=window.handleMapFiles;
-if(typeof handleOld==="function"){window.handleMapFiles=function(input){const forest=window.SolinWorkspace?.activeId;const files=Array.from(input?.files||[]);const operation=(async()=>{await handleOld(input);for(const f of files){if(f.size<=36*1024*1024){try{await dbPut('maps',{id:(forest||'legacy')+'|'+f.name+'|'+f.size+'|'+f.lastModified,forestId:forest,file:f,name:f.name,date:Date.now()});}catch(err){console.warn('Save map cache',err);}}}})();window.__solinMapImportPromise=operation;return operation;};}
+const mapScope=()=>window.SolinWorkspace?.mapScope||'map-only';
+const projectMaps={
+ '213::1':{path:'213-1.cmf2',name:'Комсомольское л-во.cmf2'},
+ '213::2':{path:'213-2.cmf2',name:'Богетсайское л-во.cmf2'}
+};
+function queueMap(task){
+ const operation=(window.__solinMapImportPromise||Promise.resolve()).catch(()=>{}).then(task);
+ window.__solinMapImportPromise=operation;
+ return operation;
+}
+let activeMapKey = null;
+let libraryScope;
+window.openMapScreen = function() {
+ if (!mapOpenOld()) return false;
+ const scope = mapScope();
+ if (scope !== libraryScope || !importedMapLayers.length) {
+  libraryScope = scope;
+  activeMapKey = null;
+ }
+ const placeholder = document.querySelector('#mapLayerList .mapLayerRow');
+ if (placeholder && !importedMapLayers.length) placeholder.onclick = window.openMapFilePicker;
+ void queueMap(refreshMapLibrary).catch(error => toast(error.message));
+ return true;
+};
+
+async function activateMap(file, scope) {
+ if (scope !== mapScope()) return false;
+ const key = mapFileKey(file);
+ const accepted = await handleOld({files:[file]});
+ if (!accepted.has(key)) return false;
+ if (scope !== mapScope()) {
+  removeMapFileLayers(key);
+  return false;
+ }
+ removeMapFileLayers(null, key);
+ activeMapKey = key;
+ return true;
+}
+
+window.handleMapFiles = function(input) {
+ const files = Array.from(input?.files || []);
+ if (input) input.value = '';
+ if (!files.length) return Promise.resolve(new Set());
+ const scope = mapScope();
+ return queueMap(async () => {
+  const accepted = new Set();
+  for (const file of files) {
+   if (!await activateMap(file, scope)) continue;
+   const key = mapFileKey(file);
+   accepted.add(key);
+   try {
+    await dbPut('maps', {id:scope+'|'+key, forestId:scope, file, name:file.name,
+     lastModified:file.lastModified, date:Date.now()});
+   } catch (error) {
+    toast('Карта открыта, но не сохранена офлайн: ' + error.message);
+   }
+  }
+  await refreshMapLibrary();
+  return accepted;
+ });
+};
 const mkdir=()=>new Promise((resolve,reject)=>{const r=indexedDB.open("SOLIN_FIELD_OFFLINE_V3",1);
  r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains("maps"))r.result.createObjectStore("maps",{keyPath:"id"});if(!r.result.objectStoreNames.contains("photos"))r.result.createObjectStore("photos",{keyPath:"id"});};
  r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);
@@ -84,12 +143,100 @@ window.solinRenderPhotos=async()=>{
  for(const p of photos){const img=document.createElement('img');const url=URL.createObjectURL(p.blob);img.src=url;img.alt=p.name;img.onclick=()=>window.open(url,'_blank');img.onload=()=>{};grid.appendChild(img);}
  box.appendChild(grid);
 };
-window.solinRestoreMaps=async()=>{
- let rows=[];try{rows=await dbGetAll('maps');}catch(e){console.warn('Offline cache:',e);return;}
- if(!rows.length)return;
- rows=rows.filter(r=>r.forestId===window.SolinWorkspace?.activeId||(!r.forestId&&window.SolinWorkspace?.activeId==='213::2'));rows.sort((a,b)=>b.date-a.date);const list=rows.slice(0,3);toast('Восстанавливаю карты: '+list.length);
- if(typeof window.handleMapFiles==="function"){for(const item of list){const file=item.file;if(!file)continue;const f=file instanceof File?file:new File([file],item.name,{lastModified:Date.now()});try{await window.handleMapFiles({files:[f],value:''})}catch(e){console.warn('Map restore',e)}}}
-};
+function mapLibraryButton(text, action) {
+ const button = document.createElement('button');
+ button.type = 'button';
+ button.className = 'mapMode';
+ button.textContent = text;
+ button.addEventListener('click', () => {
+  button.disabled = true;
+  void queueMap(action).catch(error => toast(error.message)).finally(() => { button.disabled = false; });
+ });
+ return button;
+}
+
+async function refreshMapLibrary() {
+ const toolbar = document.querySelector('#mapScreen .mapToolbar');
+ if (!toolbar) return;
+ let library = document.getElementById('mapLibrary');
+ if (!library) {
+  library = document.createElement('details');
+  library.id = 'mapLibrary';
+  const summary = document.createElement('summary');
+  summary.textContent = 'Мои карты';
+  const list = document.createElement('div');
+  list.id = 'mapLibraryList';
+  library.append(summary, list);
+  toolbar.after(library);
+ }
+ const list = library.querySelector('#mapLibraryList');
+ const scope = mapScope();
+ const saved = (await dbGetAll('maps')).filter(row => row.forestId === scope || (!row.forestId && scope === '213::2'));
+ if (scope !== mapScope()) return;
+ list.replaceChildren();
+ const add = document.createElement('button');
+ add.type = 'button';
+ add.className = 'mapMode';
+ add.textContent = 'Добавить карту';
+ add.addEventListener('click', window.openMapFilePicker);
+ list.append(add);
+
+ function addRow(name, key, open, deleteSaved) {
+  const row = document.createElement('div');
+  row.className = 'mapLayerRow';
+  const title = document.createElement('span');
+  title.textContent = name;
+  row.append(title);
+  if (key && activeMapKey === key) row.append(mapLibraryButton('Закрыть', async () => {
+   removeMapFileLayers(key);
+   activeMapKey = null;
+   setMapImportStatus('');
+   await refreshMapLibrary();
+  }));
+  else row.append(mapLibraryButton('Открыть', async () => {
+   if (scope !== mapScope()) return;
+   await activateMap(await open(), scope);
+   await refreshMapLibrary();
+  }));
+  if (deleteSaved) row.append(mapLibraryButton('Удалить', async () => {
+   if (!window.confirm('Убрать карту «' + name + '» из приложения?')) return;
+   await deleteSaved();
+   if (activeMapKey === key) {
+    removeMapFileLayers(key);
+    activeMapKey = null;
+    setMapImportStatus('');
+   }
+   await refreshMapLibrary();
+  }));
+  list.append(row);
+ }
+
+ for (const item of saved.sort((a,b) => b.date - a.date)) {
+  if (!item.file) continue;
+  const file = item.file instanceof File ? item.file :
+   new File([item.file], item.name, {lastModified:item.lastModified ?? item.date});
+  addRow(item.name, mapFileKey(file), () => file, () => deleteCachedMap(item.id));
+ }
+ const builtIn = projectMaps[scope];
+ if (builtIn) {
+  const key = activeMapKey?.startsWith(builtIn.name + '|') && activeMapKey.endsWith('|0') ? activeMapKey : '';
+  addRow(builtIn.name + ' · встроенная', key, async () => {
+   const response = await fetch('./maps/' + builtIn.path);
+   if (!response.ok) throw Error('Встроенный файл карты недоступен');
+   return new File([await response.blob()], builtIn.name, {lastModified:0});
+  });
+ }
+}
+
+async function deleteCachedMap(id) {
+ const db = await mkdir();
+ return new Promise((resolve, reject) => {
+  const tx = db.transaction('maps', 'readwrite');
+  tx.objectStore('maps').delete(id);
+  tx.oncomplete = () => { db.close(); resolve(); };
+  tx.onabort = () => { db.close(); reject(tx.error || Error('Карта не удалена')); };
+ });
+}
 window.solinClearCachedMaps=async()=>{if(!confirm('Удалить сохранённые локальные файлы карт из браузера?'))return;await dbClear('maps');toast('Кэш карт очищен');};
 window.solinExportEdits=()=>{
  const data={format:'SOLIN-Field-JSON-Prototype-v1',exportedAt:new Date().toISOString(),overrides:saved(),created:JSON.parse(localStorage.getItem('solin_user_data_v1')||'{}')};
@@ -103,7 +250,7 @@ document.addEventListener('DOMContentLoaded',()=>{
  document.querySelector('#mapScreen .mapOfflineHint')?.insertAdjacentHTML('beforeend','<br><small>CMF2 structural-v4 / атрибуты inline-v7 сохранены из предыдущей SOLI-N Field. Спутниковые снимки требуют интернет; собственные контуры CMF2 можно видеть офлайн.</small>');
  const m=document.querySelector('#menuScreen .workspace');
  if(m)m.insertAdjacentHTML('beforeend','<button class="menuRow" onclick="solinImportEdits()"><span><b>Открыть резервную копию JSON</b><small>Восстановить изменения</small></span><span>⇧</span></button><button class="menuRow" onclick="solinClearCachedMaps()"><span><b>Очистить офлайн-кэш карт</b><small>Только сохранённые карты, не карточки</small></span><span>×</span></button><div class="solinFormHelp">Прототип SOLI-N Field · основан на исходном интерфейсе и базе проекта · файлы и правки хранятся локально. Экспорт Transfer нужно проверить с настольной программой.</div>');
- const input=document.getElementById('mapFileInput');if(input)input.accept=".cmf2,.kmf2,.kml,.kmz,.geojson,.json,.gpx,.gpkg";
  const sr=document.createElement('style');sr.textContent='.solinEditBar{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}.solinEditBar button{font-size:13px;min-height:42px}.solinFormHelp{background:#112f1e;color:#bde2c6;border:1px solid #316541;border-radius:12px;padding:11px;margin:10px 0;line-height:1.5;font-size:12px}.solinPhotos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.solinPhotos img{width:100%;aspect-ratio:1.2;object-fit:cover;border-radius:10px;cursor:pointer}#fieldMap{background:linear-gradient(135deg,#15291f,#1a352b)}';document.head.appendChild(sr);
 });
 })();
+
