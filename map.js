@@ -40,6 +40,19 @@ function openMapFilePicker(){document.getElementById('mapFileInput')?.click()}
 function makeGeoGroup(geo){return L.geoJSON(geo,{smoothFactor:2.5,style:styleImportedFeature,pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:5,weight:2,fillOpacity:.8}),onEachFeature:bindImportedFeature}).addTo(fieldMap)}
 function addGeoLayer(name,geo,key,format){if(!geo||geo.type!=='FeatureCollection')throw new Error('Нет векторных объектов');const group=makeGeoGroup(geo);const entry={key,name,layer:group,count:(geo.features||[]).length,visible:true,format};importedMapLayers.push(entry);return entry}
 async function handleMapFiles(input){const files=[...(input?.files||[])];if(!files.length)return;if(!fieldMap)initFieldMap();let added=0,lastBounds=null;for(const file of files){try{const baseKey=`${file.name}|${file.size}|${file.lastModified}`;if(importedMapLayers.some(x=>x.fileKey===baseKey||x.key===baseKey))continue;const detected=window.SolinMapImport?await SolinMapImport.detect(file):'';
+if (detected === 'zip') {
+ const layers = await readMapInfoZip(file);
+ const bounds = L.latLngBounds([]);
+ const entries = layers.map((layer, index) => createMapInfoLayer(layer, baseKey, index, layers.length));
+ for (const entry of entries) {
+  if (entry.visible) entry.layer.addTo(fieldMap);
+  importedMapLayers.push(entry);
+  bounds.extend(entry.layer.getBounds());
+  added += entry.count;
+ }
+ if (bounds.isValid()) lastBounds = bounds;
+ continue;
+}
 if(detected==='cmf2'){toast('CMF2: декодирую геометрию…');const info=await inspectCmf2(file);const entry={key:baseKey,fileKey:baseKey,name:file.name,cmf2:true,count:info.decodedFeatures||0,projection:info.projection,visible:true,info,geometryEntries:[]};for(const g of info.geometryLayers||[]){const group=makeGeoGroup(g.geojson),ge={source:g.source,name:g.name,type:g.type,count:g.count,layer:group,visible:true};entry.geometryEntries.push(ge);added+=g.count;const b=group.getBounds();if(b?.isValid())lastBounds=b}if(!entry.geometryEntries.length&&info.extent?.wgs84){const e=info.extent.wgs84,b=[[e.south,e.west],[e.north,e.east]];entry.layer=L.rectangle(b,{weight:2,fillOpacity:0,dashArray:'7 6',interactive:false}).addTo(fieldMap);lastBounds=entry.layer.getBounds()}importedMapLayers.push(entry);toast(entry.geometryEntries.length?`CMF2 открыт: ${info.decodedFeatures} объектов · ${entry.geometryEntries.length} слоёв`:`CMF2 открыт, но геометрия этого файла не распознана`);continue}
 if(detected==='gpkg'){const pack=await openGeoPackageFile(file);if(!pack.layers.length)throw new Error('В GeoPackage нет векторных таблиц');for(const t of pack.layers){const e=addGeoLayer(`${file.name} › ${t.name}`,t.geojson,`${baseKey}|${t.name}`,'GPKG');e.fileKey=baseKey;added+=e.count;const b=e.layer.getBounds();if(b?.isValid())lastBounds=b}toast(`GeoPackage открыт: ${pack.layers.length} слоёв`);continue}
 let geo,format;if(detected==='kmz'){const kml=await SolinMapImport.kmzToKml(file);geo=kmlToGeoJSON(kml);format='KMZ'}else if(detected==='kml'){geo=kmlToGeoJSON(await file.text());format='KML'}else if(detected==='gpx'){geo=SolinMapImport.gpxToGeoJSON(await file.text());format='GPX'}else if(detected==='geojson'){geo=JSON.parse(await file.text());format='GeoJSON'}else throw new Error(`Формат ${detected||'неизвестен'} пока не читается`);const e=addGeoLayer(file.name,geo,baseKey,format);e.fileKey=baseKey;added+=e.count;const b=e.layer.getBounds();if(b?.isValid())lastBounds=b}catch(e){console.error(e);toast(`${file.name}: ${e.message||'не удалось открыть'}`)}}renderMapLayerList();if(lastBounds?.isValid())fieldMap.fitBounds(lastBounds,{padding:[18,18]});if(added)toast(`Открыто объектов: ${added}`);if(input)input.value=''}
@@ -158,5 +171,45 @@ function installFieldMapTools(map) {
   return panel;
  };
  control.addTo(map);
+}
+
+function createMapInfoLayer({name, geojson, settings}, fileKey, index, count) {
+ const pane = 'mapinfo-' + importedMapLayers.length + '-' + index;
+ fieldMap.createPane(pane).style.zIndex = String(410 + (count - index) / count * 80 | 0);
+ const color = value => '#' + Number(value).toString(16).padStart(6, '0');
+ const globalPen = settings.match(/^\s*Global\b[^\r\n]*?\bPen\s*\((\d+),(\d+),(\d+)\)/im);
+ const globalBrush = settings.match(/^\s*Global\b[^\r\n]*?\bBrush\s*\((\d+),(\d+)/im);
+ const globalSymbol = settings.match(/^\s*Global\b[^\r\n]*?\bSymbol\s*\(\d+,(\d+),(\d+)/im);
+ function style(feature) {
+  const ogr = feature.properties?.solin_mapinfo_style || '';
+  const pen = ogr.match(/PEN\([^)]*?c:(#[\da-f]{6})/i);
+  const brush = ogr.match(/BRUSH\([^)]*?fc:(#[\da-f]{6})/i);
+  return {
+   color: globalPen ? color(globalPen[3]) : pen?.[1] || '#333333',
+   weight: globalPen ? Math.min(8, Number(globalPen[1])) : 2,
+   fillColor: globalBrush ? color(globalBrush[2]) : brush?.[1] || '#738b93',
+   fillOpacity: globalBrush?.[1] === '1' ? 0 : 0.35
+  };
+ }
+ const group = L.geoJSON(geojson, {
+  pane, smoothFactor:0, style,
+  pointToLayer(feature, latlng) {
+   const ogr = feature.properties?.solin_mapinfo_style || '';
+   const label = ogr.match(/LABEL\(t:"((?:[^"\\]|\\.)*)"/);
+   if (label) {
+    const text = document.createElement('span');
+    text.textContent = label[1].replace(/\\(["\\])/g, '$1').trim();
+    text.style.color = ogr.match(/,c:(#[\da-f]{6})/i)?.[1] || '#111';
+    text.style.fontWeight = ogr.includes(',bo:1') ? 'bold' : 'normal';
+    text.style.textShadow = '0 0 2px white, 0 0 2px white';
+    return L.marker(latlng, {pane, icon:L.divIcon({className:'mapinfo-label', html:text, iconSize:[0,0]})});
+   }
+   const symbolColor = ogr.match(/SYMBOL\([^)]*?c:(#[\da-f]{6})/i)?.[1];
+   return L.circleMarker(latlng, {pane, radius:globalSymbol ? Math.min(10, Number(globalSymbol[2]) / 2) : 4,
+    color:globalSymbol ? color(globalSymbol[1]) : symbolColor || '#333', fillOpacity:.85});
+  },
+  onEachFeature:bindImportedFeature
+ });
+ return {fileKey, name, count:geojson.features.length, layer:group, visible:!/^\s*Display\s+Off/im.test(settings), format:'MapInfo'};
 }
 
