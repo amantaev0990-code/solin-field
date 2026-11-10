@@ -72,10 +72,11 @@ async function runInWebView(url) {
 
 async function main() {
  adb('install', '-r', 'android/app/build/outputs/apk/debug/app-debug.apk');
- adb('shell', 'am', 'start', '-n', pkg + '/kz.solin.field.MainActivity');
- let port;
+ console.log(adb('shell', 'am', 'start', '-W', '-n', pkg + '/kz.solin.field.MainActivity'));
+ let port, previousPid;
  for (let attempt = 0; attempt < 30; attempt++) {
-  const pid = adb('shell', 'pidof', pkg).split(/\s+/)[0];
+  const pid = adb('shell', 'pidof ' + pkg + ' || true').split(/\s+/)[0];
+  if (pid !== previousPid) { port = undefined; previousPid = pid; }
   if (pid) {
    port ||= adb('forward', 'tcp:0', 'localabstract:webview_devtools_remote_' + pid);
    const pages = await fetch('http://127.0.0.1:' + port + '/json/list')
@@ -85,6 +86,7 @@ async function main() {
   }
   await delay(2000);
  }
+ console.error(adb('logcat', '-d', '-t', '200', 'AndroidRuntime:E', '*:S'));
  throw Error('Could not connect to Android WebView');
 }
 main().catch(error => {console.error(error);process.exitCode = 1;});
