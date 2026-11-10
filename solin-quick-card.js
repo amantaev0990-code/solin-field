@@ -126,6 +126,59 @@
       '</div>' + additional + '</div></section><footer><button type="button" id="kt-exit">Выход</button></footer></article>';
   }
 
+  function openKT(records, index = 0) {
+    const arrows = records.length > 1;
+    openModal('ВыделКрат', '<div class="kt-view"></div>', {confirmChanges:false});
+    const view = document.querySelector('#modalBody .kt-view');
+    const sheet = document.createElement('div');
+    sheet.className = 'kt-sheet-scroll';
+    const nav = document.createElement('nav');
+    nav.className = 'kt-review-nav';
+    nav.setAttribute('aria-label','Просмотр выделов квартала');
+    const previous = button('← Предыдущий', () => move(-1));
+    const next = button('Следующий →', () => move(1));
+    const status = document.createElement('span');
+    status.setAttribute('aria-live','polite');
+    if (arrows) view.append(nav);
+    nav.append(previous,status,next);
+    view.append(sheet);
+    function render() {
+      const record = records[index];
+      const forest = D.lesnichestvo?.find(item => String(item.POS) === String(record.POS) && String(item.LESN) === String(record.LESN));
+      sheet.innerHTML = preview(record,forest);
+      sheet.scrollTop = 0;
+      sheet.querySelector('#kt-exit').onclick = () => closeModal();
+      status.textContent = 'Выдел ' + record.VD + ' · ' + (index + 1) + ' из ' + records.length;
+      previous.disabled = index === 0;
+      next.disabled = index === records.length - 1;
+    }
+    function move(delta) {
+      if (index + delta < 0 || index + delta >= records.length) return;
+      index += delta;
+      render();
+    }
+    if (arrows) view.addEventListener('keydown', event => {
+      if (!['ArrowLeft','ArrowRight'].includes(event.key)) return;
+      event.preventDefault();
+      move(event.key === 'ArrowLeft' ? -1 : 1);
+    });
+    render();
+    if (arrows) next.focus();
+  }
+
+  function mountQuarterKT(key) {
+    const actions = document.querySelector('#quarters .quarter-head-actions');
+    const records = D.quarters?.[key]?.compartments;
+    if (!actions || !records || actions.querySelector('.kt-quarter-button')) return;
+    const ordered = [...records].sort((a,b) =>
+      String(a.VD).localeCompare(String(b.VD),'ru',{numeric:true}) ||
+      String(a.KGLF).localeCompare(String(b.KGLF),'ru',{numeric:true}));
+    const control = button('КТ', () => openKT(ordered), 'kt-quarter-button');
+    control.disabled = ordered.length === 0;
+    control.setAttribute('aria-label','КТ — просмотр выделов квартала');
+    actions.prepend(control);
+  }
+
   function refresh() {
     const card = document.getElementById('card');
     const edit = card.querySelector('#wfEditBase');
@@ -140,15 +193,18 @@
       const saved = D.quarters?.[String(current.KV)]?.compartments?.includes(current);
       window.SolinCardEditor.open(current, {isNew:!saved, quick:true});
     }, 'wf-primary'));
-    if (!footer.querySelector('.kt-button')) footer.append(button('КТ', () => {
-      const forest = D.lesnichestvo?.find(item => String(item.POS) === String(current.POS) && String(item.LESN) === String(current.LESN));
-      openModal('ВыделКрат', preview(current,forest), {confirmChanges:false});
-      document.getElementById('kt-exit').onclick = () => closeModal();
-    }, 'v37-new-stand-button kt-button'));
+    if (!footer.querySelector('.kt-button'))
+      footer.append(button('КТ', () => openKT([current]), 'v37-new-stand-button kt-button'));
   }
 
   window.SolinQuickCard = {mount};
   function init() {
+    const openQuarter = window.openQuarter;
+    window.openQuarter = function(key,...args) {
+      const result = openQuarter.call(this,key,...args);
+      queueMicrotask(() => mountQuarterKT(key));
+      return result;
+    };
     const render = window.renderComp;
     window.renderComp = function(...args) {
       const result = render.apply(this,args);

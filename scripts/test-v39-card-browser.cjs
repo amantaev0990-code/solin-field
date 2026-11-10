@@ -108,6 +108,20 @@ const server = http.createServer(async (request, response) => {
     await page.waitForFunction(() => current?._local === true);
     await card.getByRole('button',{name:'Быстрый ввод',exact:true}).click();
     assert.ok(await form.locator('input[data-ce-field="VD"]').isVisible());
+    await page.locator('#ce-cancel').click();
+    await page.locator('#modal').waitFor({state:'hidden'});
+    await page.evaluate(key => {window.show('quartersScreen');openQuarter(key);}, context.key);
+    await page.getByRole('button',{name:'КТ — просмотр выделов квартала'}).click();
+    const nav = page.locator('.kt-review-nav');
+    const prev = nav.getByRole('button',{name:/Предыдущий/});
+    const next = nav.getByRole('button',{name:/Следующий/});
+    assert.ok(await prev.isDisabled());
+    assert.match(await nav.locator('span').textContent(), / · 1 из \d+$/);
+    await next.click();
+    assert.match(await nav.locator('span').textContent(), / · 2 из \d+$/);
+    await prev.click();
+    assert.ok(await prev.isDisabled());
+
     console.log('V39 browser PASS: read-only KT, keyboard and screen Enter, Maket 23, complete editor and new stand');
   } finally {
     await browser?.close();

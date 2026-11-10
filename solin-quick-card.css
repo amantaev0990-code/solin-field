@@ -39,3 +39,10 @@
 .kt-extra-row {display:grid;grid-template-columns:26px repeat(8,minmax(0,1fr));gap:8px;text-align:center;align-items:center;}
 .kt-sheet footer {border-top:1px solid #000;display:flex;justify-content:flex-end;padding:5px 48px;}
 .kt-sheet footer button {border:1px solid #aaa;border-radius:0;background:#ddd;color:red;font:bold 15px Arial;min-width:84px;}
+
+#quarters .kt-quarter-button {background:#175bb0;color:#fff;min-width:54px;min-height:44px;}
+#quarters .kt-quarter-button:disabled {opacity:.45;}
+.kt-review-nav {display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;background:#fff;}
+.kt-review-nav button {min-height:44px;}
+.kt-review-nav span {text-align:center;}
+.kt-sheet-scroll {overflow:auto;max-height:74dvh;}
