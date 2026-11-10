@@ -80,6 +80,9 @@ function initFieldMap(){
  watchBaseTiles(baseOSM);
  setBaseMap(onlineBase);
  installFieldMapTools(fieldMap);
+ const labels = () => container.classList.toggle('mapinfo-hide-labels', fieldMap.getZoom() < 12);
+ fieldMap.on('zoomend', labels);
+ labels();
  renderMapLayerList();
  void loadMapOverview(fieldMap).catch(error=>console.warn(error.message));
  void window.SolinOfflineImagery?.attach?.(fieldMap);
@@ -294,6 +297,7 @@ function installFieldMapTools(map) {
 
   function setMode(next) {
    mode = next;
+   map.getContainer().dataset.mapTool = mode;
    markButton.setAttribute('aria-pressed', String(mode === 'mark'));
    rulerButton.setAttribute('aria-pressed', String(mode === 'ruler'));
    updateStatus();
@@ -355,9 +359,13 @@ function installFieldMapTools(map) {
  control.addTo(map);
 }
 
+let mapInfoPaneId = 0;
 function createMapInfoLayer({name, geojson, settings}, fileKey, index, count) {
- const pane = 'mapinfo-' + importedMapLayers.length + '-' + index;
+ const pane = 'mapinfo-' + (++mapInfoPaneId);
  fieldMap.createPane(pane).style.zIndex = String(410 + (count - index) / count * 80 | 0);
+ const renderer = L.canvas({pane, padding:0.1});
+ const isStandLayer = /(?:^|_)выдпл$/i.test(name);
+ if (!isStandLayer) fieldMap.getPane(pane).style.pointerEvents = 'none';
  const color = value => '#' + Number(value).toString(16).padStart(6, '0');
  const globalPen = settings.match(/^\s*Global\b[^\r\n]*?\bPen\s*\((\d+),(\d+),(\d+)\)/im);
  const globalBrush = settings.match(/^\s*Global\b[^\r\n]*?\bBrush\s*\((\d+),(\d+)/im);
@@ -374,7 +382,7 @@ function createMapInfoLayer({name, geojson, settings}, fileKey, index, count) {
   };
  }
  const group = L.geoJSON(geojson, {
-  pane, smoothFactor:0, style,
+  pane, renderer, smoothFactor:0, style, interactive:isStandLayer,
   pointToLayer(feature, latlng) {
    const ogr = feature.properties?.solin_mapinfo_style || '';
    const label = ogr.match(/LABEL\(t:"((?:[^"\\]|\\.)*)"/);
@@ -383,16 +391,44 @@ function createMapInfoLayer({name, geojson, settings}, fileKey, index, count) {
     text.textContent = label[1].replace(/\\(["\\])/g, '$1').trim();
     text.style.color = ogr.match(/,c:(#[\da-f]{6})/i)?.[1] || '#111';
     text.style.fontWeight = ogr.includes(',bo:1') ? 'bold' : 'normal';
-    text.style.textShadow = '0 0 2px white, 0 0 2px white';
-    return L.marker(latlng, {pane, icon:L.divIcon({className:'mapinfo-label', html:text, iconSize:[0,0]})});
+    text.style.textShadow = '0 0 2px white';
+    return L.marker(latlng, {pane, interactive:false, icon:L.divIcon({className:'mapinfo-label', html:text, iconSize:[0,0]})});
    }
    const symbolColor = ogr.match(/SYMBOL\([^)]*?c:(#[\da-f]{6})/i)?.[1];
-   return L.circleMarker(latlng, {pane, radius:globalSymbol ? Math.min(10, Number(globalSymbol[2]) / 2) : 4,
+   return L.circleMarker(latlng, {pane, renderer, interactive:false, radius:globalSymbol ? Math.min(10, Number(globalSymbol[2]) / 2) : 4,
     color:globalSymbol ? color(globalSymbol[1]) : symbolColor || '#333', fillOpacity:.85});
   },
-  onEachFeature:bindImportedFeature
+  onEachFeature(feature, layer) {
+   if (!isStandLayer || !/Polygon$/.test(feature.geometry?.type || '')) return;
+   layer.on('click', event => {
+    if (fieldMap.getContainer().dataset.mapTool) return;
+    const stand = {...feature, properties:{...feature.properties, _mapInfoLayer:name}};
+    showCmfSheet(stand, event.latlng, layer);
+   });
+  }
  });
- return {fileKey, name, count:geojson.features.length, layer:group, visible:!/^\s*Display\s+Off/im.test(settings), format:'MapInfo'};
+ return {pane, renderer, fileKey, name, count:geojson.features.length, layer:group, visible:!/^\s*Display\s+Off/im.test(settings), format:'MapInfo'};
+}
+
+function removeMapFileLayers(removeKey, keepKey) {
+ if (!fieldMap) return;
+ for (let i = importedMapLayers.length - 1; i >= 0; i--) {
+  const entry = importedMapLayers[i];
+  const key = entry.fileKey || entry.key;
+  if (keepKey ? key === keepKey : key !== removeKey) continue;
+  for (const layer of [entry.layer, ...(entry.geometryEntries || []).map(item => item.layer),
+   ...Object.values(entry.labelLayers || {}), entry.renderer]) {
+   if (layer) fieldMap.removeLayer(layer);
+  }
+  if (entry.pane) {
+   fieldMap.getPane(entry.pane)?.remove();
+   delete fieldMap.getPanes()[entry.pane];
+  }
+  importedMapLayers.splice(i,1);
+ }
+ window.clearCmfSelection?.();
+ window.closeCmfSheet?.();
+ renderMapLayerList();
 }
 
 function setMapImportStatus(message) {
