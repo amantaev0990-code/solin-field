@@ -14,7 +14,7 @@ on:
       source_ref:
         description: 'Reviewed source branch or commit'
         required: true
-        default: 'd3fbb01f221e78661a3e2b9b1255276722b3c61c'
+        default: 'd0668508fc3e9a814f610f887f19c740f29300f3'
         type: string
       version_code:
         description: 'Android versionCode: auto or explicit numeric value'
@@ -57,7 +57,7 @@ jobs:
           if [[ "$EVENT" = push && "$TAG" = main ]]; then
             # A self-check verifies signing but cannot publish a release.
             CODE='auto'
-            SOURCE='d3fbb01f221e78661a3e2b9b1255276722b3c61c'
+            SOURCE='d0668508fc3e9a814f610f887f19c740f29300f3'
           elif [[ "$EVENT" = push ]]; then
             [[ "$TAG" =~ ^solin-field-v([0-9]{6,9})$ ]] || { echo "::error::Invalid tag"; exit 1; }
             CODE="${BASH_REMATCH[1]}"
@@ -129,6 +129,7 @@ jobs:
           if [[ -f scripts/test-v34-regressions.cjs ]]; then node scripts/test-v34-regressions.cjs; fi
           if [[ -f scripts/test-v35-selects.cjs ]]; then node scripts/test-v35-selects.cjs; fi
           if [[ -f scripts/test-v36-http-retry.cjs ]]; then node scripts/test-v36-http-retry.cjs; fi
+          if [[ -f scripts/test-v37-ui.cjs ]]; then node scripts/test-v37-ui.cjs; fi
           node scripts/test-card-calculations.cjs
           node scripts/test-quarter-geography-selects.cjs
           node scripts/test-stand-quick-makets.cjs
@@ -199,6 +200,10 @@ jobs:
               node scripts/patch-v36-seed.cjs
               node scripts/test-v36-http-retry.cjs --built
             fi
+            if [[ -f scripts/patch-v37-seed.cjs ]]; then
+              node scripts/patch-v37-seed.cjs
+              node scripts/test-v37-ui.cjs --built
+            fi
             # V36 end of feature overlay
           fi
           npx cap add android
@@ -214,6 +219,7 @@ jobs:
           if [[ -f scripts/test-v33-ux.cjs ]]; then node scripts/test-v33-ux.cjs --android; fi
           if [[ -f scripts/test-v34-regressions.cjs ]]; then node scripts/test-v34-regressions.cjs --android; fi
           if [[ -f scripts/test-v36-http-retry.cjs ]]; then node scripts/test-v36-http-retry.cjs --android; fi
+          if [[ -f scripts/test-v37-ui.cjs ]]; then node scripts/test-v37-ui.cjs --android; fi
           grep -q 'applicationId "kz.solin.field.v23build"' android/app/build.gradle
           grep -q 'versionCode ${{ steps.meta.outputs.code }}' android/app/build.gradle
 
