@@ -60,7 +60,7 @@ const quarterRecord={KV:213,KGLF:7,VD:1,POS:213,LESN:2,_children:{Макет10:[
 const quarter={compartments:[quarterRecord],meta:{KGLF:7}};
 const database={quarters:{213:quarter}};
 let standArgs=[],toastMessages=[],created=0;
-window.eval('let current = '+JSON.stringify(quarterRecord)+'; let D = '+JSON.stringify(database)+';');
+window.eval('var current = '+JSON.stringify(quarterRecord)+'; var D = '+JSON.stringify(database)+';');
 window.eval('current=D.quarters["213"].compartments[0];');
 window.show=function(id){
  document.querySelector('.screen.active')?.classList.remove('active');
