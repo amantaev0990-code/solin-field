@@ -82,14 +82,16 @@ jobs:
           node scripts/test-card-calculations.cjs
           node scripts/test-quarter-geography-selects.cjs
           node scripts/test-stand-quick-makets.cjs
-          gh release download solin-field-v230022 --repo amantaev0990-code/solin-field \
+          gh release download solin-field-v230021 --repo amantaev0990-code/solin-field \
             --pattern SOLIN-Field-update.apk --dir "$RUNNER_TEMP/v38"
           BASE="$RUNNER_TEMP/v38/SOLIN-Field-update.apk"
           printf '%s  %s\n' 'b5ab14838a742c413d62e1e139b728bc7583db98d2bbd51bf8baff44babfdc00' "$BASE" | sha256sum -c -
           unzip -q "$BASE" 'assets/public/*' -d "$RUNNER_TEMP/v38"
           mv "$RUNNER_TEMP/v38/assets/public" www
           npm install --no-save --no-audit --no-fund playwright@1.56.1
-          cp solin-quick-card.js www/
+          cp map.js solin-quick-card.js www/
+          node --check www/map.js
+          grep -q 'installFieldMapTools(fieldMap)' www/map.js
           node scripts/patch-v42-stock.cjs
           node scripts/test-v42-stock.cjs
           sed -i 's/solin-quick-card.js?v=41/solin-quick-card.js?v=42/; s/solin-card-editor.js?v=39-quick/solin-card-editor.js?v=42-stock/' www/index.html
