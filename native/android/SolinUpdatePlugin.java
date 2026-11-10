@@ -326,6 +326,21 @@ public class SolinUpdatePlugin extends Plugin {
        || host.equals("objects.githubusercontent.com")
        || host.endsWith(".githubusercontent.com"));
   }
+  /** Short bounded retries; the global 4-minute deadline remains authoritative. */
+  private static void retryDelay(UpdateTask task, int attempt) throws IOException {
+    long delay = Math.min(6000L, 600L * (1L << Math.min(attempt, 3)));
+    long until = SystemClock.elapsedRealtime() + delay;
+    while (SystemClock.elapsedRealtime() < until) {
+      task.timeLeft();
+      try {
+        Thread.sleep(Math.min(250L, until - SystemClock.elapsedRealtime()));
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        throw new IOException("Загрузка прервана.", interrupted);
+      }
+    }
+  }
+
   private String downloadApk(String location, File target, UpdateTask task) throws Exception {
     URL url = new URL(location);
     HttpURLConnection conn = null;
@@ -338,7 +353,23 @@ public class SolinUpdatePlugin extends Plugin {
         conn.setConnectTimeout(timeout);
         conn.setReadTimeout(timeout);
         conn.setRequestProperty("Accept", "application/octet-stream");
-        int status = conn.getResponseCode();
+        int status;
+        try {
+          status = conn.getResponseCode();
+        } catch (IOException networkError) {
+          if (attempt >= 6) throw networkError;
+          conn.disconnect();
+          conn = null;
+          retryDelay(task, attempt);
+          continue;
+        }
+        if (status == 502 || status == 503 || status == 504 || status == 429) {
+          if (attempt >= 6) throw new IOException("GitHub временно недоступен (HTTP " + status + "). Повторите позже.");
+          conn.disconnect();
+          conn = null;
+          retryDelay(task, attempt);
+          continue;
+        }
         if (status == 301 || status == 302 || status == 303 || status == 307 || status == 308) {
           String next = conn.getHeaderField("Location");
           if (next == null) throw new SecurityException("Нет адреса перенаправления.");
