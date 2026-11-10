@@ -1,0 +1,138 @@
+name: SOLI-N Field - publish verified V37
+
+# This one-shot promotion uses an already successful signed candidate.
+# It never rebuilds the app, cannot change the signing key, or replace V36.
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/solin-v37-promote.yml']
+
+permissions: {contents: write}
+
+jobs:
+  publish-v37:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: amantaev0990-code/solin-field
+      TAG: solin-field-v230017
+      SOURCE_SHA: 16abc5962b623a6dd69494c01309c3fa1339626a
+    steps:
+      - name: Download exact successful signed candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN=42754363849
+          [[ "$(gh api "repos/$REPO/actions/runs/$RUN" --jq .conclusion)" == success ]] || exit 1
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "::error::V37 already exists; never overwrite a release APK."
+            exit 1
+          fi
+          mkdir -p release
+          gh run download "$RUN" --repo "$REPO" --name SOLIN-Field-SIGNED-230017 --dir release
+          test -s release/SOLIN-Field-update.apk
+          test -s release/SHA256SUMS.txt
+          sha256sum -c release/SHA256SUMS.txt
+
+      - uses: android-actions/setup-android@v3
+        with: {packages: platform-tools}
+
+      - name: Verify native installer, package, permanent key, maps, references
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=release/SOLIN-Field-update.apk
+          TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$TOOLS/apksigner" verify --verbose "$APK"
+          CERT="$("$TOOLS/apksigner" verify --print-certs "$APK" | sed -nE 's/^((Signer #[0-9]+)|(V[0-9.]+ Signer)): certificate SHA-256 digest: //p' | head -n 1 | tr '[:lower:]' '[:upper:]')"
+          [[ "$CERT" == '5A1C2E2BF2EFE5AA7382674B651533A11D2B93C802A1C09ADC72656C5A29ED7E' ]] || exit 1
+          BADGING="$("$TOOLS/aapt" dump badging "$APK" | head -n 1)"
+          [[ "$BADGING" == *"package: name='kz.solin.field.v23build'"* ]] || exit 1
+          [[ "$BADGING" == *"versionCode='230017'"* ]] || exit 1
+          for entry in \
+            'assets/public/maps/213-1.cmf2:67d30ff85d0d49efc9a467efe585f3aae345073724ae5c60aa895e93e4aa02da' \
+            'assets/public/maps/213-2.cmf2:74043a02e2d74f4e69bc6af8f2b9eea6a5c20a18ad93f677179075003a380076' \
+            'assets/public/solin-map-overview.geojson:15e57e7fafa470c62ddb168aadd63817304f1f60bd1f20927358ef4f0a8ccf03' \
+            'assets/public/solin-private-refs.packed.bin:c2705bf1ecfa98b007fdbecd1b8f7be908b73591ee2eccae327cf88629bb60e5'; do
+            file="${entry%%:*}"
+            expected="${entry#*:}"
+            actual="$(unzip -p "$APK" "$file" | sha256sum | cut -d' ' -f1)"
+            [[ "$actual" == "$expected" ]] || { echo "::error::Missing or changed $file"; exit 1; }
+          done
+          for web in 'assets/public/solin-v33-ux.css' 'assets/public/solin-v33-ux.js' 'assets/public/solin-v35-features.js' 'assets/public/solin-v35-motion.css'; do
+            [[ "$(unzip -p "$APK" "$web" | wc -c)" -gt 1000 ]] || {
+              echo "::error::New V37 workspace asset missing: $web"; exit 1;
+            }
+          done
+          # Prove BOTH user-reported V33 failures were corrected INSIDE the
+          # signed APK, not merely in a source branch.
+          unzip -p "$APK" assets/public/solin-v33-ux.css | grep -qF 'V34 CRITICAL HIT-BOX FIX'
+          unzip -p "$APK" assets/public/solin-v33-ux.js | grep -qF 'guardModalOnlyX()'
+          unzip -p "$APK" assets/public/index.html | grep -qF 'solin-v33-ux.js?v=34'
+          unzip -p "$APK" assets/public/solin-usability.js | grep -qF "const bar=document.querySelector('.quickActions');"
+          if unzip -p "$APK" assets/public/solin-usability.js | grep -qF "document.querySelector('.quickActions').style.display"; then
+            echo "::error::V33 null-style crash still present in signed APK"
+            exit 1
+          fi
+          for spec in \
+            'assets/public/solin-v35-features.js|chooseGroup(groups)' \
+            'assets/public/solin-v35-features.js|v35-screen-in' \
+            'assets/public/solin-v35-motion.css|v35-dialog-enter' \
+            'assets/public/solin-card-assist.js|openFieldByKey(field)' \
+            'assets/public/solin-dependent-rules.js|const fallback=!original' \
+            'assets/public/solin-dependent-rules.js|const ambiguous=!groupKnown&&groups.length>1' \
+            'assets/public/index.html|solin-v35-features.js?v=35'; do
+            entry="${spec%%|*}"
+            pattern="${spec#*|}"
+            payload="$(unzip -p "$APK" "$entry")"
+            [[ "$payload" == *"$pattern"* ]] || { echo "::error::Missing V37 integration: $entry / $pattern"; exit 1; }
+          done
+          # Verify that the NEW signed web payload has the bounded retry
+          # and progress behavior, not just the source branch.
+          for check in \
+            'assets/public/solin-updates.js|temporaryHttp' \
+            'assets/public/solin-updates.js|progressHandle' \
+            'assets/public/solin-updates.js|versionCode: release.versionCode' \
+            'assets/public/index.html|solin-updates.js?v=36-github-retry'; do
+            file="${check%%|*}"
+            pattern="${check#*|}"
+            content="$(unzip -p "$APK" "$file")"
+            [[ "$content" == *"$pattern"* ]] || {
+              echo "::error::Missing signed V37 updater feature: $file $pattern"
+              exit 1
+            }
+          done
+          for feature in \
+            'assets/public/solin-v37-ui.js|function navigationBack()' \
+            'assets/public/solin-v37-ui.js|window.openCompForm(k,cat)' \
+            'assets/public/solin-v37-ui.js|v37-menu-ready' \
+            'assets/public/solin-v37-ui.css|#modal.ce-modal #ce-section-10 .ce-v23-species' \
+            'assets/public/solin-v37-ui.css|.v37-new-stand-button' \
+            'assets/public/app.js|const existing=quarter.compartments||[];' \
+            'assets/public/index.html|solin-v37-ui.js?v=37' \
+            'assets/public/index.html|id="solin-v37-startup"'; do
+            file="${feature%%|*}"
+            pattern="${feature#*|}"
+            payload="$(unzip -p "$APK" "$file")"
+            [[ "$payload" == *"$pattern"* ]] || {
+              echo "::error::V37 feature missing in signed APK: $file / $pattern"
+              exit 1
+            }
+          done
+          echo 'V37 signed APK: five new UI controls and Back router, original V35 data and V36 updater verified.'
+
+      - name: Publish exactly the verified V36 APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          LATEST="$(gh api "repos/$REPO/releases/latest" --jq .tag_name)"
+          [[ "$LATEST" == 'solin-field-v230016' ]] || { echo "::error::Unexpected latest release: $LATEST"; exit 1; }
+          gh release create "$TAG" release/SOLIN-Field-update.apk release/SHA256SUMS.txt \
+            --repo "$REPO" --target "$SOURCE_SHA" --latest \
+            --title 'SOLI-N Field V37 — новое меню, Назад и красная кнопка Новая' \
+            --notes 'V37: при запуске больше не мелькает старое главное меню; название Головное меню заменено на Главное меню. Android Назад и системный жест перемещают по экранам внутри приложения и не закрывают Activity, а открытые окна закрываются только крестиком с существующим подтверждением несохранённых правок. Дубли главной породы и характеристики типа леса скрыты из раздела Основные данные, рабочий выбор остаётся в Макете 3. Внизу открытого сохранённого выдела красная кнопка Новая создаёт отдельную несохранённую карточку в том же квартале и категории ГЛФ со следующим уникальным номером. Размер APK не ограничен 27 МБ (допускается до 150 МБ). Сохраняются V36 обновлялка, пароль подписи вне APK, обе карты, справочники, MDB/Transfer и расчёты. Это проверено автоматическими тестами и подписью APK; тест на конкретном планшете ещё требуется. Рекомендуется резервная копия полевых данных; приложение не удаляйте. Предупреждения Google Play Защиты пока отдельно не устранены.'
+          EXPECTED="sha256:$(sha256sum release/SOLIN-Field-update.apk | cut -d' ' -f1)"
+          ACTUAL="$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.assets[] | select(.name=="SOLIN-Field-update.apk") | .digest')"
+          [[ "$EXPECTED" == "$ACTUAL" ]] || { echo "::error::Uploaded GitHub APK digest differs"; exit 1; }
+          echo 'Public release V37 is verified and immutable by convention.'
