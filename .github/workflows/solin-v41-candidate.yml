@@ -1,4 +1,4 @@
-name: SOLI-N Field - verify and sign V41 candidate
+name: SOLI-N Field - verify and publish V41
 
 # Preserve the published V37 source and acceptance fixtures.
 on:
@@ -173,11 +173,11 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  sign:
+  sign-and-publish:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    permissions: {contents: read}
+    permissions: {contents: write}
     env:
       SOLIN_V23_KEYSTORE_PASSWORD: ${{ secrets.SOLIN_V23_KEYSTORE_PASSWORD }}
       CODE: ${{ needs.build.outputs.code }}
@@ -267,4 +267,27 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-
+      - name: Publish signed update to GitHub Releases
+        shell: bash
+        env:
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          [[ "$REPO" = 'amantaev0990-code/solin-field' ]] || exit 1
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "::error::Release already exists. Do not overwrite an existing APK."
+            exit 1
+          fi
+          LATEST="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name' 2>/dev/null || true)"
+          if [[ "$LATEST" != "solin-field-v230020" ]]; then
+            echo "::error::Expected the published V40 as latest release"
+            exit 1
+          fi
+          gh release create "$TAG" release/SOLIN-Field-update.apk release/SHA256SUMS.txt \
+            --repo "$REPO" --target "$SOURCE_SHA" --latest \
+            --title "SOLI-N Field V41 — просмотр КТ квартала" \
+            --notes 'Синяя КТ внизу открытого квартала. Листайте карточки всех выделов квартала по порядку.'
+          EXPECTED="sha256:$(sha256sum release/SOLIN-Field-update.apk | cut -d' ' -f1)"
+          ACTUAL="$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.assets[] | select(.name=="SOLIN-Field-update.apk") | .digest')"
+          [[ "$ACTUAL" = "$EXPECTED" ]] || { echo "::error::Published APK digest differs"; exit 1; }
+          echo 'Signed APK is discoverable by the in-app update button.'

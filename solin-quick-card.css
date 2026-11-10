@@ -1,6 +1,6 @@
 #card .v37-new-stand-footer > button {width:165px;flex:0 1 165px;}
-#card .v37-new-stand-footer .kt-button {background:#175bb0;border-color:#124886;}
-#card .v37-new-stand-footer .kt-button:hover {background:#124886;}
+:is(#card,#quarters) .v37-new-stand-footer .kt-button {background:#175bb0;border-color:#124886;}
+:is(#card,#quarters) .v37-new-stand-footer .kt-button:hover {background:#124886;}
 .quick-card-nav {display:flex;gap:6px;align-items:center;padding:6px;overflow-x:auto;flex:none;}
 .quick-card-nav button {min-height:38px;white-space:nowrap;}
 .quick-card-nav button[aria-pressed="true"], .quick-card-nav .quick-card-enter {background:#155b46;color:white;}
@@ -40,7 +40,8 @@
 .kt-sheet footer {border-top:1px solid #000;display:flex;justify-content:flex-end;padding:5px 48px;}
 .kt-sheet footer button {border:1px solid #aaa;border-radius:0;background:#ddd;color:red;font:bold 15px Arial;min-width:84px;}
 
-#quarters .kt-quarter-button {background:#175bb0;color:#fff;min-width:54px;min-height:44px;}
+#quarters .kt-quarter-footer {display:flex;justify-content:flex-end;padding:12px clamp(12px,2vw,20px);border-top:1px solid #d5ddd6;background:#f8faf8;}
+#quarters .kt-quarter-button {width:165px;min-height:52px;border:1px solid #124886;border-radius:10px;color:#fff;font:750 17px/1.2 system-ui;touch-action:manipulation;}
 #quarters .kt-quarter-button:disabled {opacity:.45;}
 .kt-review-nav {display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;background:#fff;}
 .kt-review-nav button {min-height:44px;}

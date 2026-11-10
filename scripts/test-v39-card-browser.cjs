@@ -111,7 +111,9 @@ const server = http.createServer(async (request, response) => {
     await page.locator('#ce-cancel').click();
     await page.locator('#modal').waitFor({state:'hidden'});
     await page.evaluate(key => {window.show('quartersScreen');openQuarter(key);}, context.key);
-    await page.getByRole('button',{name:'КТ — просмотр выделов квартала'}).click();
+    const quarterKT = page.locator('#quarters > .kt-quarter-footer:last-child').getByRole('button',{name:'КТ — просмотр выделов квартала'});
+    assert.equal(await quarterKT.evaluate(button => getComputedStyle(button).backgroundColor), 'rgb(23, 91, 176)');
+    await quarterKT.click();
     const nav = page.locator('.kt-review-nav');
     const prev = nav.getByRole('button',{name:/Предыдущий/});
     const next = nav.getByRole('button',{name:/Следующий/});

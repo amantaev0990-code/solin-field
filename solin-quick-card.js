@@ -167,16 +167,19 @@
   }
 
   function mountQuarterKT(key) {
-    const actions = document.querySelector('#quarters .quarter-head-actions');
+    const quarter = document.querySelector('#quarters');
     const records = D.quarters?.[key]?.compartments;
-    if (!actions || !records || actions.querySelector('.kt-quarter-button')) return;
+    if (!quarter?.querySelector('.quarter-head-actions') || !records || quarter.querySelector('.kt-quarter-button')) return;
     const ordered = [...records].sort((a,b) =>
       String(a.VD).localeCompare(String(b.VD),'ru',{numeric:true}) ||
       String(a.KGLF).localeCompare(String(b.KGLF),'ru',{numeric:true}));
-    const control = button('КТ', () => openKT(ordered), 'kt-quarter-button');
+    const control = button('КТ', () => openKT(ordered), 'v37-new-stand-button kt-button kt-quarter-button');
     control.disabled = ordered.length === 0;
     control.setAttribute('aria-label','КТ — просмотр выделов квартала');
-    actions.prepend(control);
+    const footer = document.createElement('div');
+    footer.className = 'v37-new-stand-footer kt-quarter-footer';
+    footer.append(control);
+    quarter.append(footer);
   }
 
   function refresh() {
