@@ -169,22 +169,18 @@ if (process.env.SOLIN_GITHUB_UPDATES === '1') {
    const marker='    super.onCreate(state);';
    if(!main.includes(marker))throw Error('Expected BridgeActivity onCreate marker missing');
    const hook=`
-    // SolinOnlyXBackDispatcher: hold Android Back while a modal is active.
+    // SolinOnlyXBackDispatcher: Android Back NEVER exits the application.
+    // The WebView router navigates to the previous screen, but leaves dialogs
+    // open for the explicitly visible X button and confirmation of drafts.
     getOnBackPressedDispatcher().addCallback(this,
         new androidx.activity.OnBackPressedCallback(true) {
           @Override public void handleOnBackPressed() {
             android.webkit.WebView w = getBridge() == null ? null : getBridge().getWebView();
-            if (w == null) { passToSystem(); return; }
+            if (w == null) return;
             w.evaluateJavascript(
-                "(function(){var m=document.getElementById('modal');return Boolean("
-                + "document.getElementById('solin-v23-leave-confirm')"
-                + "||(m&&!m.classList.contains('hidden')));})()",
-                response -> { if (!"true".equals(response)) passToSystem(); });
-          }
-          private void passToSystem() {
-            setEnabled(false);
-            try { getOnBackPressedDispatcher().onBackPressed(); }
-            finally { setEnabled(true); }
+                "(function(){try{return window.SolinV37&&window.SolinV37.back"
+                + "?window.SolinV37.back():'blocked-root';}"
+                + "catch(e){return 'blocked-error';}})()", null);
           }
         });
 `;
