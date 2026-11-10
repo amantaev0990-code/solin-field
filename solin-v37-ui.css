@@ -1,0 +1,68 @@
+/* SOLI-N Field V37, designed for Android tablet.
+   Avoid drawing any pre-V33 menu before the working layout is mounted.
+   Keep a timed fallback for failed DOM initialisation, rather than a blank app.
+*/
+html:not(.v37-menu-ready):not(.v37-menu-fallback) .screen.active {
+ visibility:hidden!important;
+ pointer-events:none!important;
+}
+/* There is ONE visible species/type pair: the functional Maket 3 controls.
+   Maket 10's original form controls remain hidden as its single data source
+   for dependent validation and the fullscreen reference picker.
+*/
+#modal.ce-modal #ce-section-10 .ce-v23-species {
+ display:none!important;
+ visibility:hidden!important;
+}
+#card .v37-new-stand-footer {
+ display:flex;
+ justify-content:flex-end;
+ align-items:center;
+ gap:12px;
+ position:sticky;
+ bottom:0;
+ z-index:15;
+ min-height:75px;
+ margin-top:14px;
+ padding:12px clamp(12px,2vw,20px);
+ background:linear-gradient(180deg,rgba(248,250,248,.94),#f8faf8);
+ border-top:1px solid #d5ddd6;
+ backdrop-filter:none;
+}
+#card .v37-new-stand-button {
+ appearance:none;
+ display:inline-flex;
+ align-items:center;
+ justify-content:center;
+ min-width:165px;
+ min-height:52px;
+ margin:0;
+ border:1px solid #9b1025;
+ border-radius:10px;
+ padding:12px 25px;
+ background:#bd1f32;
+ color:#fff;
+ font:750 17px/1.2 system-ui,-apple-system,Arial,sans-serif;
+ box-shadow:0 3px 8px #54101d2d;
+ cursor:pointer;
+ touch-action:manipulation;
+ transition:background-color .16s ease,transform .16s ease,box-shadow .16s ease;
+}
+#card .v37-new-stand-button:enabled:hover {
+ background:#a9172b;
+ box-shadow:0 5px 13px #54101d36;
+}
+#card .v37-new-stand-button:enabled:active {transform:scale(.98);}
+#card .v37-new-stand-button:focus-visible {
+ outline:3px solid #f3a6b0;outline-offset:3px;
+}
+#card .v37-new-stand-button:disabled {
+ background:#bc858b;border-color:#a37a7f;cursor:not-allowed;box-shadow:none;
+}
+@media(max-width:600px){
+ #card .v37-new-stand-footer{padding:10px 12px;min-height:68px;}
+ #card .v37-new-stand-button{min-height:48px;width:100%;}
+}
+@media(prefers-reduced-motion:reduce){
+ #card .v37-new-stand-button{transition:none;}
+}
