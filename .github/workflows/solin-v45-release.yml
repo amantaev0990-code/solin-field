@@ -4,7 +4,7 @@ name: SOLI-N Field - verify and publish V45
 on:
   push:
     branches: [v45-mapinfo-fix]
-    paths: ['.github/workflows/solin-v45-release.yml']
+    paths: ['.github/workflows/solin-v45-release.yml', 'scripts/test-v45-mapinfo-emulator.cjs', 'map.js', 'universal-import.js']
 
 permissions:
   contents: read
