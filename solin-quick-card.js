@@ -86,11 +86,24 @@
   const cells = (record, columns) => columns.map(([name,key]) => value(name,record[key])).join('');
   const block = (id, record, columns) => '<div class="kt-block"><b>' + id + '</b>' + cells(record,columns) + '</div>';
   const stand = [['Ярус','IAR'],['Коэф.','KOEF'],['Порода','POR'],['А, лет','LET'],['Н, м','PH'],['Д, см','PD2'],['Класс товар.','KT'],['Происхожд.','PROI'],['Полнота','POL'],['Пл. сеч.','SPS'],['Запас, м³/га','ZAP']];
+  function standValue(row, key) {
+    const raw = row[key];
+    if (key !== 'POL' || raw == null || String(raw).trim() === '') return raw;
+    const number = Number(String(raw).replace(',', '.'));
+    const tenth = Math.round(number * 10) / 10;
+    // Access Single imports can carry the binary approximation of a tenth.
+    // Keep actual extra precision and whole-number survival percentages.
+    if (tenth >= 0.1 && tenth <= 1 && Math.abs(number - tenth) < 1e-7) {
+      return typeof raw === 'number' && Number.isInteger(raw) ? raw : String(tenth);
+    }
+    return raw;
+  }
+
   function preview(record, forest) {
     const groups = Object.entries(record._children || {}).filter(([key,rows]) =>
       /^Макет\d+$/.test(key) && key !== 'Макет10' && rows.length);
     const rows = (record._children?.Макет10 || []).map(row =>
-      '<tr>' + stand.map(([,key]) => '<td>' + escape(row[key]) + '</td>').join('') + '</tr>').join('');
+      '<tr>' + stand.map(([,key]) => '<td>' + escape(standValue(row, key)) + '</td>').join('') + '</tr>').join('');
     const additional = groups.flatMap(([key, entries]) => entries.map(row => {
       const columns = (D.transfSchema[key] || Object.keys(row)).filter(field =>
         !['POS','LESN','KV','KGLF','VD'].includes(field));

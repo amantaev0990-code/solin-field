@@ -56,7 +56,22 @@ const server = http.createServer(async (request, response) => {
       return {key, vd:row.VD};
     });
     const card = page.locator('#card.active');
+    const original = await page.evaluate(() => {
+      const rows = current._children.Макет10;
+      const prior = rows.map(row => row.POL);
+      rows[0].POL = '0.699999999999999988079071';
+      rows[1].POL = 65;
+      return prior;
+    });
     await card.getByRole('button',{name:'КТ',exact:true}).click();
+    const pol = page.locator('.kt-stand tbody tr td:nth-child(9)');
+    assert.equal(await pol.nth(0).textContent(), '0.7');
+    assert.equal(await pol.nth(1).textContent(), '65');
+    await page.evaluate(prior => {
+      const rows = current._children.Макет10;
+      if (rows[0].POL !== '0.699999999999999988079071') throw Error('KT changed stored data');
+      prior.forEach((value, i) => { rows[i].POL = value; });
+    }, original);
     await page.locator('.kt-sheet').waitFor();
     assert.equal(await page.locator('.kt-sheet .kt-block output').first().textContent(),String(context.vd));
     await page.getByRole('button',{name:'Выход',exact:true}).click();
