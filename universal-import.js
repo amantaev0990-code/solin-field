@@ -28,7 +28,14 @@
 async function readMapInfoZip(file, openDecoder = loadMapInfoDecoder) {
  const maxBytes = 64 * 1024 * 1024;
  if (file.size > maxBytes) throw Error('ZIP MapInfo больше 64 МБ');
- const zip = await JSZip.loadAsync(await file.arrayBuffer());
+ const utf8 = new TextDecoder('utf-8', {fatal:true});
+ const dosCyrillic = new TextDecoder('ibm866');
+ const zip = await JSZip.loadAsync(await file.arrayBuffer(), {
+  decodeFileName(bytes) {
+   try { return utf8.decode(bytes); }
+   catch { return dosCyrillic.decode(bytes); }
+  }
+ });
  const files = new Map();
  let totalBytes = 0;
  for (const entry of Object.values(zip.files)) {
