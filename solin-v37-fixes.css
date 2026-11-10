@@ -1,0 +1,51 @@
+/* V37 splash prevents the old prototype menu being drawn for one frame. */
+html:not(.v37-ready) .app { visibility:hidden !important; }
+#v37-splash {
+ position:fixed;z-index:2147483000;inset:0;
+ display:flex;flex-direction:column;align-items:center;justify-content:center;
+ gap:14px;padding:24px;background:#f2f5f1;color:#185335;
+ font:600 16px/1.35 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+ text-align:center;
+}
+#v37-splash img {width:96px;height:96px;object-fit:contain;}
+#v37-splash strong {font-size:24px;letter-spacing:-.6px;}
+#v37-splash [data-v37-status] {font-size:13px;font-weight:500;color:#68796d;}
+#v37-splash [data-v37-recover] {
+ min-height:46px;padding:10px 16px;background:#185335;color:white;
+ border:0;border-radius:9px;font:650 15px system-ui,Arial;
+}
+html.v37-ready #v37-splash {display:none!important;}
+/* At the bottom of a selected stand, not inside the taxation editor modal. */
+#card .v37-new-stand {
+ display:flex;justify-content:center;align-items:center;gap:9px;
+ box-sizing:border-box;width:100%;min-height:56px;
+ margin:22px 0 18px;padding:13px 18px;
+ border:1px solid #941d24;border-radius:11px;
+ background:#ba2633;color:#fff;box-shadow:0 3px 11px rgba(108,17,25,.19);
+ cursor:pointer;touch-action:manipulation;
+ font:750 17px/1.25 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+ transition:background-color .15s ease,transform .15s ease,box-shadow .15s ease;
+}
+#card .v37-new-stand:hover,#card .v37-new-stand:focus-visible {
+ background:#9f1d28;outline:2px solid #d3727a;outline-offset:2px;
+}
+#card .v37-new-stand:active {transform:scale(.99);}
+#modal.ce-modal #ce-section-3 .v37-source-search {
+ display:inline-flex;justify-content:center;align-items:center;
+ min-width:85px;min-height:34px;margin:3px 0 1px;padding:5px 11px;
+ background:#e8f3e9;color:#185235;border:1px solid #65a67f;
+ border-radius:7px;cursor:pointer;touch-action:manipulation;
+ font:650 12px system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+}
+#modal.ce-modal #ce-section-3 .v37-source-search:is(:hover,:focus-visible){
+ background:#d8eddf;border-color:#258251;outline-offset:2px;
+}
+#modal.ce-modal #ce-section-3 [data-ce-field="M3Pr"],
+#modal.ce-modal #ce-section-3 [data-ce-field="M3TLU"] {
+ min-height:35px!important;cursor:pointer;
+}
+@media (prefers-reduced-motion: reduce){
+ #card .v37-new-stand, #modal.ce-modal #ce-section-3 .v37-source-search {
+  transition:none!important;transform:none!important;
+ }
+}
