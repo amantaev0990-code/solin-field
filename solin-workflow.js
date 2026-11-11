@@ -91,14 +91,14 @@ function maketSummary(r,m){const rows=rowsOf(r,m),length=rows.length;
 function cardToolbar(){const host=document.querySelector('#childTabs');if(!host||!record())return;
 const others=CORE.filter(m=>m!=='Макет10');
 const tabs='<div class="v25-card-switch" role="navigation" aria-label="Разделы карточки">'+
- '<button type="button" class="v25-stand-switch'+(currentMaket==='Макет10'?' active':'')+'" data-maket="Макет10">Древостой</button>'+
- '<label class="v25-maket-choice">Другие макеты<select id="v25MaketChoice" aria-label="Выбрать другой макет"><option value="">Выбрать…</option>'+
- others.map(m=>'<option value="'+h(m)+'"'+(currentMaket===m?' selected':'')+'>'+h(m.replace('Макет','М'))+' · '+h(window.SolinHuman?.formName(m)||NAMES[m])+'</option>').join('')+
- '</select></label>'+
- '<details class="v25-card-more"><summary>Разделы</summary><div><button type="button" id="wfShowComplete">Вся карточка</button></div></details></div>';
+ '<button type="button"'+(currentMaket==='Макет10'?' class="active" aria-current="true"':'')+' data-maket="Макет10">Основные данные</button>'+
+ '<details class="v25-card-more"><summary>Макеты</summary><div>'+
+ others.map(m=>'<button type="button" data-maket="'+h(m)+'"'+(currentMaket===m?' aria-current="true"':'')+'>'+h(m.replace('Макет','М'))+' · '+h(window.SolinHuman?.formName(m)||NAMES[m])+'</button>').join('')+
+ '<button type="button" id="wfAllMakets">Все макеты</button>'+
+ '<button type="button" id="wfShowComplete">Вся карточка</button></div></details></div>';
 host.innerHTML=tabs;
 host.querySelectorAll('[data-maket]').forEach(b=>b.onclick=()=>openMaket(b.dataset.maket));
-host.querySelector('#v25MaketChoice').onchange=e=>{if(CORE.includes(e.target.value))openMaket(e.target.value);};
+host.querySelector('#wfAllMakets').onclick=()=>window.SolinCardEditor?.openQuick(record(),'makets');
 host.querySelector('#wfShowComplete').onclick=showWholeCard;
 const oldBar=document.querySelector('#humanContent .solinEditBar');
 if(oldBar)oldBar.style.display='none';
@@ -117,7 +117,7 @@ if(content&&!content.querySelector('#wfCardActions')){
    const button=bar.querySelector('#'+id);
    if(button){button.disabled=true;button.title='Сначала сохраните новую карточку';}
   }
-  host.querySelectorAll('button,select').forEach(control=>{control.disabled=true;control.title='Сначала сохраните новую карточку';});
+  host.querySelectorAll('button').forEach(control=>{control.disabled=true;control.title='Сначала сохраните новую карточку';});
  }
  content.prepend(bar);
  bar.querySelector('#wfEditBase').onclick=editBase;
@@ -132,7 +132,7 @@ document.querySelectorAll('[data-cardmak]').forEach(b=>b.onclick=()=>openMaket(b
 function openMaket(m){const r=record();if(!r||!CORE.includes(m))return;currentMaket=m;cardToolbar();
 const rs=rowsOf(r,m),fields=(db()?.transfSchema?.[m]||[]).filter(n=>!KEY_FIELDS.includes(n)&&!(m==='Макет10'&&n==='SPS'));
 const wrap=document.querySelector('#childContent');if(!wrap)return;
-let html='<div class="wf-maket-view"><div class="wf-section-head"><div><div class="wf-eyebrow">'+rs.length+' записей</div><h3>'+h(window.SolinHuman?.formName(m)||NAMES[m])+'</h3></div><button class="wf-primary" id="wfAddRow">＋ Строка</button></div>';
+let html='<div class="wf-maket-view"><div class="wf-section-head"><div><div class="wf-eyebrow">'+rs.length+' записей</div><h3>'+h(m==='Макет10'?'Основные данные':window.SolinHuman?.formName(m)||NAMES[m])+'</h3></div><button class="wf-primary" id="wfAddRow">＋ Строка</button></div>';
 html+='<p class="wf-muted">Выберите запись для изменения или добавьте новую.</p>';
 if(m==='Макет10'&&window.SolinCardCalculations){
  const b=window.SolinCardCalculations.bonitet(r,window.SOLIN_REFS?.tables);
@@ -149,31 +149,31 @@ rs.forEach((row,i)=>{
  html+='<article class="wf-row"><div class="wf-rowhead"><b>Запись '+(i+1)+'</b><span><button data-edit="'+i+'">Изменить</button><button class="wf-danger" data-del="'+i+'">Удалить</button></span></div><div class="wf-grid">'+(values||'<div class="wf-muted">Запись без заполненных полей</div>')+(raw?'<details class="human-source"><summary>Служебные данные</summary>'+raw+'</details>':'')+'</div></article>';
 });
 html+='</div>';wrap.innerHTML=html;
-wrap.querySelector('#wfAddRow').onclick=()=>editMaket(m,rs.length);
+wrap.querySelector('#wfAddRow').onclick=()=>m==='Макет10'?editComposition({add:true}):editMaket(m,rs.length);
 wrap.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editMaket(m,Number(b.dataset.edit)));
 wrap.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>deleteMaket(m,Number(b.dataset.del)));
 }
 // V20: edit an entire mixed-species stand in one transaction. Each species is
 // stored as its own original Maket10 row, never concatenated into a fake code.
-function editComposition(){
+function editComposition({add=false}={}){
  const r=record();if(!r)return;
  const name='Макет10';
  const fields=['IAR','KOEF','POR','LET','PH','PD2','KT','PROI','POL','ZAP'];
  const existing=rowsOf(r,name).map(x=>({...x}));
  const drafts=existing.length?existing:[{IAR:1,KOEF:10,POR:null,LET:null,PH:null,PD2:null,KT:null,PROI:null,POL:null,ZAP:0}];
- openModal('Древостой',
+ openModal('Основные данные · древостой',
   '<div class="v25-stand-basics">'+
    '<label class="wf-field"><span>Категория угодий</span><select id="wfCompKU"></select></label>'+
    '<label class="wf-field"><span>Характеристика типа леса</span><select id="wfQuickForestType"><option value="">Не указано</option></select></label>'+
   '</div>'+
+  '<div class="wf-composition-actions"><button type="button" id="wfCompAdd" class="secondary">＋ Строка</button><output id="wfCompTotal" role="status" aria-live="polite"></output></div>'+
   '<details class="v25-stand-rules"><summary>Проверка связей</summary><p id="wfCompPolicy" role="status" aria-live="polite"></p><p id="wfQuickForestHint" role="status" aria-live="polite"></p></details>'+
   '<div id="wfCompRows"></div>'+
-  '<div class="wf-composition-actions"><button type="button" id="wfCompAdd" class="secondary">＋ Порода</button><output id="wfCompTotal" role="status" aria-live="polite"></output></div>'+
-  '<details id="wfQuickMakets" class="v25-stand-makets"><summary>Другие макеты</summary><div class="v25-stand-makets-actions">'+
+  '<details id="wfQuickMakets" class="v25-stand-makets"><summary>Макеты</summary><div class="v25-stand-makets-actions">'+
    '<select id="wfQuickDestination" aria-label="Выберите макет"><option value="">Выбрать раздел…</option>'+
     CORE.filter(m=>m!=='Макет10').map(m=>'<option value="'+h(m)+'">'+h(m.replace('Макет','М'))+' · '+h(window.SolinHuman?.formName(m)||NAMES[m])+'</option>').join('')+
-    '<option value="31">М31 · Подрост</option><option value="32">М32 · Подлесок</option><option value="kt">КТ · Просмотр</option><option value="print">Печать КТ</option><option value="cut">Контроль рубок</option><option value="control">Контроль</option></select>'+
-   '<button type="button" id="wfQuickNavigate">Открыть</button></div></details>'+
+    '<option value="31">М31 · Подрост</option><option value="32">М32 · Подлесок</option><option value="makets">Все макеты</option><option value="kt">КТ · Просмотр</option><option value="print">Печать КТ</option><option value="cut">Контроль рубок</option><option value="control">Контроль</option></select>'+
+   '<button type="button" id="wfQuickNavigate">Сохранить и открыть</button></div></details>'+
   '<div class="formActions v25-stand-save"><button type="button" class="secondary" id="wfCompCancel">Отмена</button><button type="button" class="primary" id="wfCompSave">Сохранить</button></div>');
  const root=document.getElementById('modalBody'),host=root.querySelector('#wfCompRows'),cat=root.querySelector('#wfCompKU');
  const ref=window.SOLIN_REFS?.tables,rules=window.SolinDependentRules;
@@ -183,7 +183,6 @@ function editComposition(){
   const stored=new Option('Сохранённый тип леса: '+String(r.M3TLU),String(r.M3TLU));
   forestSelect.add(stored);forestSelect.value=String(r.M3TLU);
  }
- let pendingQuickAction=null;
  const categories=new Map();
  for(const entry of ref?.SKU||[]){const val=String(entry.KU??'');if(!val||categories.has(val))continue;
   const layers=rules?.allowedLayers?.({KU:entry.KU},ref);
@@ -201,11 +200,28 @@ function editComposition(){
   const card=document.createElement('section');card.className='wf-composition-card';card.dataset.compToken=String(token);
   card.innerHTML='<div class="wf-rowhead"><b>Порода '+(cards.length+1)+'</b><button type="button" class="wf-danger" data-wf-remove>Удалить породу</button></div>'+
    '<div class="formGrid wf-formgrid">'+humanInputs(fields,original,prefix,name,{...r,KU:cat.value||r.KU})+'</div>';
-  host.append(card);const item={token,prefix,card,original};cards.push(item);
+  host.append(card);const item={token,prefix,card,original,lastSpecies:original.POR};cards.push(item);
   card.querySelector('[data-wf-remove]').onclick=()=>{if(cards.length===1)return notify('Оставьте хотя бы одну породу');
    const pos=cards.indexOf(item);if(pos>=0)cards.splice(pos,1);card.remove();renumber();refresh();};
   for(const field of fields){const el=card.querySelector('#'+prefix+'_'+field);if(!el)continue;
-   el.addEventListener('input',refresh);el.addEventListener('change',refresh);}
+   el.addEventListener('input',refresh);
+   el.addEventListener('change',() => {
+    if(field==='POR'||field==='IAR') {
+     const por=card.querySelector('#'+prefix+'_POR');
+     const iar=card.querySelector('#'+prefix+'_IAR');
+     const origin=card.querySelector('#'+prefix+'_PROI');
+     const previous=rules?.suggestedOrigin?.(item.lastSpecies,ref);
+     const suggested=rules?.suggestedOrigin?.(por?.value,ref);
+     if(iar?.value==='1'&&origin&&suggested!=null&&(!origin.value||String(previous)===origin.value)){
+      if(origin.tagName==='SELECT'&&![...origin.options].some(option=>option.value===String(suggested)))
+       origin.add(new Option(String(suggested),String(suggested)));
+      origin.value=String(suggested);
+     }
+     item.lastSpecies=por?.value;
+    }
+    refresh();
+   });
+  }
   setupRowOptions(item);renumber();refresh();
  };
  const renumber=()=>cards.forEach((x,i)=>{const title=x.card.querySelector('.wf-rowhead b');if(title)title.textContent='Порода '+(i+1)});
@@ -223,7 +239,7 @@ function editComposition(){
   const values=bindInputs(item.card,fields,item.prefix,item.original);
   const row={...item.original,...values};
   for(const k of KEY_FIELDS)row[k]=r[k]??null;
-  if(row.POR!=null&&row.PROI==null){const suggested=rules?.suggestedOrigin?.(row.POR,ref);if(suggested!=null)row.PROI=suggested;}
+  if(String(row.IAR)==='1'&&row.POR!=null&&row.PROI==null){const suggested=rules?.suggestedOrigin?.(row.POR,ref);if(suggested!=null)row.PROI=suggested;}
   return row;
  });}
  function refresh(){
@@ -288,13 +304,7 @@ function editComposition(){
   renderOne({IAR:layer,KOEF:null,POR:null,LET:null,PH:null,PD2:null,KT:null,PROI:null,POL:null,ZAP:null});
   const target=cards[cards.length-1].card.querySelector('[data-wffield="POR"]');target?.focus();};
  root.querySelector('#wfCompCancel').onclick=closeModal;
- root.querySelector('#wfQuickNavigate').onclick=()=>{
-  const choice=root.querySelector('#wfQuickDestination').value;
-  if(!choice)return notify('Выберите макет');
-  pendingQuickAction=choice;
-  root.querySelector('#wfCompSave').click();
- };
- root.querySelector('#wfCompSave').onclick=()=>{
+ function saveComposition(destination){
   let rows;try{rows=readRows();}catch(e){notify(e.message);return;}
   const desiredKU=cat.value.trim();if(!desiredKU){notify('Выберите категорию угодий выдела');return;}
   if(String(r.KU??'')!==desiredKU&&Object.values(r._children||{}).some(x=>Array.isArray(x)&&x.length)){
@@ -347,16 +357,21 @@ function editComposition(){
   }
   try{saveAll(r);}catch(e){Object.assign(r,JSON.parse(before));notify('Не удалось сохранить состав: '+e.message);return;}
   closeModal();if(typeof renderComp==='function')renderComp();
-  const destination=pendingQuickAction;
-  pendingQuickAction=null;
   if(CORE.includes(destination))openMaket(destination);
-  else if(['31','32','kt','print','cut'].includes(destination)&&window.SolinCardEditor?.openQuick){
+  else if(['31','32','makets','kt','print','cut'].includes(destination)&&window.SolinCardEditor?.openQuick){
    window.SolinCardEditor.openQuick(r,destination);
   }else if(destination==='print')printCard();
   else if(destination==='control')checkData(r,true);
   notify('Сохранено '+rows.length+' пород. Характеристика типа леса сохраняется в карточке выдела.');
+ }
+ root.querySelector('#wfCompSave').onclick=()=>saveComposition();
+ root.querySelector('#wfQuickNavigate').onclick=()=>{
+  const destination=root.querySelector('#wfQuickDestination').value;
+  if(destination)saveComposition(destination);
+  else notify('Выберите макет');
  };
  for(const row of drafts)renderOne(row);
+ if(add&&existing.length)root.querySelector('#wfCompAdd').click();
 }
 
 function editMaket(m,index){const r=record();if(!r)return;if(m==='Макет10')return editComposition();
@@ -727,7 +742,7 @@ function setup(){
  const prev=window.renderComp;
  if(typeof prev==='function')window.renderComp=function(){if(record())localPatch(record());prev();currentMaket='Макет10';cardToolbar();openMaket(currentMaket);};
  const oldQuarter=window.openQuarter;
- if(typeof oldQuarter==='function')window.openQuarter=function(k){oldQuarter(k);quarterToolbar(k);};
+ if(typeof oldQuarter==='function')window.openQuarter=function(k,...args){oldQuarter(k,...args);quarterToolbar(k);};
  const mapShow=window.showCmfSheet;
  if(typeof mapShow==='function')window.showCmfSheet=function(feature,latlng,layer){
    mapShow(feature,latlng,layer);

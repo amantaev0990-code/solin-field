@@ -47,3 +47,6 @@
 .kt-review-nav button {min-height:44px;}
 .kt-review-nav span {text-align:center;}
 .kt-sheet-scroll {overflow:auto;max-height:74dvh;}
+
+.quick-card-form #quick-card-base .quick-card-forest-type{grid-column:1/-1}
+.quick-card-forest-type select,#wfQuickForestType{width:100%;min-width:0}

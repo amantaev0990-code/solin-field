@@ -68,7 +68,7 @@ const editor=fs.readFileSync('solin-card-editor.js','utf8');
 assert.match(editor,/function recalculateEditedField\(el\)/);
 assert.match(editor,/recalculateEditedField\(e\.target\)/);
 assert.match(editor,/Было/);
-assert.match(editor,/Запас не проверен по К59/);
+assert.match(editor,/Запас не проверен по К59|К59 · .*Запас требует проверки/);
 assert.match(editor,/session\.calcNotices\.findIndex/,'Repeated ZAP correction must update its notice');
 assert.match(editor,/if\(changedStock\)/,'Save must also recalculate changed stock');
 const workflow=fs.readFileSync('solin-workflow.js','utf8');

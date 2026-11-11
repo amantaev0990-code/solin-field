@@ -43,8 +43,10 @@ window.openMapScreen = function() {
  if (!mapOpenOld()) return false;
  const scope = mapScope();
  if (scope !== libraryScope || !importedMapLayers.length) {
+  if (activeMapKey) removeMapFileLayers(activeMapKey);
   libraryScope = scope;
   activeMapKey = null;
+  void window.SolinMapObjects?.open();
  }
  const placeholder = document.querySelector('#mapLayerList .mapLayerRow');
  if (placeholder && !importedMapLayers.length) placeholder.onclick = window.openMapFilePicker;
@@ -63,6 +65,7 @@ async function activateMap(file, scope) {
  }
  removeMapFileLayers(null, key);
  activeMapKey = key;
+ await window.SolinMapObjects?.open(scope + '|' + key);
  return true;
 }
 
@@ -190,6 +193,7 @@ async function refreshMapLibrary() {
   if (key && activeMapKey === key) row.append(mapLibraryButton('Закрыть', async () => {
    removeMapFileLayers(key);
    activeMapKey = null;
+   await window.SolinMapObjects?.open();
    setMapImportStatus('');
    await refreshMapLibrary();
   }));
@@ -204,6 +208,7 @@ async function refreshMapLibrary() {
    if (activeMapKey === key) {
     removeMapFileLayers(key);
     activeMapKey = null;
+    await window.SolinMapObjects?.open();
     setMapImportStatus('');
    }
    await refreshMapLibrary();

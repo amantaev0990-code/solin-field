@@ -85,6 +85,10 @@ const server = http.createServer(async (request, response) => {
     await form.getByRole('button',{name:'Макет 10',exact:true}).click();
     const rowControls = 'input[data-ce-field]:visible:not([readonly]):not([disabled]),select[data-ce-field]:visible:not([disabled])';
     const rows = form.locator('#ce-table-Макет10 tbody tr');
+    const height = rows.nth(0).locator('[data-ce-field="PH"]');
+    const diameter = rows.nth(0).locator('[data-ce-field="PD2"]');
+    await height.press('Enter');
+    assert.ok(await diameter.evaluate(el => el === document.activeElement), 'Enter moves from height to diameter');
     const endOfRow = rows.nth(0).locator(rowControls).last();
     const startOfRow = rows.nth(1).locator(rowControls).first();
     await endOfRow.focus();

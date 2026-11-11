@@ -120,12 +120,18 @@
  }
  function onTouchStart(e){
   const select=targetSelect(e);
-  if(!ordinary(select))return;
-  swallow(e);
-  pending={select,kind:'touch',serial:++tapSerial};
+  if(!ordinary(select)||e.touches.length!==1)return;
+  const touch=e.touches[0];
+  pending={select,kind:'touch',serial:++tapSerial,id:touch.identifier,x:touch.clientX,y:touch.clientY,moved:false};
+ }
+ function onTouchMove(e){
+  if(pending?.kind!=='touch')return;
+  const touch=[...e.touches].find(item=>item.identifier===pending.id);
+  if(!touch||Math.hypot(touch.clientX-pending.x,touch.clientY-pending.y)>8)pending.moved=true;
  }
  function onTouchEnd(e){
   if(pending?.kind!=='touch')return;
+  if(pending.moved){pending=null;tapSerial++;return;}
   const {select,serial}=pending;swallow(e);queueOpen(select,serial);
  }
  function onTouchCancel(e){
@@ -156,7 +162,8 @@
   // pointer/touch events but should use the same custom list.
   queueOpen(select,++tapSerial);
  }
- window.addEventListener('touchstart',onTouchStart,{capture:true,passive:false});
+ window.addEventListener('touchstart',onTouchStart,{capture:true,passive:true});
+ window.addEventListener('touchmove',onTouchMove,{capture:true,passive:true});
  window.addEventListener('touchend',onTouchEnd,{capture:true,passive:false});
  window.addEventListener('touchcancel',onTouchCancel,true);
  window.addEventListener('pointerdown',onPointerDown,true);

@@ -19,6 +19,7 @@
     const number = main.querySelector('.dt-base > :first-child');
     const baseFields = ['KU','M3Pr','M3TLU','PLV'].map(key =>
       main.querySelector('[data-ce-scope="base"][data-ce-field="' + key + '"]').closest('.dt-cell'));
+    baseFields[2].classList.add('quick-card-forest-type');
     base.append(number, ...baseFields);
     main.prepend(base);
 
@@ -27,10 +28,11 @@
     nav.setAttribute('aria-label','Быстрый ввод');
     let step = 'base';
     let lastField;
-    const fields = () => [...form.querySelectorAll('input[data-ce-field], select[data-ce-field], textarea[data-ce-field]')]
+    const fields = () => [...form.querySelectorAll('input[data-ce-field], select[data-ce-field]:not(.solin-species-native), textarea[data-ce-field], input[data-species-for]')]
       .filter(el => el.getClientRects().length && !el.readOnly && !el.disabled && !el.closest('[hidden], [inert]'));
     const focus = el => {
       if (!el) return;
+      if(el.tagName==='INPUT'&&!el.readOnly)el.enterKeyHint='next';
       el.focus({preventScroll:true});
       el.scrollIntoView({block:'nearest',inline:'nearest'});
     };
@@ -46,15 +48,14 @@
     }
     function next(el) {
       const controls = fields();
-      const index = controls.indexOf(el);
+      const index = controls.findIndex(field => field === el || (el?.id && field.id === el.id));
       if (index < 0 && controls.length) return focus(controls[0]);
       const successor = index >= 0 ? controls[index + 1] : undefined;
       if (successor) {
         // Maket 10 can rebuild a row on change. Resolve the next cell again.
-        const {ceField,ceRow,ceScope} = successor.dataset;
-        el.blur();
-        return focus(fields().find(item => item.dataset.ceField === ceField &&
-          item.dataset.ceRow === ceRow && item.dataset.ceScope === ceScope));
+        const id = successor.id;
+        el?.blur();
+        return focus(fields().find(item => item.id === id));
       }
       const following = order[order.indexOf(step) + 1];
       if (following) go(following);
@@ -64,12 +65,19 @@
       if (fields().includes(event.target)) lastField = event.target;
     });
     form.addEventListener('keydown', event => {
-      if (!form.dataset.quickStep || event.key !== 'Enter' || event.isComposing || !fields().includes(event.target)) return;
-      if (form.querySelector('#ce-assist:not([hidden]), #v35-forest-group-dialog')) return;
+      if (!form.dataset.quickStep || event.key !== 'Enter' || event.isComposing || !event.target.matches('[data-ce-field], [data-species-for]')) return;
+      if (form.querySelector('#ce-assist:not([hidden]):not(:empty), #v35-forest-group-dialog')) return;
       event.preventDefault();
       event.stopPropagation();
       next(event.target);
     });
+    form.addEventListener('submit', event => {
+      const active = document.activeElement;
+      if(!form.dataset.quickStep || event.submitter || !fields().includes(active)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      next(active);
+    }, true);
     const enter = button('Ввод ↵', () => next(lastField), 'quick-card-enter');
     enter.addEventListener('pointerdown', event => event.preventDefault());
     nav.append(...tabs, button('Все макеты', () => {

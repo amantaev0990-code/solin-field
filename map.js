@@ -176,7 +176,7 @@ async function handleMapFiles(input){
     for (const entry of entries) {
      if (entry.visible) entry.layer.addTo(fieldMap);
      importedMapLayers.push(entry);
-     bounds.extend(entry.layer.getBounds());
+     bounds.extend(entry.bounds);
      added += entry.count;
     }
     accepted.add(key);
@@ -251,149 +251,277 @@ function kmlToGeoJSON(text){const xml=new DOMParser().parseFromString(text,'text
 function kmlGeometry(el){const tag=el.localName;if(tag==='Point'){const c=parseKmlCoords(el.querySelector('coordinates')?.textContent);return c.length?{type:'Point',coordinates:c[0]}:null}if(tag==='LineString'){const c=parseKmlCoords(el.querySelector('coordinates')?.textContent);return c.length>1?{type:'LineString',coordinates:c}:null}if(tag==='Polygon'){const rings=[];el.querySelectorAll('outerBoundaryIs LinearRing coordinates, innerBoundaryIs LinearRing coordinates').forEach(n=>{const c=parseKmlCoords(n.textContent);if(c.length>2)rings.push(c)});return rings.length?{type:'Polygon',coordinates:rings}:null}return null}
 function parseKmlCoords(s){return String(s||'').trim().split(/\s+/).map(x=>x.split(',').slice(0,3).map(Number)).filter(a=>a.length>=2&&Number.isFinite(a[0])&&Number.isFinite(a[1]))}
 
-function installFieldMapTools(map) {
- const storageKey = 'solin.field.map-marks.v1';
- let marks = [];
- try {
-  const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
-  if (Array.isArray(saved)) marks = saved.filter(mark => mark &&
-   Number.isFinite(mark.lat) && Math.abs(mark.lat) <= 90 &&
-   Number.isFinite(mark.lng) && Math.abs(mark.lng) <= 180 && typeof mark.name === 'string');
- } catch (error) {
-  console.error(error);
-  toast('Не удалось прочитать сохранённые метки');
+function fieldAreaHectares(points) {
+ const radians = Math.PI / 180;
+ let sum = 0;
+ for (let i = 0; i < points.length; i++) {
+  const a = points[i], b = points[(i + 1) % points.length];
+  const longitude = ((b.lng - a.lng + 540) % 360 - 180) * radians;
+  sum += longitude * (Math.sin(a.lat * radians) + Math.sin(b.lat * radians));
  }
- const markers = L.layerGroup().addTo(map);
- const ruler = L.polyline([], {color:'#facc15', weight:4, interactive:false}).addTo(map);
- let mode = '';
- let points = [];
- let distance = 0;
- const control = L.control({position:'topright'});
- control.onAdd = () => {
-  const panel = L.DomUtil.create('div', 'leaflet-bar');
-  panel.style.cssText = 'background:white;color:#222;padding:4px;max-width:220px';
+ return Math.abs(sum) * 6371008.8 ** 2 / 20000;
+}
+
+function installFieldMapTools(map) {
+ const legacyKey = 'solin.field.map-marks.v1';
+ const db = new Promise((resolve, reject) => {
+  const request = indexedDB.open('solin-field-map-objects', 1);
+  request.onupgradeneeded = () => request.result.createObjectStore('layers');
+  request.onerror = () => reject(request.error);
+  request.onsuccess = () => resolve(request.result);
+ });
+ // The shared legacy map shows existing V43–V48 marks after upgrading.
+ const shared = 'legacy';
+ let scope = shared, features = [], loaded = false, mode = '', points = [], tracking = null;
+ let busy = false;
+ const saved = L.layerGroup().addTo(map);
+ const preview = L.layerGroup().addTo(map);
+ const style = {color:'#ec8515',weight:4};
+ const tools = L.control({position:'topright'});
+ const layers = L.control.layers({}, {'Полевые объекты':saved}, {position:'topright'}).addTo(map);
+ layers.getContainer().setAttribute('aria-label','Полевые объекты');
+ const status = document.createElement('output');
+ const buttons = new Map();
+ const minimum = kind => ({mark:1,line:2,area:3,track:2})[kind] || Infinity;
+ const position = point => [point.lat, point.lng];
+ const hectares = () => fieldAreaHectares(points).toLocaleString('ru-RU',{maximumFractionDigits:3}) + ' га';
+
+ function access(key, value) {
+  return db.then(database => new Promise((resolve, reject) => {
+   const writing = value !== undefined;
+   const tx = database.transaction('layers', writing ? 'readwrite' : 'readonly');
+   const store = tx.objectStore('layers');
+   const request = writing ? store.put(value,key) : store.get(key);
+   tx.oncomplete = () => resolve(request.result);
+   tx.onabort = () => reject(tx.error);
+  }));
+ }
+ function stopTrack() {
+  if (tracking != null) navigator.geolocation.clearWatch(tracking);
+  tracking = null;
+ }
+ function reset() {
+  stopTrack();
+  mode = '';
+  points = [];
+  redraw();
+ }
+ function redraw() {
+  map.getContainer().dataset.mapTool = mode;
+  for (const [key,button] of buttons) {
+   if (['mark','line','area','track','ruler'].includes(key)) {
+    button.setAttribute('aria-pressed', String(key === mode));
+    button.disabled = !loaded || busy || (key !== mode && !!mode);
+   }
+  }
+  buttons.get('undo').disabled = !points.length || mode === 'track' || busy;
+  buttons.get('save').disabled = points.length < minimum(mode) || busy;
+  buttons.get('cancel').disabled = !mode || busy;
+  preview.clearLayers();
+  if (points.length >= 2) {
+   const shape = mode === 'area' ? L.polygon : L.polyline;
+   shape(points, {...style,interactive:false}).addTo(preview);
+  }
+  if (mode !== 'track') for (const point of points) {
+   L.circleMarker(point,{...style,radius:4,interactive:false}).addTo(preview);
+  }
+  const distance = () => points.slice(1).reduce((sum,point,i) => sum + map.distance(points[i],point),0);
+  status.textContent = {
+   mark:'Коснитесь места для метки',
+   line:points.length + ' точек · касайтесь карты',
+   area:points.length < 3 ? 'Поставьте минимум три точки' : hectares(),
+   track:'Запись GPS · ' + points.length + ' точек',
+   ruler:points.length ? Math.round(distance()) + ' м' : 'Поставьте начальную точку'
+  }[mode] || '';
+ }
+ async function write(next) {
+  if (!loaded || busy) return false;
+  const key = scope;
+  busy = true;
+  try {
+   await access(key,next);
+   if (scope === key) {
+    features = next;
+    drawSaved();
+   }
+   return true;
+  } catch (error) {
+   toast('Не удалось сохранить полевой слой: ' + error.message);
+   return false;
+  } finally {
+   busy = false;
+   redraw();
+  }
+ }
+ function drawSaved() {
+  saved.clearLayers();
+  for (const feature of features) {
+   const popup = document.createElement('div');
+   const title = document.createElement('div');
+   title.textContent = feature.name + (feature.kind === 'area' ?
+    ' · ' + fieldAreaHectares(feature.points.map(([lat,lng])=>({lat,lng}))).toFixed(3) + ' га' : '');
+   const remove = document.createElement('button');
+   remove.type = 'button';
+   remove.textContent = 'Удалить';
+   remove.onclick = () => { void write(features.filter(item => item !== feature)); };
+   popup.append(title, remove);
+   const shape = feature.kind === 'mark' ?
+    L.circleMarker(feature.points[0],{...style,radius:7,fillOpacity:1,bubblingMouseEvents:false}) :
+    (feature.kind === 'area' ? L.polygon : L.polyline)(feature.points,
+     {...style,color:feature.kind === 'track' ? '#a221d2' : style.color,bubblingMouseEvents:false});
+   shape.bindPopup(popup).addTo(saved);
+  }
+ }
+ let loadGeneration = 0;
+ async function open(key = shared) {
+  const generation = ++loadGeneration;
+  scope = key;
+  loaded = false;
+  saved.clearLayers();
+  reset();
+  try {
+   let rows = await access(key);
+   if (rows === undefined && key === shared) {
+    const legacy = JSON.parse(localStorage.getItem(legacyKey) || '[]');
+    if (Array.isArray(legacy)) rows = legacy.filter(item => item && Number.isFinite(item.lat) &&
+     Number.isFinite(item.lng) && typeof item.name === 'string').map(item =>
+      ({kind:'mark',name:item.name,points:[[item.lat,item.lng]]}));
+   }
+   if (generation !== loadGeneration) return;
+   features = Array.isArray(rows) ? rows : [];
+   loaded = true;
+   drawSaved();
+   redraw();
+  } catch (error) {
+   if (generation === loadGeneration) toast('Не удалось прочитать полевой слой: ' + error.message);
+  }
+ }
+ function start(kind) {
+  if (!loaded || busy || (mode && mode !== kind)) return;
+  if (mode === kind) return;
+  if (kind === 'track' && !navigator.geolocation) return toast('GPS недоступен');
+  mode = kind;
+  map.addLayer(saved);
+  if (kind === 'track') tracking = navigator.geolocation.watchPosition(result => {
+   if (mode !== 'track' || busy) return;
+   const {latitude:lat,longitude:lng,accuracy} = result.coords;
+   if (!Number.isFinite(lat) || !Number.isFinite(lng) || accuracy > 75) return;
+   const point = L.latLng(lat,lng), last = points.at(-1);
+   if (last && map.distance(last,point) < 3) return;
+   points.push(point);
+   redraw();
+  }, error => {
+   toast('GPS: ' + error.message);
+   if (error.code === 1) reset();
+  }, {enableHighAccuracy:true,maximumAge:3000,timeout:15000});
+  redraw();
+ }
+ async function saveShape() {
+  if (busy || points.length < minimum(mode)) return;
+  const kind = mode;
+  const fallback = {mark:'Метка',line:'Линия',area:'Площадь',track:'GPS-трек'}[kind];
+  const name = window.prompt('Название объекта', fallback);
+  if (name == null) return;
+  const generation = loadGeneration;
+  const feature = {kind,name:name.trim().slice(0,120)||fallback,points:points.map(position)};
+  if (await write([...features,feature]) && generation === loadGeneration) reset();
+ }
+ tools.onAdd = () => {
+  const panel = L.DomUtil.create('details','leaflet-bar field-map-tools');
+  const summary = document.createElement('summary');
+  summary.textContent = 'Инструменты карты';
+  panel.append(summary);
+  const grid = document.createElement('div');
+  grid.className = 'field-map-tool-buttons';
+  const add = (key,label,action) => {
+   const button = document.createElement('button');
+   button.type = 'button';
+   button.textContent = label;
+   button.onclick = action;
+   buttons.set(key,button);
+   grid.append(button);
+  };
+  for (const [key,label] of Object.entries({mark:'Метка',line:'Линия',area:'Площадь',track:'GPS-трекер',ruler:'Линейка'})) {
+   add(key,label,() => start(key));
+  }
+  add('undo','Убрать точку',() => { points.pop(); redraw(); });
+  add('save','Сохранить',() => { void saveShape(); });
+  add('cancel','Отмена',reset);
+  status.setAttribute('aria-live','polite');
+  panel.append(grid,status);
   L.DomEvent.disableClickPropagation(panel);
   L.DomEvent.disableScrollPropagation(panel);
-  const status = document.createElement('div');
-  status.setAttribute('role', 'status');
-  function button(title, action) {
-   const element = document.createElement('button');
-   element.type = 'button';
-   element.textContent = title;
-   element.style.minHeight = '36px';
-   element.addEventListener('click', action);
-   panel.append(element);
-   return element;
-  }
-  const markButton = button('Метка', () => setMode(mode === 'mark' ? '' : 'mark'));
-  const rulerButton = button('Линейка', () => setMode(mode === 'ruler' ? '' : 'ruler'));
-  button('Сброс', () => {
-   points = [];
-   distance = 0;
-   ruler.setLatLngs(points);
-   setMode('');
-  });
-  panel.append(status);
-
-  function setMode(next) {
-   mode = next;
-   map.getContainer().dataset.mapTool = mode;
-   markButton.setAttribute('aria-pressed', String(mode === 'mark'));
-   rulerButton.setAttribute('aria-pressed', String(mode === 'ruler'));
-   updateStatus();
-  }
-
-  function updateStatus() {
-   if (mode === 'mark') status.textContent = 'Коснитесь карты для новой метки';
-   else if (points.length) status.textContent = distance >= 1000
-    ? (distance / 1000).toFixed(2) + ' км'
-    : distance.toFixed(1) + ' м';
-   else status.textContent = mode === 'ruler' ? 'Коснитесь начальной точки' : '';
-  }
-
-  function save(next) {
-   try {
-    localStorage.setItem(storageKey, JSON.stringify(next));
-   } catch (error) {
-    console.error(error);
-    toast('Не удалось сохранить изменения меток');
-    return;
-   }
-   marks = next;
-   drawMarks();
-  }
-
-  function drawMarks() {
-   markers.clearLayers();
-   for (const mark of marks) {
-    const popup = document.createElement('div');
-    const title = document.createElement('div');
-    title.textContent = mark.name;
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.textContent = 'Удалить метку';
-    remove.addEventListener('click', () => save(marks.filter(item => item !== mark)));
-    popup.append(title, remove);
-    L.circleMarker([mark.lat, mark.lng], {radius:8, weight:2, color:'#fff', fillColor:'#d23434', fillOpacity:1, bubblingMouseEvents:false}).bindPopup(popup).addTo(markers);
-   }
-  }
-
-  map.on('click', ({latlng}) => {
-   if (mode === 'mark') {
-    const name = window.prompt('Название метки', 'Метка');
-    if (name === null) return;
-    const {lat, lng} = latlng.wrap();
-    save([...marks, {name:name.trim().slice(0, 120) || 'Метка', lat, lng}]);
-    setMode('');
-   } else if (mode === 'ruler') {
-    if (points.length) distance += map.distance(points[points.length - 1], latlng);
-    points.push(latlng);
-    ruler.setLatLngs(points);
-    updateStatus();
-   }
-  });
-  drawMarks();
-  setMode('');
   return panel;
  };
- control.addTo(map);
+ tools.addTo(map);
+ map.on('click', ({latlng}) => {
+  if (!mode || mode === 'track' || busy) return;
+  if (mode === 'mark') points = [latlng.wrap()];
+  else points.push(latlng.wrap());
+  redraw();
+  if (mode === 'mark') void saveShape();
+ });
+ window.SolinMapObjects = {open};
+ void open();
 }
 
 let mapInfoPaneId = 0;
 function createMapInfoLayer({name, geojson, settings}, fileKey, index, count) {
  const pane = 'mapinfo-' + (++mapInfoPaneId);
  fieldMap.createPane(pane).style.zIndex = String(410 + (count - index) / count * 80 | 0);
- const renderer = L.canvas({pane, padding:0.1});
+ const renderer = L.canvas({pane, padding:0.06});
  const isStandLayer = /(?:^|_)выдпл$/i.test(name);
  if (!isStandLayer) fieldMap.getPane(pane).style.pointerEvents = 'none';
  const color = value => '#' + Number(value).toString(16).padStart(6, '0');
- const globalPen = settings.match(/^\s*Global\b[^\r\n]*?\bPen\s*\((\d+),(\d+),(\d+)\)/im);
+ const globalPen = settings.match(/^\s*Global\b[^\r\n]*?\bPen\s*\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)\)/im);
+ const displayOverride = /^\s*(?:Display\s+)?Override\b/im.test(settings);
+ const labels = [];
+ const labelLayer = L.layerGroup();
+ function syncLabels() {
+  if (!fieldMap.hasLayer(group)) return;
+  const view = fieldMap.getBounds().pad(.08);
+  const shown = fieldMap.getZoom() >= 12;
+  for (const label of labels) {
+   const visible = shown && view.contains(label.getLatLng());
+   if (visible && !labelLayer.hasLayer(label)) labelLayer.addLayer(label);
+   if (!visible && labelLayer.hasLayer(label)) labelLayer.removeLayer(label);
+  }
+ }
  const globalBrush = settings.match(/^\s*Global\b[^\r\n]*?\bBrush\s*\((\d+),(\d+)/im);
  const globalSymbol = settings.match(/^\s*Global\b[^\r\n]*?\bSymbol\s*\(\d+,(\d+),(\d+)/im);
  function style(feature) {
   const ogr = feature.properties?.solin_mapinfo_style || '';
   const pen = ogr.match(/PEN\([^)]*?c:(#[\da-f]{6})/i);
   const brush = ogr.match(/BRUSH\([^)]*?fc:(#[\da-f]{6})/i);
+  const penWidth = /PEN\([^)]*?\bw:([\d.]+)(px|pt)?/i.exec(ogr);
+  const penPattern = /PEN\([^)]*?\bp:"([^"]+)"/i.exec(ogr)?.[1];
+  const dashArray = penPattern?.split(/\s+/).map(value => Number.parseFloat(value)).filter(Number.isFinite);
   return {
-   color: globalPen ? color(globalPen[3]) : pen?.[1] || '#333333',
-   weight: globalPen ? Math.min(8, Number(globalPen[1])) : 2,
-   fillColor: globalBrush ? color(globalBrush[2]) : brush?.[1] || '#738b93',
+   color: displayOverride && globalPen ? color(globalPen[3]) : pen?.[1] || (globalPen ? color(globalPen[3]) : '#333333'),
+   dashArray: !displayOverride && dashArray?.length > 1 ? dashArray.join(' ') : null,
+   weight: Math.max(.6,Math.min(12,displayOverride && globalPen ? +globalPen[1] : penWidth ? +penWidth[1] * (penWidth[2] === 'pt' ? 4/3 : 1) : +(globalPen?.[1] || 2))),
+   fillColor: displayOverride && globalBrush ? color(globalBrush[2]) : brush?.[1] || (globalBrush ? color(globalBrush[2]) : '#738b93'),
    fillOpacity: globalBrush?.[1] === '1' ? 0 : 0.35
   };
  }
  const group = L.geoJSON(geojson, {
-  pane, renderer, smoothFactor:0, style, interactive:isStandLayer,
+  pane, renderer, smoothFactor:1.25, style, interactive:isStandLayer,
+  filter(feature) {
+   if (!/^LABEL\(/i.test(feature.properties?.solin_mapinfo_style || '') || feature.geometry?.type !== 'Point') return true;
+   const [lng,lat] = feature.geometry.coordinates;
+   const ogr = feature.properties.solin_mapinfo_style;
+   const label = ogr.match(/LABEL\(t:"((?:[^"\\]|\\.)*)"/);
+   if (!label) return true;
+   const text = document.createElement('span');
+   text.textContent = label[1].replace(/\\(["\\])/g, '$1').trim();
+   text.style.color = ogr.match(/,c:(#[\da-f]{6})/i)?.[1] || '#111';
+   text.style.fontWeight = ogr.includes(',bo:1') ? 'bold' : 'normal';
+   text.style.textShadow = '0 0 2px white';
+   labels.push(L.marker([lat,lng],{pane,interactive:false,icon:L.divIcon({className:'mapinfo-label',html:text,iconSize:[0,0]})}));
+   return false;
+  },
   pointToLayer(feature, latlng) {
    const ogr = feature.properties?.solin_mapinfo_style || '';
-   const label = ogr.match(/LABEL\(t:"((?:[^"\\]|\\.)*)"/);
-   if (label) {
-    const text = document.createElement('span');
-    text.textContent = label[1].replace(/\\(["\\])/g, '$1').trim();
-    text.style.color = ogr.match(/,c:(#[\da-f]{6})/i)?.[1] || '#111';
-    text.style.fontWeight = ogr.includes(',bo:1') ? 'bold' : 'normal';
-    text.style.textShadow = '0 0 2px white';
-    return L.marker(latlng, {pane, interactive:false, icon:L.divIcon({className:'mapinfo-label', html:text, iconSize:[0,0]})});
-   }
    const symbolColor = ogr.match(/SYMBOL\([^)]*?c:(#[\da-f]{6})/i)?.[1];
    return L.circleMarker(latlng, {pane, renderer, interactive:false, radius:globalSymbol ? Math.min(10, Number(globalSymbol[2]) / 2) : 4,
     color:globalSymbol ? color(globalSymbol[1]) : symbolColor || '#333', fillOpacity:.85});
@@ -407,7 +535,21 @@ function createMapInfoLayer({name, geojson, settings}, fileKey, index, count) {
    });
   }
  });
- return {pane, renderer, fileKey, name, count:geojson.features.length, layer:group, visible:!/^\s*Display\s+Off/im.test(settings), format:'MapInfo'};
+ const bounds = group.getBounds();
+ for (const label of labels) bounds.extend(label.getLatLng());
+ if (labels.length) {
+  group.on('add', () => {
+   labelLayer.addTo(fieldMap);
+   fieldMap.on('moveend',syncLabels);
+   syncLabels();
+  });
+  group.on('remove', () => {
+   fieldMap.off('moveend',syncLabels);
+   labelLayer.clearLayers();
+   labelLayer.remove();
+  });
+ }
+ return {pane, renderer, bounds, fileKey, name, count:geojson.features.length, layer:group, visible:!/^\s*Display\s+Off/im.test(settings), format:'MapInfo'};
 }
 
 function removeMapFileLayers(removeKey, keepKey) {

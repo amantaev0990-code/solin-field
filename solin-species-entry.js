@@ -19,8 +19,9 @@
   const q=strip(query);
   if(!q)return entries(select).slice(0,14);
   const items=entries(select);
-  const exact=items.filter(x=>strip(x.code)===q);
-  const starts=items.filter(x=>strip(x.code).startsWith(q)&&strip(x.code)!==q);
+  const preferred=auto(select,query);
+  const exact=items.filter(x=>strip(x.code)===q||x.code===preferred?.code);
+  const starts=items.filter(x=>strip(x.code).startsWith(q)&&!exact.includes(x));
   const nameStarts=items.filter(x=>strip(x.label).startsWith(q)&&!exact.includes(x)&&!starts.includes(x));
   const other=items.filter(x=>strip(x.label).includes(q)&&!exact.includes(x)&&!starts.includes(x)&&!nameStarts.includes(x));
   return [...exact,...starts,...nameStarts,...other].slice(0,30);
@@ -32,6 +33,10 @@
   if(exact)return exact;
   const exactName=items.filter(x=>strip(x.label)===q);
   if(exactName.length===1)return exactName[0];
+  if(q==='ОС'){
+   const aspen=items.filter(x=>strip(x.label)==='ОСИНА'||strip(x.code)==='ОСИ');
+   if(aspen.length===1)return aspen[0];
+  }
   const prefix=items.filter(x=>strip(x.code).startsWith(q)||strip(x.label).startsWith(q));
   return prefix.length===1?prefix[0]:null;
  }
@@ -157,6 +162,7 @@
   const owner=select.closest('label');
   select.before(input);
   if(owner){owner.htmlFor=input.id;owner.after(select);}
+  if(select.dataset.ceField)input.dataset.speciesFor=select.id;
   const state={select,input,popup:null,items:[],index:0};mounted.set(select,state);syncUI(state);
   input.addEventListener('focus',()=>{
    const found=entries(select).find(x=>x.code===select.value);
@@ -181,7 +187,7 @@
    }
    if(e.key==='Enter'){
     const item=active===state?state.items[state.index]:auto(select,input.value);
-    if(item){e.preventDefault();commit(state,item,true);hide();input.select();}
+    if(item){e.preventDefault();commit(state,item,true);hide();if(input.isConnected)input.select();}
    }
   });
   input.addEventListener('blur',()=>{

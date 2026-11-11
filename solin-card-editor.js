@@ -20,7 +20,7 @@ function quarterForRecord(record){
  return window.SolinAddressContext?.resolveQuarter(record,q)||null;
 }
 const numeric=new Set(['PLV','GodT','CkKr','VNUM','M2Pr','M3G','M3KP','M3KPC','M4ZO','M4ZL','M4SS','AKL','AGR','AGR1','STUR','STUR1','PRkol','PRH','PRA','PRK1','PRK2','PRK3','KOEF','LET','PH','PD2','KT','POL','SPS','ZAP','RAS','Koef16','Voz16','H16','Ur16','Sbor','VZ','SHR','PRT','SHT','KLD','PR','PL','PL15','PTR1','PTR2','PTR3','PTR4','ZPR','STUR1','KOL','AV','ZO','LIK','DEL','PLP','MTC','G15','GZ']);
-numeric.add('VD');
+
 numeric.add('IAR'); // Original SIAR/PIAP link uses numeric KIAR; preserve numeric MDB column type.
 const aliases={PRkol:'Количество, тыс. шт.',PRH:'Средняя высота, м',PRA:'Средний возраст, лет',PRK1:'Коэффициент 1',PRK2:'Коэффициент 2',PRK3:'Коэффициент 3',PRP1:'Порода 1',PRP2:'Порода 2',PRP3:'Порода 3',PLP1:'Порода 1',PLP2:'Порода 2',PLP3:'Порода 3',PLG:'Густота',AGR1:'Группа возраста ТО',M2Pr:'Процент выборки, %'};
 const h=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -81,7 +81,7 @@ function recoveryPrompt(s,item){
  const box=document.createElement('section');box.className='ce-recovery';box.setAttribute('role','status');
  box.innerHTML='<div><b>Есть незаконченный ввод</b><p>'+h(stale?'Сохранённая карточка изменилась после создания черновика. Скачайте его копию перед началом новой работы.':'Продолжите с того места, где остановились. Сохранённая карточка пока не изменена.')+'</p></div><div class="ce-recovery-actions">'+(!stale?'<button type="button" data-ce-recover>Продолжить черновик</button>':'')+'<button type="button" data-ce-draft-copy>Скачать копию</button><button type="button" data-ce-draft-discard>Начать заново</button></div>';
  const form=document.getElementById('ce-form');form.querySelector('.dt-toolbar').inert=true;form.querySelector('.dt-viewport').inert=true;
- form.querySelector('.ce-area-help').after(box);
+ form.querySelector('#ce-entry-checks').after(box);
  box.addEventListener('click',e=>{
   if(e.target.closest('[data-ce-draft-copy]')){
    draftCopy(item);return;
@@ -149,9 +149,11 @@ function input(form,field,value,scope,index){
   el.replaceWith(numericInput);el=numericInput;
  }
  window.SolinFieldTypes?.bind(el,value);
+ if(field==='VD'){el.type='text';el.inputMode='text';el.autocomplete='off';}
  const caption=form==='Макет10'&&field==='POL'?polRules(session?.draft?.KU).label:
   (SolinHuman.isTechnical(form,field)?D.fieldLabels?.[field]||field:title(form,field));
  label.className='ce-field';label.querySelector('span').textContent=caption+(session?.isNew&&scope==='base'&&['KU','M3Pr','M3TLU'].includes(field)?' *':'');
+ if(session?.quick&&el.tagName==='INPUT')el.enterKeyHint='next';
  el.id=id;el.dataset.ceField=field;el.dataset.ceScope=scope;el.dataset.ceForm=form;
  el.setAttribute('aria-label',caption);el.removeAttribute('data-wffield');
  if(index!=null)el.dataset.ceRow=index;
@@ -211,33 +213,34 @@ function table(form){
   return '<div class="ce-category-no-trees" role="status">Для категории '+h(category.code)+
    ' «'+h(category.name)+'» оригинальный SKU.P10 не предусматривает ярусы древостоя.'+
    ' Макет 10 здесь не заполняется; существующие записи других категорий не изменены.</div>';
- return '<div class="ce-table-wrap" tabindex="0" aria-label="Таблица '+h(form)+'"><table class="ce-table"><caption class="ce-sr-only">'+h(form)+' — '+h(SolinHuman.formName(form))+'</caption><colgroup><col style="width:24px">'+schema.map(f=>'<col'+(m10?' style="width:'+({IAR:145,KOEF:85,POR:190,LET:55,PH:55,PD2:55,KT:70,PROI:160,POL:80,SPS:75,ZAP:110}[f]||90)+'px"':'')+'>').join('')+'</colgroup><thead><tr><th scope="col"></th>'+schema.map(f=>'<th scope="col">'+h(m10&&f==='POL'?polRules(session.draft.KU).label:m10?desktopLabels[f]:SolinHuman.label(form,f))+'</th>').join('')+'</tr></thead><tbody>'+shown.map((row,i)=>'<tr'+(!rs.length?' data-ce-placeholder="true"':'')+'><th scope="row" tabindex="0" data-ce-select="'+i+'" data-ce-select-form="'+h(form)+'" aria-label="Запись '+(i+1)+'">'+(i===0?'►':'')+'</th>'+schema.map(f=>maket10InputCell(form,f,row,i,shown)).join('')+'</tr>').join('')+'</tbody></table></div><div class="dt-record-nav"><span>Запись: </span><button type="button" data-ce-record="first" data-ce-table="'+form+'" aria-label="Первая запись">|◀</button><button type="button" data-ce-record="previous" data-ce-table="'+form+'" aria-label="Предыдущая запись">◀</button><span data-ce-count="'+form+'">'+(rs.length?'1 из '+rs.length:'Новая')+'</span><button type="button" data-ce-record="next" data-ce-table="'+form+'" aria-label="Следующая запись">▶</button><button type="button" data-ce-record="last" data-ce-table="'+form+'" aria-label="Последняя запись">▶|</button><button type="button" data-ce-add="'+form+'" aria-label="Добавить запись">▶*</button><button type="button" data-ce-delete="'+form+'" data-ce-index="0" aria-label="Удалить выбранную запись">×</button></div>';
+ return '<div class="ce-table-wrap" tabindex="0" aria-label="Таблица '+h(form)+'"><table class="ce-table"><caption class="ce-sr-only">'+h(form)+' — '+h(SolinHuman.formName(form))+'</caption><colgroup><col style="width:24px">'+schema.map(f=>'<col'+(m10?' style="width:'+({IAR:145,KOEF:85,POR:190,LET:55,PH:55,PD2:55,KT:70,PROI:160,POL:80,SPS:75,ZAP:110}[f]||90)+'px"':'')+'>').join('')+'</colgroup><thead><tr><th scope="col"></th>'+schema.map(f=>'<th scope="col">'+h(m10&&f==='POL'?polRules(session.draft.KU).label:m10?desktopLabels[f]:SolinHuman.label(form,f))+'</th>').join('')+'</tr></thead><tbody>'+shown.map((row,i)=>'<tr'+(!rs.length?' data-ce-placeholder="true"':'')+'><th scope="row" tabindex="0" data-ce-select="'+i+'" data-ce-select-form="'+h(form)+'" aria-label="Запись '+(i+1)+'">'+(i===0?'►':'')+'</th>'+schema.map(f=>maket10InputCell(form,f,row,i,shown)).join('')+'</tr>').join('')+'</tbody></table></div><div class="dt-record-nav"><span>Запись: </span><button type="button" data-ce-record="first" data-ce-table="'+form+'" aria-label="Первая запись">|◀</button><button type="button" data-ce-record="previous" data-ce-table="'+form+'" aria-label="Предыдущая запись">◀</button><span data-ce-count="'+form+'">'+(rs.length?'1 из '+rs.length:'Новая')+'</span><button type="button" data-ce-record="next" data-ce-table="'+form+'" aria-label="Следующая запись">▶</button><button type="button" data-ce-record="last" data-ce-table="'+form+'" aria-label="Последняя запись">▶|</button><button type="button" data-ce-add="'+form+'" aria-label="Добавить запись">'+(m10?'＋ Строка':'▶*')+'</button><button type="button" data-ce-delete="'+form+'" data-ce-index="0" aria-label="Удалить выбранную запись">×</button></div>';
 }
 function footer(){const routes=SOLIN_AUDIT.routes['ВыделВ']||[],buttons=routes.filter(x=>/^\d+$/.test(x.caption)).sort((a,b)=>Number(a.left)-Number(b.left));
- return '<footer class="dt-footer"><span class="dt-footer-label">Макет</span>'+buttons.map(b=>'<button type="button" data-ce-extra="Макет'+h(b.caption)+'" style="left:'+(Number(b.left)*.08)+'px;width:'+(Number(b.width)*.08)+'px" title="'+h(SolinHuman.formName('Макет'+b.caption))+'" aria-label="Макет '+b.caption+' — '+h(SolinHuman.formName('Макет'+b.caption))+'">'+b.caption+'</button>').join('')+'<select class="dt-maket-select" aria-label="Дополнительные макеты"><option value=""></option>'+[10,...extras,31,32].map(n=>'<option value="'+n+'">Макет '+n+' — '+h(SolinHuman.formName('Макет'+n))+'</option>').join('')+'</select><button type="button" class="dt-kt" data-ce-preview>КТ</button><button type="button" class="dt-print" data-ce-print>Печать</button><button type="button" class="dt-control" data-ce-controls="6">Конт. рубок</button><button type="button" class="dt-new" data-ce-new>Новая</button><button type="submit" class="dt-exit" id="ce-exit">Выход</button></footer>';
+ return '<footer class="dt-footer"><button type="button" class="field-makets-button" data-ce-makets>Макеты</button><div hidden><span class="dt-footer-label">Макет</span>'+buttons.map(b=>'<button type="button" data-ce-extra="Макет'+h(b.caption)+'" style="left:'+(Number(b.left)*.08)+'px;width:'+(Number(b.width)*.08)+'px" title="'+h(SolinHuman.formName('Макет'+b.caption))+'" aria-label="Макет '+b.caption+' — '+h(SolinHuman.formName('Макет'+b.caption))+'">'+b.caption+'</button>').join('')+'<select class="dt-maket-select" aria-label="Дополнительные макеты"><option value=""></option>'+[10,...extras,31,32].map(n=>'<option value="'+n+'">Макет '+n+' — '+h(SolinHuman.formName('Макет'+n))+'</option>').join('')+'</select><button type="button" class="dt-kt" data-ce-preview>КТ</button><button type="button" class="dt-print" data-ce-print>Печать</button><button type="button" class="dt-control" data-ce-controls="6">Конт. рубок</button><button type="button" class="dt-new" data-ce-new>Новая</button><button type="submit" class="dt-exit" id="ce-exit">Выход</button></div></footer>';
 }
 function markup(){const s=session,r=s.draft,o=D.lesnichestvo?.find(x=>same(x.POS,r.POS)&&same(x.LESN,r.LESN))||{},stands=D.quarters[r.KV]?.compartments.filter(x=>same(x.POS,r.POS)&&same(x.LESN,r.LESN)&&same(x.KGLF,r.KGLF))||[],known=new Set([...keys,'Fzona','PLV','KU','CR','KlxrVD',...sections.flatMap(x=>x[2])]),rest=(D.transfSchema['Выдел']||[]).filter(f=>!known.has(f));
- return '<form id="ce-form" novalidate><div class="dt-toolbar"><div class="dt-zoom-controls"><span>Масштаб</span><button type="button" data-ce-zoom="out" aria-label="Уменьшить">−</button><output id="ce-zoom">100%</output><button type="button" data-ce-zoom="in" aria-label="Увеличить">+</button><button type="button" data-ce-zoom="fit">По ширине</button><button type="button" data-ce-zoom="actual">100%</button></div><span class="dt-toolbar-spacer"></span><div class="dt-tools"><button type="button" data-ce-support>Поля…</button><button type="button" data-ce-makets>Макеты</button><button type="button" data-ce-controls="">Контроль</button><button type="submit" id="ce-save">Сохранить</button><button type="button" id="ce-cancel">Отмена</button><span id="ce-status" role="status">'+(s.isNew?'Новая':'')+'</span></div></div>'+
+ return '<form id="ce-form" novalidate><div class="dt-toolbar"><div class="dt-zoom-controls"><span>Масштаб</span><button type="button" data-ce-zoom="out" aria-label="Уменьшить">−</button><output id="ce-zoom">100%</output><button type="button" data-ce-zoom="in" aria-label="Увеличить">+</button><button type="button" data-ce-zoom="fit">По ширине</button><button type="button" data-ce-zoom="actual">100%</button></div><span class="dt-toolbar-spacer"></span><div class="dt-tools"><details class="ce-card-more"><summary>Ещё</summary><div><button type="button" data-ce-support>Дополнительные поля</button><button type="button" data-ce-controls="">Контроль карточки</button><button type="button" data-ce-controls="6">Контроль рубок</button><button type="button" data-ce-preview>Просмотр КТ</button><button type="button" data-ce-print>Печать КТ</button><button type="button" data-ce-new>Новая карточка</button></div></details><button type="submit" id="ce-save">Сохранить</button><button type="button" id="ce-cancel">Отмена</button><span id="ce-status" role="status">'+(s.isNew?'Новая':'')+'</span></div></div>'+
  '<div id="ce-calc-notice" class="ce-calc-notice" role="status" aria-live="polite" hidden></div>'+
   '<div id="ce-stock-audit" class="ce-stock-audit" role="status" aria-live="polite"></div>'+ 
  '<div class="dt-viewport" aria-label="Настольная карточка. Прокрутка по горизонтали и вертикали" tabindex="0"><div class="dt-stage"><div class="dt-board" data-desktop-width="1200"><div id="ce-main"><header class="dt-header"><div class="ce-summary"><h2>Карточка таксации</h2></div><div class="dt-counters"><span>Выделов всего;</span>'+fixed('',stands.length,42,{aria:'Выделов всего'})+'<span>последний</span>'+fixed('',stands.length?Math.max(...stands.map(x=>Number(x.VD)||0)):'',48,{aria:'Последний выдел'})+'</div><div class="dt-owner"><span>Лесовладелец</span>'+fixed('',r.POS,42,{aria:'Код лесовладельца'})+fixed('',o.NLX,520,{aria:'Лесовладелец'})+'<span>Лесничество</span>'+fixed('',r.LESN,40,{aria:'Номер лесничества'})+fixed('',o.NOS,304,{aria:'Лесничество'})+'</div><div class="dt-category"><span>Категория ГЛФ</span>'+fixed('',r.KGLF,42,{aria:'Категория ГЛФ, код'})+fixed('',description('ВыделВ','KGLF',r.KGLF),745,{aria:'Категория ГЛФ'})+cell('Fzona',r.Fzona,'base','ВыделВ',{label:'Функ. зона',inline:true,split:true})+'</div><div class="dt-quarter"><span>Квартал</span>'+fixed('',r.KV,38,{aria:'Квартал'})+cell('GodT',s.quarter.GodT,'quarter','Квартал',{label:'Год таксации',inline:true})+cell('Rel',s.quarter.Rel,'quarter','Квартал',{label:'Рельеф',inline:true,split:true})+cell('Dost',s.quarter.Dost,'quarter','Квартал',{label:'Доступность',inline:true,split:true})+
  cell('Raion',s.quarter.Raion,'quarter','Квартал',{label:'Адм. район',inline:true})+cell('KlxrVD',r.KlxrVD,'base','ВыделВ',{label:false,split:true})+'</div></header>'+
  '<section class="dt-base" aria-label="Выдел и категория угодий">'+(s.isNew?cell('VD',r.VD,'base','ВыделВ',{label:'Выдел',weight:.45}):fixed('Выдел',r.VD,42))+cell('PLV',r.PLV,'base','ВыделВ',{label:'Площадь',weight:.65})+cell('KU',r.KU,'base','ВыделВ',{label:'Категория угодий',weight:3.2,split:true})+cell('CR',r.CR,'base','ВыделВ',{label:'Способ рубки',weight:1.9,split:true})+fixed('Памятник, заказник','',235,{unavailable:true})+fixed('Арендатор','',220,{unavailable:true})+'</section>'+
- '<div id="ce-category-guidance" class="ce-category-guidance" role="status" aria-live="polite">Допустимые ярусы будут показаны после выбора категории угодий.</div>'+ 
+ '<div id="ce-category-guidance" class="ce-category-guidance" role="status" aria-live="polite" hidden></div>'+
  maket('1',cell('OZU',r.OZU,'base','ВыделВ',{label:'Особозащитный участок',weight:3.2,split:true})+cell('CkEk',r.CkEk,'base','ВыделВ',{label:'Склон - экспозиция',weight:1.7,split:true})+cell('CkKr',r.CkKr,'base','ВыделВ',{label:'крутизна',weight:.65})+cell('VNUM',r.VNUM,'base','ВыделВ',{label:'ВНУМ',weight:.65})+cell('ErV',r.ErV,'base','ВыделВ',{label:'Эрозия - вид',weight:1.6,split:true})+cell('ErCt',r.ErCt,'base','ВыделВ',{label:'степень',weight:1.5,split:true}))+
  maket('2',cell('M2PM1',r.M2PM1,'base','ВыделВ',{label:'Первое мероприятие',weight:3.1,split:true})+cell('M2Pr',r.M2Pr,'base','ВыделВ',{label:'Процент',weight:.55})+cell('M22',r.M22,'base','ВыделВ',{label:'Второе мероприятие',weight:2.6,split:true})+cell('M23',r.M23,'base','ВыделВ',{label:'Третье мероприятие',weight:2.6,split:true})+cell('M2Cp',r.M2Cp,'base','ВыделВ',{label:'Целевая порода',weight:2.2,split:true}))+
- maket('3',fixed('Главная порода (см. Основные данные)',description('ВыделВ','M3Pr',r.M3Pr)||r.M3Pr,210)+cell('M3B',r.M3B,'base','ВыделВ',{label:'Бонитет',weight:.6})+fixed('Тип леса (см. Основные данные)',description('ВыделВ','M3TLU',r.M3TLU)||r.M3TLU,260)+cell('M3G',r.M3G,'base','ВыделВ',{label:'Год выруб.',weight:.75})+cell('M3KP',r.M3KP,'base','ВыделВ',{label:'Пней всего, шт.',weight:.9})+cell('M3KPC',r.M3KPC,'base','ВыделВ',{label:'в т.ч. хвойных',weight:.9}))+
+ maket('3',fixed('Главная порода',description('ВыделВ','M3Pr',r.M3Pr)||r.M3Pr,210)+cell('M3B',r.M3B,'base','ВыделВ',{label:'Бонитет',weight:.6})+fixed('Тип леса',description('ВыделВ','M3TLU',r.M3TLU)||r.M3TLU,260)+cell('M3G',r.M3G,'base','ВыделВ',{label:'Год выруб.',weight:.75})+cell('M3KP',r.M3KP,'base','ВыделВ',{label:'Пней всего, шт.',weight:.9})+cell('M3KPC',r.M3KPC,'base','ВыделВ',{label:'в т.ч. хвойных',weight:.9}))+
  maket('4',cell('M4ZO',r.M4ZO,'base','ВыделВ',{label:'Захламленность общая, м3/га',inline:true,weight:3.5})+cell('M4ZL',r.M4ZL,'base','ВыделВ',{label:'Ликвид, м3/га',inline:true,weight:2.1})+cell('M4SS',r.M4SS,'base','ВыделВ',{label:'Сухостой, м3/га',inline:true,weight:2.1}))+
  maket('5',cell('AKL',r.AKL,'base','ВыделВ',{label:'Класс возраста',inline:true,weight:1.8})+cell('AGR',r.AGR,'base','ВыделВ',{label:'Группа возраста',inline:true,weight:1.8})+cell('AGR1',r.AGR1,'base','ВыделВ',{label:'Группа возр. ТО',inline:true,weight:1.9})+cell('STUR',r.STUR,'base','ВыделВ',{label:'Запас выдела',inline:true,weight:1.9})+cell('STUR1',r.STUR1,'base','ВыделВ',{label:'Запас на гектар',inline:true,weight:2})+'<div class="dt-fixed dt-inline ce-stock-metric"><span>Все живые ярусы, м³/га</span><output id="ce-stock-live">—</output></div><div class="dt-fixed dt-inline ce-stock-metric"><span>Ед. деревья, м³/га</span><output id="ce-stock-single">—</output></div>'+
  '<div class="dt-fixed dt-inline ce-stock-metric"><span>Свежий сухостой ярус 8, м³/га</span><output id="ce-stock-fresh">—</output></div>'+
   '<div class="dt-fixed dt-inline ce-stock-metric"><span>Сухостой M4SS, м³/га</span><output id="ce-stock-drywood">—</output></div>')+
  
- '<section class="dt-stand" id="ce-section-10" aria-label="Основные данные о древостое"><b class="dt-stand-title" title="Исходный макет 10 SOLI-N: древостой, полнота, запас">Основные данные</b><div class="ce-v23-species"><span>Главная порода и характеристика типа леса (М3). Важно: Е — ель, ЕШ — ель Шренка (разные таблицы запаса):</span>'+cell('M3Pr',r.M3Pr,'base','ВыделВ',{label:'Главная порода',weight:1,split:true})+cell('M3TLU',r.M3TLU,'base','ВыделВ',{label:'Характеристика типа леса',weight:2,split:true})+'</div><div id="ce-table-Макет10">'+table('Макет10')+'</div></section>'+
+ '<section class="dt-stand" id="ce-section-10" aria-label="Основные данные о древостое"><b class="dt-stand-title" title="Исходный макет 10 SOLI-N: древостой, полнота, запас">Основные данные</b><div class="ce-v23-species">'+cell('M3Pr',r.M3Pr,'base','ВыделВ',{label:'Главная порода',weight:1,split:true})+cell('M3TLU',r.M3TLU,'base','ВыделВ',{label:'Характеристика типа леса',weight:2,split:true})+'</div><div id="ce-table-Макет10">'+table('Макет10')+'</div></section>'+
  maket('31',cell('PRkol',r.PRkol,'base','ВыделВ',{label:'К-во, тыс.шт.',weight:.65})+cell('PRH',r.PRH,'base','ВыделВ',{label:'Ср. выс.',weight:.6})+cell('PRA',r.PRA,'base','ВыделВ',{label:'Ср. возр.',weight:.6})+cell('PRK1',r.PRK1,'base','ВыделВ',{label:'коэфф. 1',weight:.55})+cell('PRP1',r.PRP1,'base','ВыделВ',{label:'1 порода',weight:2,split:true})+cell('PRK2',r.PRK2,'base','ВыделВ',{label:'коэфф. 2',weight:.55})+cell('PRP2',r.PRP2,'base','ВыделВ',{label:'2 порода',weight:2,split:true})+cell('PRK3',r.PRK3,'base','ВыделВ',{label:'коэфф. 3',weight:.55})+cell('PRP3',r.PRP3,'base','ВыделВ',{label:'3 порода',weight:2,split:true}))+
  maket('32',cell('PLG',r.PLG,'base','ВыделВ',{label:'Густота',weight:2,split:true})+cell('PLP1',r.PLP1,'base','ВыделВ',{label:'1 порода',weight:2.8,split:true})+cell('PLP2',r.PLP2,'base','ВыделВ',{label:'2 порода',weight:2.8,split:true})+cell('PLP3',r.PLP3,'base','ВыделВ',{label:'3 порода',weight:2.8,split:true}))+footer()+'</div><div id="ce-extra" hidden></div><div id="ce-action-panel" hidden></div><div class="ce-other" hidden><div class="ce-grid">'+fields('ВыделВ',rest,r,'base')+'</div></div></div></div></div><div id="ce-error" role="alert" tabindex="-1"></div></form>';
 }
 
 function readValue(el,old){const raw=el.__solinQuarterPicker?el.__solinQuarterPicker.value():el.tagName==='SELECT'?el.value:el.value.trim(),field=el.dataset.ceField;
+ if(field==='VD'){const number=standNumber(raw);if(!number)throw Error('Введите номер выдела, например 1 или 1а.');return String(old)===number?old:number;}
  // Native tablet select uses canonical fractions, not floating-point text.
  // In particular, selecting 0.7 must never be confused with the saved 0.
  if(el.dataset.ceForm==='Макет10'&&field==='POL'&&el.tagName==='SELECT'){
@@ -285,17 +288,10 @@ function refreshLinked(){
  const engine=window.SolinDependentRules;
  const guide=document.getElementById('ce-category-guidance');
  if(guide){
-  const info=window.SolinDependentRules.allowedLayers(session.draft,window.SOLIN_REFS?.tables);
-  const categoryGuide=window.SolinCategoryRules?.guide(session.draft.KU,window.SOLIN_REFS?.tables)||'';
-  const layerGuide=info.status==='complete'&&info.items.length?
-   ' Допустимые ярусы: '+info.items.map(x=>x.value+' '+x.label).join('; ')+'.':
-   info.reason?' '+info.reason:'';
   const reclassified=!session.isNew&&String(session.original.KU??'')!==String(session.draft.KU??'');
   const hasOldMakets=Object.values(session.original._children||{}).some(rows=>Array.isArray(rows)&&rows.length>0);
-  guide.textContent=categoryGuide+layerGuide+
-   (reclassified&&hasOldMakets?
-    ' Внимание: категория изменена. В оригинальном SOLI-N требуется удалить и заново ввести такой выдел, чтобы старые макеты не попали в новую категорию. Сохранение прежних макетов заблокировано.':'');
-  guide.dataset.ceCategoryStatus=info.status;
+  guide.hidden=!(reclassified&&hasOldMakets);
+  guide.textContent=guide.hidden?'':'Для смены категории при заполненных макетах создайте новый выдел.';
  }
 
  for(const el of document.querySelectorAll('#ce-form select[data-ce-field]')){
@@ -403,14 +399,13 @@ function recalculateEditedField(el){
    }
  }
  if(!changed.length){refreshStockPanel();
-  if(scope==='Макет10'&&standFields.has(field)){
+  if(scope==='Макет10'){
    const root=document.getElementById('ce-calc-notice'),k59=check.stockPerHectare;
    if(root){
-    if(!root.hidden&&root.querySelector('table')&&(session.calcNotices||[]).length)return;
-    root.hidden=false;
-    root.innerHTML=k59?.status==='complete'?
-     '<strong>К59: нормативный запас проверен</strong><p>Расчётный запас '+h(k59.expected)+' м³/га совпадает со значением макета 10. Автоматическая замена не требовалась.</p>':
-     '<strong>Запас не проверен по К59</strong><p>'+h(k59?.reason||'Не удалось получить нормативный запас')+'. Введённое значение не признано правильным и не исправлено автоматически.</p>';
+    if(!root.hidden&&root.querySelector('.ce-calc-changes'))return;
+    const warning=field==='ZAP'&&k59?.status!=='complete';
+    root.hidden=!warning;
+    root.textContent=warning?'К59 · '+(k59?.reason||'Не удалось проверить запас'):'';
    }
   }
   return;
@@ -433,25 +428,15 @@ function recalculateEditedField(el){
  const companionCorrected=changed.some(item=>item.kind==='companion-zero');
  const k59=check.stockPerHectare,normativeVerified=k59?.status==='complete';
  if(!normativeVerified)session.calcNotices=session.calcNotices.filter(x=>x.field!=='ZAP');
- const headline=normativeCorrected?'К59: нормативный ZAP исправлен':
-  companionCorrected?'Макет 10: запас примесной породы обнулён':
-  normativeVerified?'К59: запас проверен, итоги пересчитаны':'Запас не проверен по К59 · пересчитаны только зависимые значения';
- const explanation=normativeCorrected?
-  'Неверный ZAP автоматически исправлен по исходной таблице SOLI-N. Итоговые запасы пересчитаны из нормативного значения. Изменения пока находятся в черновике.':
-  companionCorrected?
-   'У примеси запас должен быть 0: запас яруса хранится только у ведущей породы. '+(normativeVerified?'Норматив подтверждён по К59.':'Норматив не проверен по К59: '+(k59?.reason||'пока не подтверждён')+'.')+' Черновик не сохранён.':
-  normativeVerified?
-   'Введённый ZAP соответствует расчёту К59. Зависимые запасы пересчитаны. Изменения пока не сохранены.':
-   'К59 не подтвердил введённый ZAP: '+(k59?.reason||'нет однозначного расчёта')+
-   '. Итоги STUR1 и STUR рассчитаны из введённого ZAP, но это не доказывает, что запас на гектар правильный.';
+ const headline=normativeCorrected?'Запас исправлен по К59':
+  companionCorrected?'Запас примесной породы исправлен':'Пересчитано';
  notice.hidden=false;
  notice.innerHTML='<div class="ce-calc-heading"><strong>'+h(headline)+'</strong>'+
-   '<button type="button" data-ce-calc-close aria-label="Скрыть таблицу расчётов">×</button></div>'+
-   '<p>'+h(explanation)+'</p>'+
-   '<div class="ce-calc-table-wrap"><table><thead><tr><th>Поле</th><th>Было</th><th>Стало</th><th>Основание</th></tr></thead><tbody>'+
-   session.calcNotices.map(item=>'<tr><td>'+h(item.label)+'</td><td>'+h(item.previous)+'</td><td><b>'+h(item.expected)+'</b></td><td>'+h(item.reason)+'</td></tr>').join('')+
-   '</tbody></table></div>';
- refreshStockPanel();notice.scrollIntoView({block:'nearest',behavior:'smooth'});
+   '<button type="button" data-ce-calc-close aria-label="Скрыть результаты расчёта">×</button></div>'+
+   '<div class="ce-calc-changes">'+session.calcNotices.map(item=>'<div title="'+h(item.reason)+'">'+h(item.label)+
+    ' · '+h(item.previous)+' → <b>'+h(item.expected)+'</b></div>').join('')+'</div>'+
+   (normativeVerified?'':'<p>К59 · '+h(k59?.reason||'Запас требует проверки')+'</p>');
+ refreshStockPanel();
 }
 function linkedIssues(){
  const engine=window.SolinDependentRules;
@@ -586,16 +571,16 @@ function capture(el){if(!el.matches('[data-ce-field]'))return;
   if(rows.length===1&&String(rows[0].POR??'')===String(previous??'')){
    rows[0].POR=target[field];
    const origin=window.SolinDependentRules?.suggestedOrigin?.(target[field],window.SOLIN_REFS?.tables);
-   if(origin!=null)rows[0].PROI=origin;
+   if(origin!=null&&String(rows[0].IAR)==='1')rows[0].PROI=origin;
    rows[0].ZAP=null; // Force new K59 calculation; old species' stock cannot carry over.
    session.changedMakets.add('Макет10');rerenderTable('Макет10');
   }
  }
- if(scope==='Макет10'&&field==='POR'&&window.SolinDependentRules){
+ if(scope==='Макет10'&&['POR','IAR'].includes(field)&&String(target.IAR)==='1'&&window.SolinDependentRules){
   const engine=window.SolinDependentRules,refs=window.SOLIN_REFS?.tables;
-  const suggested=engine.suggestedOrigin(target.POR,refs),oldSuggested=engine.suggestedOrigin(previous,refs);
+  const suggested=engine.suggestedOrigin(target.POR,refs),oldSuggested=field==='POR'?engine.suggestedOrigin(previous,refs):null;
   const currentOrigin=target.PROI;
-  if(suggested!==null&&(currentOrigin==null||String(currentOrigin)==='0'||oldSuggested!==null&&String(currentOrigin)===String(oldSuggested))){
+  if(suggested!==null&&(currentOrigin==null||oldSuggested!==null&&String(currentOrigin)===String(oldSuggested))){
    target.PROI=suggested;
    const originEl=document.getElementById('ce_'+scope+'_'+index+'_PROI');
    if(originEl){
@@ -659,7 +644,7 @@ function refreshEntryChecks(){
 function error(message,el,location){const box=document.querySelector('#ce-error');box.textContent=message;
  if(location?.form){if(location.form.startsWith('Макет')&&location.form!=='Макет10')showExtra(location.form);else showMain();el=document.querySelector('[data-ce-scope="'+location.scope+'"][data-ce-field="'+location.field+'"]'+(location.index==null?'':'[data-ce-row="'+location.index+'"]'));}
  const main=document.querySelector('#ce-main'),extra=document.querySelector('#ce-extra');
- if(el){const form=el.dataset.ceScope;if(form.startsWith('Макет')&&form!=='Макет10')showExtra(form);else{main.hidden=false;extra.hidden=true;}}
+ if(el){const form=el.dataset.ceScope;if(form.startsWith('Макет')&&form!=='Макет10')showExtra(form);else{main.hidden=false;extra.hidden=true;document.querySelector('#ce-action-panel').hidden=true;}}
  if(el?.closest('.ce-other'))showSupport();
  const target=el?.isConnected?el:box;target.closest('details')?.setAttribute('open','');target.focus();target.scrollIntoView({block:'center',inline:'center'});
 }
@@ -668,10 +653,10 @@ function showMain(jump){document.querySelector('#ce-main').hidden=false;document
  document.querySelector('#ce-action-panel').hidden=true;
  document.querySelectorAll('[data-ce-extra]').forEach(b=>b.removeAttribute('aria-current'));
  if(jump)document.getElementById('ce-section-'+jump)?.scrollIntoView({block:'start',behavior:'smooth'});
- else document.querySelector('.ce-summary').scrollIntoView({block:'start'});
+ else document.querySelector('.dt-viewport').scrollTop=0;
 }
 function showExtra(form){const root=document.querySelector('#ce-extra');
- document.querySelector('#ce-main').hidden=false;document.querySelector('#ce-action-panel').hidden=true;root.hidden=false;
+ document.querySelector('#ce-main').hidden=true;document.querySelector('#ce-action-panel').hidden=true;root.hidden=false;
  if(root.dataset.form!==form){root.dataset.form=form;root.innerHTML='<div class="dt-subtitle"><span>Макет '+h(form.replace('Макет',''))+' — '+h(SolinHuman.formName(form))+'</span><button type="button" data-ce-main aria-label="Закрыть макет">×</button></div><div class="dt-subbody">'+(form==='Макет16'?'<p>Параметры и урожайность можно рассчитать по древостою. Сначала проверьте предлагаемые изменения.</p><button type="button" data-ce-m16="create">Создать по древостою</button> <button type="button" data-ce-m16="parameters">Обновить параметры</button>':'')+'<div id="ce-table-'+h(form)+'">'+table(form)+'</div></div>';}
  document.querySelectorAll('[data-ce-extra]').forEach(b=>{if(b.dataset.ceExtra===form)b.setAttribute('aria-current','true');else b.removeAttribute('aria-current')});
  refreshLinked();root.scrollIntoView({block:'nearest',inline:'nearest'});
@@ -714,28 +699,46 @@ function setZoom(value){const viewport=document.querySelector('.dt-viewport'),fi
  let scale=value==='fit'?fit:value==='actual'?1:value==='in'?(session.zoom||1)+.15:value==='out'?(session.zoom||1)-.15:Number(value);
  scale=Math.max(Math.min(fit,.25),Math.min(2,scale));session.zoom=scale;const stage=viewport.querySelector('.dt-stage');stage.style.width=DESKTOP_WIDTH*scale+'px';stage.style.height=DESKTOP_HEIGHT*scale+'px';stage.querySelector('.dt-board').style.transform='scale('+scale+')';document.querySelector('#ce-zoom').textContent=Math.round(scale*100)+'%';if(value==='fit'||value==='actual'){viewport.scrollLeft=0;viewport.scrollTop=0;}
 }
-function panel(caption,html){const root=document.querySelector('#ce-action-panel');document.querySelector('#ce-extra').hidden=true;root.hidden=false;root.innerHTML='<div class="dt-subtitle"><span>'+h(caption)+'</span><button type="button" data-ce-main aria-label="Закрыть окно">×</button></div><div class="dt-subbody">'+html+'</div>';root.scrollIntoView({block:'nearest',inline:'nearest'});return root;}
+function panel(caption,html){const root=document.querySelector('#ce-action-panel');document.querySelector('#ce-main').hidden=true;document.querySelector('#ce-extra').hidden=true;root.hidden=false;root.innerHTML='<div class="dt-subtitle"><span>'+h(caption)+'</span><button type="button" data-ce-main aria-label="Закрыть окно">×</button></div><div class="dt-subbody">'+html+'</div>';root.scrollIntoView({block:'nearest',inline:'nearest'});return root;}
 function showSupport(){panel('Дополнительные поля карточки','').querySelector('.dt-subbody').append(session.supportGrid);}
 function showMaketNavigator(){
  const standard=sections.map(([n,label])=>({n,label,kind:'standard'}));
- const others=[{n:'10',label:'Таксационная характеристика древостоя',kind:'table'},
+ const others=[{n:'10',label:'Основные данные · древостой',kind:'table'},
    ...extras.map(n=>({n:String(n),label:SolinHuman.formName('Макет'+n),kind:'table'}))];
  const items=[...standard,...others].sort((a,b)=>Number(a.n)-Number(b.n));
- const html='<p class="ce-maket-guide">Макеты выбранного выдела. Число записей берётся из текущей карточки. Изменения сохраняются только кнопкой «Сохранить».</p>'+
-  '<div class="ce-maket-nav">'+items.map(item=>{
+ const html='<div class="ce-maket-nav">'+items.map(item=>{
    const form='Макет'+item.n;
    const count=item.kind==='table'?(session.draft._children?.[form]?.length||0):null;
    return '<button type="button" class="ce-maket-nav-item" data-ce-nav-maket="'+h(item.n)+'">'+
-    '<b>Макет '+h(item.n)+'</b><span>'+h(item.label)+'</span>'+
+    '<b>'+(item.n==='10'?'Основные данные':'Макет '+h(item.n))+'</b><span>'+h(item.n==='10'?'Древостой':item.label)+'</span>'+
     (count==null?'':'<small>'+count+' зап.</small>')+'</button>';
   }).join('')+'</div>';
- panel('Навигатор макетов',html);
+ panel('Макеты',html);
 }
 function focusControlIssue(issue){
- const form=issue.form||'ВыделВ';if(form==='ВыделВ')showMain();else if(form==='Макет10')showMain('10');else showExtra(form);
- const scope=form==='ВыделВ'?'base':form;const fields=[...document.querySelectorAll('[data-ce-scope="'+scope+'"]')];
- const target=fields.find(el=>(!issue.field||el.dataset.ceField===issue.field)&&(issue.row==null||Number(el.dataset.ceRow)===issue.row));
- if(target){target.closest('details')?.setAttribute('open','');target.focus();target.scrollIntoView({block:'center',inline:'nearest'});}
+ const form=issue.form||'ВыделВ';
+ const number=/^Макет(\d+)$/.exec(form)?.[1];
+ const mainSection=sections.some(([section])=>section===number);
+ let scope;
+ if(form==='Квартал'){
+  scope='quarter';showMain();
+ }else if(form==='ВыделВ'||form==='Выдел'||mainSection){
+  scope='base';showMain(mainSection?number:undefined);
+ }else if(form==='Макет10'){
+  scope=form;showMain('10');
+ }else if(number&&extras.includes(Number(number))){
+  scope=form;showExtra(form);
+ }else{
+  return toast('Поле контроля находится за пределами карточки выдела.');
+ }
+ const fields=[...document.querySelectorAll('[data-ce-scope="'+scope+'"]')];
+ const target=fields.find(el=>(!issue.field||el.dataset.ceField===issue.field)&&
+  (scope==='base'||scope==='quarter'||issue.row==null||Number(el.dataset.ceRow)===Number(issue.row)));
+ if(!target)return toast('Поле для этого замечания в карточке не найдено.');
+ if(session?.supportGrid?.contains(target))showSupport();
+ target.closest('details')?.setAttribute('open','');
+ target.focus();
+ target.scrollIntoView({block:'center',inline:'nearest'});
 }
 function showChecks(group=''){
  const currentSession=session,r=session.draft,q=D.quarters[String(r.KV)],rows=q.quarterRows?.length?q.quarterRows:[q.meta||{}];
@@ -744,8 +747,8 @@ function showChecks(group=''){
  const host=panel('Контроль карточки','<div id="ce-control-report"></div>').querySelector('#ce-control-report');
  SolinControlUI.mount(host,{records:[r],database,draft:true,caption:'Квартал '+r.KV+' · выдел '+r.VD,group,onNavigate:issue=>{if(session===currentSession)focusControlIssue(issue);}});
 }
-function preview(print){const popup=window.open('','_blank');if(!popup)return toast('Разрешите открытие окна карточки');const paper=document.querySelector('.dt-board').cloneNode(true);paper.querySelectorAll('#ce-extra,#ce-action-panel,.ce-other').forEach(e=>e.remove());for(const el of paper.querySelectorAll('input,select')){const span=document.createElement('output');span.textContent=el.tagName==='SELECT'?el.selectedOptions[0]?.textContent||'':el.value;el.replaceWith(span);}paper.querySelectorAll('button').forEach(b=>b.disabled=true);paper.style.transform='none';const css=new URL('solin-card-editor.css?v=20261023-6',location.href).href;popup.document.write('<!doctype html><html lang="ru"><meta charset="utf-8"><title>Карточка таксации — КТ</title><link rel="stylesheet" href="'+h(css)+'"><style>body{margin:8px;background:#eee}.ce-print{display:block;position:static}.ce-print .dt-board{position:relative}.print-action{margin-bottom:8px}</style><button class="print-action" onclick="print()">Печать</button><div class="ce-modal ce-print">'+paper.outerHTML+'</div><p style="font:11px Arial">Предварительный просмотр карточки. Официальное таксационное описание формируется в настольной SOLI-N.</p></html>');popup.document.close();if(print)popup.addEventListener('load',()=>popup.print(),{once:true});}
-function newCard(e){const previous=session.draft,kv=previous.KV;if(!save(e))return;const q=D.quarters[kv],org=D.lesnichestvo?.[0]||{},r=Object.fromEntries((D.transfSchema['Выдел']||[]).map(f=>[f,null]));for(const f of numeric)if(f in r)r[f]=0;for(const f of ['CR','OZU','ErV','ErCt','M2PM1','M22','M23','PLG'])r[f]=0;Object.assign(r,{POS:previous.POS??org.POS,LESN:previous.LESN??org.LESN,KV:kv,KGLF:previous.KGLF,VD:Math.max(0,...q.compartments.filter(x=>same(x.POS,previous.POS)&&same(x.LESN,previous.LESN)&&same(x.KGLF,previous.KGLF)).map(x=>Number(x.VD)||0))+1,PLV:1,KU:null,Fzona:previous.Fzona,KlxrVD:previous.KlxrVD,_children:{},_local:true});window.SolinAddressContext?.enrichStand(r,q,org);open(r,{isNew:true});}
+function preview(print){const popup=window.open('','_blank');if(!popup)return toast('Разрешите открытие окна карточки');const paper=document.querySelector('.dt-board').cloneNode(true);paper.querySelector('#ce-main').hidden=false;paper.querySelectorAll('#ce-extra,#ce-action-panel,.ce-other').forEach(e=>e.remove());for(const el of paper.querySelectorAll('input,select')){const span=document.createElement('output');span.textContent=el.tagName==='SELECT'?el.selectedOptions[0]?.textContent||'':el.value;el.replaceWith(span);}paper.querySelectorAll('button').forEach(b=>b.disabled=true);paper.style.transform='none';const css=new URL('solin-card-editor.css?v=20261023-6',location.href).href;popup.document.write('<!doctype html><html lang="ru"><meta charset="utf-8"><title>Карточка таксации — КТ</title><link rel="stylesheet" href="'+h(css)+'"><style>body{margin:8px;background:#eee}.ce-print{display:block;position:static}.ce-print .dt-board{position:relative}.print-action{margin-bottom:8px}</style><button class="print-action" onclick="print()">Печать</button><div class="ce-modal ce-print">'+paper.outerHTML+'</div><p style="font:11px Arial">Предварительный просмотр карточки. Официальное таксационное описание формируется в настольной SOLI-N.</p></html>');popup.document.close();if(print)popup.addEventListener('load',()=>popup.print(),{once:true});}
+function newCard(e){const previous=session.draft,kv=previous.KV;if(!save(e))return;const q=D.quarters[kv],org=D.lesnichestvo?.[0]||{},r=Object.fromEntries((D.transfSchema['Выдел']||[]).map(f=>[f,null]));for(const f of numeric)if(f in r)r[f]=0;for(const f of ['CR','OZU','ErV','ErCt','M2PM1','M22','M23','PLG'])r[f]=0;Object.assign(r,{POS:previous.POS??org.POS,LESN:previous.LESN??org.LESN,KV:kv,KGLF:previous.KGLF,VD:nextStandNumber(q.compartments.filter(x=>same(x.POS,previous.POS)&&same(x.LESN,previous.LESN)&&same(x.KGLF,previous.KGLF))),PLV:1,KU:null,Fzona:previous.Fzona,KlxrVD:previous.KlxrVD,_children:{},_local:true});window.SolinAddressContext?.enrichStand(r,q,org);open(r,{isNew:true});}
 function updateBadges(form){const n=session.draft._children[form]?.length||0;document.querySelectorAll('[data-ce-badge="'+form+'"]').forEach(b=>b.textContent=n||'');}
 function validate(){
  const originalRegion=String(session.originalQuarter?.Raion??'');
@@ -758,7 +761,7 @@ function validate(){
  const linkIssue=linkedIssues();if(linkIssue)throw linkIssue;
  const invalid=document.querySelector('#ce-form [aria-invalid="true"]');if(invalid)throw {message:invalid.validationMessage,el:invalid};
  if(!(Number(session.draft.PLV)>0))throw {message:'Площадь выдела должна быть больше нуля.',el:document.querySelector('[data-ce-field="PLV"]')};
- if(session.isNew){if(!Number.isInteger(Number(session.draft.VD))||Number(session.draft.VD)<1)throw {message:'Номер выдела должен быть положительным целым.',el:document.querySelector('[data-ce-field="VD"]')};if(D.quarters[session.draft.KV].compartments.some(r=>keys.every(k=>same(r[k],session.draft[k]))))throw {message:'Выдел с таким номером и категорией ГЛФ уже есть.',el:document.querySelector('[data-ce-field="VD"]')};if(session.draft.KU==null||Number(session.draft.KU)===0)throw {message:'Выберите категорию угодий.',el:document.querySelector('[data-ce-field="KU"]')};
+ if(session.isNew){if(!standNumber(session.draft.VD))throw {message:'Введите номер выдела, например 1 или 1а.',el:document.querySelector('[data-ce-field="VD"]')};if(D.quarters[session.draft.KV].compartments.some(r=>keys.every(k=>k==='VD'?standNumber(r[k])===standNumber(session.draft[k]):same(r[k],session.draft[k]))))throw {message:'Выдел с таким номером и категорией ГЛФ уже есть.',el:document.querySelector('[data-ce-field="VD"]')};if(session.draft.KU==null||Number(session.draft.KU)===0)throw {message:'Выберите категорию угодий.',el:document.querySelector('[data-ce-field="KU"]')};
  // For forested categories, a new stand without these fields cannot
  // pass desktop controls K16/K58.  For nonforest lands, type/species may
  // legitimately be absent; do not fabricate stand composition.
@@ -772,6 +775,9 @@ function validate(){
  const year=session.quarter.GodT;if(year!=null&&(!Number.isInteger(Number(year))||Number(year)<1900||Number(year)>2200))throw {message:'Укажите год таксации от 1900 до 2200.',el:document.querySelector('[data-ce-field="GodT"]')};
  const check=(form,row,before)=>{const failed=(solinCore.validateRow(form,row,session.draft)||[]).filter(m=>{
   const f=m.split(':')[0];
+  if(form==='Макет10'&&m==='ZAP: Is Not Null'&&
+     !leadingMaket10Row(session.draft._children.Макет10,
+       session.draft._children.Макет10.indexOf(row),session.draft))return false;
   if(form==='Макет10'&&f==='POL'){
    const policy=window.SolinCategoryRules?.validatePol(session.draft.KU,row.POL,window.SOLIN_REFS?.tables);
    if(policy&&policy.status!=='error')return false; // warnings remain visible; no auto-rewrite
@@ -825,6 +831,7 @@ function save(e){e?.preventDefault();if(!session||session.pendingRecovery)return
  discardRecovery(s);current=s.record;close();renderComp();refresh();toast('Карточка сохранена'+(recap?' · изменения: '+recap:''));return true;
 }
 function click(e){const b=e.target.closest('button');if(!b)return;
+ const more=b.closest('.ce-card-more');if(more)more.open=false;
  if(b.hasAttribute('data-ce-m16-apply')){applyMaket16();return;}
  if(b.dataset.ceM16){if(b.dataset.ceM16==='back')showExtra('Макет16');else previewMaket16(b.dataset.ceM16);return;}
  if(b.dataset.ceZoom){setZoom(b.dataset.ceZoom);return;}
@@ -853,7 +860,10 @@ function click(e){const b=e.target.closest('button');if(!b)return;
  else{if(!confirm('Удалить запись '+(Number(b.dataset.ceIndex)+1)+' макета '+form.replace('Макет','')+'? Изменения применятся после сохранения карточки.'))return;session.draft._children[form].splice(Number(b.dataset.ceIndex),1);}
  session.changedMakets.add(form);session.dirty=true;scheduleDraft();document.querySelector('#ce-status').textContent='Есть несохранённые изменения';rerenderTable(form);updateBadges(form);
  if(form==='Макет10')recalculateEditedField({dataset:{ceScope:'Макет10',ceField:'IAR'},getAttribute:()=>null});
- if(b.dataset.ceAdd)document.getElementById('ce-table-'+form).querySelector('tbody tr:last-child input,tbody tr:last-child select')?.focus();
+ if(b.dataset.ceAdd){
+  selectRecord(form,'last');
+  document.getElementById('ce-table-'+form).querySelector('tbody tr:last-child input:not([disabled]),tbody tr:last-child select:not([disabled])')?.focus();
+ }
 }
 function selectRecord(form,value){const rows=session.draft._children[form]||[],table=document.getElementById('ce-table-'+form);let selected=session.selected?.[form]||0;selected=value==='first'?0:value==='last'?rows.length-1:value==='next'?selected+1:value==='previous'?selected-1:Number(value);selected=Math.max(0,Math.min(Math.max(0,rows.length-1),selected));(session.selected??={})[form]=selected;table.querySelectorAll('tbody tr').forEach((tr,i)=>{tr.classList.toggle('dt-selected',i===selected);tr.querySelector('th').textContent=i===selected?'►':'';});table.querySelector('[data-ce-delete]').dataset.ceIndex=selected;table.querySelector('[data-ce-count]').textContent=rows.length?(selected+1)+' из '+rows.length:'Новая';}
 function open(record,options={}){if(!record)return;
@@ -865,7 +875,7 @@ function open(record,options={}){if(!record)return;
  const quarter=quarterForRecord(record);
  if(!quarter)return toast('Строка квартала не найдена или неоднозначна по адресу, секции и функциональной зоне. Изменения не выполнялись.');
  previousFocus=document.activeElement;previousOverflow=document.body.style.overflow;
- session={record,original:clone(record),draft:clone(record),quarterTarget:quarter,originalQuarter:clone(quarter),quarter:clone(quarter),dirty:false,changedMakets:new Set(),closeButton:document.querySelector('#modal .close').onclick};
+ session={record,quick:!!options.quick,original:clone(record),draft:clone(record),quarterTarget:quarter,originalQuarter:clone(quarter),quarter:clone(quarter),dirty:false,changedMakets:new Set(),closeButton:document.querySelector('#modal .close').onclick};
  // The actual quarter is the source of KlxrVD/Fzona. Restore only missing
  // fields in the draft; conflicting explicit values are never rewritten.
  const inherited=window.SolinAddressContext?.enrichStand(session.draft,q,D.lesnichestvo?.[0]);
@@ -890,8 +900,6 @@ function open(record,options={}){if(!record)return;
   {current:session.quarter.Raion,org:()=>linkedOrg()});
  const entry=document.createElement('div');entry.id='ce-entry-checks';entry.className='ce-entry-checks';entry.hidden=true;entry.setAttribute('role','status');entry.setAttribute('aria-live','polite');
  form.querySelector('.dt-toolbar').after(entry);
- const areaHelp=document.createElement('p');areaHelp.className='ce-area-help';areaHelp.textContent='При наборе можно оставить площадь 1.0 га. Точные площади полигонов переносятся позже: MapInfo → Excel → SOLI-N.';
- entry.after(areaHelp);
  form.addEventListener('input',e=>{capture(e.target);if(e.target.matches('[data-ce-field]')&&!['ZAP','STUR','STUR1'].includes(e.target.dataset.ceField)){clearTimeout(stockTimer);const el=e.target;stockTimer=setTimeout(()=>{if(el.isConnected)recalculateEditedField(el);},160);}if(e.target.dataset.ceScope?.startsWith('Макет'))session.changedMakets.add(e.target.dataset.ceScope);if(session.entryTouched?.has(e.target.dataset.ceScope+':'+e.target.dataset.ceField))refreshEntryChecks()});
  form.addEventListener('focusout',e=>{if(!e.target.matches('[data-ce-field]'))return;clearTimeout(stockTimer);recalculateEditedField(e.target);(session.entryTouched??=new Set()).add(e.target.dataset.ceScope+':'+e.target.dataset.ceField);refreshEntryChecks();});
  form.addEventListener('change',e=>{
@@ -920,6 +928,7 @@ function open(record,options={}){if(!record)return;
  refreshLinked();window.SolinSpeciesEntry?.mountAll?.();refreshStockPanel();
  form.addEventListener('click',click);form.addEventListener('submit',save);document.querySelector('#ce-cancel').onclick=cancel;
  document.addEventListener('keydown',onKey);window.addEventListener('beforeunload',onUnload);modal.querySelector('.modalCard').scrollTop=0;modal.querySelector('.close').focus();if(options.focus)focusControlIssue(options.focus);
+ if(options.quick)window.SolinQuickCard.mount(form,{showMain,showExtra,showMaketNavigator});
  if(recovery){
   for(const raw of recovery.invalidInputs||[]){const el=[...form.querySelectorAll('[data-ce-field]')].find(el=>el.dataset.ceScope===raw.scope&&el.dataset.ceField===raw.field&&el.dataset.ceRow===raw.index);if(el){el.value=raw.value;capture(el);}}
   refreshEntryChecks();writeRecovery();
@@ -929,7 +938,8 @@ window.addEventListener('solin-refs-ready',()=>{if(session){refreshLinked();wind
 function openQuick(record,kind){
  open(record);
  if(!session||session.pendingRecovery)return;
- if(kind==='31'||kind==='32')showMain(kind);
+ if(kind==='makets')showMaketNavigator();
+ else if(kind==='31'||kind==='32')showMain(kind);
  else if(kind==='kt')preview(false);
  else if(kind==='print')preview(true);
  else if(kind==='cut')showChecks('6');

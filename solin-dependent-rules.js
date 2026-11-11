@@ -117,10 +117,7 @@ function functionalZones(row,refs=ref(),context={}){
 }
 function suggestedOrigin(species,refs=ref()){
  const physical=(refs?.SDP||[]).find(r=>same(r.KPC,species));
- if(!physical||!filled(physical['ОбПор']))return null;
- // Original SOLI-N manual: auto-origin except birch, where it is manual.
- if(code(physical['ОбПор']).toLocaleUpperCase('ru')==='Б')return null;
- if(!filled(physical['Происхож']))return null;
+ if(!physical||!filled(physical['Происхож']))return null;
  const v=Number(physical['Происхож']);
  return Number.isFinite(v)?v:null;
 }

@@ -6,7 +6,15 @@ const childNames={Макет10:'Древостой',Макет11:'Лесные �
 async function getJSON(u){const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw new Error(u);return r.json()}
 function esc(v){if(v===null||v===undefined||v==='')return '—';return String(v).replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[m]||m))}function num(v,d=1){const n=Number(v);return Number.isFinite(n)?n.toLocaleString('ru-RU',{maximumFractionDigits:d}):'—'}
 function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),1800)}
-function show(id){$$('.screen').forEach(x=>x.classList.remove('active'));$('#'+id)?.classList.add('active');$$('.sectionTab').forEach(x=>x.classList.toggle('active',x.dataset.s===id));scrollTo({top:0,behavior:'smooth'})}
+function show(id) {
+  const next = document.getElementById(id);
+  if (!next?.classList.contains('screen') || next.classList.contains('active')) return;
+  $$('.screen.active').forEach(screen => screen.classList.remove('active', 'screen-enter'));
+  next.classList.add('active', 'screen-enter');
+  $$('.sectionTab').forEach(tab => tab.classList.toggle('active', tab.dataset.s === id));
+  if (id !== 'mapScreen') next.scrollTo({top: 0, left: 0, behavior: 'instant'});
+  window.scrollTo({top: 0, left: 0, behavior: 'instant'});
+}
 function lookup(k,v){const maps=D?.fieldLookups||{};const aliases={M3Pr:'POR',PORP:'POR',P15:'POR',PRP1:'POR',PRP2:'POR',PRP3:'POR',PLP1:'POR',PLP2:'POR',PLP3:'POR'};const m=maps[k]||maps[aliases[k]];return m?.[String(v)]??v}
 function landName(v){return lookup('KU',v)||''}function speciesName(v){return lookup('POR',v)||''}
 function saveLocal(){const obj={quarters:{}};for(const[k,q]of Object.entries(D.quarters))if(q._local||q.compartments.some(x=>x._local))obj.quarters[k]={_local:q._local||false,meta:q.meta||{},compartments:q.compartments.filter(x=>x._local)};localStorage.setItem('solin_user_data_v1',JSON.stringify(obj))}
@@ -14,7 +22,7 @@ function mergeLocal(){try{const L=JSON.parse(localStorage.getItem('solin_user_da
 async function boot(){try{const mf=await getJSON('./data-manifest.json');D=await getJSON('./data-meta.json');const chunks=await Promise.all(mf.quarterChunks.map(f=>getJSON('./'+f)));D.quarters=Object.assign({},...chunks);D.references=D.references||{};mergeLocal();refresh();renderFriendlyRefs();renderDb();window.dispatchEvent(new Event('solin-ready'))}catch(e){console.error(e);toast('Ошибка загрузки данных: '+e.message);document.querySelector('#quarters').innerHTML='<button class="widePrimary" onclick="boot()">Повторить загрузку</button>'}}
 function totals(){const qs=Object.values(D.quarters),comps=qs.flatMap(q=>q.compartments||[]);return{q:qs.length,v:comps.length,a:comps.reduce((s,r)=>s+(+r.PLV||0),0)}}
 function refresh(){const t=totals();$('#qcount').textContent=t.q;$('#vcount').textContent=t.v;$('#area').textContent=num(t.a);$('#rcount').textContent=D.stats?.referenceTables||132;$('#qheadCount').textContent='('+t.q+')';$('#vheadCount').textContent='('+t.v+')';renderQuarters();renderAllComps()}
-function renderQuarters(filter=''){const box=$('#quarters');box.innerHTML='';Object.keys(D.quarters).sort((a,b)=>+a-+b).filter(k=>!filter||k.includes(filter.trim())).forEach(k=>{const q=D.quarters[k],rs=q.compartments||[],a=rs.reduce((sum,r)=>sum+(+r.PLV||0),0);const b=document.createElement('button');b.type='button';b.className='quarterCard';b.innerHTML=`<span class="quarterNo">${esc(k)}</span><span class="quarterText"><b>Квартал ${esc(k)}</b><small>Выделов: ${rs.length}</small><small>Площадь: ${num(a)} га</small></span><span class="arrow">›</span>`;b.onclick=()=>openQuarter(k);const entry=document.createElement('div');entry.className='record-entry';const remove=document.createElement('button');remove.type='button';remove.className='record-delete';remove.innerHTML=SOLIN_DELETE_ICON;remove.title='Удалить квартал '+k;remove.setAttribute('aria-label','Удалить квартал '+k);remove.onclick=()=>openDeleteQuarter(k);entry.append(b,remove);box.appendChild(entry)});if(!box.children.length)box.innerHTML='<div class="empty">Кварталы не найдены</div>'}
+function renderQuarters(filter=''){$('#quartersScreen').classList.remove('field-quarter-open');const box=$('#quarters');box.innerHTML='';Object.keys(D.quarters).sort((a,b)=>+a-+b).filter(k=>!filter||k.includes(filter.trim())).forEach(k=>{const q=D.quarters[k],rs=q.compartments||[],a=rs.reduce((sum,r)=>sum+(+r.PLV||0),0);const b=document.createElement('button');b.type='button';b.className='quarterCard';b.innerHTML=`<span class="quarterNo">${esc(k)}</span><span class="quarterText"><b>Квартал ${esc(k)}</b><small>Выделов: ${rs.length}</small><small>Площадь: ${num(a)} га</small></span><span class="arrow">›</span>`;b.onclick=()=>openQuarter(k);const entry=document.createElement('div');entry.className='record-entry';const remove=document.createElement('button');remove.type='button';remove.className='record-delete';remove.innerHTML=SOLIN_DELETE_ICON;remove.title='Удалить квартал '+k;remove.setAttribute('aria-label','Удалить квартал '+k);remove.onclick=()=>openDeleteQuarter(k);entry.append(b,remove);box.appendChild(entry)});if(!box.children.length)box.innerHTML='<div class="empty">Кварталы не найдены</div>'}
 // The desktop "Список кварталов" selects a row by KV + KGLF.
 // A quarter can span multiple KGLF rows; group at the user-interface layer only.
 function quarterCategories(q){
@@ -23,6 +31,7 @@ function quarterCategories(q){
 }
 function openQuarter(k,selectedKGLF=null){
  const q=D.quarters?.[k],box=$('#quarters');if(!q||!box)return;
+ $('#quartersScreen').classList.add('field-quarter-open');
  const categories=quarterCategories(q),selected=selectedKGLF==null?null:String(selectedKGLF);
  const scoped=selected==null?q.compartments||[]:(q.compartments||[]).filter(r=>String(r.KGLF)===selected);
  const area=scoped.reduce((sum,r)=>sum+(Number(r.PLV)||0),0);
@@ -32,7 +41,7 @@ function openQuarter(k,selectedKGLF=null){
   $('#qDelete').onclick=()=>openDeleteQuarter(k);
  if(all){
   const menu=$('#qCategoryList');
-  menu.innerHTML='<p class="quarterCategoryHint">В настольном SOLI-N один квартал отображается отдельно по категориям ГЛФ. Выберите строку:</p>';
+  menu.innerHTML='<p class="quarterCategoryHint">Категории ГЛФ</p>';
   for(const cat of categories){
    const subset=(q.compartments||[]).filter(r=>String(r.KGLF)===cat);
    const hectares=subset.reduce((sum,r)=>sum+(Number(r.PLV)||0),0);
@@ -45,10 +54,55 @@ function openQuarter(k,selectedKGLF=null){
  const actions=$('#qActions'),create=document.createElement('button');create.type='button';create.className='widePrimary';
  create.textContent='＋ Создать выдел в квартале '+k+(selected!=null?' · КГЛФ '+selected:'');
  create.onclick=()=>openCompForm(k,selected);actions.appendChild(create);
- renderCompList($('#qComps'),scoped);
+ filterStandList($('#qComps'),scoped);
 }
-function renderCompList(box,rs){box.innerHTML='';[...rs].sort((a,b)=>+a.VD-+b.VD).forEach(r=>{const b=document.createElement('button');b.type='button';b.className='compCard';const cat=landName(r.KU)||'Категория не указана',sp=r.M3Pr?speciesName(r.M3Pr):'';b.innerHTML=`<span class="compNo">${esc(r.KV)}-${esc(r.VD)}</span><span class="compText"><b>Выдел ${esc(r.VD)}</b><small>${num(r.PLV)} га · ${esc(cat)}</small>${sp?`<small>Порода: ${esc(sp)}</small>`:''}</span><span class="arrow">›</span>`;b.onclick=()=>{current=r;renderComp();show('card')};const entry=document.createElement('div');entry.className='record-entry';const remove=document.createElement('button');remove.type='button';remove.className='record-delete';remove.innerHTML=SOLIN_DELETE_ICON;remove.title='Удалить выдел '+r.VD+' квартала '+r.KV;remove.setAttribute('aria-label',remove.title);remove.onclick=()=>openDeleteComp(r);entry.append(b,remove);box.appendChild(entry)})}
-function renderAllComps(filter=''){const box=$('#allComps');if(!box)return;let rs=Object.values(D?.quarters||{}).flatMap(q=>q.compartments||[]);filter=filter.trim().toLowerCase();if(filter)rs=rs.filter(r=>String(r.KV).includes(filter)||String(r.VD).includes(filter));renderCompList(box,rs)}
+function standNumber(value) {
+ const match = /^0*([1-9]\d*)([а-яёa-z]?)$/iu.exec(String(value ?? '').trim());
+ return match ? match[1] + match[2].toLocaleLowerCase('ru') : '';
+}
+function nextStandNumber(records) {
+ return Math.max(0, ...records.map(r => parseInt(standNumber(r.VD), 10) || 0)) + 1;
+}
+function filterStandList(list, records, query = '') {
+ const controls = list.parentElement.querySelector('[data-stand-filters]') || document.createElement('div');
+ const previous = [...controls.querySelectorAll('select')].map(select => select.value);
+ controls.dataset.standFilters = '';
+ controls.className = 'stand-filters';
+ const options = (field, caption, reference = []) => {
+  const label = document.createElement('label');
+  const select = document.createElement('select');
+  const values = new Map(reference);
+  for (const row of records) {
+   const code = String(row[field] ?? '');
+   if (code && !values.has(code)) values.set(code, field === 'KU' ? landName(code) : '');
+  }
+  select.add(new Option('Все', ''));
+  for (const [code, name] of [...values].sort(([a],[b]) => a.localeCompare(b,'ru',{numeric:true}))) {
+   select.add(new Option(name && name !== code ? code + ' — ' + name : code, code));
+  }
+  label.append(caption, select);
+  return label;
+ };
+ const categories = (window.SOLIN_REFS?.tables?.SKU || [])
+  .filter(row => row.KU != null).map(row => [String(row.KU), String(row.NKU ?? '').trim()]);
+ controls.replaceChildren(options('KU','Категория угодий',categories), options('KGLF','Категория ГЛФ'));
+ const [land, fund] = controls.querySelectorAll('select');
+ land.value = previous[0] || '';
+ fund.value = previous[1] || '';
+ const render = () => {
+  const search = query.trim().toLocaleLowerCase('ru');
+  const matches = records.filter(r => (!land.value || String(r.KU) === land.value) &&
+   (!fund.value || String(r.KGLF) === fund.value) && (!search ||
+   String(r.KV).includes(search) || String(r.VD).toLocaleLowerCase('ru').includes(search)));
+  renderCompList(list, matches);
+  if (!matches.length) list.textContent = 'Выделы не найдены';
+ };
+ controls.onchange = render;
+ if (!controls.isConnected) list.before(controls);
+ render();
+}
+function renderCompList(box,rs){box.innerHTML='';[...rs].sort((a,b)=>String(a.VD).localeCompare(String(b.VD),'ru',{numeric:true})).forEach(r=>{const b=document.createElement('button');b.type='button';b.className='compCard';const cat=landName(r.KU)||'Категория не указана',sp=r.M3Pr?speciesName(r.M3Pr):'';b.innerHTML=`<span class="compNo">${esc(r.KV)}-${esc(r.VD)}</span><span class="compText"><b>Выдел ${esc(r.VD)}</b><small>${num(r.PLV)} га · ${esc(cat)}</small>${sp?`<small>Порода: ${esc(sp)}</small>`:''}</span><span class="arrow">›</span>`;b.onclick=()=>{current=r;renderComp();show('card')};const entry=document.createElement('div');entry.className='record-entry';const remove=document.createElement('button');remove.type='button';remove.className='record-delete';remove.innerHTML=SOLIN_DELETE_ICON;remove.title='Удалить выдел '+r.VD+' квартала '+r.KV;remove.setAttribute('aria-label',remove.title);remove.onclick=()=>openDeleteComp(r);entry.append(b,remove);box.appendChild(entry)})}
+function renderAllComps(filter=''){const box=$('#allComps');if(!box)return;const rs=Object.values(D?.quarters||{}).flatMap(q=>q.compartments||[]);filterStandList(box,rs,filter||$('#vSearch input')?.value||'')}
 function field(k,v){if(window.SolinHuman)return `<div class="humanField"><span>${esc(SolinHuman.label('ВыделВ',k))}</span><b>${esc(SolinHuman.value('ВыделВ',k,v,current))}</b></div>`;return `<div class="humanField"><span>${friendly[k]||k}</span><b>${esc(lookup(k,v))}</b></div>`}
 function section(title,keys,o){const a=keys.filter(k=>o[k]!==undefined&&o[k]!==null&&o[k]!=='');return a.length?`<div class="humanSection"><h3>${title}</h3><div class="humanGrid">${a.map(k=>field(k,o[k])).join('')}</div></div>`:''}
 function renderComp(){const r=current;$('#cardTitle').textContent=`Квартал ${r.KV} · Выдел ${r.VD}`;$('#cardSub').textContent=`${num(r.PLV)} га · ${landName(r.KU)||'категория не указана'}`;$('#humanContent').innerHTML=section('Основные сведения',['PLV','KU','KGLF','Fzona','OZU'],r)+section('Лесорастительные условия',['M3Pr','M3B','M3TL','M3TLU','M3G','M3KP'],r)+section('Проектируемые мероприятия',['M2PM1','M2Pr'],r)+section('Подрост',['PRkol','PRH','PRA'],r);const names=Object.keys(r._children||{});$('#childTabs').innerHTML=names.map((n,i)=>`<button class="chip ${i===0?'active':''}" onclick="renderChild('${n}',this)">${childNames[n]||n}</button>`).join('');$('#childContent').innerHTML='';if(names[0])renderChild(names[0],$('#childTabs button'))}
@@ -205,7 +259,7 @@ function openCompForm(k='',selectedKGLF=null){
  // Generate the next AVAILABLE number across the full current quarter.
  // This avoids accidentally reusing a VD from another KGLF category.
  const existing=quarter.compartments||[];
- const next=Math.max(0,...existing.map(x=>Number(x.VD)||0))+1;
+ const next=nextStandNumber(existing);
  const schema=D.transfSchema?.['Выдел']||[];
  const r=Object.fromEntries(schema.map(field=>[field,null]));
  Object.assign(r,{POS:org.POS,LESN:org.LESN,KV:Number(k),KGLF:source.KGLF,
@@ -245,13 +299,15 @@ function updateNewCompQuarter(k){
  category.replaceChildren(...options);
  if(options.some(o=>o.value===selected))category.value=selected;
 }
-function createComp(){const k=$('#newCompKV').value,vd=$('#newVD').value.trim(),pl=Number($('#newPLV').value.replace(',','.'));if(!k||!vd)return toast('Укажи квартал и выдел');if(!Number.isFinite(pl)||pl<=0)return toast('Проверь площадь');if(D.quarters[k].compartments.some(r=>Number(r.VD)===Number(vd)&&String(r.KGLF??'')===String($('#newCompKGLF')?.value??'')))return toast('Такой выдел уже есть');if(!/^\d+$/.test(vd)||Number(vd)<=0)return toast('Номер выдела должен быть положительным целым');if(!$('#newPOR')?.value&&document.querySelector('#newPOR__quick')?.value.trim())return toast('Выберите породу из подсказок: код или название');const source=(D.quarters[k].quarterRows||[]).find(q=>String(q.KGLF)===String($('#newCompKGLF')?.value))||D.quarters[k].meta||{};const r={POS:source.POS??D.lesnichestvo?.[0]?.POS,LESN:source.LESN??D.lesnichestvo?.[0]?.LESN,KGLF:source.KGLF??null,KV:+k||k,VD:+vd||vd,PLV:pl,KU:$('#newKU').value||null,M3Pr:$('#newPOR').value||null,M3B:0,_children:{},_local:true};window.SolinAddressContext?.enrichStand(r,D.quarters[k],D.lesnichestvo?.[0]);D.quarters[k].compartments.push(r);saveLocal();closeModal();refresh();show('quartersScreen');openQuarter(k);toast('Выдел создан')}
+function createComp(){const k=$('#newCompKV').value,vd=standNumber($('#newVD').value),pl=Number($('#newPLV').value.replace(',','.'));if(!k||!vd)return toast('Укажите квартал и номер выдела, например 1, 1а или 1б');if(!Number.isFinite(pl)||pl<=0)return toast('Проверь площадь');if(D.quarters[k].compartments.some(r=>standNumber(r.VD)===vd&&String(r.KGLF??'')===String($('#newCompKGLF')?.value??'')))return toast('Такой выдел уже есть');if(!$('#newPOR')?.value&&document.querySelector('#newPOR__quick')?.value.trim())return toast('Выберите породу из подсказок: код или название');const source=(D.quarters[k].quarterRows||[]).find(q=>String(q.KGLF)===String($('#newCompKGLF')?.value))||D.quarters[k].meta||{};const r={POS:source.POS??D.lesnichestvo?.[0]?.POS,LESN:source.LESN??D.lesnichestvo?.[0]?.LESN,KGLF:source.KGLF??null,KV:+k||k,VD:vd,PLV:pl,KU:$('#newKU').value||null,M3Pr:$('#newPOR').value||null,M3B:0,_children:{},_local:true};window.SolinAddressContext?.enrichStand(r,D.quarters[k],D.lesnichestvo?.[0]);D.quarters[k].compartments.push(r);saveLocal();closeModal();refresh();show('quartersScreen');openQuarter(k);toast('Выдел создан')}
 // A single modal root for every standard SOLI-N Field window. Keep it
 // above fullscreen map/sheets; never recreate that root while an iOS
 // native picker is active. The taxation card supplies its own close guard.
-function openModal(t,html){
+function openModal(t,html,{confirmChanges=true}={}){
  const modal=$('#modal');
  if(!modal)return;
+ if(!modal.classList.contains('hidden'))modal.dispatchEvent(new Event('solin-modal-dismissed'));
+ modal.dataset.confirmChanges=String(confirmChanges);
  $('#modalTitle').textContent=t;
  $('#modalBody').innerHTML=html;
  modal.classList.remove('hidden');
@@ -263,7 +319,7 @@ function openModal(t,html){
 }
 function closeModal(){
  const modal=$('#modal');
- if(!modal)return;
+ if(!modal||modal.classList.contains('hidden'))return;
  // Blur the active native input before hiding, so iOS does not leave its
  // keyboard/select picker over the next dialog.
  if(modal.contains(document.activeElement))document.activeElement?.blur?.();
@@ -271,6 +327,7 @@ function closeModal(){
  modal.removeAttribute('role');
  modal.removeAttribute('aria-modal');
  modal.removeAttribute('aria-labelledby');
+ modal.dispatchEvent(new Event('solin-modal-dismissed'));
 }
 // V23: tapping outside the form never dismisses any editor.
 // Escape is ignored here; the taxation card independently handles its dialogs.

@@ -13,7 +13,23 @@ function validateBackup(x){
 }
 function commitImport(x){if(x.lesnichestvo?.[0]&&window.SolinWorkspace?.activeId&&[x.lesnichestvo[0].POS,x.lesnichestvo[0].LESN].join('::')!==SolinWorkspace.activeId)throw Error('Эта копия относится к другому лесничеству. Загрузите её через главное окно');const n=validateBackup(x);localStorage.setItem(KEY,JSON.stringify({...x,history:[...(x.history||[]).slice(-49),{at:new Date().toISOString(),reason:'Импорт',records:n}]}));D.quarters=clone(x.quarters);D._transferExtras=clone(x.extraTables||{});for(const k of ['solin_field_audited_work_v1','solin_user_data_v1','solin_field_overrides_v3'])localStorage.removeItem(k);current=null;refresh();show('quartersScreen');closeModal();window.dispatchEvent(new Event('solin-saved'));toast('Восстановлено выделов: '+n);}
 window.solinExportEdits=()=>{try{download('solin-field-backup-v2.json',checkpoint('Резервная копия'))}catch(e){toast('Не удалось создать копию: '+e.message)}};
-window.solinSaveGPS=()=>{const r=current;if(!r)return;if(!navigator.geolocation)return toast('GPS недоступен');navigator.geolocation.getCurrentPosition(p=>{const before=r._gps;r._gps={latitude:p.coords.latitude,longitude:p.coords.longitude,accuracy:p.coords.accuracy,at:new Date().toISOString()};try{checkpoint('GPS '+r.KV+'-'+r.VD);openModal('GPS выдела','<p>'+h(JSON.stringify(r._gps))+'</p>')}catch(e){r._gps=before;toast('GPS не сохранён: '+e.message)}},e=>toast(e.message),{enableHighAccuracy:true,timeout:15000})};
+window.solinSaveGPS=async()=>{
+ const record=current;if(!record)return;
+ const saved=()=>D.quarters?.[String(record.KV)]?.compartments?.includes(record);
+ if(!saved())return toast('Сначала сохраните выдел.');
+ try{
+  toast('Ищу спутники GPS…');
+  const position=await window.SolinLocation.current();
+  if(current!==record||!saved())return;
+  const {latitude,longitude,accuracy}=position.coords;
+  const before=record._gps;
+  record._gps={latitude,longitude,accuracy,at:new Date().toISOString()};
+  try{checkpoint('GPS '+record.KV+'-'+record.VD);}
+  catch(error){record._gps=before;throw error;}
+  openModal('GPS выдела','<p>'+h(latitude)+', '+h(longitude)+
+   (Number.isFinite(accuracy)?' · точность ±'+Math.round(accuracy)+' м':'')+'</p>');
+ }catch(error){if(current===record&&saved())toast('GPS не сохранён: '+error.message);}
+};
 window.solinImportEdits=()=>{const input=document.createElement('input');input.type='file';input.accept='.json';input.onchange=async()=>{try{const file=input.files[0];if(!file)return;if(file.size>30*1024*1024)throw Error('Файл больше 30 МБ');const x=JSON.parse(await file.text()),n=validateBackup(x);openModal('Предпросмотр восстановления','<p>Кварталов: '+Object.keys(x.quarters).length+'; выделов: '+n+'.</p><p>Текущие карточки будут заменены. Скачайте копию текущего состояния перед подтверждением.</p><button id="backupBefore">Скачать текущую копию</button><button id="commitImport" class="primary">Восстановить</button>');document.querySelector('#backupBefore').onclick=solinExportEdits;document.querySelector('#commitImport').onclick=()=>{try{commitImport(x)}catch(e){toast(e.message)}};}catch(e){toast(e.message)}};input.click()};
 window.exportTransfer=()=>{if(!D)return toast('Данные загружаются');const tables={...clone(D._transferExtras||{}),...Object.fromEntries(Object.keys(D.transfSchema).map(k=>[k,[]]))};tables['Лесничество']=clone(D.lesnichestvo||[]);for(const [kv,q]of Object.entries(D.quarters)){for(const qr of q.quarterRows?.length?q.quarterRows:[q.meta||{}]){const merged={...D.lesnichestvo?.[0],...qr,KV:Number(kv)};tables['Квартал'].push(Object.fromEntries(D.transfSchema['Квартал'].map(k=>[k,merged[k]??null])));}for(const r of q.compartments){const address={};for(const k of KEYS)address[k]=r[k]??q.meta?.[k]??D.lesnichestvo?.[0]?.[k]??null;tables['Выдел'].push({...Object.fromEntries(Object.entries(r).filter(([k])=>!k.startsWith('_'))),...Object.fromEntries(D.transfSchema['Выдел'].map(k=>[k,address[k]??r[k]??null]))});for(const [m,rows]of Object.entries(r._children||{}))if(tables[m])for(const row of rows)tables[m].push({...row,...address});}}download('SOLIN-Transfer-review.json',{format:'SOLI-N Transfer',schemaVersion:2,scope:'all-current-records',createdAt:new Date().toISOString(),desktopImportVerified:false,tables});};
 // Unsupported expressions and absent form context stay explicitly unverified.
@@ -22,12 +38,23 @@ function controls(r){const results=[];for(const v of SOLIN_AUDIT.validations){le
 function showControls(records=all()){const result=records.flatMap(r=>controls(r).map(x=>({...x,kv:r.KV,vd:r.VD})));const bad=result.filter(x=>x.status==='Ошибка'),skipped=result.filter(x=>x.status==='Не проверено');openModal('Контроль по оригинальным ValidationRule','<p>Ошибок: '+bad.length+'; не проверено: '+skipped.length+'; всего применений: '+result.length+'.</p><p>Это правила полей Access, не набор К01–К142. NULL учитывается отдельно. Условия с неизвестным контекстом не объявляются пройденными.</p><button id="controlExport">Скачать протокол JSON</button>'+result.filter(x=>x.status!=='Пройден').map(x=>'<div class="wf-check '+(x.status==='Ошибка'?'bad':'warn')+'"><b>'+h(x.kv+'-'+x.vd+' · '+x.form+' · '+x.source+' #'+x.row)+'</b><br>'+h(x.rule)+'<br>'+h(x.status+' '+x.detail)+'</div>').join(''));document.querySelector('#controlExport').onclick=()=>download('solin-controls.json',{kind:'Access-ValidationRule-subset',results:result});return result;}
 function auditSearch(q=''){const target=document.querySelector('#auditResults');q=q.toLowerCase();target.innerHTML=Object.entries(SOLIN_AUDIT.routes).filter(([f,buttons])=>(f+' '+buttons.map(x=>x.caption).join(' ')).toLowerCase().includes(q)).map(([f,buttons])=>'<details class="refCard"><summary>'+h(f)+' · '+buttons.length+' кнопок</summary>'+buttons.map(b=>'<div class="wf-check"><b>'+h(b.caption||b.name)+'</b><br>'+h(b.onClick)+' · '+h(b.status)+'<pre style="white-space:pre-wrap">'+h(JSON.stringify(b.actions||b.actionStatements||b.code||[],null,2))+'</pre></div>').join('')+'</details>').join('');}
 function audit(){openModal('554 формы · исходные маршруты и выражения','<p>Каталог исходных определений. Просмотр не исполняет VBA, SQL или макросы. 30 ссылок на макросы остаются неразрешёнными. Формулы: 611; правила: 203.</p><input id="auditQuery" placeholder="Форма или подпись кнопки"><div id="auditResults"></div>');document.querySelector('#auditQuery').oninput=e=>auditSearch(e.target.value);auditSearch('ГОЛОВНОЕ МЕНЮ');}
-function filter(){const opts=Object.entries(D.fieldLookups.KU).map(([k,v])=>'<option value="'+h(k)+'">'+h(k+' '+v)+'</option>').join('');openModal('Фильтрация данных','<label>Категория угодий<select id="filterKU"><option value="">Все категории</option>'+opts+'</select></label><label>Квартал<input id="filterKV" inputmode="numeric"></label><label>Минимальная площадь<input id="filterArea" inputmode="decimal"></label><button id="filterRun">Выбрать</button><div id="filterRows"></div>');document.querySelector('#filterRun').onclick=()=>{const ku=document.querySelector('#filterKU').value,kv=document.querySelector('#filterKV').value,a=Number(document.querySelector('#filterArea').value.replace(',','.'));const rows=all().filter(r=>(!ku||String(r.KU)===ku)&&(!kv||String(r.KV)===kv)&&Number(r.PLV)>=a);document.querySelector('#filterRows').innerHTML='<p>Найдено: '+rows.length+'</p>';const host=document.createElement('div');document.querySelector('#filterRows').append(host);renderCompList(host,rows);host.querySelectorAll('button').forEach(b=>b.addEventListener('click',closeModal));};}
+function filter(){const opts=Object.entries(D.fieldLookups.KU||{}).map(([k,v])=>'<option value="'+h(k)+'">'+h(k+' '+v)+'</option>').join('');openModal('Фильтрация данных','<div class="field-filter"><label>Категория угодий<select id="filterKU"><option value="">Все категории</option>'+opts+'</select></label><label>Квартал<input id="filterKV" inputmode="numeric"></label><label>Минимальная площадь, га<input id="filterArea" inputmode="decimal"></label></div><button type="button" id="filterRun" class="primary">Найти</button><div id="filterRows"></div>',{confirmChanges:false});document.querySelector('#filterRun').onclick=()=>{const ku=document.querySelector('#filterKU').value,kv=document.querySelector('#filterKV').value.trim(),a=Number(document.querySelector('#filterArea').value.replace(',','.'));if(!Number.isFinite(a)||a<0){document.querySelector('#filterRows').textContent='Укажите площадь числом от 0.';return;}const rows=all().filter(r=>(!ku||String(r.KU)===ku)&&(!kv||String(r.KV)===kv)&&Number(r.PLV)>=a);document.querySelector('#filterRows').innerHTML='<p>Найдено: '+rows.length+'</p>';const host=document.createElement('div');document.querySelector('#filterRows').append(host);renderCompList(host,rows);host.querySelectorAll('button.compCard').forEach(b=>b.addEventListener('click',closeModal));};}
 function refs(q=''){if(!D)return;const box=document.querySelector('#friendlyRefs');box.innerHTML=Object.entries(D.fieldLookups).filter(([k,v])=>!q||(k+' '+Object.values(v).join(' ')).toLowerCase().includes(q.toLowerCase())).map(([k,v])=>'<details class="refCard"><summary>'+h(D.fieldLabels[k]||k)+' · '+Object.keys(v).length+'</summary>'+Object.entries(v).filter(([c,n])=>!q||(k+' '+c+' '+n).toLowerCase().includes(q.toLowerCase())).map(([c,n])=>'<div class="refRow"><b>'+h(c)+'</b> '+h(n)+'</div>').join('')+'</details>').join('');}
 async function loadRefs(){try{let res=await fetch(window.Capacitor?.isNativePlatform?.()?'./refs-audit.packed.bin':'./refs-audit.json.gz');if(!res.ok&&window.Capacitor?.isNativePlatform?.())res=await fetch('./refs-audit.json.gz');if(!res.ok)throw Error('HTTP '+res.status);window.SOLIN_REFS=JSON.parse(await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).text());await window.SolinReferenceSupplement?.load?.(window.SOLIN_REFS);const byCode=new Map(SOLIN_REFS.tables.SDP.map(r=>[r.KPC,r]));SOLIN_REFS.tables.SDP_Tip=SOLIN_REFS.tables.SDP_Tip.map(r=>({...byCode.get(r.KPC),...r}));D.stats.referenceTables=Object.keys(SOLIN_REFS.tables).length;document.querySelector('#rcount').textContent=D.stats.referenceTables;D.scopedLookups={};for(const x of window.SOLIN_LOOKUP_SOURCES||[]){const rows=SOLIN_REFS.tables[x.table];if(!rows)continue;(D.scopedLookups[x.form]??={})[x.field]=Object.fromEntries(rows.filter(r=>r[x.code]!=null&&r[x.label]!=null).map(r=>[r[x.code],r[x.label]]));}refs();window.dispatchEvent(new Event('solin-refs-ready'));}catch(e){toast('Полные справочники недоступны: '+e.message)}}
 function auditedRefs(q=''){if(!window.SOLIN_REFS)return refs(q);const box=document.querySelector('#friendlyRefs');box.innerHTML='<p>153 исходные таблицы S* и вычисленный SDP_Tip · 24 946 строк. Динамические ограничения списков Access здесь не исполняются.</p>';for(const [name,table]of Object.entries(SOLIN_REFS.tables).sort(([a],[b])=>a.localeCompare(b))){const rows=q?table.filter(r=>(name+' '+Object.values(r).join(' ')).toLowerCase().includes(q.toLowerCase())):table;if(!rows.length)continue;const details=document.createElement('details');details.className='refCard';details.innerHTML='<summary>'+h(refNames[name]||name)+' · '+rows.length+'</summary>';let count=0,host;function more(){const slice=rows.slice(count,count+100);count+=slice.length;host.insertAdjacentHTML('beforeend',slice.map(r=>'<div class="wf-check">'+Object.entries(r).filter(([,v])=>v!=null&&v!=='').map(([k,v])=>'<span>'+h(k)+': <b>'+h(v)+'</b></span>').join(' · ')+'</div>').join(''));details.querySelector('.refMore')?.remove();if(count<rows.length){const b=document.createElement('button');b.className='refMore';b.textContent='Ещё 100';b.onclick=more;details.append(b);}}details.ontoggle=()=>{if(details.open&&!host){host=document.createElement('div');details.append(host);more();}};box.append(details);}}
 function formulas(){openModal('611 исходных выражений Access','<p>Сохранённые определения из аудита. Выполнение в контексте Access ещё не воспроизведено.</p><input id="formulaQuery" placeholder="Форма или выражение"><div id="formulaRows"></div>');const draw=q=>{document.querySelector('#formulaRows').innerHTML=SOLIN_AUDIT.formulas.filter(x=>(x.form+' '+x.name+' '+x.expression).toLowerCase().includes(q.toLowerCase())).map(x=>'<div class="wf-check"><b>'+h(x.form+' / '+x.name)+'</b><pre style="white-space:pre-wrap">'+h(x.expression)+'</pre></div>').join('')};document.querySelector('#formulaQuery').oninput=e=>draw(e.target.value);draw('ВыделВ');}
-function editQuarter(k,index=0){const q=D.quarters[k],rows=q.quarterRows?.length?q.quarterRows:[q.meta||{}],sourceRows=clone(rows);let selected=rows[index];const fields=D.transfSchema['Квартал'].filter(f=>!['POS','LESN','KV','KGLF'].includes(f));openModal('Корректировка квартала '+k,'<p>Адрес POS / LESN / KV / KGLF сохраняется. Выберите запись категории ГЛФ.</p><select id="quarterCategory">'+rows.map((r,i)=>'<option value="'+i+'" '+(i===index?'selected':'')+'>KGLF '+h(r.KGLF)+'</option>').join('')+'</select>'+fields.map(f=>'<label class="wf-field">'+h(D.fieldLabels[f]||f)+'<input data-qfield="'+f+'" value="'+h(selected[f]??'')+'"></label>').join('')+'<button id="saveQuarter">Сохранить</button>');// Never recreate the modal from an iOS native select change event.
+function editQuarter(k,index=0){
+ const q=D.quarters?.[k];if(!q)return toast('Квартал не найден.');
+ const rows=q.quarterRows?.length?q.quarterRows:[q.meta||{}];
+ const sourceRows=clone(rows);let selected=rows[index];
+ if(!selected)return toast('Строка обложки не найдена.');
+ const fields=D.transfSchema['Квартал'].filter(f=>!['POS','LESN','KV','KGLF'].includes(f));
+ openModal('Корректировка квартала '+k,'<div id="quarterEditor"><label class="wf-field">Обложка квартала<select id="quarterCategory">'+
+  rows.map((r,i)=>'<option value="'+i+'" '+(i===index?'selected':'')+'>КГЛФ '+h(r.KGLF)+
+    ' · Функ. зона '+h(r.Fzona??'—')+' · ЛХЗ '+h(r.Klxr??'—')+'</option>').join('')+
+  '</select></label>'+fields.map(f=>'<label class="wf-field">'+h(D.fieldLabels[f]||f)+
+    '<input data-qfield="'+f+'" value="'+h(selected[f]??'')+'"></label>').join('')+
+  '<button type="button" id="saveQuarter" class="primary">Сохранить</button></div>');// Never recreate the modal from an iOS native select change event.
 // Shared Access RowSource picker: Kpz + original KTO/Szap region.
  // Unlike a datalist, it cannot show the unrestricted Slxr table.
  let zoneInput=document.querySelector('#modalBody [data-qfield="Klxr"]');
@@ -49,10 +76,10 @@ function editQuarter(k,index=0){const q=D.quarters[k],rows=q.quarterRows?.length
   zoneHint.textContent=result.reason+(current&&rules.currentIsAllowed(current,result)===false?
    '. Сохранённый код '+current+' отсутствует среди допустимых для этой области; уточните зону по исходным данным.':'');
  };
- document.querySelector('#modalBody').addEventListener('input',e=>{
+ document.querySelector('#quarterEditor').addEventListener('input',e=>{
   if(e.target===kpzInput||e.target===zoneInput)updateZoneHint();
  });
- document.querySelector('#modalBody').addEventListener('change',e=>{
+ document.querySelector('#quarterEditor').addEventListener('change',e=>{
   if(e.target===kpzInput||e.target===zoneInput)updateZoneHint();
  });
  updateZoneHint();
@@ -84,12 +111,16 @@ function editQuarter(k,index=0){const q=D.quarters[k],rows=q.quarterRows?.length
   }
   updateZoneHint();
   refreshIncompleteRows();
- };document.querySelector('#saveQuarter').onclick=()=>{const before=clone(q),next={...selected};for(const el of document.querySelectorAll('#modalBody [data-qfield]')){
+ };document.querySelector('#saveQuarter').onclick=()=>{
+ if(D.quarters?.[k]!==q)return toast('Квартал изменился. Откройте его заново.');
+ const before=clone(q),next={...selected};for(const el of document.querySelectorAll('#modalBody [data-qfield]')){
   const value=String(window.SolinQuarterPickers?.value(el)??el.value).trim();
   if(['Raion','Fzona'].includes(el.dataset.qfield)&&value&&!/^\d+$/.test(value)){
    toast('Укажите числовой код: '+(D.fieldLabels[el.dataset.qfield]||el.dataset.qfield));return;
   }
-  next[el.dataset.qfield]=['Fzona','Raion'].includes(el.dataset.qfield)?(value===''?null:Number(value)):(value||null);
+  const field=el.dataset.qfield;
+  if(value===String(selected[field]??''))continue;
+  next[field]=['Fzona','Raion'].includes(field)?(value===''?null:Number(value)):(value||null);
  }const regionCheck=window.SolinQuarterPickers?.validateDistrict?.(next.Raion,D.lesnichestvo?.[0]);
  if(String(next.Raion??'')!==String(selected.Raion??'')&&
     ['invalid','mismatch'].includes(regionCheck?.status)){
@@ -112,21 +143,35 @@ function editQuarter(k,index=0){const q=D.quarters[k],rows=q.quarterRows?.length
  const oldRow=sourceRows[index]; // Preserve original Klxr BEFORE iOS select change/blur mutates bound row.
  const inheritedCount=window.SolinAddressContext?.cascadeQuarterZone(q,oldRow,next)||0;
  try{checkpoint('Корректировка квартала '+k+' KGLF '+selected.KGLF);
-  closeModal();openQuarter(k);
+  closeModal();openQuarter(k,next.KGLF);
   if(inheritedCount)toast('Зона Klxr обновлена у '+inheritedCount+' выделов; пересохраните макет 10 для расчёта запаса');
  }catch(e){D.quarters[k]=before;toast('Не сохранено: '+e.message)}};}
 window.solinEditQuarter=editQuarter;
 window.renderFriendlyRefs=auditedRefs;
-function setup(){const menu=document.querySelector('#menuScreen .workspace');for(const [label,fn]of [['Фильтрация данных',filter],['Каталог 554 форм и 1420 кнопок',audit],['Лесовладелец и лесничество',()=>openModal('Адрес текущей базы','<pre>'+h(JSON.stringify(D.lesnichestvo,null,2))+'</pre>')],['Журнал изменений',()=>openModal('Журнал', '<pre>'+h(JSON.stringify(JSON.parse(localStorage.getItem(KEY)||'{}').history||[],null,2))+'</pre>')]]){const b=document.createElement('button');b.className='menuRow';b.textContent=label+' ›';b.onclick=fn;menu.append(b);}
- const oldRender=window.renderComp;window.renderComp=function(){oldRender();const bar=document.querySelector('#wfCardActions');if(bar){for(const [label,fn]of [['Фото',solinOpenPhoto],['GPS',solinSaveGPS]]){const x=document.createElement('button');x.textContent=label;x.onclick=fn;bar.append(x);}}};
+function setup(){const menu=document.querySelector('#menuScreen .workspace');for(const [label,fn]of [['Каталог 554 форм и 1420 кнопок',audit],['Лесовладелец и лесничество',()=>openModal('Адрес текущей базы','<pre>'+h(JSON.stringify(D.lesnichestvo,null,2))+'</pre>')],['Журнал изменений',()=>openModal('Журнал', '<pre>'+h(JSON.stringify(JSON.parse(localStorage.getItem(KEY)||'{}').history||[],null,2))+'</pre>')]]){const b=document.createElement('button');b.className='menuRow';b.textContent=label+' ›';b.onclick=fn;menu.append(b);}
+ const oldRender=window.renderComp;window.renderComp=function(){oldRender();const bar=document.querySelector('#wfCardActions .v25-card-actions-more > div');if(bar){for(const [label,fn]of [['Фото',solinOpenPhoto],['GPS',solinSaveGPS]]){const x=document.createElement('button');x.textContent=label;x.onclick=fn;bar.append(x);}}};
  const oldSave=window.saveLocal;window.saveLocal=function(){try{checkpoint('Создание квартала / выдела')}catch(e){const last=JSON.parse(localStorage.getItem(KEY)||'null');if(last)D.quarters=last.quarters;refresh();throw e;}};
- const oldQuarter=window.openQuarter;window.openQuarter=function(k){oldQuarter(k);const bar=document.querySelector('#wfQuarterToolbar');if(bar){const b=document.createElement('button');b.textContent='Корректировка квартала';b.onclick=()=>editQuarter(k);bar.append(b);}};
+ const oldQuarter=window.openQuarter;
+ window.openQuarter=function(k,selectedKGLF,...args){
+  oldQuarter(k,selectedKGLF,...args);
+  const bar=document.querySelector('#wfQuarterToolbar');
+  if(!bar)return;
+  const button=document.createElement('button');
+  button.type='button';button.textContent='Корректировка квартала';
+  button.onclick=()=>{
+   const q=D.quarters?.[k];if(!q)return toast('Квартал не найден.');
+   const rows=q.quarterRows?.length?q.quarterRows:[q.meta||{}];
+   const index=selectedKGLF==null?0:rows.findIndex(row=>String(row.KGLF)===String(selectedKGLF));
+   if(index<0)return toast('У КГЛФ '+selectedKGLF+' отсутствует обложка квартала.');
+   editQuarter(k,index);
+  };
+  bar.append(button);
+ };
  const formulaButton=document.createElement('button');formulaButton.className='menuRow';formulaButton.textContent='Исходные 611 выражений Access ›';formulaButton.onclick=formulas;menu.append(formulaButton);
- const oldShow=window.showCmfSheet;window.showCmfSheet=function(f,ll,layer){oldShow(f,ll,layer);const button=document.querySelector('.wf-card-from-map');if(!button)return;button.onclick=()=>{const k=cmfStandKeys(f),p=f.properties||{};let matches=all().filter(r=>Number(r.KV)===Number(k.kv)&&Number(r.VD)===Number(k.vd));for(const key of ['POS','LESN','KGLF'])if(p[key]!=null)matches=matches.filter(r=>String(r[key]??D.lesnichestvo?.[0]?.[key])===String(p[key]));if(matches.length!==1)return toast(matches.length?'Неоднозначный адрес: уточните POS / LESN / KGLF':'Выдел отсутствует в текущей базе');closeCmfSheet();current=matches[0];renderComp();show('card');};};
- const offline=document.querySelector('.topactions .ghost');offline.removeAttribute('onclick');offline.onclick=()=>toast(navigator.serviceWorker.controller?'Офлайн-оболочка установлена; снимки требуют сети':'Офлайн-оболочка ещё не установлена');
+ const oldShow=window.showCmfSheet;window.showCmfSheet=function(f,ll,layer){oldShow(f,ll,layer);const button=document.querySelector('.wf-card-from-map');if(!button)return;button.onclick=()=>{const k=cmfStandKeys(f),p=f.properties||{};let matches=all().filter(r=>Number(r.KV)===Number(k.kv)&&standNumber(r.VD)===standNumber(k.vd)&&!!standNumber(k.vd));for(const key of ['POS','LESN','KGLF'])if(p[key]!=null)matches=matches.filter(r=>String(r[key]??D.lesnichestvo?.[0]?.[key])===String(p[key]));if(matches.length!==1)return toast(matches.length?'Неоднозначный адрес: уточните POS / LESN / KGLF':'Выдел отсутствует в текущей базе');closeCmfSheet();current=matches[0];renderComp();show('card');};};
 }
 function validateRow(form,row,parent){return SOLIN_AUDIT.validations.filter(v=>v.form===form).flatMap(v=>{try{return rule(v.rule,row[v.source],{...parent,...row,__parent:parent})===false?[v.source+': '+v.rule]:[]}catch{return []}});}
-window.solinCore={checkpoint,validateBackup,commitImport,controls,rule,showControls,validateRow};
+window.solinCore={checkpoint,validateBackup,commitImport,controls,rule,showControls,validateRow,filter};
 window.addEventListener('solin-refs-ready',()=>auditedRefs());
 window.addEventListener('solin-ready',()=>{try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s){validateBackup(s);D.quarters=s.quarters;if(s.lesnichestvo?.length)D.lesnichestvo=s.lesnichestvo;if(s.source)D.source=s.source;D._transferExtras=s.extraTables||{};for(const k of ['solin_field_audited_work_v1','solin_user_data_v1','solin_field_overrides_v3'])localStorage.removeItem(k);refresh();}refs();loadRefs();}catch(e){toast('Не удалось восстановить копию: '+e.message)}});
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});else setup();

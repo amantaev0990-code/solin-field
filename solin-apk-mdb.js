@@ -3,6 +3,7 @@
 (() => {
   'use strict';
   const IDB = 'solin-offline-mdb-templates-v1';
+  let exporting = false;
   const esc = text => String(text??'').replace(/[&<>"']/g, x =>
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
   const keyOf = id => [id.POS,id.LESN,id.GodT].join('::');
@@ -48,9 +49,9 @@
     window.Capacitor?.isNativePlatform?.();
   const plugin = () => window.Capacitor?.Plugins?.SolinMdb;
   const button = () => document.getElementById('solin-mdb-export');
-  const modal = (title,html)=> {
+  const modal = (title,html,options)=> {
     if(typeof openModal!=='function')throw Error('Экран экспорта не загрузился.');
-    openModal(title,html);
+    openModal(title,html,options);
   };
   function base64(buffer){
     const b=new Uint8Array(buffer);
@@ -101,8 +102,7 @@
       addresses.add(key(q));
     }
     for(const stand of stands){
-      if(!addresses.has(key(stand))||!Number.isSafeInteger(Number(stand.VD))||
-         Number(stand.VD)<1||!(Number(stand.PLV)>0))
+      if(!addresses.has(key(stand))||!standNumber(stand.VD)||!(Number(stand.PLV)>0))
         throw Error('Выдел '+(stand.VD??'?')+' в квартале '+(stand.KV??'?')+
           ' не связан с корректной строкой квартала (КГЛФ/Fzona/адрес/площадь).');
     }
@@ -114,25 +114,44 @@
     const owner=typeof D!=='undefined'?D?.lesnichestvo?.[0]:null;
     if(!owner)throw Error('Не выбрано лесничество.');
     const current=Number(owner.GodT),prior=Number(owner.GodPU);
-    if(Number.isInteger(prior)&&prior>=1900&&prior<current)return;
-    await new Promise((resolve,reject)=>{
+    if(!Number.isInteger(current)||current<=1900)throw Error('Укажите действующий год таксации лесничества.');
+    if(Number.isInteger(prior)&&prior>=1900&&prior<current)return true;
+    return new Promise(resolve=>{
       modal('Контроль К82 · год предыдущей таксации',
        '<p>В оригинальном SOLI-N необходим год <b>предыдущей таксации</b> лесничества. '+
        'Он не совпадает с годом создания новой карточки. Укажите фактический год из исходных документов; программа не будет его угадывать.</p>'+
        '<label class="wf-field"><span>Предыдущий год таксации (GodPU)</span><input type="number" id="wfPreviousTaxYear" min="1900" max="'+(current-1)+'" placeholder="Например, 2015"></label>'+
        '<div class="formActions"><button type="button" id="wfPrevCancel">Отмена</button><button type="button" class="primary" id="wfPrevSave">Сохранить и экспортировать</button></div>'+
-       '<p id="wfPrevError" role="alert"></p>');
+       '<p id="wfPrevError" role="alert"></p>',{confirmChanges:false});
+      const dialog=document.getElementById('modal');
       const el=document.getElementById('wfPreviousTaxYear'),msg=document.getElementById('wfPrevError');
-      const closeIcon=document.querySelector('#modal .modalHead .close');
-      const cancel=()=>{closeIcon?.removeEventListener('click',cancel);closeModal();reject(Error('Экспорт отменён: не задан фактический год предыдущей таксации (К82).'));};
-      closeIcon?.addEventListener('click',cancel,{once:true});
-      document.getElementById('wfPrevCancel').onclick=cancel;
-      document.getElementById('wfPrevSave').onclick=async()=>{
+      const save=document.getElementById('wfPrevSave');
+      let saving=false,dismissed=false;
+      const onDismiss=()=>{dismissed=true;if(!saving)resolve(false);};
+      dialog.addEventListener('solin-modal-dismissed',onDismiss,{once:true});
+      document.getElementById('wfPrevCancel').onclick=closeModal;
+      save.onclick=async()=>{
+        if(saving||dismissed)return;
         const val=Number(el.value);
         if(!Number.isInteger(val)||val<1900||val>=current){msg.textContent='Укажите фактический год от 1900 до '+(current-1);return;}
+        saving=true;
+        save.disabled=true;
         const old=owner.GodPU;owner.GodPU=val;
-        try{await window.SolinWorkspace?.persist?.();closeIcon?.removeEventListener('click',cancel);closeModal();resolve();}
-        catch(e){owner.GodPU=old;msg.textContent='Не удалось сохранить год: '+e.message;}
+        try{
+          await window.SolinWorkspace?.persist?.();
+        }catch(error){
+          owner.GodPU=old;
+          if(dismissed)resolve(false);
+          else msg.textContent='Не удалось сохранить год: '+error.message;
+          return;
+        }finally{
+          saving=false;
+          save.disabled=false;
+        }
+        if(dismissed){resolve(false);return;}
+        dialog.removeEventListener('solin-modal-dismissed',onDismiss);
+        closeModal();
+        resolve(true);
       };
     });
   }
@@ -148,9 +167,11 @@
       if(incomplete(s.M3B))fields.push('бонитет (M3B)');
       if(incomplete(s.M3TLU))fields.push('тип леса (M3TLU)');
       throw Error('Контроль К16: квартал '+s.KV+', выдел '+s.VD+': не заполнено: '+fields.join(', ')+'. '+
-       'Откройте карточку таксации → Макет 3, заполните поля по справочникам и повторите экспорт.');}
+       'В карточке выдела главная порода и тип леса находятся в «Основных данных», бонитет — в макете 3.');}
   }
   async function exportMDB(){
+    if(exporting)return;
+    exporting=true;
     const b=button();
     if(b)b.disabled=true;
     try{
@@ -166,7 +187,7 @@
         throw Error('Нативный модуль MDB отсутствует в этой сборке APK.');
       }
       await window.SolinWorkspace?.ready;
-      await ensurePreviousTaxationYear();
+      if(!await ensurePreviousTaxationYear())return;
       await window.SolinWorkspace?.persist?.();
       const transfer=window.SolinMDBBridge?.snapshot?.();
       if(!transfer||transfer.format!=='SOLIN-MDB-Bridge-v1')throw Error('Не удалось собрать карточки Transfer.');
@@ -195,11 +216,11 @@
         '<p role="alert">'+esc(e?.message||'Ошибка локального экспорта')+'</p>'+
         '<p>Карточки приложения и исходный шаблон не изменены.</p>'+
         '<button type="button" onclick="closeModal()">Закрыть</button>');
-    }finally{if(b)b.disabled=false;}
+    }finally{exporting=false;if(b)b.disabled=false;}
   }
   function install(){
     const b=button();if(!b)return;
-    b.innerHTML='<span><b>Экспорт</b><small>Создание MDB без сервера (APK Android)</small></span><span>⇩</span>';
+    b.textContent='Экспорт MDB';
     b.type='button';b.onclick=exportMDB;
   }
   window.SolinOfflineMDB={exportMDB,readStored,saveStored,deleteStored};
