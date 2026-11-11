@@ -40,7 +40,14 @@ const server = http.createServer(async (request, response) => {
     await page.waitForFunction(() => document.documentElement.classList.contains('v37-menu-ready'));
     await page.waitForFunction(() => document.querySelector('#mainScreen.active') && window.SolinV37);
     const active = page.locator('.screen.active');
-    const route = id => page.locator('#mainScreen [data-field-route="' + id + '"]').click();
+    // Navigation removes its own button as soon as a click is handled.
+    // Playwright's actionability retry may see it as hidden *after* successful
+    // navigation. Assert visibility before dispatch and test the real handler.
+    const route = async id => {
+      const button=page.locator('#mainScreen [data-field-route="' + id + '"]');
+      await button.waitFor({state:'visible'});
+      await button.dispatchEvent('click');
+    };
     const snapshot = () => page.evaluate(() => {
       const screen = document.querySelector('.screen.active');
       const workspace = screen.querySelector(':scope > .workspace');
@@ -57,16 +64,6 @@ const server = http.createServer(async (request, response) => {
     });
 
     await addScrollRoom('refsScreen');
-    const state=await page.evaluate(()=>{
-      const el=document.querySelector('#mainScreen [data-field-route="refsScreen"]');
-      const chain=[];for(let node=el;node&&chain.length<12;node=node.parentElement){
-        const css=getComputedStyle(node),r=node.getBoundingClientRect();
-        chain.push({tag:node.tagName,id:node.id,className:String(node.className).slice(0,100),display:css.display,visibility:css.visibility,opacity:css.opacity,width:r.width,height:r.height});
-      }
-      return {html:document.documentElement.className,body:document.body.className,
-        screen:document.querySelector('.screen.active')?.id,chain};
-    });
-    console.log('V52_MENU_DIAGNOSTIC '+JSON.stringify(state));
     await route('refsScreen');
     await page.waitForFunction(() => window.transitions.some(([id, name]) => id === 'refsScreen' && name === 'field-screen-enter'));
     assert.equal(await active.getAttribute('id'), 'refsScreen');
