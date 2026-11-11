@@ -59,9 +59,11 @@ jobs:
           sha256sum -c release/SHA256SUMS.txt
           TOOLS="$ANDROID_HOME/build-tools/36.0.0"
           CERT="$("$TOOLS/apksigner" verify --print-certs "$APK" | sed -nE 's/^((Signer #[0-9]+)|(V[0-9.]+ Signer)): certificate SHA-256 digest: //p' | head -n 1 | tr '[:lower:]' '[:upper:]')"
-          test "$CERT" = "$EXPECTED_CERT"
-          BADGING="$("$TOOLS/aapt" dump badging "$APK")"
-          [[ "$BADGING" = *"package: name='kz.solin.field.v23build' versionCode='230029'"* ]]
+          [[ "$CERT" == "$EXPECTED_CERT" ]] || { echo "::error::V49 certificate fingerprint differs ($CERT)"; exit 1; }
+          BADGING="$("$TOOLS/aapt" dump badging "$APK" | sed -n '/^package:/p' || true)"
+          printf '%s\n' "$BADGING"
+          [[ "$BADGING" == *"package: name='kz.solin.field.v23build'"* ]] || { echo "::error::Wrong Android package"; exit 1; }
+          [[ "$BADGING" == *"versionCode='230029'"* ]] || { echo "::error::Wrong Android version code"; exit 1; }
           LATEST="$(gh api "repos/$REPO/releases/latest" --jq .tag_name)"
           if [[ "$LATEST" == "$PREVIOUS_TAG" ]]; then
             gh release create "$TAG" "$APK" release/SHA256SUMS.txt \
@@ -69,7 +71,7 @@ jobs:
               --title "SOLI-N Field V49 — полевые инструменты и быстрый ввод" \
               --notes 'Полевые метки, линии, площадь в гектарах и GPS-треки. Исходные цвета линий MapInfo, буквенные номера новых выделов, фильтры и улучшенный быстрый ввод.'
           else
-            test "$LATEST" = "$TAG"
+            [[ "$LATEST" == "$TAG" ]] || { echo "::error::Unexpected latest release $LATEST"; exit 1; }
           fi
           EXPECTED="sha256:$(sha256sum "$APK" | cut -d' ' -f1)"
           ACTUAL="$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.assets[] | select(.name=="SOLIN-Field-update.apk") | .digest')"
