@@ -172,6 +172,45 @@
       editor.showMaketNavigator();
     }), enter);
     form.querySelector('.dt-toolbar').after(nav);
+    // The source SKU controls which form groups the desktop can expose.
+    // P10 is verified. P31 and PF1 are shown as source flags, not
+    // fabricated unconditional required-field rules for all 123 KU.
+    const maketHint=document.createElement('div');
+    maketHint.id='ce-required-makets';
+    maketHint.setAttribute('role','status');
+    maketHint.setAttribute('aria-live','polite');
+    nav.after(maketHint);
+    const updateMaketHint=()=>{
+      if(!form.isConnected)return;
+      const code=form.querySelector('[data-ce-scope="base"][data-ce-field="KU"]')?.value;
+      const p=window.SolinCategoryRules?.profile?.(code,window.SOLIN_REFS?.tables);
+      maketHint.replaceChildren();
+      if(!p || !p.code){maketHint.hidden=true;return;}
+      maketHint.hidden=false;
+      const title=document.createElement('strong');
+      title.textContent='Для категории '+p.code+':';
+      maketHint.append(title);
+      const flags=[
+        {n:'10',enabled:p.group!=null && p.group>0,certainty:'Подтверждено SKU.P10'},
+        {n:'31',enabled:p.p31!=null && p.p31>0,certainty:'Признак SKU.P31'},
+        {n:'1',enabled:p.form1!=null && p.form1>0,certainty:'Признак SKU.PF1'}
+      ].filter(x=>x.enabled);
+      for(const item of flags){
+        const b=button('Макет '+item.n,()=>go(item.n));
+        b.title=item.certainty;
+        maketHint.append(b);
+      }
+      const note=document.createElement('small');
+      note.textContent=p.status==='verified-reference'
+        ? 'Макеты показаны по исходным признакам SKU. Полная матрица обязательности остальных макетов ещё сверяется с настольным SOLI-N.'
+        : 'Не найдены полные признаки обязательных макетов: справочник KU требует проверки.';
+      maketHint.append(note);
+    };
+    form.addEventListener('change',event=>{
+      if(event.target.matches('[data-ce-scope="base"][data-ce-field="KU"]'))queueMicrotask(updateMaketHint);
+    });
+    window.addEventListener('solin-refs-ready',updateMaketHint);
+    updateMaketHint();
     go('base');
   }
 
