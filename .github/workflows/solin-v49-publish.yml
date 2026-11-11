@@ -58,7 +58,8 @@ jobs:
           APK=release/SOLIN-Field-update.apk
           sha256sum -c release/SHA256SUMS.txt
           TOOLS="$ANDROID_HOME/build-tools/36.0.0"
-          CERT="$("$TOOLS/apksigner" verify --print-certs "$APK" | sed -nE 's/^((Signer #[0-9]+)|(V[0-9.]+ Signer)): certificate SHA-256 digest: //p' | head -n 1 | tr '[:lower:]' '[:upper:]')"
+          CERTIFICATES="$("$TOOLS/apksigner" verify --verbose --print-certs "$APK")"
+          CERT="$(sed -nE 's/^.*Signer.*certificate SHA-256 digest:[[:space:]]*([[:xdigit:]]{64})[[:space:]]*$/\1/p' <<< "$CERTIFICATES" | head -n 1 | tr '[:lower:]' '[:upper:]')"
           [[ "$CERT" == "$EXPECTED_CERT" ]] || { echo "::error::V49 certificate fingerprint differs ($CERT)"; exit 1; }
           BADGING="$("$TOOLS/aapt" dump badging "$APK" | sed -n '/^package:/p' || true)"
           printf '%s\n' "$BADGING"
