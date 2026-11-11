@@ -1,7 +1,11 @@
 'use strict';
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
-const merge=require('../solin-transfer-merge.js');
+const vm=require('node:vm');
+const sandbox={window:{}};
+vm.runInNewContext(fs.readFileSync('solin-transfer-merge.js','utf8'),sandbox);
+const merge=sandbox.window.SolinTransferMerge;
+assert.equal(typeof merge?.mergeForest,'function','Merger must expose browser API');
 const baseline={
   id:'213::1',org:{POS:213,LESN:1,GodT:2026,NLX:'Лесовладелец',NOS:'Лесничество'},
   quarters:{1:{quarterRows:[{POS:213,LESN:1,KV:1,KGLF:1,Fzona:0,Klxr:3,GodT:2026}],
