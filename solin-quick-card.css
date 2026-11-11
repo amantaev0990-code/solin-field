@@ -69,3 +69,47 @@
 .field-filter-v50 .record-delete{display:none}
 @media(max-width:600px){.field-filter-rule{grid-template-columns:1fr 1fr}.field-filter-rule :first-child{grid-column:1/-1}}
 .screen .record-entry,.screen .compCard,.screen .quarterCard,.ce-assist-option {touch-action:pan-y}
+
+/* V51 — only ONE Maket navigation, immediately below the card toolbar. The
+   legacy V33 strip was inserted after the green calculation panel on Android. */
+#modal.ce-modal #ce-form.quick-card-form .v33-card-jump,
+#modal.ce-modal #ce-form.quick-card-form .ce-mobile-tabs,
+#modal.ce-modal #ce-form.quick-card-form .ce-assist-shortcuts {
+  display:none!important;
+}
+/* Android WebView can leave 100dvh at its pre-keyboard height. The actual
+   visible viewport is measured in solin-quick-card.js on each IME resize. */
+#modal.ce-modal.ce-ime-visible {
+  top:var(--ce-ime-top,0px)!important;
+  bottom:auto!important;
+  height:var(--ce-ime-height,100dvh)!important;
+  max-height:var(--ce-ime-height,100dvh)!important;
+  padding:4px!important;
+  align-items:stretch!important;
+  overflow:hidden!important;
+}
+#modal.ce-modal.ce-ime-visible .modalCard {
+  flex:1 1 auto!important;
+  height:100%!important;
+  max-height:100%!important;
+  min-height:0!important;
+  margin:0 auto!important;
+}
+#modal.ce-modal.ce-ime-visible #ce-form {
+  min-height:0!important;
+}
+#modal.ce-modal.ce-ime-visible #ce-form #ce-stock-audit,
+#modal.ce-modal.ce-ime-visible #ce-form #ce-calc-notice,
+#modal.ce-modal.ce-ime-visible #ce-form #ce-entry-checks {
+  display:none!important;
+}
+#modal.ce-modal.ce-ime-visible #ce-form .dt-viewport {
+  flex:1 1 auto!important;
+  min-height:65px!important;
+  overflow-y:auto!important;
+  scroll-padding-bottom:18px;
+}
+#modal.ce-modal.ce-ime-visible #ce-form .quick-card-nav {
+  padding-top:3px;
+  padding-bottom:3px;
+}
