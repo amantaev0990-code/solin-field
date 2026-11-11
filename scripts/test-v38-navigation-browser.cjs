@@ -72,6 +72,14 @@ const server = http.createServer(async (request, response) => {
 
     await addScrollRoom('refsScreen');
     await route('refsScreen');
+    console.log('V52_CHECK '+JSON.stringify(await page.evaluate(()=>({
+      active:document.querySelector('.screen.active')?.id,
+      transitions:window.transitions,
+      body:document.body.className,
+      classes:[...document.querySelector('#refsScreen')?.classList||[]],
+      animation:document.querySelector('#refsScreen > .workspace') ? getComputedStyle(document.querySelector('#refsScreen > .workspace')).animationName:null,
+      ready:!!window.SolinWorkspace?.activeId
+    }))));
     await page.waitForFunction(() => window.transitions.some(([id, name]) => id === 'refsScreen' && name === 'field-screen-enter'));
     assert.equal(await active.getAttribute('id'), 'refsScreen');
     await active.evaluate(screen => { screen.scrollTop = 640; });
