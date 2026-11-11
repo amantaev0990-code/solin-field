@@ -72,8 +72,32 @@
     const baseFields = ['KU','M3Pr','M3TLU','PLV'].map(key =>
       main.querySelector('[data-ce-scope="base"][data-ce-field="' + key + '"]').closest('.dt-cell'));
     baseFields[2].classList.add('quick-card-forest-type');
+    const groupsBar=document.createElement('div');
+    groupsBar.className='quick-card-groups';
+    const groupsNote=document.createElement('small');
+    groupsNote.className='quick-card-groups-note';
+    const groupsButton=button('Сменить группу типов леса',()=>{
+      // Only original STL-backed groups and their real KTL choices are offered.
+      window.SolinForestGroups?.open?.();
+    },'quick-card-groups-button');
+    groupsButton.hidden=true;
+    groupsBar.append(groupsNote,groupsButton);
+    baseFields[2].append(groupsBar);
+    const updateGroups=()=>{
+      if(!form.isConnected)return;
+      const result=window.SolinForestGroups?.available?.();
+      if(!result)return;
+      const length=result.items?.length||0;
+      groupsButton.hidden=!(result.groups?.length>1);
+      groupsNote.textContent=result.status==='complete'||result.status==='partial'?
+        ('Для текущей области и зоны: '+length+' типов леса из STL'):
+        result.reason||'';
+    };
+    form.addEventListener('change',()=>queueMicrotask(updateGroups));
+    window.addEventListener('solin-refs-ready',updateGroups);
     base.append(number, ...baseFields);
     main.prepend(base);
+    queueMicrotask(updateGroups);
 
     const nav = document.createElement('nav');
     nav.className = 'quick-card-nav';
