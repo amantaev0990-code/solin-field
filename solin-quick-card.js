@@ -11,8 +11,60 @@
     return element;
   };
 
+  let releaseImeListeners = null;
   function mount(form, editor) {
     form.classList.add('quick-card-form');
+    // Android may paint the keyboard over a fixed WebView dialog without
+    // resizing its CSS viewport. Constrain the card to the *visual* viewport.
+    releaseImeListeners?.();
+    const modal = form.closest('#modal');
+    const vv = window.visualViewport;
+    let alignFrame = 0;
+    const isInput = node => !!node && form.contains(node) &&
+      node.matches?.('input:not([readonly]):not([disabled]),textarea:not([readonly]):not([disabled])');
+    const keepInputVisible = () => {
+      const active = document.activeElement;
+      if (!isInput(active)) return;
+      const scroller = active.closest('.ce-table-wrap') || form.querySelector('.dt-viewport');
+      if (!scroller) return;
+      const fieldRect = active.getBoundingClientRect(), area = scroller.getBoundingClientRect();
+      if (fieldRect.bottom > area.bottom - 14) scroller.scrollTop += fieldRect.bottom - area.bottom + 24;
+      else if (fieldRect.top < area.top + 10) scroller.scrollTop -= area.top - fieldRect.top + 18;
+    };
+    const alignIme = () => {
+      if (!modal?.isConnected || !form.isConnected) return;
+      const active = document.activeElement;
+      const editing = isInput(active);
+      modal.classList.toggle('ce-ime-visible', editing);
+      if (editing) {
+        const height = Math.max(180, Math.floor((vv?.height || window.innerHeight) - 10));
+        modal.style.setProperty('--ce-ime-height', height + 'px');
+        modal.style.setProperty('--ce-ime-top', Math.max(0, Math.floor(vv?.offsetTop || 0)) + 'px');
+        cancelAnimationFrame(alignFrame);
+        alignFrame = requestAnimationFrame(keepInputVisible);
+      } else {
+        modal.style.removeProperty('--ce-ime-height');
+        modal.style.removeProperty('--ce-ime-top');
+      }
+    };
+    const onFocus = () => {alignIme();setTimeout(alignIme, 200);};
+    const onViewport = () => {alignIme();setTimeout(alignIme, 80);};
+    form.addEventListener('focusin', onFocus);
+    form.addEventListener('focusout', onFocus);
+    window.addEventListener('resize', onViewport);
+    vv?.addEventListener('resize', onViewport);
+    vv?.addEventListener('scroll', onViewport);
+    releaseImeListeners = () => {
+      cancelAnimationFrame(alignFrame);
+      form.removeEventListener('focusin', onFocus);
+      form.removeEventListener('focusout', onFocus);
+      window.removeEventListener('resize', onViewport);
+      vv?.removeEventListener('resize', onViewport);
+      vv?.removeEventListener('scroll', onViewport);
+      modal?.classList.remove('ce-ime-visible');
+      modal?.style.removeProperty('--ce-ime-height');
+      modal?.style.removeProperty('--ce-ime-top');
+    };
     const main = form.querySelector('#ce-main');
     const base = document.createElement('section');
     base.id = 'quick-card-base';
@@ -48,14 +100,22 @@
       el.scrollIntoView({block:'nearest',inline:'nearest'});
     };
     const tabs = order.map(n => button(label(n), () => go(n)));
-    function go(n) {
+    function go(n, focusFirst = false) {
+      // Tapping a Maket tab must never summon or retain the numeric keyboard.
+      if (form.contains(document.activeElement) && document.activeElement.matches?.('input,textarea,select')) {
+        document.activeElement.blur();
+      }
       step = n;
       lastField = null;
       form.dataset.quickStep = n;
       tabs.forEach((tab, i) => tab.setAttribute('aria-pressed', String(order[i] === n)));
       if (n === '23') editor.showExtra('Макет23');
       else editor.showMain();
-      focus(fields()[0]);
+      if (focusFirst) focus(fields()[0]);
+      else {
+        form.querySelector('.dt-viewport')?.scrollTo({top:0,behavior:'instant'});
+        alignIme();
+      }
     }
     function next(el) {
       const controls = fields();
@@ -71,7 +131,7 @@
         if(nextField)return focus(nextField);
       }
       const following = order[order.indexOf(step) + 1];
-      if (following) go(following);
+      if (following) go(following, true);
       else form.querySelector('#ce-save').focus();
     }
     form.addEventListener('focusin', event => {
