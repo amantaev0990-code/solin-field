@@ -7,6 +7,7 @@
 .quick-card-enter {position:sticky;right:0;}
 .quick-card-form[data-quick-step] #ce-main > :not([data-quick-visible]) {display:none!important;}
 .quick-card-form[data-quick-step="base"] #ce-main > #quick-card-base {display:grid!important;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;padding:12px;}
+.quick-card-form[data-quick-step="1"] #ce-main > #ce-section-1,
 .quick-card-form[data-quick-step="10"] #ce-main > #ce-section-10,
 .quick-card-form[data-quick-step="31"] #ce-main > #ce-section-31,
 .quick-card-form[data-quick-step="32"] #ce-main > #ce-section-32,
@@ -55,13 +56,13 @@
 .quick-card-form[data-quick-step] .ce-assist-shortcuts,
 .quick-card-form[data-quick-step] .dt-footer {display:none!important}
 .quick-card-form #quick-card-base .quick-card-forest-type .dt-input {
- display:grid;grid-template-columns:minmax(8ch,115px) minmax(0,1fr);align-items:start;
+ display:grid;grid-template-columns:minmax(135px,180px) minmax(0,1fr);align-items:start;
 }
 .quick-card-form #quick-card-base .quick-card-forest-type select {
- width:100%!important;min-width:8ch!important;max-width:none;padding-right:20px;
+ width:100%!important;min-width:125px!important;max-width:none;padding-right:20px;
 }
 .quick-card-form #quick-card-base .quick-card-forest-type output {
- width:auto!important;min-width:0!important;max-width:35ch;height:auto;white-space:normal;overflow-wrap:anywhere;
+ display:block!important;width:100%!important;min-width:0!important;max-width:none!important;height:auto;min-height:39px;white-space:normal;overflow-wrap:anywhere;padding:7px 10px;
 }
 #wfQuarterToolbar .kt-quarter-button{background:#175bb0;color:#fff;border:1px solid #124886;min-height:42px}
 .field-filter-rule{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) auto;gap:7px;margin-bottom:9px}
@@ -121,3 +122,15 @@
   display:inline-flex;min-height:34px;padding:6px 11px;border:1px solid #a6c3ad;
   border-radius:7px;background:#edf7ee;color:#145a36;font:650 12px system-ui,Arial
 }
+
+/* V52: full-width forest-type description, and category-derived Maket hints. */
+.quick-card-forest-type{width:100%;min-width:0}
+#modal.ce-modal #ce-required-makets{display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+ padding:7px 12px;background:#f3f7f1;border-bottom:1px solid #c7d8c9;
+ color:#31523a;font:13px/1.35 system-ui,Arial,sans-serif}
+#modal.ce-modal #ce-required-makets[hidden]{display:none!important}
+#modal.ce-modal #ce-required-makets button{min-height:29px;padding:4px 9px;border:1px solid #a4beaa;
+ border-radius:6px;background:white;color:#155138;font:700 12px system-ui,Arial}
+#modal.ce-modal #ce-required-makets small{color:#6b745e;flex-basis:100%}
+#modal.ce-modal #quick-card-base .dt-cell[data-dt-cell="M3TLU"]{grid-column:1/-1}
+@media(max-width:700px){.quick-card-form #quick-card-base .quick-card-forest-type .dt-input{grid-template-columns:minmax(115px,36%) minmax(0,1fr)}}
