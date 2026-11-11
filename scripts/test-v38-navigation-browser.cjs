@@ -38,7 +38,14 @@ const server = http.createServer(async (request, response) => {
     });
     await page.goto('http://127.0.0.1:' + server.address().port, {waitUntil: 'domcontentloaded'});
     await page.waitForFunction(() => document.documentElement.classList.contains('v37-menu-ready'));
-    await page.waitForFunction(() => document.querySelector('#mainScreen.active') && window.SolinV37);
+    // Forest workspaces initialize asynchronously. Earlier tests raced
+    // their redirect to homeScreen and clicked an inactive old menu.
+    await page.waitForFunction(() => window.SolinWorkspace && window.SolinV37);
+    await page.evaluate(async () => {
+      await window.SolinWorkspace.ready;
+      window.show('mainScreen');
+    });
+    await page.waitForFunction(() => document.querySelector('#mainScreen.active'));
     const active = page.locator('.screen.active');
     // Navigation removes its own button as soon as a click is handled.
     // Playwright's actionability retry may see it as hidden *after* successful
@@ -65,13 +72,6 @@ const server = http.createServer(async (request, response) => {
 
     await addScrollRoom('refsScreen');
     await route('refsScreen');
-    console.log('V52_AFTER_ROUTE '+JSON.stringify(await page.evaluate(()=>({
-      active:document.querySelector('.screen.active')?.id, transitions:window.transitions,
-      target:document.querySelector('#refsScreen')?.className,
-      route:document.querySelector('#mainScreen [data-field-route="refsScreen"]')?.getAttribute('onclick'),
-      workAnimation:document.querySelector('#refsScreen > .workspace') ? getComputedStyle(document.querySelector('#refsScreen > .workspace')).animationName:null,
-      body:document.body.className
-    }))));
     await page.waitForFunction(() => window.transitions.some(([id, name]) => id === 'refsScreen' && name === 'field-screen-enter'));
     assert.equal(await active.getAttribute('id'), 'refsScreen');
     await active.evaluate(screen => { screen.scrollTop = 640; });
