@@ -99,7 +99,8 @@ jobs:
           sed -i -E 's/((app|map|solin-card-assist|solin-card-editor|solin-enhancements|solin-field-core|solin-v35-features|solin-apk-mdb|solin-mdb-bridge|solin-quick-card|solin-transfer-merge|solin-workspace|solin-workflow)\.(js|css))(\?v=[^" ]+)?"/\1?v=52"/g' www/index.html
           node scripts/test-v42-stock.cjs
           npx playwright install --with-deps chromium
-          node scripts/test-v38-navigation-browser.cjs
+          # V38 old mainScreen-only test no longer matches V51 chooser. Check actual tablet navigation instead.
+          node scripts/test-v52-navigation-browser.cjs
           node scripts/test-v39-card-browser.cjs
           # This asset is reinserted byte-for-byte in the original signing stage.
           rm www/solin-private-refs.packed.bin
