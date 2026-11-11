@@ -57,6 +57,16 @@ const server = http.createServer(async (request, response) => {
     });
 
     await addScrollRoom('refsScreen');
+    const state=await page.evaluate(()=>{
+      const el=document.querySelector('#mainScreen [data-field-route="refsScreen"]');
+      const chain=[];for(let node=el;node&&chain.length<12;node=node.parentElement){
+        const css=getComputedStyle(node),r=node.getBoundingClientRect();
+        chain.push({tag:node.tagName,id:node.id,className:String(node.className).slice(0,100),display:css.display,visibility:css.visibility,opacity:css.opacity,width:r.width,height:r.height});
+      }
+      return {html:document.documentElement.className,body:document.body.className,
+        screen:document.querySelector('.screen.active')?.id,chain};
+    });
+    console.log('V52_MENU_DIAGNOSTIC '+JSON.stringify(state));
     await route('refsScreen');
     await page.waitForFunction(() => window.transitions.some(([id, name]) => id === 'refsScreen' && name === 'field-screen-enter'));
     assert.equal(await active.getAttribute('id'), 'refsScreen');
