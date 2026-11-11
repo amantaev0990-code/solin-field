@@ -1,0 +1,88 @@
+name: Publish verified SOLI-N Field V49 artifact
+
+on:
+  push:
+    branches: [v49-publish]
+    paths: [.github/workflows/solin-v49-publish.yml]
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: solin-automatic-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      RUN_ID: '42960918098'
+      SOURCE_SHA: '366846058ea94a5a0cc2bbc3650f734343766889'
+      TAG: solin-field-v230029
+      PREVIOUS_TAG: solin-field-v230028
+      EXPECTED_CERT: 5A1C2E2BF2EFE5AA7382674B651533A11D2B93C802A1C09ADC72656C5A29ED7E
+    steps:
+      - name: Verify provenance of tested and signed candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$REPO" = 'amantaev0990-code/solin-field'
+          gh api "repos/$REPO/actions/runs/$RUN_ID" --jq .head_sha | grep -Fx "$SOURCE_SHA"
+          gh api "repos/$REPO/actions/runs/$RUN_ID/jobs" | jq -e '
+            any(.jobs[]; .name == "build" and .conclusion == "success") and
+            any(.jobs[]; .name == "sign-and-publish" and any(.steps[];
+              .name == "Restore original dictionary, sign and verify APK" and .conclusion == "success"))'
+          gh api "repos/$REPO/actions/artifacts/13829108319" | jq -e '
+            .name == "SOLIN-Field-SIGNED-230029" and .expired == false and
+            .workflow_run.id == 42960918098 and
+            .digest == "sha256:223d1c65bc916f1267f6f1176dfed0dba33007df5cafe5865b20630947e25cbf"'
+      - uses: actions/download-artifact@v4
+        with:
+          name: SOLIN-Field-SIGNED-230029
+          path: release
+          repository: ${{ github.repository }}
+          run-id: '42960918098'
+          github-token: ${{ github.token }}
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '21'}
+      - uses: android-actions/setup-android@v3
+        with: {packages: 'build-tools;36.0.0'}
+      - name: Verify and publish the original signed APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=release/SOLIN-Field-update.apk
+          sha256sum -c release/SHA256SUMS.txt
+          TOOLS="$ANDROID_HOME/build-tools/36.0.0"
+          CERT="$("$TOOLS/apksigner" verify --print-certs "$APK" | sed -nE 's/^((Signer #[0-9]+)|(V[0-9.]+ Signer)): certificate SHA-256 digest: //p' | head -n 1 | tr '[:lower:]' '[:upper:]')"
+          test "$CERT" = "$EXPECTED_CERT"
+          BADGING="$("$TOOLS/aapt" dump badging "$APK")"
+          [[ "$BADGING" = *"package: name='kz.solin.field.v23build' versionCode='230029'"* ]]
+          LATEST="$(gh api "repos/$REPO/releases/latest" --jq .tag_name)"
+          if [[ "$LATEST" == "$PREVIOUS_TAG" ]]; then
+            gh release create "$TAG" "$APK" release/SHA256SUMS.txt \
+              --repo "$REPO" --target "$SOURCE_SHA" --latest \
+              --title "SOLI-N Field V49 — полевые инструменты и быстрый ввод" \
+              --notes 'Полевые метки, линии, площадь в гектарах и GPS-треки. Исходные цвета линий MapInfo, буквенные номера новых выделов, фильтры и улучшенный быстрый ввод.'
+          else
+            test "$LATEST" = "$TAG"
+          fi
+          EXPECTED="sha256:$(sha256sum "$APK" | cut -d' ' -f1)"
+          ACTUAL="$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.assets[] | select(.name=="SOLIN-Field-update.apk") | .digest')"
+          test "$ACTUAL" = "$EXPECTED"
+          gh api "repos/$REPO/releases/tags/$TAG" | jq '{
+            tag_name, draft, prerelease,
+            assets: [.assets[] | select(.name == "SOLIN-Field-update.apk") | {name, size, digest, browser_download_url}]
+          }' > release/latest.json
+          CHANNEL="$(gh api "repos/$REPO/contents/latest.json?ref=updater-channel")"
+          CHANNEL_TAG="$(jq -r .content <<< "$CHANNEL" | base64 -d | jq -r .tag_name)"
+          [[ "$CHANNEL_TAG" == "$PREVIOUS_TAG" || "$CHANNEL_TAG" == "$TAG" ]]
+          SHA="$(jq -r .sha <<< "$CHANNEL")"
+          gh api --method PUT "repos/$REPO/contents/latest.json" \
+            -f branch=updater-channel -f sha="$SHA" \
+            -f message="Publish verified metadata for $TAG" \
+            -f content="$(base64 -w0 release/latest.json)" --silent
