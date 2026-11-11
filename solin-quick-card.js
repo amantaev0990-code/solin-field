@@ -47,7 +47,9 @@
         modal.style.removeProperty('--ce-ime-top');
       }
     };
-    const onFocus = () => {alignIme();setTimeout(alignIme, 200);};
+    // Do not move the modal during pointerdown/focusin. Otherwise Chromium
+    // may finish a tap in a different position and reset its text caret.
+    const onFocus = () => {setTimeout(alignIme, 90);setTimeout(alignIme, 230);};
     const onViewport = () => {alignIme();setTimeout(alignIme, 80);};
     form.addEventListener('focusin', onFocus);
     form.addEventListener('focusout', onFocus);
