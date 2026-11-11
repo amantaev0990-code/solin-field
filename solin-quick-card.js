@@ -165,7 +165,13 @@
       }
     });
     form.addEventListener('click',event=>{
-      if(form.dataset.quickStep&&fields().includes(event.target))caretToEnd(event.target);
+      const field=event.target;
+      if(!form.dataset.quickStep||!fields().includes(field))return;
+      caretToEnd(field);
+      // A WebView tap may adjust the cursor after focusin/click; keep
+      // the established fast-entry caret-at-end behaviour.
+      queueMicrotask(()=>{if(document.activeElement===field)caretToEnd(field);});
+      requestAnimationFrame(()=>{if(document.activeElement===field)caretToEnd(field);});
     });
     form.addEventListener('keydown', event => {
       if (!form.dataset.quickStep || event.key !== 'Enter' || event.isComposing || !event.target.matches('[data-ce-field], [data-species-for]')) return;
