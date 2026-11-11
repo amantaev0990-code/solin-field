@@ -428,11 +428,40 @@ public class SolinMdbPlugin extends Plugin {
       }
       db.flush();
     }
-    // Verify persisted rows using a fresh file handle.
+    // Verify persisted rows using a fresh file handle. Row counts alone
+    // miss Maket10 lines that no longer join to the correct desktop stand.
     try(Database verify=DatabaseBuilder.open(output)){
       for(String name:names){
         if(verify.getTable(name).getRowCount()!=records.getJSONArray(name).length())
           throw new IllegalStateException("Проверка MDB не пройдена: "+name);
+      }
+      for(String name:new String[]{"Выдел","Макет10"}){
+        if(!names.contains(name))continue;
+        String[] fields="Выдел".equals(name)?
+          new String[]{"POS","LESN","KV","KGLF","VD"}:
+          new String[]{"POS","LESN","KV","KGLF","VD","IAR","POR"};
+        Table table=verify.getTable(name);
+        Set<String> available=new HashSet<>();
+        for(Column column:table.getColumns())available.add(column.getName());
+        for(String field:fields)if(!available.contains(field))
+          throw new IllegalStateException("В MDB отсутствует ключевое поле "+name+"."+field);
+        Map<String,Integer> expected=new HashMap<>(),actual=new HashMap<>();
+        JSONArray expectedRows=records.getJSONArray(name);
+        for(int i=0;i<expectedRows.length();i++){
+          JSONObject row=expectedRows.getJSONObject(i);
+          Object[] values=new Object[fields.length];
+          for(int n=0;n<fields.length;n++)values[n]=row.opt(fields[n]);
+          String identity=key(values);
+          expected.put(identity,expected.getOrDefault(identity,0)+1);
+        }
+        for(Row row:table){
+          Object[] values=new Object[fields.length];
+          for(int n=0;n<fields.length;n++)values[n]=row.get(fields[n]);
+          String identity=key(values);
+          actual.put(identity,actual.getOrDefault(identity,0)+1);
+        }
+        if(!expected.equals(actual))throw new IllegalStateException(
+          "MDB "+name+": адреса/породы/ярусы после записи отличаются от Transfer");
       }
     }
   }
