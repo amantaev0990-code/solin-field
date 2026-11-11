@@ -113,3 +113,11 @@
   padding-top:3px;
   padding-bottom:3px;
 }
+
+/* STL choices are source-backed; switching GrTL reveals other valid groups. */
+.quick-card-groups{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:7px}
+.quick-card-groups-note{font:12px/1.35 system-ui,Arial;color:#526756}
+#modal.ce-modal .quick-card-groups-button:not([hidden]){
+  display:inline-flex;min-height:34px;padding:6px 11px;border:1px solid #a6c3ad;
+  border-radius:7px;background:#edf7ee;color:#145a36;font:650 12px system-ui,Arial
+}
