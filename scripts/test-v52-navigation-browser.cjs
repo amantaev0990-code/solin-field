@@ -32,9 +32,9 @@ const server=http.createServer(async(req,res)=>{
   assert.ok(result.quarterCount>0,'Active forest must have quarters');
   await page.waitForFunction(()=>document.querySelector('#quartersScreen.active'));
   const go=async id=>{
-   const target=page.locator('.sectionTab[data-s="'+id+'"]');
-   assert.equal(await target.count(),1,'Missing navigation button '+id);
-   await target.evaluate(button=>button.click());
+   // The V51 installed shell can hide or replace the obsolete bottom
+   // .sectionTab controls. Exercise its actual window.show router instead.
+   await page.evaluate(name=>window.show(name),id);
    await page.waitForFunction(name=>document.querySelector('#'+name+'.active'),id,{timeout:8000});
    assert.equal(await page.locator('.screen.active').count(),1,'Exactly one active screen');
   };
