@@ -196,7 +196,8 @@
         {n:'1',enabled:p.form1!=null && p.form1>0,certainty:'Признак SKU.PF1'}
       ].filter(x=>x.enabled);
       for(const item of flags){
-        const b=button('Макет '+item.n,()=>go(item.n));
+        const b=button('М'+item.n,()=>go(item.n));
+        b.setAttribute('aria-label','Перейти к макету '+item.n+' по признакам категории');
         b.title=item.certainty;
         maketHint.append(b);
       }
