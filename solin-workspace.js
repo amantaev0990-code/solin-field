@@ -420,8 +420,45 @@ function previewTransfer(payload){const tables=payload?.tables;if(!tables||!Arra
  for(const raw of tables['Выдел']){const row=copy(raw),f=owner(row);if(!/^\d+$/.test(String(row.KV))||Number(row.KV)<1||row.VD==null||typeof row.VD==='object'||String(row.VD).trim()===''||!Number.isFinite(Number(row.PLV))||Number(row.PLV)<=0)throw Error('Проверьте номер квартала, выдела и площадь в Transfer');row.KV=Number(row.KV);row.VD=String(row.VD);const k=key(row);if(stands.has(k))throw Error('Дублируется полный адрес выдела в Transfer');if(Object.keys(row._children||{}).some(m=>(tables[m]||[]).length))throw Error('Файл одновременно содержит вложенные макеты и отдельные таблицы. Используйте экспорт Transfer без дублирования');row._children=row._children||{};stands.set(k,row);const q=f.quarters[String(row.KV)]??={quarterRows:[],compartments:[]};if(!q.quarterRows.some(x=>String(x.KGLF??'')===String(row.KGLF??'')))q.quarterRows.push({POS:row.POS,LESN:row.LESN,KV:row.KV,KGLF:row.KGLF??null});q.compartments.push(row);}
  for(const [name,rows]of Object.entries(tables)){if(!/^Макет\d+$/.test(name))continue;if(!Array.isArray(rows))throw Error('Неверная таблица '+name);if(!D.transfSchema[name])throw Error('Таблица '+name+' пока не поддерживается; импорт остановлен без потери данных');for(const raw of rows){const row=copy(raw);let target=stands.get(key(row));if(!target&&row.KGLF==null){const matches=[...stands.values()].filter(r=>['POS','LESN','KV','VD'].every(k=>String(r[k])===String(row[k])));if(matches.length===1)target=matches[0];}if(!target)throw Error('Строка '+name+' не связана с единственным выделом');(target._children[name]??=[]).push(row);}}
  for(const [name,rows]of Object.entries(tables)){if(['Лесничество','Квартал','Выдел'].includes(name)||/^Макет\d+$/.test(name))continue;if(!Array.isArray(rows))throw Error('Неверная таблица '+name);for(const forest of groups.values()){const selected=rows.filter(r=>r.POS==null||r.LESN==null||idOf(r)===forest.id);(forest.extraTables??={})[name]=copy(selected);}}if(!groups.size)throw Error('В файле нет лесничеств');return [...groups.values()];}
-async function importTransfer(payload,options={}){const groups=previewTransfer(payload),existing=await list();if(groups.some(g=>existing.some(f=>f.id===g.id))&&!options.replace)throw Error('Лесничество с таким адресом уже сохранено. Для замены выберите соответствующее действие в предпросмотре');await persist();await putMany(groups);if(groups.some(g=>g.id===activeId)){const f=groups.find(g=>g.id===activeId);/* Prevent activate from persisting the replaced in-memory copy. */activeId=null;await activate(f.id);}await home();return groups;}
-async function importFile(file){if(!file)return;openModal('Чтение Transfer','<p>Читаю файл на этом устройстве…</p>');try{await persist();const payload=await SolinTransferReader.read(file),groups=previewTransfer(payload),existing=await list(),conflicts=groups.filter(g=>existing.some(f=>f.id===g.id));openModal('Загрузка Transfer','<p>Файл: '+html(file.name)+'. Данные остаются на устройстве.</p>'+groups.map(f=>'<article class="transfer-preview"><h3>'+html(f.org.NOS)+'</h3><p>'+html(f.org.NLX)+'</p><small>'+Object.keys(f.quarters).length+' кварталов · '+Object.values(f.quarters).reduce((n,q)=>n+q.compartments.length,0)+' выделов</small></article>').join('')+(conflicts.length?'<p class="import-warning">Будут заменены сохранённые данные: '+conflicts.map(f=>html(f.org.NOS)).join(', ')+'. Сначала сохраните их копию.</p>'+conflicts.map(f=>'<button class="saveConflictBackup" data-forest="'+html(f.id)+'">Копия: '+html(f.org.NOS)+'</button>').join('')+'':'<p>Новые лесничества появятся в списке. Остальные сохранятся.</p>')+'<div class="formActions"><button onclick="closeModal()">Отмена</button><button id="acceptTransfer" class="primary">'+(conflicts.length?'Заменить указанные лесничества':'Добавить лесничества')+'</button></div><p id="transferError" role="alert"></p>');for(const b of document.querySelectorAll('.saveConflictBackup'))b.onclick=()=>{const f=existing.find(x=>x.id===b.dataset.forest),u=URL.createObjectURL(new Blob([JSON.stringify(checkpointFor(f),null,2)],{type:'application/json'})),a=document.createElement('a');a.href=u;a.download='SOLIN-backup-'+f.org.POS+'-'+f.org.LESN+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),2000);};document.querySelector('#acceptTransfer').onclick=async()=>{const b=document.querySelector('#acceptTransfer');b.disabled=true;try{await importTransfer(payload,{replace:!!conflicts.length});
+async function importTransfer(payload,options={}){
+ // Persist first so multi-device merge sees the latest locally edited stands.
+ await persist();
+ const groups=previewTransfer(payload),existing=await list(),merged=[];
+ for(const group of groups){
+  const prior=existing.find(f=>f.id===group.id);
+  if(!prior){merged.push(group);continue;}
+  if(options.merge){
+   if(!window.SolinTransferMerge?.mergeForest)
+    throw Error('Модуль безопасного объединения Transfer отсутствует');
+   merged.push(window.SolinTransferMerge.mergeForest(prior,group).forest);
+  }else if(options.replace)merged.push(group);
+  else throw Error('Такое лесничество уже существует. Выберите «Добавить данные» или сохраните резервную копию перед заменой.');
+ }
+ // All conflicts are checked before the first IndexedDB write.
+ await putMany(merged);
+ if(merged.some(g=>g.id===activeId)){
+  const currentId=activeId;
+  activeId=null; // never persist stale in-memory data over imported records
+  await activate(currentId);
+ }
+ await home();
+ return merged;
+}
+async function importFile(file){if(!file)return;openModal('Чтение Transfer','<p>Читаю файл на этом устройстве…</p>');try{await persist();const payload=await SolinTransferReader.read(file),groups=previewTransfer(payload),existing=await list(),conflicts=groups.filter(g=>existing.some(f=>f.id===g.id));openModal('Загрузка Transfer','<p>Файл: '+html(file.name)+'. Данные остаются на устройстве.</p>'+groups.map(f=>'<article class="transfer-preview"><h3>'+html(f.org.NOS)+'</h3><p>'+html(f.org.NLX)+'</p><small>'+Object.keys(f.quarters).length+' кварталов · '+Object.values(f.quarters).reduce((n,q)=>n+q.compartments.length,0)+' выделов</small></article>').join('')+(conflicts.length?'<p class="import-warning">Совпадает адрес лесничества: '+conflicts.map(f=>html(f.org.NOS)).join(', ')+'. Можно добавить непересекающиеся выделы либо заменить весь набор. При конфликте карточек добавление будет отменено.</p>'+conflicts.map(f=>'<button class="saveConflictBackup" data-forest="'+html(f.id)+'">Копия: '+html(f.org.NOS)+'</button>').join('')+'':'<p>Новые лесничества появятся в списке. Остальные сохранятся.</p>')+'<div class="formActions"><button onclick="closeModal()">Отмена</button>'+(conflicts.length?'<button id="mergeTransfer" type="button">Добавить данные в лесничество</button>':'')+'<button id="acceptTransfer" class="primary">'+(conflicts.length?'Заменить указанные лесничества':'Добавить лесничества')+'</button></div><p id="transferError" role="alert"></p>');for(const b of document.querySelectorAll('.saveConflictBackup'))b.onclick=()=>{const f=existing.find(x=>x.id===b.dataset.forest),u=URL.createObjectURL(new Blob([JSON.stringify(checkpointFor(f),null,2)],{type:'application/json'})),a=document.createElement('a');a.href=u;a.download='SOLIN-backup-'+f.org.POS+'-'+f.org.LESN+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),2000);};
+ const mergeButton=document.querySelector('#mergeTransfer');
+ if(mergeButton)mergeButton.onclick=async()=>{
+  mergeButton.disabled=true;
+  try{
+   const imported=await importTransfer(payload,{merge:true});
+   closeModal();
+   toast('Transfer объединены: '+imported.map(g=>g.org.NOS).join(', ')+'. Экспорт MDB создаст один файл лесничества.');
+  }catch(err){
+   const status=document.querySelector('#transferError');
+   if(status)status.textContent=err.message||'Конфликт объединения';
+   mergeButton.disabled=false;
+  }
+ };
+ document.querySelector('#acceptTransfer').onclick=async()=>{const b=document.querySelector('#acceptTransfer');b.disabled=true;try{await importTransfer(payload,{replace:!!conflicts.length});
   // Keep the ORIGINAL Jet file locally for one-touch MDB export after import.
   // Do not publish it or send it to any network. Only cache after successful import.
   if(/\.mdb$/i.test(file.name)&&groups.length===1&&file.size<=12*1024*1024&&window.SolinOfflineMDB?.saveStored){
