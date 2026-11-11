@@ -30,10 +30,21 @@
     let lastField;
     const fields = () => [...form.querySelectorAll('input[data-ce-field], select[data-ce-field]:not(.solin-species-native), textarea[data-ce-field], input[data-species-for]')]
       .filter(el => el.getClientRects().length && !el.readOnly && !el.disabled && !el.closest('[hidden], [inert]'));
+    function caretToEnd(el) {
+      if (!el?.matches('input:not([readonly]),textarea')) return;
+      if (el.type==='number') {
+        const value=el.value;
+        el.type='text';
+        el.inputMode=el.inputMode||'decimal';
+        el.value=value;
+      }
+      if (el.selectionStart!==null) el.setSelectionRange(el.value.length,el.value.length);
+    }
     const focus = el => {
       if (!el) return;
       if(el.tagName==='INPUT'&&!el.readOnly)el.enterKeyHint='next';
       el.focus({preventScroll:true});
+      caretToEnd(el);
       el.scrollIntoView({block:'nearest',inline:'nearest'});
     };
     const tabs = order.map(n => button(label(n), () => go(n)));
@@ -53,16 +64,24 @@
       const successor = index >= 0 ? controls[index + 1] : undefined;
       if (successor) {
         // Maket 10 can rebuild a row on change. Resolve the next cell again.
-        const id = successor.id;
+        const ids = controls.slice(index+1).map(item=>item.id);
         el?.blur();
-        return focus(fields().find(item => item.id === id));
+        const visible = fields();
+        const nextField = ids.map(id=>visible.find(item=>item.id===id)).find(Boolean);
+        if(nextField)return focus(nextField);
       }
       const following = order[order.indexOf(step) + 1];
       if (following) go(following);
       else form.querySelector('#ce-save').focus();
     }
     form.addEventListener('focusin', event => {
-      if (fields().includes(event.target)) lastField = event.target;
+      if (fields().includes(event.target)) {
+        lastField = event.target;
+        caretToEnd(event.target);
+      }
+    });
+    form.addEventListener('click',event=>{
+      if(form.dataset.quickStep&&fields().includes(event.target))caretToEnd(event.target);
     });
     form.addEventListener('keydown', event => {
       if (!form.dataset.quickStep || event.key !== 'Enter' || event.isComposing || !event.target.matches('[data-ce-field], [data-species-for]')) return;
@@ -73,7 +92,7 @@
     });
     form.addEventListener('submit', event => {
       const active = document.activeElement;
-      if(!form.dataset.quickStep || event.submitter || !fields().includes(active)) return;
+      if(!form.dataset.quickStep || event.submitter===form.querySelector('#ce-save') || !fields().includes(active)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       next(active);
@@ -182,10 +201,8 @@
     const control = button('КТ', () => openKT(ordered), 'v37-new-stand-button kt-button kt-quarter-button');
     control.disabled = ordered.length === 0;
     control.setAttribute('aria-label','КТ — просмотр выделов квартала');
-    const footer = document.createElement('div');
-    footer.className = 'v37-new-stand-footer kt-quarter-footer';
-    footer.append(control);
-    quarter.append(footer);
+    const toolbar=quarter.querySelector('#wfQuarterToolbar');
+    toolbar?.prepend(control);
   }
 
   function refresh() {

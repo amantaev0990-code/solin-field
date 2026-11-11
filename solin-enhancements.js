@@ -28,10 +28,6 @@ let photos=document.createElement('div');photos.id='solinPhotoList';container.ap
 const mapOpenOld=window.openMapScreen;
 const handleOld=window.handleMapFiles;
 const mapScope=()=>window.SolinWorkspace?.mapScope||'map-only';
-const projectMaps={
- '213::1':{path:'213-1.cmf2',name:'Комсомольское л-во.cmf2'},
- '213::2':{path:'213-2.cmf2',name:'Богетсайское л-во.cmf2'}
-};
 function queueMap(task){
  const operation=(window.__solinMapImportPromise||Promise.resolve()).catch(()=>{}).then(task);
  window.__solinMapImportPromise=operation;
@@ -222,15 +218,7 @@ async function refreshMapLibrary() {
    new File([item.file], item.name, {lastModified:item.lastModified ?? item.date});
   addRow(item.name, mapFileKey(file), () => file, () => deleteCachedMap(item.id));
  }
- const builtIn = projectMaps[scope];
- if (builtIn) {
-  const key = activeMapKey?.startsWith(builtIn.name + '|') && activeMapKey.endsWith('|0') ? activeMapKey : '';
-  addRow(builtIn.name + ' · встроенная', key, async () => {
-   const response = await fetch('./maps/' + builtIn.path);
-   if (!response.ok) throw Error('Встроенный файл карты недоступен');
-   return new File([await response.blob()], builtIn.name, {lastModified:0});
-  });
- }
+
 }
 
 async function deleteCachedMap(id) {

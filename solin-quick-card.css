@@ -50,3 +50,22 @@
 
 .quick-card-form #quick-card-base .quick-card-forest-type{grid-column:1/-1}
 .quick-card-forest-type select,#wfQuickForestType{width:100%;min-width:0}
+
+.quick-card-form[data-quick-step] .ce-mobile-tabs,
+.quick-card-form[data-quick-step] .ce-assist-shortcuts,
+.quick-card-form[data-quick-step] .dt-footer {display:none!important}
+.quick-card-form #quick-card-base .quick-card-forest-type .dt-input {
+ display:grid;grid-template-columns:minmax(8ch,115px) minmax(0,1fr);align-items:start;
+}
+.quick-card-form #quick-card-base .quick-card-forest-type select {
+ width:100%!important;min-width:8ch!important;max-width:none;padding-right:20px;
+}
+.quick-card-form #quick-card-base .quick-card-forest-type output {
+ width:auto!important;min-width:0!important;max-width:35ch;height:auto;white-space:normal;overflow-wrap:anywhere;
+}
+#wfQuarterToolbar .kt-quarter-button{background:#175bb0;color:#fff;border:1px solid #124886;min-height:42px}
+.field-filter-rule{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) auto;gap:7px;margin-bottom:9px}
+.field-filter-rule :is(select,input){width:100%;min-width:0}
+.field-filter-v50 .record-delete{display:none}
+@media(max-width:600px){.field-filter-rule{grid-template-columns:1fr 1fr}.field-filter-rule :first-child{grid-column:1/-1}}
+.screen .record-entry,.screen .compCard,.screen .quarterCard,.ce-assist-option {touch-action:pan-y}

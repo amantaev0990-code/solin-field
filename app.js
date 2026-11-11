@@ -54,7 +54,7 @@ function openQuarter(k,selectedKGLF=null){
  const actions=$('#qActions'),create=document.createElement('button');create.type='button';create.className='widePrimary';
  create.textContent='＋ Создать выдел в квартале '+k+(selected!=null?' · КГЛФ '+selected:'');
  create.onclick=()=>openCompForm(k,selected);actions.appendChild(create);
- filterStandList($('#qComps'),scoped);
+ renderCompList($('#qComps'),scoped);
 }
 function standNumber(value) {
  const match = /^0*([1-9]\d*)([а-яёa-z]?)$/iu.exec(String(value ?? '').trim());

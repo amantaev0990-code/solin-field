@@ -549,7 +549,42 @@ function linkedIssues(){
  }
  return null;
 }
-function capture(el){if(!el.matches('[data-ce-field]'))return;
+function syncMainSpecies(previous,selected){
+ if(!selected)return;
+ const refs=window.SOLIN_REFS?.tables;
+ const engine=window.SolinDependentRules;
+ const allowed=engine?.allowedLayers?.(session.draft,refs);
+ if(allowed?.status==='complete'&&!allowed.items.some(item=>String(item.value)==='1'))return;
+ const rows=session.draft._children.Макет10??=[];
+ const sameCode=(left,right)=>String(left??'').trim().toLocaleUpperCase('ru')===String(right??'').trim().toLocaleUpperCase('ru');
+ const firstLayer=rows.filter(row=>String(row.IAR)==='1');
+ let row=firstLayer.find(item=>sameCode(item.POR,selected));
+ if(row){
+  if(row!==firstLayer[0]){
+   rows.splice(rows.indexOf(row),1);
+   rows.splice(rows.indexOf(firstLayer[0]),0,row);
+   session.changedMakets.add('Макет10');
+   rerenderTable('Макет10');
+  }
+  return;
+ }
+ row=firstLayer.find(item=>previous&&sameCode(item.POR,previous))||firstLayer.find(item=>!item.POR);
+ if(!row){
+  row=newTableRow('Макет10');
+  row.IAR=1;
+  if(!firstLayer.length)row.KOEF=10;
+  rows.unshift(row);
+ }else{
+  if(Number(session.draft.KU)!==19)row.ZAP=null;
+  row.PROI=null;
+ }
+ row.POR=selected;
+ const origin=engine?.suggestedOrigin?.(selected,refs);
+ if(origin!=null)row.PROI=origin;
+ session.changedMakets.add('Макет10');
+ rerenderTable('Макет10');
+}
+function capture(el){if(!session||!el.matches('[data-ce-field]'))return;
  const {ceScope:scope,ceField:field,ceRow:index}=el.dataset;
  if(scope.startsWith('Макет')&&!session.draft._children[scope]?.[Number(index)]){(session.draft._children[scope]??=[]).push(newTableRow(scope));el.closest('tr')?.removeAttribute('data-ce-placeholder');session.changedMakets.add(scope);}
  const target=scope==='base'?session.draft:scope==='quarter'?session.quarter:session.draft._children[scope][Number(index)];
@@ -563,18 +598,8 @@ function capture(el){if(!el.matches('[data-ce-field]'))return;
   el.removeAttribute('aria-invalid');el.setCustomValidity('');}
  catch(e){el.setAttribute('aria-invalid','true');el.setCustomValidity(e.message);}
  if(!document.querySelector('#ce-form [aria-invalid="true"]'))document.querySelector('#ce-error').textContent='';
- // When changing a single-species stand's main code (e.g. Е -> ЕШ),
- // keep the corresponding original Maket10.POR consistent. Never infer a
- // change across a mixed-species stand or silently overwrite additional rows.
  if(scope==='base'&&field==='M3Pr'&&String(previous??'')!==String(target[field]??'')){
-  const rows=session.draft._children?.Макет10||[];
-  if(rows.length===1&&String(rows[0].POR??'')===String(previous??'')){
-   rows[0].POR=target[field];
-   const origin=window.SolinDependentRules?.suggestedOrigin?.(target[field],window.SOLIN_REFS?.tables);
-   if(origin!=null&&String(rows[0].IAR)==='1')rows[0].PROI=origin;
-   rows[0].ZAP=null; // Force new K59 calculation; old species' stock cannot carry over.
-   session.changedMakets.add('Макет10');rerenderTable('Макет10');
-  }
+  syncMainSpecies(previous,target[field]);
  }
  if(scope==='Макет10'&&['POR','IAR'].includes(field)&&String(target.IAR)==='1'&&window.SolinDependentRules){
   const engine=window.SolinDependentRules,refs=window.SOLIN_REFS?.tables;
@@ -901,7 +926,7 @@ function open(record,options={}){if(!record)return;
  const entry=document.createElement('div');entry.id='ce-entry-checks';entry.className='ce-entry-checks';entry.hidden=true;entry.setAttribute('role','status');entry.setAttribute('aria-live','polite');
  form.querySelector('.dt-toolbar').after(entry);
  form.addEventListener('input',e=>{capture(e.target);if(e.target.matches('[data-ce-field]')&&!['ZAP','STUR','STUR1'].includes(e.target.dataset.ceField)){clearTimeout(stockTimer);const el=e.target;stockTimer=setTimeout(()=>{if(el.isConnected)recalculateEditedField(el);},160);}if(e.target.dataset.ceScope?.startsWith('Макет'))session.changedMakets.add(e.target.dataset.ceScope);if(session.entryTouched?.has(e.target.dataset.ceScope+':'+e.target.dataset.ceField))refreshEntryChecks()});
- form.addEventListener('focusout',e=>{if(!e.target.matches('[data-ce-field]'))return;clearTimeout(stockTimer);recalculateEditedField(e.target);(session.entryTouched??=new Set()).add(e.target.dataset.ceScope+':'+e.target.dataset.ceField);refreshEntryChecks();});
+ form.addEventListener('focusout',e=>{if(!session||!e.target.matches('[data-ce-field]'))return;clearTimeout(stockTimer);recalculateEditedField(e.target);(session.entryTouched??=new Set()).add(e.target.dataset.ceScope+':'+e.target.dataset.ceField);refreshEntryChecks();});
  form.addEventListener('change',e=>{
   if(e.target.matches('.dt-maket-select')){const n=e.target.value;e.target.value='';if(n==='10'||n==='31'||n==='32')showMain(n);else if(n)showExtra('Макет'+n);return;}
   capture(e.target);

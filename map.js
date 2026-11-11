@@ -2,7 +2,28 @@ let fieldMap=null,baseGoogle=null,baseOSM=null,userMarker=null;
 const cmf2Layers=[];
 const importedMapLayers=window.importedMapLayers=[];
 function cmfTypeLabel(t){return({region:'полигон',polyline:'линия',text:'текст',point:'точка'})[t]||t||'слой'}
-function renderMapLayerList(){const box=document.getElementById('mapLayerList');if(!box)return;if(!importedMapLayers.length){box.innerHTML='<div class="mapLayerRow"><span>＋</span><span>Откройте карту<small>ZIP MapInfo · CMF2 · KML/KMZ · GeoJSON · GeoPackage · GPX</small></span></div>';return}box.innerHTML=importedMapLayers.map((x,i)=>{if(x.cmf2){const info=x.info||{},layers=info.layers||[],decoded=new Map((x.geometryEntries||[]).map(g=>[g.source,g]));const head=`<div class="mapLayerRow"><span>◈</span><span><b>${escapeMapHtml(x.name)}</b><small>CMF2 · ${info.decodedFeatures||0} объектов · ${info.decodedVertices||0} вершин${info.zone?` · UTM ${info.zone}`:''}</small></span></div>`;const rows=layers.map(l=>{const g=decoded.get(l.source);if(g)return `<label class="mapLayerRow cmfSubLayer"><input type="checkbox" ${g.visible?'checked':''} onchange="toggleCmfLayer(${i},${escapeMapHtml(JSON.stringify(String(l.source)))},this.checked)"><span>${l.type==='region'?'⬠':'╱'}</span><span>${escapeMapHtml(l.name||l.source)}<small>${g.count} объектов · ${cmfTypeLabel(l.type)}</small></span></label>`;return `<div class="mapLayerRow cmfSubLayer"><span>${l.type==='text'?'T':'•'}</span><span>${escapeMapHtml(l.name||l.source)}<small>${cmfTypeLabel(l.type)} · геометрия пока не декодируется</small></span></div>`}).join('');return head+rows}return `<label class="mapLayerRow"><input type="checkbox" ${x.visible?'checked':''} onchange="toggleImportedLayer(${i},this.checked)"><span>${escapeMapHtml(x.name)}<small>${x.count} объектов${x.format?` · ${x.format}`:''}</small></span></label>`}).join('')}
+function renderSourceMapLayerList(){const box=document.getElementById('mapLayerList');if(!box)return;if(!importedMapLayers.length){box.innerHTML='<div class="mapLayerRow"><span>＋</span><span>Откройте карту<small>ZIP MapInfo · CMF2 · KML/KMZ · GeoJSON · GeoPackage · GPX</small></span></div>';return}box.innerHTML=importedMapLayers.map((x,i)=>{if(x.cmf2){const info=x.info||{},layers=info.layers||[],decoded=new Map((x.geometryEntries||[]).map(g=>[g.source,g]));const head=`<div class="mapLayerRow"><span>◈</span><span><b>${escapeMapHtml(x.name)}</b><small>CMF2 · ${info.decodedFeatures||0} объектов · ${info.decodedVertices||0} вершин${info.zone?` · UTM ${info.zone}`:''}</small></span></div>`;const rows=layers.map(l=>{const g=decoded.get(l.source);if(g)return `<label class="mapLayerRow cmfSubLayer"><input type="checkbox" ${g.visible?'checked':''} onchange="toggleCmfLayer(${i},${escapeMapHtml(JSON.stringify(String(l.source)))},this.checked)"><span>${l.type==='region'?'⬠':'╱'}</span><span>${escapeMapHtml(l.name||l.source)}<small>${g.count} объектов · ${cmfTypeLabel(l.type)}</small></span></label>`;return `<div class="mapLayerRow cmfSubLayer"><span>${l.type==='text'?'T':'•'}</span><span>${escapeMapHtml(l.name||l.source)}<small>${cmfTypeLabel(l.type)} · геометрия пока не декодируется</small></span></div>`}).join('');return head+rows}return `<label class="mapLayerRow"><input type="checkbox" ${x.visible?'checked':''} onchange="toggleImportedLayer(${i},this.checked)"><span>${escapeMapHtml(x.name)}<small>${x.count} объектов${x.format?` · ${x.format}`:''}</small></span></label>`}).join('')}
+function renderMapLayerList(){
+ renderSourceMapLayerList();
+ const list=document.getElementById('mapLayerList');
+ const objects=window.SolinMapObjects;
+ if(!list||!objects)return;
+ const row=document.createElement('label');
+ row.className='mapLayerRow';
+ const toggle=document.createElement('input');
+ toggle.type='checkbox';
+ toggle.checked=objects.visible();
+ toggle.setAttribute('aria-label','Значения');
+ toggle.onchange=()=>objects.setVisible(toggle.checked);
+ const title=document.createElement('span');
+ title.textContent='Значения';
+ const info=document.createElement('small');
+ const prefix=importedMapLayers.find(layer=>layer.format==='MapInfo')?.name.match(/^\d+_\d+_/i)?.[0]||'';
+ info.textContent=prefix+'ЗНАЧ · '+objects.count()+' объектов';
+ title.append(info);
+ row.append(toggle,title);
+ list.append(row);
+}
 function ensureMapFileUi(){
  if(document.getElementById('mapFileInput'))return;
  const toolbar=document.querySelector('#mapScreen .mapToolbar');
@@ -80,7 +101,7 @@ function initFieldMap(){
  watchBaseTiles(baseOSM);
  setBaseMap(onlineBase);
  installFieldMapTools(fieldMap);
- const labels = () => container.classList.toggle('mapinfo-hide-labels', fieldMap.getZoom() < 12);
+ const labels = () => container.classList.toggle('mapinfo-hide-labels', fieldMap.getZoom() < 11);
  fieldMap.on('zoomend', labels);
  labels();
  renderMapLayerList();
@@ -278,13 +299,23 @@ function installFieldMapTools(map) {
  const preview = L.layerGroup().addTo(map);
  const style = {color:'#ec8515',weight:4};
  const tools = L.control({position:'topright'});
- const layers = L.control.layers({}, {'Полевые объекты':saved}, {position:'topright'}).addTo(map);
- layers.getContainer().setAttribute('aria-label','Полевые объекты');
+ const areaBadge=document.createElement('output');
+ areaBadge.className='field-map-area';
+ areaBadge.hidden=true;
+ areaBadge.setAttribute('aria-label','Площадь, гектары');
+ map.getContainer().append(areaBadge);
+ L.DomEvent.disableClickPropagation(areaBadge);
  const status = document.createElement('output');
  const buttons = new Map();
  const minimum = kind => ({mark:1,line:2,area:3,track:2})[kind] || Infinity;
  const position = point => [point.lat, point.lng];
  const hectares = () => fieldAreaHectares(points).toLocaleString('ru-RU',{maximumFractionDigits:3}) + ' га';
+ const canDraw=()=>scope!==shared&&map.hasLayer(saved);
+ const areaHandleIcon=L.divIcon({className:'field-area-handle',iconSize:[24,24],iconAnchor:[12,12]});
+ function showArea(){
+  areaBadge.hidden=mode!=='area';
+  areaBadge.textContent=points.length>=3?hectares():'— га';
+ }
 
  function access(key, value) {
   return db.then(database => new Promise((resolve, reject) => {
@@ -311,25 +342,39 @@ function installFieldMapTools(map) {
   for (const [key,button] of buttons) {
    if (['mark','line','area','track','ruler'].includes(key)) {
     button.setAttribute('aria-pressed', String(key === mode));
-    button.disabled = !loaded || busy || (key !== mode && !!mode);
+    button.disabled = !loaded || busy || (key!=='ruler'&&!canDraw()) || (key !== mode && !!mode);
    }
   }
   buttons.get('undo').disabled = !points.length || mode === 'track' || busy;
   buttons.get('save').disabled = points.length < minimum(mode) || busy;
   buttons.get('cancel').disabled = !mode || busy;
   preview.clearLayers();
-  if (points.length >= 2) {
-   const shape = mode === 'area' ? L.polygon : L.polyline;
-   shape(points, {...style,interactive:false}).addTo(preview);
+  if(mode==='area'){
+   const outline=L.polygon(points,{...style,interactive:false}).addTo(preview);
+   points.forEach((point,index)=>{
+    const vertex=L.marker(point,{icon:areaHandleIcon,draggable:true,bubblingMouseEvents:false,
+     alt:'Вершина '+(index+1)+'. Нажмите, чтобы удалить, или перетащите.'}).addTo(preview);
+    vertex.on('click',event=>{
+     L.DomEvent.stopPropagation(event);
+     points.splice(index,1);
+     redraw();
+    });
+    vertex.on('drag',()=>{
+     points[index]=vertex.getLatLng().wrap();
+     outline.setLatLngs(points);
+     showArea();
+    });
+   });
+  }else{
+   if(points.length>=2)L.polyline(points,{...style,interactive:false}).addTo(preview);
+   if(mode!=='track')for(const point of points)L.circleMarker(point,{...style,radius:4,interactive:false}).addTo(preview);
   }
-  if (mode !== 'track') for (const point of points) {
-   L.circleMarker(point,{...style,radius:4,interactive:false}).addTo(preview);
-  }
+  showArea();
   const distance = () => points.slice(1).reduce((sum,point,i) => sum + map.distance(points[i],point),0);
   status.textContent = {
    mark:'Коснитесь места для метки',
    line:points.length + ' точек · касайтесь карты',
-   area:points.length < 3 ? 'Поставьте минимум три точки' : hectares(),
+   area:points.length < 3 ? 'Поставьте минимум три точки' : 'Коснитесь вершины для удаления. Потяните её для переноса.',
    track:'Запись GPS · ' + points.length + ' точек',
    ruler:points.length ? Math.round(distance()) + ' м' : 'Поставьте начальную точку'
   }[mode] || '';
@@ -355,6 +400,7 @@ function installFieldMapTools(map) {
  }
  function drawSaved() {
   saved.clearLayers();
+  renderMapLayerList();
   for (const feature of features) {
    const popup = document.createElement('div');
    const title = document.createElement('div');
@@ -397,11 +443,10 @@ function installFieldMapTools(map) {
   }
  }
  function start(kind) {
-  if (!loaded || busy || (mode && mode !== kind)) return;
+  if (!loaded || busy || (kind!=='ruler'&&!canDraw()) || (mode && mode !== kind)) return;
   if (mode === kind) return;
   if (kind === 'track' && !navigator.geolocation) return toast('GPS недоступен');
   mode = kind;
-  map.addLayer(saved);
   if (kind === 'track') tracking = navigator.geolocation.watchPosition(result => {
    if (mode !== 'track' || busy) return;
    const {latitude:lat,longitude:lng,accuracy} = result.coords;
@@ -417,7 +462,7 @@ function installFieldMapTools(map) {
   redraw();
  }
  async function saveShape() {
-  if (busy || points.length < minimum(mode)) return;
+  if (busy || !canDraw() || points.length < minimum(mode)) return;
   const kind = mode;
   const fallback = {mark:'Метка',line:'Линия',area:'Площадь',track:'GPS-трек'}[kind];
   const name = window.prompt('Название объекта', fallback);
@@ -461,7 +506,19 @@ function installFieldMapTools(map) {
   redraw();
   if (mode === 'mark') void saveShape();
  });
- window.SolinMapObjects = {open};
+ window.SolinMapObjects = {
+  open,
+  visible:()=>map.hasLayer(saved),
+  count:()=>features.length,
+  setVisible(visible){
+   if(visible)map.addLayer(saved);
+   else{
+    map.removeLayer(saved);
+    if(mode!=='ruler')reset();
+   }
+   redraw();
+  }
+ };
  void open();
 }
 
@@ -471,6 +528,8 @@ function createMapInfoLayer({name, geojson, settings}, fileKey, index, count) {
  fieldMap.createPane(pane).style.zIndex = String(410 + (count - index) / count * 80 | 0);
  const renderer = L.canvas({pane, padding:0.06});
  const isStandLayer = /(?:^|_)выдпл$/i.test(name);
+ const isBoundary = /(?:^|_)(?:грвыд|квпрос|грзем|гркатлф|выдпл)$/i.test(name);
+ const importantLabel = /(?:^|_)(?:номкв|площкв|номвыд)$/i.test(name);
  if (!isStandLayer) fieldMap.getPane(pane).style.pointerEvents = 'none';
  const color = value => '#' + Number(value).toString(16).padStart(6, '0');
  const globalPen = settings.match(/^\s*Global\b[^\r\n]*?\bPen\s*\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)\)/im);
@@ -480,7 +539,7 @@ function createMapInfoLayer({name, geojson, settings}, fileKey, index, count) {
  function syncLabels() {
   if (!fieldMap.hasLayer(group)) return;
   const view = fieldMap.getBounds().pad(.08);
-  const shown = fieldMap.getZoom() >= 12;
+  const shown = fieldMap.getZoom() >= (/(?:^|_)номкв$/i.test(name) ? 11 : /(?:^|_)номвыд$/i.test(name) ? 13 : 12);
   for (const label of labels) {
    const visible = shown && view.contains(label.getLatLng());
    if (visible && !labelLayer.hasLayer(label)) labelLayer.addLayer(label);
@@ -499,7 +558,7 @@ function createMapInfoLayer({name, geojson, settings}, fileKey, index, count) {
   return {
    color: displayOverride && globalPen ? color(globalPen[3]) : pen?.[1] || (globalPen ? color(globalPen[3]) : '#333333'),
    dashArray: !displayOverride && dashArray?.length > 1 ? dashArray.join(' ') : null,
-   weight: Math.max(.6,Math.min(12,displayOverride && globalPen ? +globalPen[1] : penWidth ? +penWidth[1] * (penWidth[2] === 'pt' ? 4/3 : 1) : +(globalPen?.[1] || 2))),
+   weight: Math.max(isBoundary?3.4:2.7,Math.min(12,displayOverride && globalPen ? +globalPen[1] : penWidth ? +penWidth[1] * (penWidth[2] === 'pt' ? 4/3 : 1) : +(globalPen?.[1] || 2))),
    fillColor: displayOverride && globalBrush ? color(globalBrush[2]) : brush?.[1] || (globalBrush ? color(globalBrush[2]) : '#738b93'),
    fillOpacity: globalBrush?.[1] === '1' ? 0 : 0.35
   };
@@ -507,13 +566,20 @@ function createMapInfoLayer({name, geojson, settings}, fileKey, index, count) {
  const group = L.geoJSON(geojson, {
   pane, renderer, smoothFactor:1.25, style, interactive:isStandLayer,
   filter(feature) {
-   if (!/^LABEL\(/i.test(feature.properties?.solin_mapinfo_style || '') || feature.geometry?.type !== 'Point') return true;
+   if (feature.geometry?.type !== 'Point') return true;
+   if(!importantLabel&&!/^LABEL\(/i.test(feature.properties?.solin_mapinfo_style || ''))return true;
    const [lng,lat] = feature.geometry.coordinates;
-   const ogr = feature.properties.solin_mapinfo_style;
+   const props=feature.properties||{};
+   const ogr=props.solin_mapinfo_style||'';
    const label = ogr.match(/LABEL\(t:"((?:[^"\\]|\\.)*)"/);
-   if (!label) return true;
-   const text = document.createElement('span');
-   text.textContent = label[1].replace(/\\(["\\])/g, '$1').trim();
+   const names=/(?:^|_)номкв$/i.test(name)?['Nкварт','НомКв','Номер','KV']:
+    /(?:^|_)номвыд$/i.test(name)?['Nвыд','НомВыд','Номер','VD']:['ПлощКв','Площадь','Площ','PL'];
+   const fallback=importantLabel?cmfReadProp(props,names):null;
+   const value=label?.[1]??fallback;
+   if(value==null||String(value).trim()==='')return true;
+   const text=document.createElement('span');
+   text.textContent=String(value).replace(/\\(["\\])/g,'$1').trim();
+   if(importantLabel)text.className='mapinfo-important-label';
    text.style.color = ogr.match(/,c:(#[\da-f]{6})/i)?.[1] || '#111';
    text.style.fontWeight = ogr.includes(',bo:1') ? 'bold' : 'normal';
    text.style.textShadow = '0 0 2px white';

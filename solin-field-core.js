@@ -38,7 +38,124 @@ function controls(r){const results=[];for(const v of SOLIN_AUDIT.validations){le
 function showControls(records=all()){const result=records.flatMap(r=>controls(r).map(x=>({...x,kv:r.KV,vd:r.VD})));const bad=result.filter(x=>x.status==='Ошибка'),skipped=result.filter(x=>x.status==='Не проверено');openModal('Контроль по оригинальным ValidationRule','<p>Ошибок: '+bad.length+'; не проверено: '+skipped.length+'; всего применений: '+result.length+'.</p><p>Это правила полей Access, не набор К01–К142. NULL учитывается отдельно. Условия с неизвестным контекстом не объявляются пройденными.</p><button id="controlExport">Скачать протокол JSON</button>'+result.filter(x=>x.status!=='Пройден').map(x=>'<div class="wf-check '+(x.status==='Ошибка'?'bad':'warn')+'"><b>'+h(x.kv+'-'+x.vd+' · '+x.form+' · '+x.source+' #'+x.row)+'</b><br>'+h(x.rule)+'<br>'+h(x.status+' '+x.detail)+'</div>').join(''));document.querySelector('#controlExport').onclick=()=>download('solin-controls.json',{kind:'Access-ValidationRule-subset',results:result});return result;}
 function auditSearch(q=''){const target=document.querySelector('#auditResults');q=q.toLowerCase();target.innerHTML=Object.entries(SOLIN_AUDIT.routes).filter(([f,buttons])=>(f+' '+buttons.map(x=>x.caption).join(' ')).toLowerCase().includes(q)).map(([f,buttons])=>'<details class="refCard"><summary>'+h(f)+' · '+buttons.length+' кнопок</summary>'+buttons.map(b=>'<div class="wf-check"><b>'+h(b.caption||b.name)+'</b><br>'+h(b.onClick)+' · '+h(b.status)+'<pre style="white-space:pre-wrap">'+h(JSON.stringify(b.actions||b.actionStatements||b.code||[],null,2))+'</pre></div>').join('')+'</details>').join('');}
 function audit(){openModal('554 формы · исходные маршруты и выражения','<p>Каталог исходных определений. Просмотр не исполняет VBA, SQL или макросы. 30 ссылок на макросы остаются неразрешёнными. Формулы: 611; правила: 203.</p><input id="auditQuery" placeholder="Форма или подпись кнопки"><div id="auditResults"></div>');document.querySelector('#auditQuery').oninput=e=>auditSearch(e.target.value);auditSearch('ГОЛОВНОЕ МЕНЮ');}
-function filter(){const opts=Object.entries(D.fieldLookups.KU||{}).map(([k,v])=>'<option value="'+h(k)+'">'+h(k+' '+v)+'</option>').join('');openModal('Фильтрация данных','<div class="field-filter"><label>Категория угодий<select id="filterKU"><option value="">Все категории</option>'+opts+'</select></label><label>Квартал<input id="filterKV" inputmode="numeric"></label><label>Минимальная площадь, га<input id="filterArea" inputmode="decimal"></label></div><button type="button" id="filterRun" class="primary">Найти</button><div id="filterRows"></div>',{confirmChanges:false});document.querySelector('#filterRun').onclick=()=>{const ku=document.querySelector('#filterKU').value,kv=document.querySelector('#filterKV').value.trim(),a=Number(document.querySelector('#filterArea').value.replace(',','.'));if(!Number.isFinite(a)||a<0){document.querySelector('#filterRows').textContent='Укажите площадь числом от 0.';return;}const rows=all().filter(r=>(!ku||String(r.KU)===ku)&&(!kv||String(r.KV)===kv)&&Number(r.PLV)>=a);document.querySelector('#filterRows').innerHTML='<p>Найдено: '+rows.length+'</p>';const host=document.createElement('div');document.querySelector('#filterRows').append(host);renderCompList(host,rows);host.querySelectorAll('button.compCard').forEach(b=>b.addEventListener('click',closeModal));};}
+function filter(){
+ const skip = new Set(['POS','LESN','KV','KGLF','VD']);
+ const schema = D.transfSchema || {};
+ const source = all();
+ const columns = [];
+ const add = (form, fields) => {
+  const labelForm = form==='Выдел'?'ВыделВ':form;
+  for(const field of new Set(fields)){
+   const type=window.SolinFieldTypes?.type(labelForm,field)||window.SolinFieldTypes?.type(form,field);
+   const label=window.SolinHuman?.label(labelForm,field)||D.fieldLabels?.[field]||field;
+   columns.push({form,field,label,labelForm,numeric:['integer','long','float','double','numeric','currency','byte'].includes(type)});
+  }
+ };
+ add('Выдел',['KV','VD','KU','KGLF','M3Pr','PLV','STUR1','STUR','Vsost',
+  ...(schema.Выдел||[]),...source.flatMap(row=>Object.keys(row).filter(key=>!key.startsWith('_')))]);
+ const children=new Map();
+ for(const [form,fields] of Object.entries(schema)){
+  if(/^Макет\d+$/.test(form))children.set(form,new Set(fields.filter(field=>!skip.has(field))));
+ }
+ for(const stand of source)for(const [form,rows] of Object.entries(stand._children||{})){
+  if(!/^Макет\d+$/.test(form))continue;
+  if(!children.has(form))children.set(form,new Set());
+  for(const row of rows)for(const field of Object.keys(row)){
+   if(!skip.has(field)&&!field.startsWith('_'))children.get(form).add(field);
+  }
+ }
+ for(const [form,fields] of [...children].sort(([a],[b])=>a.localeCompare(b,'ru',{numeric:true})))add(form,fields);
+ openModal('Фильтрация данных','<div class="field-filter-v50"><div id="filterRules"></div><div class="formActions"><button type="button" id="filterAdd">＋ Условие</button><button type="button" id="filterRun" class="primary">Найти выделы</button></div><p id="filterSummary" role="status"></p><div id="filterResult"></div></div>');
+ const root=document.getElementById('filterRules');
+ const summary=document.getElementById('filterSummary');
+ const results=document.getElementById('filterResult');
+ const text=value=>String(value??'').trim().toLocaleLowerCase('ru');
+ const number=value=>text(value)===''?NaN:Number(text(value).replace(',','.'));
+ const lookup=column=>window.SolinHuman?.lookup(column.labelForm,column.field)||D.fieldLookups?.[column.field]||{};
+ let ruleId=0;
+ function addRule(){
+  const row=document.createElement('div');
+  row.className='field-filter-rule';
+  const field=document.createElement('select');
+  field.setAttribute('aria-label','Поле для фильтрации');
+  field.add(new Option('Выберите поле',''));
+  const groups=new Map();
+  for(const [index,column] of columns.entries()){
+   if(!groups.has(column.form)){
+    const group=document.createElement('optgroup');
+    group.label=column.form==='Выдел'?'Поля выдела':column.form.replace('Макет','Макет ');
+    groups.set(column.form,group);
+    field.append(group);
+   }
+   groups.get(column.form).append(new Option(column.label+(column.label===column.field?'':' · '+column.field),String(index)));
+  }
+  const operator=document.createElement('select');
+  operator.setAttribute('aria-label','Условие сравнения');
+  const input=document.createElement('input');
+  input.setAttribute('aria-label','Значение фильтра');
+  input.placeholder='Код, название или число';
+  const choices=document.createElement('datalist');
+  choices.id='filter-options-'+(++ruleId);
+  input.setAttribute('list',choices.id);
+  const remove=document.createElement('button');
+  remove.type='button';remove.textContent='Убрать';remove.onclick=()=>row.remove();
+  field.onchange=()=>{
+   const column=field.value===''?null:columns[Number(field.value)];
+   operator.replaceChildren(new Option('Равно','eq'),...(column?.numeric
+    ? [new Option('Не меньше','min'),new Option('Не больше','max')]
+    : [new Option('Содержит','contains')]));
+   const entries=column?Object.entries(lookup(column)):[];
+   choices.replaceChildren(...entries.map(([code,name])=>new Option(String(name),code)));
+   input.inputMode=column?.numeric&&!entries.length?'decimal':'text';
+  };
+  field.onchange();
+  row.append(field,operator,input,remove,choices);
+  root.append(row);
+ }
+ function matches(rule,row){
+  const {column,op,value}=rule;
+  const actual=row[column.field];
+  if(actual==null||actual==='')return false;
+  const named=lookup(column)[String(actual)];
+  if(column.numeric){
+   const a=number(actual),b=number(value);
+   if(!Number.isFinite(b))return op==='eq'&&text(named)===value;
+   if(!Number.isFinite(a))return false;
+   return op==='min'?a>=b:op==='max'?a<=b:Math.abs(a-b)<=1e-7*Math.max(1,Math.abs(b));
+  }
+  const values=[text(actual),text(named)].filter(Boolean);
+  return values.some(candidate=>op==='contains'?candidate.includes(value):candidate===value);
+ }
+ function run(){
+  const groups=new Map();
+  for(const row of root.children){
+   const [field,op]=row.querySelectorAll('select');
+   const input=row.querySelector('input'),value=text(input.value);
+   if(field.value===''&&!value)continue;
+   const column=field.value===''?null:columns[Number(field.value)];
+   const namedValue=column&&op.value==='eq'&&Object.values(lookup(column)).some(name=>text(name)===value);
+   if(!column||!value||(column.numeric&&!namedValue&&!Number.isFinite(number(value)))){
+    summary.textContent='Укажите поле и корректное значение для каждого условия.';
+    results.replaceChildren();
+    return;
+   }
+   if(!groups.has(column.form))groups.set(column.form,[]);
+   groups.get(column.form).push({column,op:op.value,value});
+  }
+  const found=source.filter(stand=>[...groups].every(([form,rules])=>{
+   const rows=form==='Выдел'?[stand]:stand._children?.[form]||[];
+   return rows.some(row=>rules.every(rule=>matches(rule,row)));
+  }));
+  summary.textContent='Найдено выделов: '+found.length;
+  renderCompList(results,found);
+  for(const button of results.querySelectorAll('.compCard'))button.addEventListener('click',closeModal,{capture:true});
+ }
+ document.getElementById('filterAdd').onclick=addRule;
+ document.getElementById('filterRun').onclick=run;
+ root.addEventListener('keydown',event=>{if(event.key==='Enter'&&event.target.tagName==='INPUT'){event.preventDefault();run();}});
+ addRule();
+}
+
 function refs(q=''){if(!D)return;const box=document.querySelector('#friendlyRefs');box.innerHTML=Object.entries(D.fieldLookups).filter(([k,v])=>!q||(k+' '+Object.values(v).join(' ')).toLowerCase().includes(q.toLowerCase())).map(([k,v])=>'<details class="refCard"><summary>'+h(D.fieldLabels[k]||k)+' · '+Object.keys(v).length+'</summary>'+Object.entries(v).filter(([c,n])=>!q||(k+' '+c+' '+n).toLowerCase().includes(q.toLowerCase())).map(([c,n])=>'<div class="refRow"><b>'+h(c)+'</b> '+h(n)+'</div>').join('')+'</details>').join('');}
 async function loadRefs(){try{let res=await fetch(window.Capacitor?.isNativePlatform?.()?'./refs-audit.packed.bin':'./refs-audit.json.gz');if(!res.ok&&window.Capacitor?.isNativePlatform?.())res=await fetch('./refs-audit.json.gz');if(!res.ok)throw Error('HTTP '+res.status);window.SOLIN_REFS=JSON.parse(await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).text());await window.SolinReferenceSupplement?.load?.(window.SOLIN_REFS);const byCode=new Map(SOLIN_REFS.tables.SDP.map(r=>[r.KPC,r]));SOLIN_REFS.tables.SDP_Tip=SOLIN_REFS.tables.SDP_Tip.map(r=>({...byCode.get(r.KPC),...r}));D.stats.referenceTables=Object.keys(SOLIN_REFS.tables).length;document.querySelector('#rcount').textContent=D.stats.referenceTables;D.scopedLookups={};for(const x of window.SOLIN_LOOKUP_SOURCES||[]){const rows=SOLIN_REFS.tables[x.table];if(!rows)continue;(D.scopedLookups[x.form]??={})[x.field]=Object.fromEntries(rows.filter(r=>r[x.code]!=null&&r[x.label]!=null).map(r=>[r[x.code],r[x.label]]));}refs();window.dispatchEvent(new Event('solin-refs-ready'));}catch(e){toast('Полные справочники недоступны: '+e.message)}}
 function auditedRefs(q=''){if(!window.SOLIN_REFS)return refs(q);const box=document.querySelector('#friendlyRefs');box.innerHTML='<p>153 исходные таблицы S* и вычисленный SDP_Tip · 24 946 строк. Динамические ограничения списков Access здесь не исполняются.</p>';for(const [name,table]of Object.entries(SOLIN_REFS.tables).sort(([a],[b])=>a.localeCompare(b))){const rows=q?table.filter(r=>(name+' '+Object.values(r).join(' ')).toLowerCase().includes(q.toLowerCase())):table;if(!rows.length)continue;const details=document.createElement('details');details.className='refCard';details.innerHTML='<summary>'+h(refNames[name]||name)+' · '+rows.length+'</summary>';let count=0,host;function more(){const slice=rows.slice(count,count+100);count+=slice.length;host.insertAdjacentHTML('beforeend',slice.map(r=>'<div class="wf-check">'+Object.entries(r).filter(([,v])=>v!=null&&v!=='').map(([k,v])=>'<span>'+h(k)+': <b>'+h(v)+'</b></span>').join(' · ')+'</div>').join(''));details.querySelector('.refMore')?.remove();if(count<rows.length){const b=document.createElement('button');b.className='refMore';b.textContent='Ещё 100';b.onclick=more;details.append(b);}}details.ontoggle=()=>{if(details.open&&!host){host=document.createElement('div');details.append(host);more();}};box.append(details);}}

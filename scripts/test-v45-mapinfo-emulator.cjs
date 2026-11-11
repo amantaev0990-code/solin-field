@@ -59,6 +59,22 @@ async function runInWebView(url) {
    toggleImportedLayer(index, false);
    const hidden = !fieldMap.hasLayer(entry.layer);
    toggleImportedLayer(index, true);
+   const values=document.querySelector('#mapLayerList input[aria-label="Значения"]');
+   if(!values?.checked)throw Error('Values are missing from the shared layer list');
+   values.click();
+   const mark=[...document.querySelectorAll('.field-map-tools button')].find(button=>button.textContent==='Метка');
+   if(!mark?.disabled)throw Error('Drawing remained enabled with Values hidden');
+   values.click();
+   const area=[...document.querySelectorAll('.field-map-tools button')].find(button=>button.textContent==='Площадь');
+   area.click();
+   const square=[[50.33,59.57],[50.33,59.58],[50.34,59.58]];
+   for(const point of square)fieldMap.fire('click',{latlng:L.latLng(point)});
+   const badge=document.querySelector('.field-map-area');
+   if(badge.hidden||!badge.textContent.includes(' га')||document.querySelectorAll('.field-area-handle').length!==3)
+    throw Error('Area or editable vertices absent');
+   document.querySelector('.field-area-handle').click();
+   if(document.querySelectorAll('.field-area-handle').length!==2)throw Error('Area vertex tap did not delete the vertex');
+   [...document.querySelectorAll('.field-map-tools button')].find(button=>button.textContent==='Отмена').click();
    const result = {accept:input.accept, count:entry.count, lat:center.lat, lng:center.lng,
     visible:fieldMap.hasLayer(entry.layer), hidden, accepted:accepted.size};
    const action = label => [...document.querySelectorAll('#mapLibraryList button')]
@@ -73,6 +89,7 @@ async function runInWebView(url) {
    action('Удалить').click();
    await window.__solinMapImportPromise;
    if (importedMapLayers.length || action('Удалить')) throw Error('Map was not removed from the library');
+   if(document.querySelector('#mapLibraryList').textContent.includes('встроенная'))throw Error('A built-in map is still listed');
    return result;
   })()`);
   assert.match(result.accept, /\.zip/);

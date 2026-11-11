@@ -31,6 +31,11 @@ const server = http.createServer(async (request, response) => {
     page.on('pageerror', error => console.error(error.message));
     await page.route(url => url.hostname !== '127.0.0.1', route => route.abort());
     await page.addInitScript(() => {
+      window.Capacitor = {
+        isNativePlatform: () => true,
+        getPlatform: () => 'android',
+        Plugins: {}
+      };
       window.transitions = [];
       document.addEventListener('animationstart', event => {
         const screen = event.target.parentElement;
@@ -41,7 +46,8 @@ const server = http.createServer(async (request, response) => {
     await page.goto('http://127.0.0.1:' + server.address().port, {waitUntil: 'domcontentloaded'});
     await page.waitForFunction(() => document.documentElement.classList.contains('v37-menu-ready'));
     await page.waitForFunction(() => document.querySelector('#mainScreen.active') && window.SolinV37);
-    await page.waitForFunction(() => D?.quarters && window.SolinWorkspace?.activeId);
+    await page.waitForFunction(() => D?.quarters && window.SolinWorkspace?.activeId &&
+      document.documentElement.classList.contains('solin-native-android'));
     const context = await page.evaluate(async () => {
       await window.SolinWorkspace.ready;
       await window.SolinWorkspace.activate(window.SolinWorkspace.activeId);
@@ -87,6 +93,11 @@ const server = http.createServer(async (request, response) => {
     const rows = form.locator('#ce-table-Макет10 tbody tr');
     const height = rows.nth(0).locator('[data-ce-field="PH"]');
     const diameter = rows.nth(0).locator('[data-ce-field="PD2"]');
+    await height.tap();
+    assert.ok(await height.evaluate(el=>document.activeElement===el));
+    assert.equal(await page.locator('#ce-assist:visible').count(),0);
+    assert.equal(await form.locator('.ce-mobile-tabs:visible,.dt-footer:visible').count(),0);
+    assert.ok(await height.evaluate(el=>el.selectionStart===el.value.length));
     await height.press('Enter');
     assert.ok(await diameter.evaluate(el => el === document.activeElement), 'Enter moves from height to diameter');
     const endOfRow = rows.nth(0).locator(rowControls).last();
@@ -118,7 +129,11 @@ const server = http.createServer(async (request, response) => {
     await page.locator('#ce-cancel').click();
     await page.locator('#modal').waitFor({state:'hidden'});
     await page.evaluate(key => {window.show('quartersScreen');openQuarter(key);}, context.key);
-    const quarterKT = page.locator('#quarters > .kt-quarter-footer:last-child').getByRole('button',{name:'КТ — просмотр выделов квартала'});
+    const toolbar=page.locator('#quarters #wfQuarterToolbar');
+    const quarterKT = toolbar.getByRole('button',{name:'КТ — просмотр выделов квартала'});
+    assert.equal(await toolbar.getByRole('button').count(),2);
+    assert.equal(await toolbar.getByRole('button',{name:'Корректировка квартала'}).count(),1);
+    assert.equal(await page.locator('#quarters [data-stand-filters]').count(),0);
     assert.equal(await quarterKT.evaluate(button => getComputedStyle(button).backgroundColor), 'rgb(23, 91, 176)');
     await quarterKT.click();
     const nav = page.locator('.kt-review-nav');
@@ -131,6 +146,36 @@ const server = http.createServer(async (request, response) => {
     await prev.click();
     assert.ok(await prev.isDisabled());
 
+    await page.evaluate(() => {
+      closeModal();
+      show('menuScreen');
+      const quarter=Object.values(D.quarters).find(q=>q.compartments.length);
+      quarter.compartments.push({...quarter.compartments[0],VD:'999а',
+        _children:{Макет10:[{POL:.4,POR:'ОС'},{POL:.8,POR:'Б'}]}});
+      solinCore.filter();
+    });
+    const rules=page.locator('#filterRules');
+    const field=rules.getByRole('combobox',{name:'Поле для фильтрации'});
+    await field.selectOption({label:await field.locator('optgroup[label="Макет 10"] option').filter({hasText:/· POL$/}).textContent()});
+    await rules.locator('input[aria-label="Значение фильтра"]').fill('0,4');
+    await page.locator('#filterRun').click();
+    assert.ok(await page.locator('#filterResult').getByText('Выдел 999а').count());
+
+    await page.evaluate(() => {
+      closeModal();
+      const q=Object.values(D.quarters).find(item=>item.compartments.some(row=>String(row.KU)==='1'));
+      const sample=q.compartments.find(row=>String(row.KU)==='1');
+      const draft={...structuredClone(sample),VD:'999б',M3Pr:null,_children:{},_local:true};
+      current=draft;
+      renderComp();
+      SolinCardEditor.open(draft,{quick:true,isNew:true});
+    });
+    const species=form.locator('input[data-species-for="ce_base_base_M3Pr"]');
+    await species.fill('ос');
+    await species.press('Enter');
+    await form.getByRole('button',{name:'Макет 10',exact:true}).click();
+    assert.equal(await form.locator('#ce-table-Макет10 tbody tr').first().locator('[data-ce-field="POR"]').inputValue(),'ОС');
+    console.log('V50 leading species sync PASS');
     console.log('V39 browser PASS: read-only KT, keyboard and screen Enter, Maket 23, complete editor and new stand');
   } finally {
     await browser?.close();

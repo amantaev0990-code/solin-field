@@ -39,8 +39,11 @@
   // Android tablets need the card search popup, regardless of viewport width.
   // Focus from the active user gesture, not from a delayed timer, so the
   // system keyboard reliably appears when a field is opened.
-  if(window.Capacitor?.getPlatform?.()==='android')
-   document.getElementById(list?'ce-assist-query':'ce-assist-value')?.focus({preventScroll:true});
+  if(window.Capacitor?.getPlatform?.()==='android'){
+   const input=document.getElementById(list?'ce-assist-query':'ce-assist-value');
+   input?.focus({preventScroll:true});
+   if(input?.selectionStart!=null)input.setSelectionRange(input.value.length,input.value.length);
+  }
   if(sequence){
    const index=sequence.indexOf(el),content=document.querySelector('#ce-assist .ce-assist-content');
    content.insertAdjacentHTML('afterbegin','<div class="ce-assist-progress"><span>Поле '+(index+1)+' из '+sequence.length+'</span><progress aria-label="Ход заполнения" max="'+sequence.length+'" value="'+(index+1)+'"></progress></div>');
@@ -94,7 +97,7 @@
     '<b>Макет '+number+'</b><span>'+h(name)+'</span></button>').join('')+
     (!results.length?'<p class="ce-assist-tip">Макет не найден.</p>':'');
  }
- function enhance(){const b=board();if(!b||!document.querySelector('.ce-modal #ce-form'))return;const toolbar=document.querySelector('.ce-modal .dt-toolbar');if(toolbar&&!toolbar.querySelector('.ce-assist-shortcuts')){const node=document.createElement('div');node.className='ce-assist-shortcuts';node.innerHTML='<button type="button" data-ce-assist-sequence>По порядку</button><button type="button" data-ce-assist-find>⌕ Найти поле</button><button type="button" data-ce-assist-row>▦ Древостой</button><button type="button" data-ce-assist-makets>Макеты</button>';toolbar.insertBefore(node,toolbar.querySelector('.dt-tools'));}
+ function enhance(){const b=board();if(!b||!document.querySelector('.ce-modal #ce-form')||b.closest('.quick-card-form'))return;const toolbar=document.querySelector('.ce-modal .dt-toolbar');if(toolbar&&!toolbar.querySelector('.ce-assist-shortcuts')){const node=document.createElement('div');node.className='ce-assist-shortcuts';node.innerHTML='<button type="button" data-ce-assist-sequence>По порядку</button><button type="button" data-ce-assist-find>⌕ Найти поле</button><button type="button" data-ce-assist-row>▦ Древостой</button><button type="button" data-ce-assist-makets>Макеты</button>';toolbar.insertBefore(node,toolbar.querySelector('.dt-tools'));}
   if(!document.querySelector('.ce-mobile-tabs')){const nav=document.createElement('nav');nav.className='ce-mobile-tabs';nav.setAttribute('aria-label','Макеты карточки');nav.innerHTML=[['main','Карточка'],...[1,2,3,4,5,10,31,32].map(n=>[String(n),'М'+n])].map(([id,label])=>'<button type="button" data-ce-jump="'+id+'">'+label+'</button>').join('');nav.insertAdjacentHTML('beforeend',[11,12,13,14,15,16,17,19,20,21,23,25,27,28].map(n=>'<button type="button" data-ce-mobile-extra="Макет'+n+'" title="'+h(SolinHuman.formName('Макет'+n))+'">М'+n+'</button>').join(''));toolbar.after(nav);}
  }
  function back(){if(state?.sequence){finishField(fieldValue(),-1);}else if(state?.mode==='field'&&state.returnRow!=null){syncField(true);editRow(state.returnRow);}else{syncField(true);dismiss();}}
@@ -114,11 +117,10 @@
     return;
   }
  }
- document.addEventListener('pointerdown',e=>{
-  if(!mobile()||!board()||!e.target?.closest)return;
-  // iOS retains its proven species/search interaction unchanged.
-  // For native Android, give both selects AND cramped text/number cells
-  // the same full-size, keyboard-focused edit surface.
+ document.addEventListener('click',e=>{
+  if(!mobile()||!board()||!e.target?.closest||e.target.closest('[data-quick-step]'))return;
+  // A click follows a tap on a field. A scroll beginning on the field
+  // leaves the editor closed and the gesture under native scroll handling.
   const selector=nativeAndroid()?'.dt-board [data-ce-field]':'.dt-board select[data-ce-field]';
   const el=e.target.closest(selector);
   if(!el||!host()||layer()?.hidden===false)return;
@@ -140,7 +142,7 @@
    return;
   }
   const jump=e.target.closest?.('[data-ce-jump]');if(jump){const id=jump.dataset.ceJump;document.querySelectorAll('.ce-mobile-tabs button').forEach(b=>{if(b===jump)b.setAttribute('aria-current','true');else b.removeAttribute('aria-current');});document.querySelector('#ce-extra').hidden=true;document.querySelector('#ce-action-panel').hidden=true;document.querySelector(id==='main'?'.dt-header':'#ce-section-'+id)?.scrollIntoView({block:'start'});return;}
-  const el=e.target.closest?.('.dt-board select[data-ce-field]');if(el&&mobile()&&lay?.hidden!==false){e.preventDefault();e.stopPropagation();editField(el);}},true);
+  const el=e.target.closest?.('.dt-board select[data-ce-field]');if(el&&mobile()&&!el.closest('[data-quick-step]')&&lay?.hidden!==false){e.preventDefault();e.stopPropagation();editField(el);}},true);
  document.addEventListener('input',e=>{if(e.target?.id==='ce-assist-value'){syncField();return;}if(e.target?.id==='ce-assist-query'){if(state?.mode==='picker')filterPicker(e.target.value);else if(state?.mode==='makets')filterMakets(e.target.value);else filterOptions(e.target.value);}},true);
  document.addEventListener('keydown',e=>{const lay=document.querySelector('#ce-assist');if(!lay||lay.hidden)return;if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();back();}if(e.key==='Enter'&&e.target?.id==='ce-assist-value'){e.preventDefault();finishField(e.target.value);}else if(e.key==='Enter'&&e.target?.id==='ce-assist-query'&&state?.mode==='field'&&state.list){e.preventDefault();const q=e.target.value.trim().toLocaleLowerCase('ru-RU'),exact=state.list.find(x=>x.value.toLocaleLowerCase('ru-RU')===q),visible=[...document.querySelectorAll('[data-ce-assist-option]')];const option=q?(exact||(visible.length===1?state.list[Number(visible[0].dataset.ceAssistOption)]:null)):null;if(option)finishField(option.value);}},true);
  const observer=new MutationObserver(()=>{enhance();const lay=document.querySelector('#ce-assist');if(lay&&!document.querySelector('.ce-modal'))dismiss();});observer.observe(document.getElementById('modal')||document.body,{subtree:true,childList:true});
