@@ -4,9 +4,9 @@
 (()=>{'use strict';
 const keys=['POS','LESN','KV','KGLF','VD'];
 const sections=[
- ['1','Условия участка',['OZU','CkEk','CkKr','VNUM','ErV','ErCt']],
+ ['1','Условия участка',['OZU','CkEk','CkKr','VNUM','ErV','ErCt','M3B']],
  ['2','Хозяйственные мероприятия',['M2PM1','M2Pr','M22','M23','M2Cp']],
- ['3','Лесорастительная характеристика',['M3Pr','M3B','M3TLU','M3G','M3KP','M3KPC']],
+ ['3','Лесорастительная характеристика',['M3Pr','M3TLU','M3G','M3KP','M3KPC']],
  ['4','Захламлённость и сухостой',['M4ZO','M4ZL','M4SS']],
  ['5','Возраст и запас',['AKL','AGR','AGR1','STUR','STUR1']],
  ['31','Подрост',['PRkol','PRH','PRA','PRK1','PRP1','PRK2','PRP2','PRK3','PRP3']],
@@ -226,9 +226,9 @@ function markup(){const s=session,r=s.draft,o=D.lesnichestvo?.find(x=>same(x.POS
  cell('Raion',s.quarter.Raion,'quarter','Квартал',{label:'Адм. район',inline:true})+cell('KlxrVD',r.KlxrVD,'base','ВыделВ',{label:false,split:true})+'</div></header>'+
  '<section class="dt-base" aria-label="Выдел и категория угодий">'+(s.isNew?cell('VD',r.VD,'base','ВыделВ',{label:'Выдел',weight:.45}):fixed('Выдел',r.VD,42))+cell('PLV',r.PLV,'base','ВыделВ',{label:'Площадь',weight:.65})+cell('KU',r.KU,'base','ВыделВ',{label:'Категория угодий',weight:3.2,split:true})+cell('CR',r.CR,'base','ВыделВ',{label:'Способ рубки',weight:1.9,split:true})+fixed('Памятник, заказник','',235,{unavailable:true})+fixed('Арендатор','',220,{unavailable:true})+'</section>'+
  '<div id="ce-category-guidance" class="ce-category-guidance" role="status" aria-live="polite" hidden></div>'+
- maket('1',cell('OZU',r.OZU,'base','ВыделВ',{label:'Особозащитный участок',weight:3.2,split:true})+cell('CkEk',r.CkEk,'base','ВыделВ',{label:'Склон - экспозиция',weight:1.7,split:true})+cell('CkKr',r.CkKr,'base','ВыделВ',{label:'крутизна',weight:.65})+cell('VNUM',r.VNUM,'base','ВыделВ',{label:'ВНУМ',weight:.65})+cell('ErV',r.ErV,'base','ВыделВ',{label:'Эрозия - вид',weight:1.6,split:true})+cell('ErCt',r.ErCt,'base','ВыделВ',{label:'степень',weight:1.5,split:true}))+
+ maket('1',cell('OZU',r.OZU,'base','ВыделВ',{label:'Особозащитный участок',weight:3.2,split:true})+cell('CkEk',r.CkEk,'base','ВыделВ',{label:'Склон - экспозиция',weight:1.7,split:true})+cell('CkKr',r.CkKr,'base','ВыделВ',{label:'крутизна',weight:.65})+cell('VNUM',r.VNUM,'base','ВыделВ',{label:'ВНУМ',weight:.65})+cell('ErV',r.ErV,'base','ВыделВ',{label:'Эрозия - вид',weight:1.6,split:true})+cell('ErCt',r.ErCt,'base','ВыделВ',{label:'степень',weight:1.5,split:true})+cell('M3B',r.M3B,'base','ВыделВ',{label:'Бонитет',weight:.75}))+
  maket('2',cell('M2PM1',r.M2PM1,'base','ВыделВ',{label:'Первое мероприятие',weight:3.1,split:true})+cell('M2Pr',r.M2Pr,'base','ВыделВ',{label:'Процент',weight:.55})+cell('M22',r.M22,'base','ВыделВ',{label:'Второе мероприятие',weight:2.6,split:true})+cell('M23',r.M23,'base','ВыделВ',{label:'Третье мероприятие',weight:2.6,split:true})+cell('M2Cp',r.M2Cp,'base','ВыделВ',{label:'Целевая порода',weight:2.2,split:true}))+
- maket('3',fixed('Главная порода',description('ВыделВ','M3Pr',r.M3Pr)||r.M3Pr,210)+cell('M3B',r.M3B,'base','ВыделВ',{label:'Бонитет',weight:.6})+fixed('Тип леса',description('ВыделВ','M3TLU',r.M3TLU)||r.M3TLU,260)+cell('M3G',r.M3G,'base','ВыделВ',{label:'Год выруб.',weight:.75})+cell('M3KP',r.M3KP,'base','ВыделВ',{label:'Пней всего, шт.',weight:.9})+cell('M3KPC',r.M3KPC,'base','ВыделВ',{label:'в т.ч. хвойных',weight:.9}))+
+ maket('3',fixed('Главная порода',description('ВыделВ','M3Pr',r.M3Pr)||r.M3Pr,210)+fixed('Тип леса',description('ВыделВ','M3TLU',r.M3TLU)||r.M3TLU,260)+cell('M3G',r.M3G,'base','ВыделВ',{label:'Год выруб.',weight:.75})+cell('M3KP',r.M3KP,'base','ВыделВ',{label:'Пней всего, шт.',weight:.9})+cell('M3KPC',r.M3KPC,'base','ВыделВ',{label:'в т.ч. хвойных',weight:.9}))+
  maket('4',cell('M4ZO',r.M4ZO,'base','ВыделВ',{label:'Захламленность общая, м3/га',inline:true,weight:3.5})+cell('M4ZL',r.M4ZL,'base','ВыделВ',{label:'Ликвид, м3/га',inline:true,weight:2.1})+cell('M4SS',r.M4SS,'base','ВыделВ',{label:'Сухостой, м3/га',inline:true,weight:2.1}))+
  maket('5',cell('AKL',r.AKL,'base','ВыделВ',{label:'Класс возраста',inline:true,weight:1.8})+cell('AGR',r.AGR,'base','ВыделВ',{label:'Группа возраста',inline:true,weight:1.8})+cell('AGR1',r.AGR1,'base','ВыделВ',{label:'Группа возр. ТО',inline:true,weight:1.9})+cell('STUR',r.STUR,'base','ВыделВ',{label:'Запас выдела',inline:true,weight:1.9})+cell('STUR1',r.STUR1,'base','ВыделВ',{label:'Запас на гектар',inline:true,weight:2})+'<div class="dt-fixed dt-inline ce-stock-metric"><span>Все живые ярусы, м³/га</span><output id="ce-stock-live">—</output></div><div class="dt-fixed dt-inline ce-stock-metric"><span>Ед. деревья, м³/га</span><output id="ce-stock-single">—</output></div>'+
  '<div class="dt-fixed dt-inline ce-stock-metric"><span>Свежий сухостой ярус 8, м³/га</span><output id="ce-stock-fresh">—</output></div>'+
@@ -803,6 +803,9 @@ function validate(){
   if(form==='Макет10'&&m==='ZAP: Is Not Null'&&
      !leadingMaket10Row(session.draft._children.Макет10,
        session.draft._children.Макет10.indexOf(row),session.draft))return false;
+  // For KU19, an empty PH is not mandatory; never invent a height.
+  if(form==='Макет10'&&Number(session.draft.KU)===19&&f==='PH'&&
+     (row.PH==null||String(row.PH).trim()===''))return false;
   if(form==='Макет10'&&f==='POL'){
    const policy=window.SolinCategoryRules?.validatePol(session.draft.KU,row.POL,window.SOLIN_REFS?.tables);
    if(policy&&policy.status!=='error')return false; // warnings remain visible; no auto-rewrite
