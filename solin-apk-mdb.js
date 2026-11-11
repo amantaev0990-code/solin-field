@@ -106,7 +106,36 @@
         throw Error('Выдел '+(stand.VD??'?')+' в квартале '+(stand.KV??'?')+
           ' не связан с корректной строкой квартала (КГЛФ/Fzona/адрес/площадь).');
     }
-    return {quarters:qs.length,stands:stands.length};
+    // Row counts alone cannot show whether desktop SOLI-N can join Maket10.
+    const keyStand=r=>[r.POS,r.LESN,r.KV,r.KGLF,r.VD].map(x=>String(x??'').trim()).join('::');
+    const standKeys=new Set(),children=tables['Макет10']||[];
+    for(const row of stands){
+      const key=keyStand(row);
+      if(standKeys.has(key))throw Error('Повторяется полный адрес выдела в Transfer: '+key);
+      standKeys.add(key);
+    }
+    const counts={};
+    for(const [name,rows]of Object.entries(tables)){
+      if(!/^Макет\d+$/.test(name)||!Array.isArray(rows))continue;
+      let index=0;
+      for(const row of rows){
+        index++;
+        if(!standKeys.has(keyStand(row)))throw Error(name+', запись '+index+
+          ': нет соответствующего выдела по POS/LESN/KV/KGLF/VD. Экспорт остановлен.');
+        if(name==='Макет10'){
+          if(row.IAR==null||String(row.IAR).trim()===''||row.POR==null||String(row.POR).trim()==='')
+            throw Error('Макет 10, запись '+index+': отсутствует ярус или порода.');
+        }
+      }
+      counts[name]=rows.length;
+    }
+    const expectedM10=Object.values(D.quarters).reduce((n,q)=>
+      n+(q.compartments||[]).reduce((sum,stand)=>
+        sum+(stand._children?.Макет10?.length||0),0),0);
+    if((tables['Макет10']||[]).length!==expectedM10)
+      throw Error('Макет 10: потеря строк до создания MDB ('+
+        expectedM10+' в карточках, '+(tables['Макет10']||[]).length+' в Transfer).');
+    return {quarters:qs.length,stands:stands.length,maket10:children.length,children:counts};
   }
   // K82 in the original desktop SOLI-N validates previous taxation year
   // in the FOREST record, not in an individual quarter. Never invent a year.
@@ -161,13 +190,13 @@
       [r.POS,r.LESN,r.KV,r.KGLF,r.VD].map(String).join(':')));
     const incomplete=v=>v==null||String(v).trim()===''||String(v).trim()==='0';
     const missing=stands.filter(r=>withTimber.has([r.POS,r.LESN,r.KV,r.KGLF,r.VD].map(String).join(':'))&&
-      (incomplete(r.M3Pr)||incomplete(r.M3B)||incomplete(r.M3TLU)));
+      (incomplete(r.M3Pr)||(Number(r.KU)!==19&&incomplete(r.M3B))||incomplete(r.M3TLU)));
     if(missing.length){const s=missing[0],fields=[];
       if(incomplete(s.M3Pr))fields.push('главная порода (M3Pr)');
-      if(incomplete(s.M3B))fields.push('бонитет (M3B)');
+      if(Number(s.KU)!==19&&incomplete(s.M3B))fields.push('бонитет (M3B)');
       if(incomplete(s.M3TLU))fields.push('тип леса (M3TLU)');
       throw Error('Контроль К16: квартал '+s.KV+', выдел '+s.VD+': не заполнено: '+fields.join(', ')+'. '+
-       'В карточке выдела главная порода и тип леса находятся в «Основных данных», бонитет — в макете 3.');}
+       'В карточке выдела главная порода и тип леса находятся в «Основных данных», бонитет — в макете 1.');}
   }
   async function exportMDB(){
     if(exporting)return;
@@ -208,7 +237,7 @@
       modal('Экспорт завершён',
         '<p>Файл <b>'+esc(actualName)+'</b> сохранён в '+esc(result.folder||'выбранной папке')+'.</p>'+
         '<p><b>Размер: '+size+' КБ.</b> Файл повторно считан и проверен.</p>'+
-        '<p><b>Записи:</b> '+counts.quarters+' кварталов, '+counts.stands+' выделов.</p>'+
+        '<p><b>Записи:</b> '+counts.quarters+' кварталов, '+counts.stands+' выделов, '+counts.maket10+' строк Макета 10.</p>'+
         '<p>Перед использованием в работе откройте его на настольном SOLI-N в тестовой базе.</p>'+
         '<button type="button" onclick="closeModal()">Готово</button>');
     }catch(e){
