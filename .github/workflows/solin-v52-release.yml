@@ -89,7 +89,12 @@ jobs:
           mv "$RUNNER_TEMP/v51/assets/public" www
           rm -f www/maps/213-1.cmf2 www/maps/213-2.cmf2
           npm install --no-save --no-audit --no-fund playwright@1.56.1
-          cp index.html app.js map.js map.css solin-apk-mdb.js solin-mdb-bridge.js solin-card-assist.js solin-card-editor.js solin-enhancements.js solin-field-core.js solin-v35-features.js solin-quick-card.js solin-quick-card.css solin-transfer-merge.js solin-workspace.js solin-workflow.js www/
+          cp app.js map.js map.css solin-apk-mdb.js solin-mdb-bridge.js solin-card-assist.js solin-card-editor.js solin-enhancements.js solin-field-core.js solin-v35-features.js solin-quick-card.js solin-quick-card.css solin-transfer-merge.js solin-workspace.js solin-workflow.js www/
+          # The published V51 HTML contains approved runtime script injections
+          # not present in the repository's historical index.html.
+          # Never overwrite it: append only the new Transfer merger before the workspace.
+          sed -i 's#<script src="solin-workspace.js#<script src="solin-transfer-merge.js?v=52"></script><script src="solin-workspace.js#' www/index.html
+          grep -q 'solin-transfer-merge.js?v=52' www/index.html
           for script in app.js map.js solin-card-assist.js solin-card-editor.js solin-enhancements.js solin-field-core.js solin-v35-features.js solin-apk-mdb.js solin-mdb-bridge.js solin-quick-card.js solin-transfer-merge.js solin-workspace.js solin-workflow.js; do node --check "www/$script"; done
           sed -i -E 's/((app|map|solin-card-assist|solin-card-editor|solin-enhancements|solin-field-core|solin-v35-features|solin-apk-mdb|solin-mdb-bridge|solin-quick-card|solin-transfer-merge|solin-workspace|solin-workflow)\.(js|css))(\?v=[^" ]+)?"/\1?v=52"/g' www/index.html
           node scripts/test-v42-stock.cjs
