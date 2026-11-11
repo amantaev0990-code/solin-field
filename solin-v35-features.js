@@ -114,11 +114,18 @@
      const item=document.createElement('button');
      item.type='button';
      item.className='v35-group-item';
-     item.textContent='Группа '+group;
+     item.textContent='Группа '+group+(String(input.value)===String(group)?' (текущая)':'');
      item.addEventListener('click',()=>{
-       // Exactly one original base field stores this explicit user choice.
+       // Changing a source STL group invalidates any previously selected type.
+       // Clear only the current draft's original field, never an imported row.
        const value=String(group);
        if(input.value!==value){
+         const forestSelect=modal.querySelector('#ce-form [data-ce-scope="base"][data-ce-field="M3TLU"]');
+         if(forestSelect?.value){
+           forestSelect.value='';
+           forestSelect.dispatchEvent(new Event('input',{bubbles:true}));
+           forestSelect.dispatchEvent(new Event('change',{bubbles:true}));
+         }
          input.value=value;
          input.dispatchEvent(new Event('input',{bubbles:true}));
          input.dispatchEvent(new Event('change',{bubbles:true}));
@@ -145,7 +152,9 @@
    if(field==='M3TLU'){
      const ctx=currentCard();
      const result=window.SolinDependentRules?.forestTypes?.(ctx,originalOrg(),window.SOLIN_REFS?.tables);
-     if(result?.status==='ambiguous'&&result.groups?.length>1){
+     // An existing NE2A value must not silently hide alternative legitimate
+     // STL groups. Offer the group chooser even when a group is already set.
+     if(result?.groups?.length>1){
        if(chooseGroup(result.groups))return;
      }
    }
@@ -181,6 +190,19 @@
    wrapped.__v35Motion=true;
    window.show=wrapped;
  }
+ // Used by the compact tablet input, whose original type select is moved
+ // from Maket 10 to the visible "Поля выдела" pane.
+ window.SolinForestGroups={
+   open(){
+     const ctx=currentCard();
+     const result=window.SolinDependentRules?.forestTypes?.(ctx,originalOrg(),window.SOLIN_REFS?.tables);
+     return result?.groups?.length>1 ? chooseGroup(result.groups) : false;
+   },
+   available(){
+     const ctx=currentCard();
+     return window.SolinDependentRules?.forestTypes?.(ctx,originalOrg(),window.SOLIN_REFS?.tables);
+   }
+ };
  function init(){
    animateScreen();
    const modal=document.getElementById('modal');
