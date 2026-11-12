@@ -298,7 +298,7 @@ function installFieldMapTools(map) {
  const saved = L.layerGroup().addTo(map);
  const preview = L.layerGroup().addTo(map);
  const style = {color:'#ec8515',weight:4};
- const tools = L.control({position:'topright'});
+ const tools = L.control({position:'bottomleft'});
  const areaBadge=document.createElement('output');
  areaBadge.className='field-map-area';
  areaBadge.hidden=true;
@@ -489,6 +489,7 @@ function installFieldMapTools(map) {
   for (const [key,label] of Object.entries({mark:'Метка',line:'Линия',area:'Площадь',track:'GPS-трекер',ruler:'Линейка'})) {
    add(key,label,() => start(key));
   }
+  add('offline-import','Импорт офлайн-карты',() => window.SolinOfflineImagery?.pick?.());
   add('undo','Убрать точку',() => { points.pop(); redraw(); });
   add('save','Сохранить',() => { void saveShape(); });
   add('cancel','Отмена',reset);
