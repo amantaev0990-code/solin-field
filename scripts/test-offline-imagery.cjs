@@ -109,6 +109,29 @@ const server=http.createServer((req,res)=>{try{
   assert.equal(labels.source,1000);assert.equal(labels.geometry,1000);assert(labels.visible<=220);
   await page.evaluate(()=>{fieldMap.setView([50.1025,59.204],9);});
   await page.waitForFunction(()=>__labelFixture.labelLayers.stands.getLayers().length===0&&__labelFixture.labelLayers.quarters.getLayers().length===0);
+  // Large MapInfo geometry must be cullable without losing the real full extent.
+  const mapinfo=await page.evaluate(async()=>{
+   const features=[];
+   for(let y=0;y<25;y++)for(let x=0;x<40;x++){
+    const lon=59.18+x*.003,lat=50.08+y*.003;
+    features.push({type:'Feature',properties:{Nвыд:y*40+x+1},geometry:{type:'Polygon',
+     coordinates:[[[lon,lat],[lon+.002,lat],[lon+.002,lat+.002],[lon,lat+.002],[lon,lat]]]}});
+   }
+   fieldMap.setView([50.11,59.22],15);
+   const entry=createMapInfoLayer({name:'213_1_ВыдПл',geojson:{type:'FeatureCollection',features},settings:''},'v57-test',0,1);
+   const b=entry.layer.getBounds();entry.layer.addTo(fieldMap);
+   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+   const near=entry.layer.getLayers().length;
+   fieldMap.setZoom(8);
+   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+   const far=entry.layer.getLayers().length;
+   fieldMap.removeLayer(entry.layer);
+   fieldMap.getPane(entry.pane)?.remove();
+   return {near,far,count:entry.count,full:b.isValid()};
+  });
+  assert.equal(mapinfo.count,1000);
+  assert(mapinfo.full&&mapinfo.near>0&&mapinfo.near<1000,'Large MapInfo view must contain only local features');
+  assert.equal(mapinfo.far,0,'Stand polygons should be hidden at overview zoom');
   assert.deepEqual(errors,[]);
   console.log('OFFLINE_IMAGERY_OK: nonblocking MBTiles import, bottom controls, restore/offline switch, optional four-quadrant overview pyramid, bounded cache, label culling');
   await ctx.close();
