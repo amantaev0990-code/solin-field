@@ -92,12 +92,89 @@ function exportForest(){
   stands:Object.values(forest.quarters).reduce((n,q)=>n+(q.compartments?.length||0),0)};
 }
 function clearMap(){if(typeof importedMapLayers!=='undefined'){for(const entry of importedMapLayers){for(const layer of [entry.layer,...(entry.geometryEntries||[]).map(g=>g.layer),...Object.values(entry.labelLayers||{})])if(layer?.removeFrom&&typeof fieldMap!=='undefined')fieldMap?.removeLayer(layer);}importedMapLayers.splice(0);}window.__solinMapRestored=false;window.__cmfSelectedLayer=null;window.closeCmfSheet?.();window.renderMapLayerList?.();}
-function heading(){const org=D.lesnichestvo?.[0]||{};const title=document.querySelector('.forestTitle h2'),owner=document.querySelector('.forestTitle p'),button=document.querySelector('.forestTitle .change'),brand=document.querySelector('.brand p');if(title)title.textContent=org.NOS||'Лесничество';if(owner)owner.textContent=org.NLX||'Лесовладелец не указан';if(button){button.textContent='Сменить';button.onclick=home;button.style.display='inline-flex';}if(brand)brand.textContent=opened?(org.NOS||'Полевые работы'):'Выбор рабочего лесничества';}
+function heading(){
+ const org=D?.lesnichestvo?.[0]||{};
+ const title=document.querySelector('.forestTitle h2');
+ const owner=document.querySelector('.forestTitle p');
+ const button=document.querySelector('.forestTitle .change');
+ if(title)title.textContent=org.NOS||'Лесничество';
+ if(owner)owner.textContent=org.NLX||'Лесовладелец не указан';
+ if(button){button.textContent='Сменить';button.onclick=home;button.style.display='inline-flex';}
+ // V53 selected the correct forest, but V33's brand did not show it.
+ // Keep one durable caption below SOLI-N Field on every working screen.
+ const brand=document.querySelector('.topbar .brand');
+ const container=brand?.querySelector('h1')?.parentElement||brand;
+ let subtitle=container?.querySelector('.solin-active-forest-caption');
+ if(!subtitle&&container){
+  subtitle=document.createElement('p');
+  subtitle.className='solin-active-forest-caption';
+  container.append(subtitle);
+ }
+ if(subtitle){
+  subtitle.textContent=activeId&&org.NOS?
+   org.NOS+(String(org.NOS).toLowerCase().includes('лесничество')?'':' · лесничество'):
+   'Выбор лесничества';
+  subtitle.title=org.NLX||'';
+  subtitle.style.setProperty('display','block','important');
+  subtitle.style.setProperty('font-size','12px','important');
+  subtitle.style.setProperty('line-height','1.3','important');
+  subtitle.style.setProperty('margin','3px 0 0','important');
+  subtitle.style.setProperty('color','#42634e','important');
+ }
+}
+async function syncForestContext(){
+ // The original desktop-style field-context SELECT is the only forest picker.
+ // Do not add an extra button and do not show a blank default when a forest
+ // is already active. Use the same IndexedDB list as the working chooser.
+ const context=document.querySelector('#mainScreen .field-context');
+ if(!context)return;
+ const sections=[...context.querySelectorAll(':scope > div')];
+ const section=label=>sections.find(node=>
+  [...node.querySelectorAll('dt,label,span')].some(el=>el.textContent?.trim().toLowerCase()===label));
+ const org=D?.lesnichestvo?.[0]||{};
+ const ownerBlock=section('лесовладелец');
+ const ownerText=ownerBlock?.querySelector('dd');
+ if(ownerText)ownerText.textContent=activeId?(org.NLX||'Не указан'):'—';
+ const region=String(org.Область||org.oblast||D?.source?.region||'').trim();
+ const regionText=section('область')?.querySelector('dd');
+ if(regionText)regionText.textContent=region||'—';
+ const forestBlock=section('лесничество');
+ const picker=forestBlock?.querySelector('select')||context.querySelector('select');
+ if(!picker)return;
+ const forests=await list();
+ // Another forest selection may finish while a previous asynchronous read
+ // is pending; read activeId only AFTER the IndexedDB request completes.
+ const selected=activeId;
+ picker.replaceChildren(new Option(forests.length?'Выбрать лесничество':'Нет сохранённых лесничеств',''));
+ for(const forest of forests){
+  const code=[forest.org?.POS,forest.org?.LESN].filter(x=>x!==null&&x!==undefined&&x!=='').join('/');
+  const label=String(forest.org?.NOS||'Без названия')+(code?' ('+code+')':'');
+  picker.add(new Option(label,forest.id));
+ }
+ picker.value=forests.some(x=>x.id===selected)?selected:'';
+ picker.disabled=!forests.length;
+ picker.setAttribute('aria-label','Выберите рабочее лесничество');
+ if(picker.dataset.solinForestSelectBound!=='1'){
+  picker.dataset.solinForestSelectBound='1';
+  picker.addEventListener('change',async()=>{
+   const id=picker.value;
+   if(!id||id===activeId)return;
+   picker.disabled=true;
+   try{await activate(id);}
+   catch(error){
+    console.error('Не удалось переключить лесничество',error);
+    toast('Ошибка выбора лесничества: '+error.message);
+    picker.value=activeId||'';
+   }finally{picker.disabled=false;}
+  });
+ }
+}
+
 async function activate(id){await window.__solinMapImportPromise?.catch(()=>{});await persist();const forest=(await list()).find(r=>r.id===id);if(!forest)throw Error('Лесничество не найдено');
  // Recover only missing fields with a proven source row. Never rewrite
  // explicit imported MDB values or infer Klxr from a region/owner alone.
  await repairAddressCodes(forest);
- localStorage.setItem(CHECKPOINT,JSON.stringify(checkpointFor(forest)));legacyClear();clearMap();activeId=id;D.lesnichestvo=[copy(forest.org)];D.quarters=copy(forest.quarters);D._transferExtras=copy(forest.extraTables||{});D.source={...copy(forest.source||{}),forestDistrict:forest.org.NOS,year:forest.org.GodT};current=null;gps=null;opened=true;localStorage.setItem(ACTIVE,id);heading();refresh();show(document.getElementById('mainScreen')?'mainScreen':'quartersScreen');ensureForestSelectorButton();window.dispatchEvent(new Event('solin-forest-changed'));return forest;}
+ localStorage.setItem(CHECKPOINT,JSON.stringify(checkpointFor(forest)));legacyClear();clearMap();activeId=id;D.lesnichestvo=[copy(forest.org)];D.quarters=copy(forest.quarters);D._transferExtras=copy(forest.extraTables||{});D.source={...copy(forest.source||{}),forestDistrict:forest.org.NOS,year:forest.org.GodT};current=null;gps=null;opened=true;localStorage.setItem(ACTIVE,id);heading();refresh();await syncForestContext();show(document.getElementById('mainScreen')?'mainScreen':'quartersScreen');window.dispatchEvent(new Event('solin-forest-changed'));return forest;}
 function showHome(){opened=false;show('homeScreen');heading();return renderHome();}
 async function home(){await persist();return showHome();}
 async function renderHome(){const forests=await list(),host=document.querySelector('#forestList');host.innerHTML=forests.length?'':'<p class="home-empty">Добавьте лесничество из Transfer или создайте новое.</p>';for(const f of forests){const qs=Object.values(f.quarters),rows=qs.flatMap(q=>q.compartments||[]),area=rows.reduce((n,r)=>n+(Number(r.PLV)||0),0);const b=document.createElement('button');b.className='forest-option';b.dataset.forest=f.id;b.innerHTML='<span class="forest-option-icon">♧</span><span><strong>'+html(f.org.NOS)+'</strong><small>'+html(f.org.NLX||'Лесовладелец не указан')+'</small><span class="forest-summary">'+qs.length+' кварталов · '+rows.length+' выделов · '+num(area)+' га</span></span><span class="forest-option-open">Открыть →</span>';b.onclick=()=>activate(f.id).catch(e=>toast(e.message));const entry=document.createElement('div');entry.className='forest-entry';const remove=document.createElement('button');remove.type='button';remove.className='forest-delete';remove.innerHTML=window.solinDeleteIcon||'🗑';remove.title='Удалить лесничество';remove.setAttribute('aria-label','Удалить лесничество «'+f.org.NOS+'»');remove.onclick=()=>openDeleteForest(f.id).catch(e=>toast(e.message));entry.append(b,remove);host.append(entry);}const status=document.querySelector('#forestListStatus');
@@ -520,21 +597,6 @@ function bindMainMenuRoutes(){
   }catch(error){console.error('Ошибка кнопки меню',route,error);toast('Не удалось открыть раздел: '+error.message);}
  },true);
 }
-function ensureForestSelectorButton(){
- // V51+ main menu is assembled separately from the forestry chooser.
- // Keep a guaranteed, clickable route to the local list of workspaces.
- const root=document.querySelector('#mainScreen');
- if(!root||document.getElementById('solin-switch-forest'))return;
- const host=root.querySelector('.field-context')||root.querySelector('.workspace');
- if(!host)return;
- const button=document.createElement('button');
- button.type='button';button.id='solin-switch-forest';button.className='menuRow solin-switch-forest';
- button.textContent='Выбрать или сменить лесничество';
- button.title='Показать все лесничества, сохранённые на этом планшете';
- button.style.cssText='display:block;width:100%;min-height:44px;margin:10px 0;padding:9px;border:1px solid #9eb4a0;border-radius:8px;background:#f8fcf8;color:#155138;cursor:pointer;font-weight:700';
- button.onclick=()=>home().catch(e=>toast(e.message));
- host.append(button);
-}
 function bind(){
  bindMainMenuRoutes();
  const actions=document.querySelector('#menuScreen .workspace');
@@ -566,7 +628,6 @@ function bind(){
   homeButton.classList.remove('ghost');
   homeButton.style.setProperty('min-height','42px');
  }
- ensureForestSelectorButton();
  const old=window.show;
  window.show=function(id){
   if(!initialized&&id!=='homeScreen')return old('homeScreen');
