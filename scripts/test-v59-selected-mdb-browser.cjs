@@ -19,6 +19,7 @@ const server=http.createServer(async(req,res)=>{
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   browser=await chromium.launch({channel:process.env.SOLIN_BROWSER_CHANNEL});
   const page=await browser.newPage({...devices['Pixel 7'],viewport:{width:1067,height:667}});
+  await page.addInitScript(()=>{window.Capacitor={getPlatform:()=> 'android',isNativePlatform:()=>true,Plugins:{SolinMdb:{export:async()=>({saved:true,verified:true,bytes:4096})}}};});
   page.on('pageerror',err=>console.error('PAGE_ERROR:',err.message));
   await page.route(url=>url.hostname!=='127.0.0.1',route=>route.abort());
   await page.goto('http://127.0.0.1:'+server.address().port);
