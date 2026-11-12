@@ -48,8 +48,19 @@ const server=http.createServer(async(req,res)=>{
   assert.ok(await quarters.isVisible(),'Main-menu quarter button must be visible');
   const rect=await quarters.boundingBox();
   assert.ok(rect&&rect.width>0&&rect.height>0);
+  const hit=await page.evaluate(({x,y})=>{
+   const at=document.elementFromPoint(x,y),button=document.querySelector('#mainScreen [data-field-route="quartersScreen"]');
+   return {hit:at?.outerHTML.slice(0,300),button:button?.outerHTML.slice(0,350),
+    atInsideButton:button?.contains(at),active:document.querySelector('.screen.active')?.id};
+  },{x:rect.x+rect.width/2,y:rect.y+rect.height/2});
+  console.log('V53_MAIN_MENU_HIT '+JSON.stringify(hit));
   await page.mouse.click(rect.x+rect.width/2,rect.y+rect.height/2);
-  await page.waitForFunction(()=>document.querySelector('#quartersScreen.active'),null,{timeout:10000});
+  console.log('V53_MAIN_MENU_AFTER '+JSON.stringify(await page.evaluate(()=>({
+   active:document.querySelector('.screen.active')?.id,
+   body:document.body.className,
+   workspaceId:window.SolinWorkspace?.activeId
+  }))));
+  await page.waitForFunction(()=>document.querySelector('#quartersScreen.active'),null,{timeout:5000});
   await page.locator('#homeButton').click();
   await page.waitForFunction(()=>document.querySelector('#mainScreen.active'));
   // Checkpoint and original local work must survive application updates.
