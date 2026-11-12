@@ -103,7 +103,7 @@ const server=http.createServer((req,res)=>{try{
    const layer=makeGeoGroup({type:'FeatureCollection',features});
    const entry={cmf2:true,name:'performance-fixture',geometryEntries:[{source:'ВыдПород',layer}]};importedMapLayers.push(entry);window.__labelFixture=entry;
    fieldMap.stop().setView([50.1025,59.204],17,{animate:false});
-   if(fieldMap.getZoom()!==17)throw Error('Map zoom clamped to '+fieldMap.getZoom()+' (maximum '+fieldMap.getMaxZoom()+')');
+   if(fieldMap.getZoom()!==17)throw Error('Map zoom refused: '+JSON.stringify({actual:fieldMap.getZoom(),max:fieldMap.getMaxZoom(),limit:fieldMap._limitZoom(17),center:fieldMap.getCenter(),loaded:fieldMap._loaded,animating:fieldMap._animatingZoom,zoomAnimation:fieldMap.options.zoomAnimation,active:SolinOfflineImagery.active?.name,layerLimit:fieldMap._layersMaxZoom}));
    SolinCmfLabelLayerV5.buildLabels(entry);
   });
   await page.waitForFunction(()=>window.__labelFixture.labelLayers.stands.getLayers().length>0,null,{timeout:8000}).catch(async()=>{
