@@ -6,6 +6,7 @@
  const DB_NAME='SOLIN_FIELD_OFFLINE_IMAGERY_V1',VERSION=1;
  const MAX_FILE=350*1024*1024,MAX_TILES=25000,CHUNK=80;
  let dbPromise=null,activeLayer=null,activePack=null,mapRef=null,loading=false,downloadAbort=null,restoreEpoch=0;
+ let fittedForest=null; // Never reset the user's zoom on repeated workspace events.
  // 2016 is CC BY 4.0, including commercial embedding and offline tiles.
  // Newer EOX mosaics and Google tiles are deliberately NOT downloaded.
  const SOURCE={name:'Sentinel-2 · 2016–2017 · 10 м',maxZoom:14,
@@ -184,7 +185,7 @@
    }
    await putPack(pack);
    const stmt=sql.prepare('SELECT zoom_level,tile_column,tile_row,tile_data FROM tiles');
-   let batch=[];
+   let batch=[],finestZoom=-1,minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
    while(stmt.step()){
     const item=stmt.getAsObject(),z=Number(item.zoom_level),x=Number(item.tile_column),
       tmsY=Number(item.tile_row);
@@ -198,6 +199,9 @@
       blob:new Blob([bytes],{type:mime})});
     pack.count++;
     pack.minZoom=Math.min(pack.minZoom,z);pack.maxZoom=Math.max(pack.maxZoom,z);
+    // Derive useful bounds even when the MBTiles metadata omits them.
+    if(z>finestZoom){finestZoom=z;minX=minY=Infinity;maxX=maxY=-Infinity;}
+    if(z===finestZoom){const y=tmsToXyz(z,tmsY);minX=Math.min(minX,x);maxX=Math.max(maxX,x+1);minY=Math.min(minY,y);maxY=Math.max(maxY,y+1);}
     if(batch.length>=CHUNK){
      await writeBatch(batch);batch=[];
      setStatus('Сохраняю офлайн-снимок: '+pack.count+' из '+count+' фрагментов');
@@ -206,12 +210,16 @@
    stmt.free();
    await writeBatch(batch);
    if(pack.count!==count)throw Error('Количество считанных фрагментов не совпало с пакетом');
+   if(!pack.bounds&&finestZoom>=0&&Number.isFinite(minX)){
+    const n=2**finestZoom,lat=y=>Math.atan(Math.sinh(Math.PI*(1-2*y/n)))*180/Math.PI;
+    pack.bounds=[minX/n*360-180,lat(maxY),maxX/n*360-180,lat(minY)];
+   }
    sql.close();sql=null; // Release the large SQLite buffer before rendering.
    // MBTiles already provides its native levels. Eagerly creating thousands
    // of lower-level tiles froze import on tablets with limited memory.
    pack.status='ready';await putPack(pack);
    await navigator.storage?.persist?.().catch(()=>false);
-   if(forest===forestId()){await select(pack);await showStored();}
+   if(forest===forestId()){await select(pack);await showStored();fittedForest=forest;}
    setStatus('Офлайн-снимок сохранён для лесничества: '+pack.count+' фрагментов, масштабы '+pack.minZoom+'–'+pack.maxZoom);
    return pack;
   }catch(e){
@@ -291,7 +299,8 @@
   deactivate();
   const found=await packs(forest);
   if(epoch!==restoreEpoch||forest!==forestId())return;
-  if(found.length){await select(found[0]);await showStored();
+  if(found.length){await select(found[0]);const shouldFit=fittedForest!==forest;
+   await showStored(shouldFit);if(shouldFit)fittedForest=forest;
    setStatus('Офлайн-снимок готов: '+found[0].name+' ('+found[0].count+' фрагментов).');
   }else{
    if(navigator.onLine!==false&&typeof setBaseMap==='function')setBaseMap('osm');
@@ -395,7 +404,7 @@
    // stays underneath at smaller scales without a costly pyramid rebuild.
    pack.status='ready';await putPack(pack);
    await navigator.storage?.persist?.().catch(()=>false);
-   if(forest===forestId()){await select(pack);await showStored(false);}
+   if(forest===forestId()){await select(pack);await showStored(false);fittedForest=forest;}
    setStatus('Карта сохранена полностью: '+pack.count+' фрагментов. Доступна без интернета.');
    return pack;
   }catch(e){
