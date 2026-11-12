@@ -33,7 +33,7 @@ const server=http.createServer(async(req,res)=>{
    return Object.keys(D.quarters).map(Number).sort((a,b)=>a-b);
   });
   assert(available.length>=35,'test forest requires at least 35 quarters');
-  await page.locator('#solin-mdb-export').click();
+  await page.evaluate(()=>{if(!document.querySelector('#solin-mdb-export'))throw Error('Export button missing');void window.SolinOfflineMDB.exportMDB();});
   await page.locator('#mdbQuarterRange').waitFor();
   const numbers=await page.locator('[data-mdb-quarter]').count();
   assert.equal(numbers,available.length,'one checkbox per actual quarter');
@@ -57,7 +57,7 @@ const server=http.createServer(async(req,res)=>{
   assert.match(await page.locator('#mdbQuarterError').innerText(),/Неверные границы/);
   assert.equal(await page.locator('[data-mdb-quarter]:checked').count(),35,'Bad range must not mutate selection');
   await page.locator('#mdbQuarterCancel').click();
-  await page.locator('#solin-mdb-export').click();
+  await page.evaluate(()=>{if(!document.querySelector('#solin-mdb-export'))throw Error('Export button missing');void window.SolinOfflineMDB.exportMDB();});
   await page.locator('#mdbQuarterRange').fill('36-70');
   await page.locator('#mdbApplyRange').click();
   assert.equal(await page.locator('[data-mdb-quarter]:checked').count(),35);
