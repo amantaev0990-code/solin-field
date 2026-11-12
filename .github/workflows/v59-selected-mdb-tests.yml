@@ -1,0 +1,28 @@
+name: V59 selected quarters Transfer MDB
+on:
+  push:
+    branches: [feat/v59-selected-quarters-mdb]
+    paths:
+      - 'solin-mdb-bridge.js'
+      - 'solin-apk-mdb.js'
+      - 'scripts/test-v59-selected-mdb.cjs'
+      - '.github/workflows/v59-selected-mdb-tests.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  selected-mdb:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Syntax and selected-quarter merge regressions
+        run: |
+          node --check solin-mdb-bridge.js
+          node --check solin-apk-mdb.js
+          node --check scripts/test-v59-selected-mdb.cjs
+          node scripts/test-v59-selected-mdb.cjs
+          node scripts/test-v58-mdb-team-handoff.cjs
+          node scripts/test-v52-card-merge.cjs
