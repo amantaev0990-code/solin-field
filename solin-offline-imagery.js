@@ -206,8 +206,9 @@
    stmt.free();
    await writeBatch(batch);
    if(pack.count!==count)throw Error('Количество считанных фрагментов не совпало с пакетом');
-   sql.close();sql=null; // Release the full SQLite file before building small overviews.
-   await ensurePyramid(pack);
+   sql.close();sql=null; // Release the large SQLite buffer before rendering.
+   // MBTiles already provides its native levels. Eagerly creating thousands
+   // of lower-level tiles froze import on tablets with limited memory.
    pack.status='ready';await putPack(pack);
    await navigator.storage?.persist?.().catch(()=>false);
    if(forest===forestId()){await select(pack);await showStored();}
@@ -220,7 +221,7 @@
   }finally{try{sql?.close();}catch(_){}loading=false;}
  }
  function layer(pack){
-  return L.gridLayer({tileSize:256,minZoom:0,minNativeZoom:0,maxNativeZoom:pack.maxZoom,
+  return L.gridLayer({tileSize:256,minZoom:Math.max(0,Math.min(20,Number(pack.minZoom)||0)),minNativeZoom:Math.max(0,Math.min(20,Number(pack.minZoom)||0)),maxNativeZoom:pack.maxZoom,
    bounds:pack.bounds?[[pack.bounds[1],pack.bounds[0]],[pack.bounds[3],pack.bounds[2]]]:undefined,
    updateWhenIdle:true,updateWhenZooming:false,updateInterval:200,keepBuffer:1,noWrap:true,
    maxZoom:21,attribution:pack.attribution||'Офлайн MBTiles · '+html(pack.name)});
@@ -248,7 +249,7 @@
  async function select(pack){
   if(!mapRef||pack.forest!==forestId())return;
   restoreEpoch++;
-  await ensurePyramid(pack);
+  // Show the installed map at once instead of rebuilding an overview at launch.
   if(pack.forest!==forestId())return;
   if(activeLayer)mapRef.removeLayer(activeLayer);
   activeLayer=buildLayer(pack);activePack=pack;
@@ -293,7 +294,7 @@
   if(found.length){await select(found[0]);await showStored();
    setStatus('Офлайн-снимок готов: '+found[0].name+' ('+found[0].count+' фрагментов).');
   }else{
-   if(navigator.onLine!==false&&typeof setBaseMap==='function')setBaseMap('google');
+   if(navigator.onLine!==false&&typeof setBaseMap==='function')setBaseMap('osm');
    setStatus(navigator.onLine===false?'Нет сохранённой карты. Подключитесь к интернету и нажмите «Скачать карту» перед выездом.':'Карта ещё не сохранена. Нажмите «Скачать карту» для работы без интернета.');
   }
  }
@@ -390,7 +391,8 @@
    await Promise.all([worker(),worker()]);
    if(failed)throw failed;
    if(signal.aborted||pack.count!==pack.total)throw Error('Загрузка приостановлена');
-   await ensurePyramid(pack,signal);
+   // We have already downloaded each level 8..maxZoom; the global overview
+   // stays underneath at smaller scales without a costly pyramid rebuild.
    pack.status='ready';await putPack(pack);
    await navigator.storage?.persist?.().catch(()=>false);
    if(forest===forestId()){await select(pack);await showStored(false);}
