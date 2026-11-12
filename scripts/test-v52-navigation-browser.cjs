@@ -30,7 +30,7 @@ const server=http.createServer(async(req,res)=>{
    return {id,quarterCount:Object.keys(D.quarters||{}).length,standCount:Object.values(D.quarters||{}).reduce((n,q)=>n+(q.compartments?.length||0),0)};
   });
   assert.ok(result.quarterCount>0,'Active forest must have quarters');
-  await page.waitForFunction(()=>document.querySelector('#quartersScreen.active'));
+  await page.waitForFunction(()=>document.querySelector('#mainScreen.active'));
   const go=async id=>{
    // The V51 installed shell can hide or replace the obsolete bottom
    // .sectionTab controls. Exercise its actual window.show router instead.
