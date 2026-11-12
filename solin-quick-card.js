@@ -184,13 +184,18 @@
       if(!form.isConnected)return;
       const code=form.querySelector('[data-ce-scope="base"][data-ce-field="KU"]')?.value;
       const p=window.SolinCategoryRules?.profile?.(code,window.SOLIN_REFS?.tables);
-      const requirements=window.SolinCategoryRules?.maketRequirements?.(code,window.SOLIN_REFS?.tables);
+      const forestGlf=form.querySelector('[aria-label="Категория ГЛФ, код"]')?.value;
+      const fzona=form.querySelector('[data-ce-scope="base"][data-ce-field="Fzona"]')?.value;
+      const requirements=window.SolinCategoryRules?.maketRequirements?.(
+        code,window.SOLIN_REFS?.tables,{KGLF:forestGlf,Fzona:fzona});
       maketHint.replaceChildren();
-      if(!p?.code){maketHint.hidden=true;return;}
+      // Unknown/missing mandatory requirements must not add another noisy
+      // green banner to every single category. The catalog is still available.
+      if(!p?.code||!requirements?.required?.length){maketHint.hidden=true;return;}
       maketHint.hidden=false;
       maketHint.dataset.maketRequirementStatus=requirements?.status||'unverified';
       const title=document.createElement('strong');
-      title.textContent='Категория '+p.code+(p.name?' · '+p.name:'');
+      title.textContent='Обязательные макеты · '+p.code+(p.name?' '+p.name:'');
       maketHint.append(title);
       // Only verified Access controls can create a "required" shortcut.
       // The quick editor keeps the whole card intact and uses the same
@@ -201,7 +206,8 @@
           if(form.contains(document.activeElement)&&document.activeElement.matches?.('input,textarea,select'))
             document.activeElement.blur();
           delete form.dataset.quickStep;
-          editor.showExtra('Макет'+maket);
+          if(maket==='10'){editor.showMain('10');form.querySelector('#ce-section-10')?.scrollIntoView({block:'start'});}
+          else editor.showExtra('Макет'+maket);
         },'ce-source-required-maket');
         action.title=item.name+' · источник: '+item.source;
         action.setAttribute('aria-label','Открыть обязательный Макет '+maket+' по проверке '+item.control);
@@ -213,7 +219,8 @@
       maketHint.append(note);
     };
     form.addEventListener('change',event=>{
-      if(event.target.matches('[data-ce-scope="base"][data-ce-field="KU"]'))queueMicrotask(updateMaketHint);
+      if(event.target.matches('[data-ce-scope="base"][data-ce-field="KU"],[data-ce-scope="base"][data-ce-field="Fzona"]'))
+        queueMicrotask(updateMaketHint);
     });
     window.addEventListener('solin-refs-ready',updateMaketHint);
     updateMaketHint();
