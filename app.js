@@ -16,12 +16,10 @@ function show(id) {
   window.scrollTo({top: 0, left: 0, behavior: 'instant'});
   // Keep hidden quarter, stand and reference lists unmounted during boot.
   // Populate them on the first real visit, after the new screen is visible.
-  if(id==='quartersScreen')requestAnimationFrame(()=>{
-    if(next.classList.contains('active'))renderQuarters($('#qSearch input')?.value||'');
-  });
-  if(id==='allCompsScreen')requestAnimationFrame(()=>{
-    if(next.classList.contains('active'))renderAllComps($('#vSearch input')?.value||'');
-  });
+  // Quarter lists must be ready synchronously for show('quartersScreen')
+  // followed by openQuarter(): a deferred redraw would close the open quarter.
+  if(id==='quartersScreen')renderQuarters($('#qSearch input')?.value||'');
+  if(id==='allCompsScreen')renderAllComps($('#vSearch input')?.value||'');
   if(id==='refsScreen')requestAnimationFrame(()=>{
     if(next.classList.contains('active')){
       if(typeof window.solinEnsureRefsRendered==='function')window.solinEnsureRefsRendered();
