@@ -86,7 +86,7 @@ function initFieldMap(){
  }
  ensureMapFileUi();
  fieldMap=window.fieldMap=L.map(container,{
-  zoomControl:true,preferCanvas:true,zoomAnimation:true,fadeAnimation:false,markerZoomAnimation:false
+  zoomControl:true,preferCanvas:true,zoomAnimation:false,fadeAnimation:false,markerZoomAnimation:false
  });
  fieldMap.createPane('fieldOverview').style.zIndex='190';
  fieldMap.setView([48.4,66.8],5);
