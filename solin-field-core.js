@@ -290,6 +290,6 @@ function setup(){const menu=document.querySelector('#menuScreen .workspace');for
 function validateRow(form,row,parent){return SOLIN_AUDIT.validations.filter(v=>v.form===form).flatMap(v=>{try{return rule(v.rule,row[v.source],{...parent,...row,__parent:parent})===false?[v.source+': '+v.rule]:[]}catch{return []}});}
 window.solinCore={checkpoint,validateBackup,commitImport,controls,rule,showControls,validateRow,filter};
 window.addEventListener('solin-refs-ready',()=>auditedRefs());
-window.addEventListener('solin-ready',()=>{try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s){validateBackup(s);D.quarters=s.quarters;if(s.lesnichestvo?.length)D.lesnichestvo=s.lesnichestvo;if(s.source)D.source=s.source;D._transferExtras=s.extraTables||{};for(const k of ['solin_field_audited_work_v1','solin_user_data_v1','solin_field_overrides_v3'])localStorage.removeItem(k);refresh();}refs();loadRefs();}catch(e){toast('Не удалось восстановить копию: '+e.message)}});
+window.addEventListener('solin-ready',()=>{try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s){validateBackup(s);D.quarters=s.quarters;if(s.lesnichestvo?.length)D.lesnichestvo=s.lesnichestvo;if(s.source)D.source=s.source;D._transferExtras=s.extraTables||{};/* V53: Do not purge pre-V53 local edits on ordinary cold boot. */refresh();}refs();loadRefs();}catch(e){toast('Не удалось восстановить копию: '+e.message)}});
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});else setup();
 })();
