@@ -38,7 +38,7 @@ const server=http.createServer(async(req,res)=>{
   assert.equal(await picker.count(),1,'Original forestry dropdown must be present');
   assert.ok(await picker.isVisible(),'Original dropdown must be visible');
   assert.equal(await picker.inputValue(),first.id,'Selected forest must appear immediately');
-  assert.ok(await picker.locator('option').count()>=2,'Saved forests must be actual options');
+  assert.equal(await picker.locator('option').count(),first.forests,'Only real saved forests must be options');
   const header=page.locator('.topbar .solin-active-forest-caption');
   assert.ok(await header.isVisible(),'Forest label must be visible beneath logo');
   assert.match(await header.innerText(),/Бугетсайское|лесничество/i);
