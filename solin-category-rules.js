@@ -39,34 +39,68 @@
    reason:group==null?'Из SKU известна категория, но не загружена исходная группа ярусов P10':
      'Источник: SKU.P10; возможные ярусы уточняются через SIAR/PIAP'};
  }
- // Source-backed PARTIAL requirements, not an exhaustive guessed matrix.
- // Verified from original Solim.mdb saved query predicates:
- // K02: SKU.PM=13 -> Maket13.SHT/PRT; K for PM=3 -> Maket25.NAZ.
- // The original SKU category 31 'Дорога' has PM=13 (separately confirmed
- // physical SKU crosswalk). P31=3 and PF1 are NOT Maket31/Maket1 flags.
- function maketRequirements(ku,given){
+ // These *specific* mandatory-maket predicates were recovered from
+ // physical Solim.mdb saved QueryDefs (atlas 2026-10-12):
+ // K01 KU19 -> Maket11; K02 SKU.PM=13 -> Maket13; K03 KU21/22/23
+ // -> Maket17; K04 KU60 -> Maket19; K05 KGLF21/22 or Fzona3 -> Maket21;
+ // K06 SKU.PM=3 -> Maket25; K08/K09/K10 -> Maket10 for certain KU;
+ // K24 KU11/12/13 -> Maket12.
+ // This is the evidence-backed subset of requirements, NOT a fabricated
+ // inference that SKU.PM=N implies Maket N for all PM codes.
+ const ORIGINAL_SKU_PM13=new Set([27,28,29,30,31,33,34,35,36,45,46,47,48,49,55,56,76,90,114]);
+ const ORIGINAL_SKU_PM3=new Set([43,44]);
+ // Original Solim.SKU read-only snapshot crosswalk provides these fallback
+ // groups when the compact mobile SKU table carries KU/NKU only.
+ // If an imported full SKU gives a conflicting explicit PM, trust that value.
+ function confirmedPM(p){
+  if(p.makerFlag!=null)return p.makerFlag;
+  if(ORIGINAL_SKU_PM13.has(p.code))return 13;
+  if(ORIGINAL_SKU_PM3.has(p.code))return 3;
+  return null;
+ }
+ function maketRequirements(ku,given,context={}){
   const p=profile(ku,given);
-  if(p.code==null)return {status:'waiting',required:null,reason:'Сначала выберите категорию угодий.'};
-  // Explicit KU31 fallback is grounded in the original Solim.SKU PM=13 row,
-  // and is used only when a compact dictionary omitted the PM column.
-  // A full, explicitly conflicting source value is never overridden.
-  const pm=p.makerFlag==null&&p.code===31?13:p.makerFlag;
-  if(pm===13){
-   const req={number:13,name:'Земли линейного протяжения',control:'К02',
-    fields:['SHT','PRT'],source:'Исходный SOLI-N: SKU.PM=13 и К02'};
-   return {status:'partially-confirmed',code:p.code,categoryName:p.name,
-    required:[req],complete:false,
-    reason:'М13: ширина (SHT) и протяжённость (PRT) по проверке К02. Для дороги (KU 31) дополнительно проверяются состояние, покрытие и сезонность. Другие макеты пока не классифицированы.'};
-  }
-  if(pm===3){
-   const req={number:25,name:'Плантация',control:'Исходный контроль SKU.PM=3',
-    fields:['NAZ'],source:'Исходный SOLI-N: SKU.PM=3 и Макет25.NAZ'};
-   return {status:'partially-confirmed',code:p.code,categoryName:p.name,
-    required:[req],complete:false,
-    reason:'М25: назначение плантации (NAZ) по проверенному контрольному выражению. Другие макеты пока не классифицированы.'};
-  }
-  return {status:'unverified',code:p.code,categoryName:p.name,required:null,complete:false,
-   reason:'Обязательные макеты для этой категории пока не сверены с исходными проверками настольного SOLI-N. Признаки SKU.P31/PF1/P10 не являются списком обязательных макетов.'};
+  if(p.code==null)return {status:'waiting',required:null,complete:false,
+   reason:'Сначала выберите категорию угодий.'};
+  const id=p.code,pm=confirmedPM(p);
+  const req=new Map();
+  const add=(number,name,control,fields,source)=>{
+   if(!req.has(number))req.set(number,{number,name,control,fields,source});
+  };
+  // Forested, reconstruction and unclosed cultures have actual Maket10
+  // layer validation branches; "P10" alone is not an obligation signal.
+  if((id>=1&&id<=10)||id===15||id===19)
+   add(10,'Таксационная характеристика','К08/К09/К10',['IAR'],
+    'Исходный SOLI-N: обязательные ярусы по KU в К08–К10');
+  if(id===19)
+   add(11,'Лесные культуры','К01',['CLK'],
+    'Исходный SOLI-N: KU19 и контроль Макета 11 К01');
+  if([11,12,13].includes(id))
+   add(12,'Повреждение насаждений','К24',['GP','KTP'],
+    'Исходный SOLI-N: KU11/12/13 и проверка К24');
+  if(pm===13)
+   add(13,'Земли линейного протяжения','К02',['SHT','PRT'],
+    'Исходный SOLI-N: SKU.PM=13 и К02');
+  if([21,22,23].includes(id))
+   add(17,'Сельскохозяйственные угодья','К03',['KU','TSP','CSP'],
+    'Исходный SOLI-N: KU21/22/23 и К03');
+  if(id===60)
+   add(19,'Болото','К04',['TB','TR'],
+    'Исходный SOLI-N: KU60 и К04');
+  // Maket21 follows the KGLF and functional zone, not the SKU.KU category.
+  const glf=code(context?.KGLF),zone=code(context?.Fzona);
+  if(glf===21||glf===22||zone===3)
+   add(21,'Ландшафтная характеристика','К05',['TL'],
+    'Исходный SOLI-N: KGLF21/22 или Fzona3, контроль К05');
+  if(pm===3)
+   add(25,'Плантация, древесная школа','К06',['NAZ'],
+    'Исходный SOLI-N: SKU.PM=3 и К06');
+  const required=[...req.values()].sort((a,b)=>a.number-b.number);
+  return {status:required.length?'partially-confirmed':'unverified',code:id,
+   categoryName:p.name,complete:false,required:required.length?required:null,
+   reason:required.length
+    ?'Подтверждено исходными проверками SOLI-N: '+required.map(x=>'М'+x.number+' ('+x.control+')').join(', ')+'. Другие обязательные сочетания ещё не подтверждены.'
+    :'Для этой категории нет подтверждённых обязательных дополнительных макетов. Доступ к остальным макетам сохранён.'};
  }
  // Only interpretation confirmed independently by the original Access rule
  // Макет10.POL >=0 AND <=1 OR >25 AND <101 and explicit KU=19 observation.
