@@ -52,7 +52,6 @@ const server=http.createServer(async(req,res)=>{
    assert.equal(initial.quarterCards,0,'No hidden quarter list on startup');
    assert.equal(initial.standCards,0,'No hidden stand list on startup');
    assert.equal(initial.refsCards,0,'Do not render hidden source dictionaries on startup');
-   assert.ok(window===window,'The viewport remains scriptable');
   }
   async function route(name){
    await page.evaluate(target=>window.show(target),name);
