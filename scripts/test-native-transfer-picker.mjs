@@ -14,7 +14,7 @@ try{
  const picker=page.locator('#transferForestInput');
  assert.equal(await picker.getAttribute('type'),'file');
  assert.equal(await picker.getAttribute('hidden'),null);
- assert.equal(await picker.getAttribute('accept'),null);
+ assert.match(await picker.getAttribute('accept'),/\\.mdb,\\.accdb/);
  const layout=await picker.evaluate(el=>{const r=el.getBoundingClientRect();return {width:r.width,height:r.height,opacity:getComputedStyle(el).opacity};});
  assert.ok(layout.width>100&&layout.height>40,'Native input must physically cover the visual button');
  assert.equal(Number(layout.opacity),0,'Native chooser must be invisible; only the green button is visible');
