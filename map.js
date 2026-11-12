@@ -537,15 +537,32 @@ function createMapInfoLayer({name, geojson, settings}, fileKey, index, count) {
  const displayOverride = /^\s*(?:Display\s+)?Override\b/im.test(settings);
  const labels = [];
  const labelLayer = L.layerGroup();
- function syncLabels() {
+ let labelsFrame=0;
+ function renderVisibleLabels() {
+  labelsFrame=0;
   if (!fieldMap.hasLayer(group)) return;
-  const view = fieldMap.getBounds().pad(.08);
-  const shown = fieldMap.getZoom() >= (/(?:^|_)номкв$/i.test(name) ? 11 : /(?:^|_)номвыд$/i.test(name) ? 13 : 12);
-  for (const label of labels) {
-   const visible = shown && view.contains(label.getLatLng());
-   if (visible && !labelLayer.hasLayer(label)) labelLayer.addLayer(label);
-   if (!visible && labelLayer.hasLayer(label)) labelLayer.removeLayer(label);
+  const zoom=fieldMap.getZoom();
+  const show=zoom >= (/(?:^|_)номкв$/i.test(name) ? 11 : /(?:^|_)номвыд$/i.test(name) ? 13 : 12);
+  const wanted=new Set(),occupied=new Set();
+  if(show){
+   const view=fieldMap.getBounds().pad(.08),cap=zoom>=15?300:140;
+   // CarryMap-like progressive label density: only onscreen labels with space.
+   for(const label of labels){
+    const ll=label.getLatLng();
+    if(!view.contains(ll))continue;
+    const pt=fieldMap.latLngToContainerPoint(ll);
+    const cell=Math.floor(pt.x/40)+':'+Math.floor(pt.y/32);
+    if(occupied.has(cell))continue;
+    occupied.add(cell);wanted.add(label);
+    if(wanted.size>=cap)break;
+   }
   }
+  labelLayer.eachLayer(label=>{if(!wanted.has(label))labelLayer.removeLayer(label);});
+  for(const label of wanted)if(!labelLayer.hasLayer(label))labelLayer.addLayer(label);
+ }
+ function syncLabels(){
+  if(labelsFrame)cancelAnimationFrame(labelsFrame);
+  labelsFrame=requestAnimationFrame(renderVisibleLabels);
  }
  const globalBrush = settings.match(/^\s*Global\b[^\r\n]*?\bBrush\s*\((\d+),(\d+)/im);
  const globalSymbol = settings.match(/^\s*Global\b[^\r\n]*?\bSymbol\s*\(\d+,(\d+),(\d+)/im);
@@ -612,6 +629,7 @@ function createMapInfoLayer({name, geojson, settings}, fileKey, index, count) {
   });
   group.on('remove', () => {
    fieldMap.off('moveend',syncLabels);
+   if(labelsFrame){cancelAnimationFrame(labelsFrame);labelsFrame=0;}
    labelLayer.clearLayers();
    labelLayer.remove();
   });
