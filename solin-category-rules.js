@@ -39,14 +39,33 @@
    reason:group==null?'Из SKU известна категория, но не загружена исходная группа ярусов P10':
      'Источник: SKU.P10; возможные ярусы уточняются через SIAR/PIAP'};
  }
- // SKU.P31, SKU.PF1, SKU.P10 and GrMak encode source flags/groups.
- // They are NOT a verified per-category mandatory-maket table.
- // Do not display makets as mandatory without an independently verified
- // desktop rule for that exact KU and form. Unknown != no requirements.
+ // Source-backed PARTIAL requirements, not an exhaustive guessed matrix.
+ // Verified from original Solim.mdb saved query predicates:
+ // K02: SKU.PM=13 -> Maket13.SHT/PRT; K for PM=3 -> Maket25.NAZ.
+ // The original SKU category 31 'Дорога' has PM=13 (separately confirmed
+ // physical SKU crosswalk). P31=3 and PF1 are NOT Maket31/Maket1 flags.
  function maketRequirements(ku,given){
   const p=profile(ku,given);
   if(p.code==null)return {status:'waiting',required:null,reason:'Сначала выберите категорию угодий.'};
-  return {status:'unverified',code:p.code,categoryName:p.name,required:null,
+  // Explicit KU31 fallback is grounded in the original Solim.SKU PM=13 row,
+  // and is used only when a compact dictionary omitted the PM column.
+  // A full, explicitly conflicting source value is never overridden.
+  const pm=p.makerFlag==null&&p.code===31?13:p.makerFlag;
+  if(pm===13){
+   const req={number:13,name:'Земли линейного протяжения',control:'К02',
+    fields:['SHT','PRT'],source:'Исходный SOLI-N: SKU.PM=13 и К02'};
+   return {status:'partially-confirmed',code:p.code,categoryName:p.name,
+    required:[req],complete:false,
+    reason:'М13: ширина (SHT) и протяжённость (PRT) по проверке К02. Для дороги (KU 31) дополнительно проверяются состояние, покрытие и сезонность. Другие макеты пока не классифицированы.'};
+  }
+  if(pm===3){
+   const req={number:25,name:'Плантация',control:'Исходный контроль SKU.PM=3',
+    fields:['NAZ'],source:'Исходный SOLI-N: SKU.PM=3 и Макет25.NAZ'};
+   return {status:'partially-confirmed',code:p.code,categoryName:p.name,
+    required:[req],complete:false,
+    reason:'М25: назначение плантации (NAZ) по проверенному контрольному выражению. Другие макеты пока не классифицированы.'};
+  }
+  return {status:'unverified',code:p.code,categoryName:p.name,required:null,complete:false,
    reason:'Обязательные макеты для этой категории пока не сверены с исходными проверками настольного SOLI-N. Признаки SKU.P31/PF1/P10 не являются списком обязательных макетов.'};
  }
  // Only interpretation confirmed independently by the original Access rule
