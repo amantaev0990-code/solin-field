@@ -66,6 +66,7 @@
   const d=await db(),tx=d.transaction('tiles','readwrite'),store=tx.objectStore('tiles');
   for(const row of rows)store.put(row);
   await done(tx);
+  for(const row of rows)missingTiles.delete(row.key);
  }
  async function remove(id){
   if(activePack?.id===id)deactivate();
@@ -78,6 +79,8 @@
   };
   tx.objectStore('packs').delete(id);
   await done(tx);
+  for(const [key,value] of rasterCache){if(key.startsWith(id+'|')){rasterCache.delete(key);cacheBytes-=value.size;}}
+  for(const key of missingTiles)if(key.startsWith(id+'|'))missingTiles.delete(key);
   await restore();
  }
  function tileMime(bytes){
@@ -86,14 +89,48 @@
   if(bytes.length>=12&&bytes[0]===0x52&&bytes[1]===0x49&&bytes[2]===0x46&&bytes[3]===0x46&&bytes[8]===0x57)return 'image/webp';
   return null;
  }
- const rasterCache=new Map();let cacheBytes=0;
+ // Render viewport tiles via one IndexedDB transaction per microtask, not per tile.
+ const rasterCache=new Map(),missingTiles=new Set(),inflightReads=new Map();
+ let cacheBytes=0,readQueue=[],readScheduled=false;
+ function flushTileReads(){
+  readScheduled=false;
+  const rows=readQueue;readQueue=[];
+  db().then(database=>{
+   try{
+    const tx=database.transaction('tiles','readonly'),store=tx.objectStore('tiles');
+    for(const entry of rows){
+     const request=store.get(entry.key);
+     request.onsuccess=()=>entry.resolve(request.result?.blob||null);
+     request.onerror=()=>entry.reject(request.error||Error('Ошибка чтения тайла'));
+    }
+    tx.onabort=()=>rows.forEach(entry=>entry.reject(tx.error||Error('Ошибка чтения карты')));
+   }catch(e){rows.forEach(entry=>entry.reject(e));}
+  }).catch(e=>rows.forEach(entry=>entry.reject(e)));
+ }
+ function batchedTileRead(key){return new Promise((resolve,reject)=>{
+  readQueue.push({key,resolve,reject});
+  if(!readScheduled){readScheduled=true;Promise.resolve().then(flushTileReads);}
+ });}
  async function readTile(id,z,x,y){
   const key=tileId(id,z,x,y),cached=rasterCache.get(key);
   if(cached){rasterCache.delete(key);rasterCache.set(key,cached);return cached;}
-  const blob=(await get('tiles',key))?.blob||null;
-  if(blob){rasterCache.set(key,blob);cacheBytes+=blob.size;
-   while(rasterCache.size>64||cacheBytes>8*1024*1024){const [old,value]=rasterCache.entries().next().value;rasterCache.delete(old);cacheBytes-=value.size;}}
-  return blob;
+  if(missingTiles.has(key))return null;
+  if(inflightReads.has(key))return inflightReads.get(key);
+  const request=batchedTileRead(key).then(blob=>{
+   if(blob){
+    rasterCache.set(key,blob);cacheBytes+=blob.size;
+    while(rasterCache.size>64||cacheBytes>8*1024*1024){
+     const [old,value]=rasterCache.entries().next().value;
+     rasterCache.delete(old);cacheBytes-=value.size;
+    }
+   }else{
+    missingTiles.add(key);
+    if(missingTiles.size>2048)missingTiles.delete(missingTiles.values().next().value);
+   }
+   return blob;
+  }).finally(()=>inflightReads.delete(key));
+  inflightReads.set(key,request);
+  return request;
  }
  const pyramidJobs=new Map();
  async function tileKeys(id){
@@ -363,7 +400,8 @@
     const nextPack={...pack,count:pack.count+1,size:pack.size+blob.size};
     tx.objectStore('tiles').put({key:tileId(pack.id,coords.z,coords.x,coords.y),packId:pack.id,blob});
     tx.objectStore('packs').put(nextPack);
-    await done(tx);Object.assign(pack,nextPack);progress();
+    await done(tx);missingTiles.delete(tileId(pack.id,coords.z,coords.x,coords.y));
+    Object.assign(pack,nextPack);progress();
    });
    commitTail=task.catch(()=>{});return task;
   };
