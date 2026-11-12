@@ -34,8 +34,18 @@ const server=http.createServer(async(req,res)=>{
   const select=page.locator('#mainScreen .field-context select');
   assert.equal(await select.count(),1,'The native white forest selector must remain');
   assert.ok(await select.isVisible());
+  assert.equal(await select.locator('option[value=""]').count(),0,'No decorative pick-forest row');
   assert.equal(await select.inputValue(),initial.active,'Native dropdown selects active forest at startup');
-  assert.equal(await select.locator('option').count(),initial.forests.length+1,'Dropdown lists all stored forests');
+  const regions=await page.evaluate(()=>{
+   const get=window.SolinForestRegionName;
+   return [get({POS:1408,LESN:1}),get({POS:213,LESN:2}),get({POS:723,LESN:4}),
+     get({POS:0,LESN:0,KTO:999000000})];
+  });
+  assert.deepEqual(regions,[
+   'Восточно-Казахстанская область','Актюбинская область',
+   'Карагандинская область','Код области КТО: 990000000'
+  ],'Resolve KTO using original KUch and never substitute arbitrary province names');
+  assert.equal(await select.locator('option').count(),initial.forests.length,'Dropdown lists real forests without placeholder');
   const activeForest=initial.forests.find(f=>f.id===initial.active);
   const caption=page.locator('.topbar .solin-active-forest-caption');
   assert.ok(await caption.isVisible(),'Visible name under brand logo');
@@ -47,7 +57,7 @@ const server=http.createServer(async(req,res)=>{
   const alternateId=await page.evaluate(async()=>{
    const source=(await window.SolinWorkspace.list())[0];
    const alt=JSON.parse(JSON.stringify(source));
-   alt.org.LESN=97;alt.org.NOS='Проверочное лесничество';
+   alt.org.LESN=97;alt.org.NOS='Проверочное лесничество';alt.org.KTO=630000000;
    alt.id=String(alt.org.POS)+'::97';
    alt.quarters={'997':{meta:{KV:997,KGLF:1},quarterRows:[],compartments:[]}};
    const db=await new Promise((resolve,reject)=>{
@@ -62,12 +72,14 @@ const server=http.createServer(async(req,res)=>{
   });
   await page.reload({waitUntil:'domcontentloaded'});
   await page.evaluate(async()=>await window.SolinWorkspace.ready);
-  assert.equal(await select.locator('option').count(),3,'Original dropdown shows second taxator forest');
+  assert.equal(await select.locator('option').count(),2,'Original dropdown shows two real forests');
   assert.equal(await select.inputValue(),initial.active,'Last active forest not overwritten by new entry');
   await select.selectOption(alternateId);
   await page.waitForFunction(id=>window.SolinWorkspace.activeId===id,alternateId,{timeout:10000});
   await page.waitForFunction(()=>document.querySelector('.topbar .solin-active-forest-caption')?.textContent.includes('Проверочное лесничество'));
   assert.equal(await select.inputValue(),alternateId);
+  const region=page.locator('#mainScreen .field-context').locator('div').filter({has:page.locator('dt:text-is("Область")')}).first().locator('dd');
+  assert.equal((await region.innerText()).trim(),'Восточно-Казахстанская область','Region from original KTO 630000000');
   for(const route of ['quartersScreen','mapScreen','refsScreen','menuScreen','mainScreen']){
    await page.evaluate(name=>window.show(name),route);
    await page.waitForFunction(name=>document.getElementById(name)?.classList.contains('active'),route);
