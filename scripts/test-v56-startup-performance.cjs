@@ -34,7 +34,9 @@ const server=http.createServer(async(req,res)=>{
   await page.waitForFunction(()=>window.SolinWorkspace?.ready);
   await page.evaluate(()=>window.SolinWorkspace.ready);
   const readyMs=Date.now()-start;
-  await page.waitForFunction(()=>window.SOLIN_REFS&&window.SOLIN_REFS.tables?.SKU,{timeout:25000});
+  // The unsigned CI payload deliberately omits private reference packs.
+  // Cold-start responsiveness must not depend on those optional assets.
+  await page.waitForTimeout(500);
   const initial=await page.evaluate(()=>({
    screen:document.querySelector('.screen.active')?.id,
    id:window.SolinWorkspace.activeId,
