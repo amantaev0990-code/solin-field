@@ -73,19 +73,24 @@
   }
   // Check the REAL selected forest, not only the Jet binary header.
   // A desktop SOLI-N query can silently hide a quarter whose address is incomplete.
-  function validateTransferRows(transfer){
+  function validateTransferRows(transfer,selectedQuarters=null){
     const tables=transfer?.tables||{}, owner=transfer.identity||{};
     const qs=tables['Квартал'], stands=tables['Выдел'], forests=tables['Лесничество'];
     if(!Array.isArray(qs)||!Array.isArray(stands)||!Array.isArray(forests)||forests.length!==1)
       throw Error('В MDB отсутствуют данные лесничества, кварталов или выделов.');
     if(typeof D==='undefined'||!D?.quarters||!D?.lesnichestvo?.length)
       throw Error('Лесничество не открыто для экспорта.');
-    const actualQuarters=Object.values(D.quarters).reduce((n,q)=>n+(q.quarterRows?.length||1),0);
-    const actualStands=Object.values(D.quarters).reduce((n,q)=>n+(q.compartments?.length||0),0);
+    const within=Object.entries(D.quarters).filter(([kv])=>!selectedQuarters||selectedQuarters.has(Number(kv))).map(([,q])=>q);
+    const actualQuarters=within.reduce((n,q)=>n+(q.quarterRows?.length||1),0);
+    const actualStands=within.reduce((n,q)=>n+(q.compartments?.length||0),0);
     if(actualQuarters!==qs.length||actualStands!==stands.length)
       throw Error('Экспорт подготовил не все кварталы или выделы: '+actualQuarters+'/'+actualStands+
         ' в Field, '+qs.length+'/'+stands.length+' в Transfer.');
     const key=(r)=>[Number(r.POS),Number(r.LESN),Number(r.KV),Number(r.KGLF),Number(r.Fzona)].join(':');
+    if (selectedQuarters && (
+      qs.some(q=>!selectedQuarters.has(Number(q.KV))) ||
+      stands.some(r=>!selectedQuarters.has(Number(r.KV)))))
+      throw Error('В Transfer обнаружен квартал вне выбранного набора. Экспорт отменён.');
     const addresses=new Set();
     for(const q of qs){
       if(Number(q.POS)!==Number(owner.POS)||Number(q.LESN)!==Number(owner.LESN)||
@@ -129,7 +134,7 @@
       }
       counts[name]=rows.length;
     }
-    const expectedM10=Object.values(D.quarters).reduce((n,q)=>
+    const expectedM10=within.reduce((n,q)=>
       n+(q.compartments||[]).reduce((sum,stand)=>
         sum+(stand._children?.Макет10?.length||0),0),0);
     if((tables['Макет10']||[]).length!==expectedM10)
@@ -198,6 +203,78 @@
       throw Error('Контроль К16: квартал '+s.KV+', выдел '+s.VD+': не заполнено: '+fields.join(', ')+'. '+
        'В карточке выдела главная порода и тип леса находятся в «Основных данных», бонитет — в макете 1.');}
   }
+  function chooseExportQuarters(){
+    if(typeof D==='undefined'||!D?.quarters)throw Error('Сначала откройте лесничество.');
+    const numbers=Object.keys(D.quarters).map(Number).filter(n=>Number.isSafeInteger(n)&&n>0).sort((a,b)=>a-b);
+    if(!numbers.length)throw Error('Нет кварталов для экспорта.');
+    return new Promise(resolve=>{
+      let complete=false;
+      const labels=numbers.map(num=>{
+        const q=D.quarters[String(num)];
+        return '<label style="display:flex;align-items:center;gap:8px;padding:7px 9px;border-bottom:1px solid #dce4dd">'+
+          '<input type="checkbox" data-mdb-quarter="'+num+'" checked>'+
+          '<span>Квартал <b>'+num+'</b> <small>· '+(q?.compartments?.length||0)+' выделов</small></span></label>';
+      }).join('');
+      modal('Экспорт Transfer MDB · выбор кварталов',
+        '<p>Отметьте <b>только кварталы своего участка</b>. Например, первый таксатор — 1–35, второй — 36–70. '+
+        'Все остальные кварталы останутся на планшете, но в этот MDB не попадут.</p>'+
+        '<div class="formActions"><button id="mdbSelectAll" type="button">Все</button>'+
+        '<button id="mdbSelectNone" type="button">Снять все</button></div>'+
+        '<label style="display:block;margin:10px 0">Номера или диапазон '+
+        '<input id="mdbQuarterRange" type="text" inputmode="text" placeholder="Например, 1-35 или 1-10, 14, 20-35"></label>'+
+        '<button id="mdbApplyRange" type="button">Выбрать указанные</button>'+
+        '<p id="mdbSelectedCount" role="status"></p>'+
+        '<div id="mdbQuarterList" style="overflow-y:auto;max-height:38vh;border:1px solid #dce4dd;border-radius:10px">'+labels+'</div>'+
+        '<p id="mdbQuarterError" role="alert"></p>'+
+        '<div class="formActions"><button id="mdbQuarterCancel" type="button">Отмена</button>'+
+        '<button id="mdbQuarterConfirm" type="button" class="primary">Создать Transfer MDB</button></div>',
+        {confirmChanges:false});
+      const dialog=document.getElementById('modal');
+      const boxes=[...document.querySelectorAll('#mdbQuarterList input[data-mdb-quarter]')];
+      const status=document.getElementById('mdbSelectedCount');
+      const error=document.getElementById('mdbQuarterError');
+      const available=new Set(numbers);
+      const close=()=>{if(complete)return;complete=true;dialog?.removeEventListener('solin-modal-dismissed',close);resolve(null);};
+      dialog?.addEventListener('solin-modal-dismissed',close,{once:true});
+      const update=()=>{
+        const chosen=boxes.filter(b=>b.checked);
+        const stands=chosen.reduce((n,b)=>n+(D.quarters[b.dataset.mdbQuarter]?.compartments?.length||0),0);
+        status.textContent='Выбрано кварталов: '+chosen.length+' из '+numbers.length+' · выделов: '+stands;
+        error.textContent='';
+      };
+      boxes.forEach(b=>b.addEventListener('change',update));
+      document.getElementById('mdbSelectAll').onclick=()=>{boxes.forEach(b=>b.checked=true);update();};
+      document.getElementById('mdbSelectNone').onclick=()=>{boxes.forEach(b=>b.checked=false);update();};
+      document.getElementById('mdbApplyRange').onclick=()=>{
+        try{
+          const str=document.getElementById('mdbQuarterRange').value.trim();
+          if(!str)throw Error('Введите номер или диапазон кварталов.');
+          const requested=new Set();
+          for(const part of str.split(/[;,]+/)){
+            const m=/^\s*(\d+)\s*(?:-\s*(\d+)\s*)?$/.exec(part);
+            if(!m)throw Error('Формат диапазона: 1-35 или 1-10, 14, 20-35.');
+            const start=Number(m[1]),end=m[2]==null?start:Number(m[2]);
+            if(!Number.isSafeInteger(start)||start<1||!Number.isSafeInteger(end)||end<start||end-start>2000)
+              throw Error('Неверные границы диапазона кварталов.');
+            for(let n=start;n<=end;n++)requested.add(n);
+          }
+          const absent=[...requested].filter(n=>!available.has(n));
+          if(absent.length)throw Error('Кварталы не найдены: '+absent.slice(0,12).join(', ')+'.');
+          boxes.forEach(b=>b.checked=requested.has(Number(b.dataset.mdbQuarter)));
+          update();
+        }catch(e){error.textContent=e.message;}
+      };
+      document.getElementById('mdbQuarterCancel').onclick=()=>{if(typeof closeModal==='function')closeModal();close();};
+      document.getElementById('mdbQuarterConfirm').onclick=()=>{
+        const selected=new Set(boxes.filter(b=>b.checked).map(b=>Number(b.dataset.mdbQuarter)));
+        if(!selected.size){error.textContent='Выберите хотя бы один квартал.';return;}
+        complete=true;dialog?.removeEventListener('solin-modal-dismissed',close);
+        if(typeof closeModal==='function')closeModal();
+        resolve(selected);
+      };
+      update();
+    });
+  }
   async function exportMDB(){
     if(exporting)return;
     exporting=true;
@@ -216,11 +293,13 @@
         throw Error('Нативный модуль MDB отсутствует в этой сборке APK.');
       }
       await window.SolinWorkspace?.ready;
+      const selectedQuarters=await chooseExportQuarters();
+      if(!selectedQuarters)return;
       if(!await ensurePreviousTaxationYear())return;
       await window.SolinWorkspace?.persist?.();
-      const transfer=window.SolinMDBBridge?.snapshot?.();
+      const transfer=window.SolinMDBBridge?.snapshot?.(selectedQuarters);
       if(!transfer||transfer.format!=='SOLIN-MDB-Bridge-v1')throw Error('Не удалось собрать карточки Transfer.');
-      const counts = validateTransferRows(transfer);
+      const counts = validateTransferRows(transfer,selectedQuarters);
       validateDesktopControls(transfer);
       const blank = await packagedTemplate();
       modal('Экспорт MDB','<p>Создаю и проверяю MDB. На Android 10+ файл будет сохранён в «Загрузки/SOLI-N Field».</p>');
@@ -237,7 +316,7 @@
       modal('Экспорт завершён',
         '<p>Файл <b>'+esc(actualName)+'</b> сохранён в '+esc(result.folder||'выбранной папке')+'.</p>'+
         '<p><b>Размер: '+size+' КБ.</b> Файл повторно считан и проверен.</p>'+
-        '<p><b>Записи:</b> '+counts.quarters+' кварталов, '+counts.stands+' выделов, '+counts.maket10+' строк Макета 10.</p>'+
+        '<p><b>Передано:</b> '+selectedQuarters.size+' кварталов, '+counts.stands+' выделов, '+counts.maket10+' строк Макета 10.</p>'+
         '<p>Для передачи начальнику отправьте именно этот файл .mdb. На его планшете выберите «Загрузить Transfer», затем «Добавить данные в лесничество».</p>'+
         '<button type="button" onclick="closeModal()">Готово</button>');
     }catch(e){
