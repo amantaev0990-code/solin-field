@@ -98,13 +98,15 @@ jobs:
           node --input-type=module <<'NODE'
           import {readFileSync,writeFileSync} from 'node:fs';
           const path='www/index.html', before=readFileSync(path,'utf8');
-          const marker='aria-label="Загрузить Transfer MDB, ACCDB или JSON"';
-          if(!before.includes(marker))throw Error('Expected original V57 import picker not found');
-          let html=before.replace(marker,'aria-label="Загрузить Transfer MDB или ACCDB" accept=".mdb,.accdb,application/x-msaccess"');
-          const exportLabel='<span><b>Экспорт</b><small>Передача данных в настольный SOLI-N</small></span>';
-          if(!html.includes(exportLabel))throw Error('Original V57 export menu label is missing');
-          html=html.replace(exportLabel,'<span><b>Экспорт Transfer MDB</b><small>Для планшета начальника и настольного SOLI-N</small></span>');
-          html=html.replace(/(solin-workspace\.js|solin-apk-mdb\.js)(\?v=[^\"]*)?"/g,'$1?v=58"');
+          const input=before.match(/<input\b[^>]*\bid="transferForestInput"[^>]*>/);
+          if(!input)throw Error('V57 Transfer input not found');
+          let picker=input[0].replace(/\saria-label="[^"]*"/,'').replace(/\saccept="[^"]*"/,'');
+          picker=picker.replace(/>$/,' aria-label="Загрузить Transfer MDB или ACCDB" accept=".mdb,.accdb,application/x-msaccess">');
+          let html=before.replace(input[0],picker);
+          const beforeExport=html.match(/<button\b[^>]*\bid="solin-mdb-export"[^>]*>[\s\S]*?<\/button>/);
+          if(!beforeExport)throw Error('V57 export button not found');
+          html=html.replace(beforeExport[0],beforeExport[0].replace(/>[\s\S]*<\/button>$/,'><span><b>Экспорт Transfer MDB</b><small>Для планшета начальника и настольного SOLI-N</small></span><span>⇩</span></button>'));
+          html=html.replace(/(solin-workspace\.js|solin-apk-mdb\.js)(\?v=[^"]*)?"/g,'$1?v=58"');
           writeFileSync(path,html);
           NODE
           node --check www/solin-workspace.js
