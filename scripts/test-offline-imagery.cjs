@@ -104,7 +104,10 @@ const server=http.createServer((req,res)=>{try{
    const entry={cmf2:true,name:'performance-fixture',geometryEntries:[{source:'ВыдПород',layer}]};importedMapLayers.push(entry);window.__labelFixture=entry;
    fieldMap.setView([50.1025,59.204],17);SolinCmfLabelLayerV5.buildLabels(entry);
   });
-  await page.waitForFunction(()=>window.__labelFixture.labelLayers.stands.getLayers().length>0);
+  await page.waitForFunction(()=>window.__labelFixture.labelLayers.stands.getLayers().length>0,null,{timeout:8000}).catch(async()=>{
+   const detail=await page.evaluate(()=>({zoom:fieldMap.getZoom(),center:fieldMap.getCenter(),bounds:fieldMap.getBounds().toBBoxString(),group:fieldMap.hasLayer(__labelFixture.labelLayers.stands),count:__labelFixture.labelLayers.vCount,visible:__labelFixture.labelLayers.stands.getLayers().length,items:__labelFixture.labelLayers.standsItems.length,first:__labelFixture.labelLayers.standsItems[0]?.bounds?.toBBoxString()}));
+   throw Error('CMF label fixture failed: '+JSON.stringify(detail));
+  });
   const labels=await page.evaluate(()=>({visible:__labelFixture.labelLayers.stands.getLayers().length,source:__labelFixture.labelLayers.vCount,geometry:__labelFixture.geometryEntries[0].layer.getLayers().length}));
   assert.equal(labels.source,1000);assert.equal(labels.geometry,1000);assert(labels.visible<=220);
   await page.evaluate(()=>{fieldMap.setView([50.1025,59.204],9);});
