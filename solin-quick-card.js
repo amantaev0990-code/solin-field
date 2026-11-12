@@ -192,6 +192,21 @@
       const title=document.createElement('strong');
       title.textContent='Категория '+p.code+(p.name?' · '+p.name:'');
       maketHint.append(title);
+      // Only verified Access controls can create a "required" shortcut.
+      // The quick editor keeps the whole card intact and uses the same
+      // Maket13/Maket25 editor as the "Все макеты" navigation.
+      for(const item of requirements?.required||[]){
+        const maket=String(item.number);
+        const action=button('М'+maket,()=>{
+          if(form.contains(document.activeElement)&&document.activeElement.matches?.('input,textarea,select'))
+            document.activeElement.blur();
+          delete form.dataset.quickStep;
+          editor.showExtra('Макет'+maket);
+        },'ce-source-required-maket');
+        action.title=item.name+' · источник: '+item.source;
+        action.setAttribute('aria-label','Открыть обязательный Макет '+maket+' по проверке '+item.control);
+        maketHint.append(action);
+      }
       const note=document.createElement('small');
       note.textContent=requirements?.reason||
         'Обязательные макеты не подтверждены исходными правилами настольного SOLI-N. Откройте нужный макет через «Все макеты».';
