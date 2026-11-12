@@ -590,9 +590,11 @@ async function init(){
   document.dispatchEvent(new Event('solin-workspaces-ready'));
  }catch(e){
   console.error('Не удалось запустить лесничество',e);
+  initialized=true;
+  // A failed IndexedDB access must never leave the user on a frozen screen.
+  try{await showHome();}catch(renderError){console.error('Экран восстановления недоступен',renderError);}
   const status=document.querySelector('#forestListStatus');
   if(status)status.textContent='Ошибка запуска: '+e.message+'. Сохранённые данные не удалялись.';
-  initialized=true;
   throw e;
  }
 }
