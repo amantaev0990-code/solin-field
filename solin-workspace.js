@@ -579,7 +579,7 @@ async function importTransfer(payload,options={}){
  await home();
  return merged;
 }
-async function importFile(file){if(!file)return;openModal('Чтение Transfer','<p>Читаю файл на этом устройстве…</p>');try{await persist();const payload=await SolinTransferReader.read(file),groups=previewTransfer(payload),existing=await list(),conflicts=groups.filter(g=>existing.some(f=>f.id===g.id));openModal('Загрузка Transfer','<p>Файл: '+html(file.name)+'. Данные остаются на устройстве.</p>'+groups.map(f=>'<article class="transfer-preview"><h3>'+html(f.org.NOS)+'</h3><p>'+html(f.org.NLX)+'</p><small>'+Object.keys(f.quarters).length+' кварталов · '+Object.values(f.quarters).reduce((n,q)=>n+q.compartments.length,0)+' выделов</small></article>').join('')+(conflicts.length?'<p class="import-warning">Совпадает адрес лесничества: '+conflicts.map(f=>html(f.org.NOS)).join(', ')+'. Можно добавить непересекающиеся выделы либо заменить весь набор. При конфликте карточек добавление будет отменено.</p>'+conflicts.map(f=>'<button class="saveConflictBackup" data-forest="'+html(f.id)+'">Копия: '+html(f.org.NOS)+'</button>').join('')+'':'<p>Новые лесничества появятся в списке. Остальные сохранятся.</p>')+'<div class="formActions"><button onclick="closeModal()">Отмена</button>'+(conflicts.length?'<button id="mergeTransfer" type="button">Добавить данные в лесничество</button>':'')+'<button id="acceptTransfer" class="primary">'+(conflicts.length?'Заменить указанные лесничества':'Добавить лесничества')+'</button></div><p id="transferError" role="alert"></p>');for(const b of document.querySelectorAll('.saveConflictBackup'))b.onclick=()=>{const f=existing.find(x=>x.id===b.dataset.forest),u=URL.createObjectURL(new Blob([JSON.stringify(checkpointFor(f),null,2)],{type:'application/json'})),a=document.createElement('a');a.href=u;a.download='SOLIN-backup-'+f.org.POS+'-'+f.org.LESN+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),2000);};
+async function importFile(file){if(!file)return;openModal('Чтение Transfer','<p>Читаю файл на этом устройстве…</p>');try{await persist();const payload=await SolinTransferReader.read(file),groups=previewTransfer(payload),existing=await list(),conflicts=groups.filter(g=>existing.some(f=>f.id===g.id));openModal('Загрузка Transfer','<p>Файл: '+html(file.name)+'. Данные остаются на устройстве.</p>'+groups.map(f=>'<article class="transfer-preview"><h3>'+html(f.org.NOS)+'</h3><p>'+html(f.org.NLX)+'</p><small>'+Object.keys(f.quarters).length+' кварталов · '+Object.values(f.quarters).reduce((n,q)=>n+q.compartments.length,0)+' выделов</small></article>').join('')+(conflicts.length?'<p class="import-warning">Совпадает адрес лесничества: '+conflicts.map(f=>html(f.org.NOS)).join(', ')+'. Можно добавить непересекающиеся выделы либо заменить весь набор. При конфликте карточек добавление будет отменено.</p>'+conflicts.map(f=>'<button class="saveConflictBackup" data-forest="'+html(f.id)+'">Копия: '+html(f.org.NOS)+'</button>').join('')+'':'<p>Новые лесничества появятся в списке. Остальные сохранятся.</p>')+'<div class="formActions"><button onclick="closeModal()">Отмена</button>'+(conflicts.length?'<button id="mergeTransfer" type="button" class="primary">Добавить данные в лесничество</button>':'')+'<button id="acceptTransfer" type="button" class="'+(conflicts.length?'secondary':'primary')+'">'+(conflicts.length?'Заменить всю базу':'Добавить лесничества')+'</button></div><p id="transferError" role="alert"></p>');for(const b of document.querySelectorAll('.saveConflictBackup'))b.onclick=()=>{const f=existing.find(x=>x.id===b.dataset.forest),u=URL.createObjectURL(new Blob([JSON.stringify(checkpointFor(f),null,2)],{type:'application/json'})),a=document.createElement('a');a.href=u;a.download='SOLIN-backup-'+f.org.POS+'-'+f.org.LESN+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),2000);};
  const mergeButton=document.querySelector('#mergeTransfer');
  if(mergeButton)mergeButton.onclick=async()=>{
   mergeButton.disabled=true;
@@ -593,7 +593,9 @@ async function importFile(file){if(!file)return;openModal('Чтение Transfer
    mergeButton.disabled=false;
   }
  };
- document.querySelector('#acceptTransfer').onclick=async()=>{const b=document.querySelector('#acceptTransfer');b.disabled=true;try{await importTransfer(payload,{replace:!!conflicts.length});
+ document.querySelector('#acceptTransfer').onclick=async()=>{const b=document.querySelector('#acceptTransfer');
+ if(conflicts.length&&!window.confirm('ВНИМАНИЕ! Полная замена удалит существующие кварталы и выделы этого лесничества на планшете. Для работы двух таксаторов нажмите «Добавить данные в лесничество». Продолжить замену?'))return;
+ b.disabled=true;try{await importTransfer(payload,{replace:!!conflicts.length});
   // Keep the ORIGINAL Jet file locally for one-touch MDB export after import.
   // Do not publish it or send it to any network. Only cache after successful import.
   if(/\.mdb$/i.test(file.name)&&groups.length===1&&file.size<=12*1024*1024&&window.SolinOfflineMDB?.saveStored){
@@ -638,15 +640,10 @@ function bindMainMenuRoutes(){
 }
 function bind(){
  bindMainMenuRoutes();
- const actions=document.querySelector('#menuScreen .workspace');
- if(actions&&!document.getElementById('solin-forest-transfer')){
-  const transfer=document.createElement('button');
-  transfer.id='solin-forest-transfer';transfer.className='menuRow';transfer.type='button';
-  transfer.innerHTML='<span><b>Перенести лесничество на другое устройство</b><small>Скачать всю базу с кварталами, выделами и макетами в JSON</small></span><span>↓</span>';
-  transfer.onclick=()=>{try{exportForest();}catch(e){toast(e.message);}};
-  const before=actions.querySelector('#solin-mdb-export');
-  if(before)before.before(transfer);else actions.append(transfer);
- }
+ // The field-work handoff is always a REAL Transfer MDB, exported through
+ // the single existing Android MDB button. Keep legacy JSON backup parsing
+ // for recovery, but never advertise JSON as the taxators' transfer format.
+ document.getElementById('solin-forest-transfer')?.remove();
  const newButton=document.querySelector('#newForestButton');if(newButton)newButton.onclick=newForest;// A real full-size file input sits over the visual Transfer button.
  // This avoids iOS/Safari rejecting a scripted click on a hidden input.
  const nativePicker=document.querySelector('#transferForestInput');
