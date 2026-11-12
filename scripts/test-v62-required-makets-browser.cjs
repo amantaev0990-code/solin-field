@@ -71,16 +71,20 @@ const server=http.createServer(async(req,res)=>{
   await hint.getByRole('button',{name:/Макет 10/}).click();
   assert.equal(await page.locator('#ce-main').isVisible(),true);
   await check(83,[]);
-  // K05 is not a category flag: it is mandatory for specific KGLF or Fzona.
+  // K05 is not a category flag: landscape obligations also depend on GLF.
+  // On this sample, a dependent Fzona picker rejects an unsupported zone 3,
+  // so simulate two genuine allowed forest-category contexts instead.
   await page.evaluate(()=>{
-   const z=document.querySelector('[data-ce-scope="base"][data-ce-field="Fzona"]');
-   z.value='3';z.dispatchEvent(new Event('change',{bubbles:true}));
+   document.querySelector('[aria-label="Категория ГЛФ, код"]').value='21';
+   const ku=document.querySelector('[data-ce-scope="base"][data-ce-field="KU"]');
+   ku.dispatchEvent(new Event('change',{bubbles:true}));
   });
   await page.waitForFunction(()=>document.querySelector('#ce-required-makets .ce-source-required-maket')?.textContent==='М21');
   assert.deepEqual(await hint.locator('button').allInnerTexts(),['М21']);
   await page.evaluate(()=>{
-   const z=document.querySelector('[data-ce-scope="base"][data-ce-field="Fzona"]');
-   z.value='7';z.dispatchEvent(new Event('change',{bubbles:true}));
+   document.querySelector('[aria-label="Категория ГЛФ, код"]').value='7';
+   const ku=document.querySelector('[data-ce-scope="base"][data-ce-field="KU"]');
+   ku.dispatchEvent(new Event('change',{bubbles:true}));
   });
   await page.waitForFunction(()=>document.getElementById('ce-required-makets')?.hidden===true);
   console.log('V62_BROWSER_REQUIRED_MAKETS_OK: M10/11/12/13/17/19/25 conditional, M21 follows Fzona and no nonmandatory banner.');
