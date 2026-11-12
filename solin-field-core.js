@@ -157,7 +157,7 @@ function filter(){
 }
 
 function refs(q=''){if(!D)return;const box=document.querySelector('#friendlyRefs');box.innerHTML=Object.entries(D.fieldLookups).filter(([k,v])=>!q||(k+' '+Object.values(v).join(' ')).toLowerCase().includes(q.toLowerCase())).map(([k,v])=>'<details class="refCard"><summary>'+h(D.fieldLabels[k]||k)+' · '+Object.keys(v).length+'</summary>'+Object.entries(v).filter(([c,n])=>!q||(k+' '+c+' '+n).toLowerCase().includes(q.toLowerCase())).map(([c,n])=>'<div class="refRow"><b>'+h(c)+'</b> '+h(n)+'</div>').join('')+'</details>').join('');}
-async function loadRefs(){try{let res=await fetch(window.Capacitor?.isNativePlatform?.()?'./refs-audit.packed.bin':'./refs-audit.json.gz');if(!res.ok&&window.Capacitor?.isNativePlatform?.())res=await fetch('./refs-audit.json.gz');if(!res.ok)throw Error('HTTP '+res.status);window.SOLIN_REFS=JSON.parse(await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).text());await window.SolinReferenceSupplement?.load?.(window.SOLIN_REFS);const byCode=new Map(SOLIN_REFS.tables.SDP.map(r=>[r.KPC,r]));SOLIN_REFS.tables.SDP_Tip=SOLIN_REFS.tables.SDP_Tip.map(r=>({...byCode.get(r.KPC),...r}));D.stats.referenceTables=Object.keys(SOLIN_REFS.tables).length;document.querySelector('#rcount').textContent=D.stats.referenceTables;D.scopedLookups={};for(const x of window.SOLIN_LOOKUP_SOURCES||[]){const rows=SOLIN_REFS.tables[x.table];if(!rows)continue;(D.scopedLookups[x.form]??={})[x.field]=Object.fromEntries(rows.filter(r=>r[x.code]!=null&&r[x.label]!=null).map(r=>[r[x.code],r[x.label]]));}refs();window.dispatchEvent(new Event('solin-refs-ready'));}catch(e){toast('Полные справочники недоступны: '+e.message)}}
+async function loadRefs(){try{let res=await fetch(window.Capacitor?.isNativePlatform?.()?'./refs-audit.packed.bin':'./refs-audit.json.gz');if(!res.ok&&window.Capacitor?.isNativePlatform?.())res=await fetch('./refs-audit.json.gz');if(!res.ok)throw Error('HTTP '+res.status);window.SOLIN_REFS=JSON.parse(await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).text());await window.SolinReferenceSupplement?.load?.(window.SOLIN_REFS);const byCode=new Map(SOLIN_REFS.tables.SDP.map(r=>[r.KPC,r]));SOLIN_REFS.tables.SDP_Tip=SOLIN_REFS.tables.SDP_Tip.map(r=>({...byCode.get(r.KPC),...r}));D.stats.referenceTables=Object.keys(SOLIN_REFS.tables).length;document.querySelector('#rcount').textContent=D.stats.referenceTables;D.scopedLookups={};for(const x of window.SOLIN_LOOKUP_SOURCES||[]){const rows=SOLIN_REFS.tables[x.table];if(!rows)continue;(D.scopedLookups[x.form]??={})[x.field]=Object.fromEntries(rows.filter(r=>r[x.code]!=null&&r[x.label]!=null).map(r=>[r[x.code],r[x.label]]));}window.performance?.mark?.('solin-refs-load-done');window.dispatchEvent(new Event('solin-refs-ready'));}catch(e){toast('Полные справочники недоступны: '+e.message)}}
 function auditedRefs(q=''){if(!window.SOLIN_REFS)return refs(q);const box=document.querySelector('#friendlyRefs');box.innerHTML='<p>153 исходные таблицы S* и вычисленный SDP_Tip · 24 946 строк. Динамические ограничения списков Access здесь не исполняются.</p>';for(const [name,table]of Object.entries(SOLIN_REFS.tables).sort(([a],[b])=>a.localeCompare(b))){const rows=q?table.filter(r=>(name+' '+Object.values(r).join(' ')).toLowerCase().includes(q.toLowerCase())):table;if(!rows.length)continue;const details=document.createElement('details');details.className='refCard';details.innerHTML='<summary>'+h(refNames[name]||name)+' · '+rows.length+'</summary>';let count=0,host;function more(){const slice=rows.slice(count,count+100);count+=slice.length;host.insertAdjacentHTML('beforeend',slice.map(r=>'<div class="wf-check">'+Object.entries(r).filter(([,v])=>v!=null&&v!=='').map(([k,v])=>'<span>'+h(k)+': <b>'+h(v)+'</b></span>').join(' · ')+'</div>').join(''));details.querySelector('.refMore')?.remove();if(count<rows.length){const b=document.createElement('button');b.className='refMore';b.textContent='Ещё 100';b.onclick=more;details.append(b);}}details.ontoggle=()=>{if(details.open&&!host){host=document.createElement('div');details.append(host);more();}};box.append(details);}}
 function formulas(){openModal('611 исходных выражений Access','<p>Сохранённые определения из аудита. Выполнение в контексте Access ещё не воспроизведено.</p><input id="formulaQuery" placeholder="Форма или выражение"><div id="formulaRows"></div>');const draw=q=>{document.querySelector('#formulaRows').innerHTML=SOLIN_AUDIT.formulas.filter(x=>(x.form+' '+x.name+' '+x.expression).toLowerCase().includes(q.toLowerCase())).map(x=>'<div class="wf-check"><b>'+h(x.form+' / '+x.name)+'</b><pre style="white-space:pre-wrap">'+h(x.expression)+'</pre></div>').join('')};document.querySelector('#formulaQuery').oninput=e=>draw(e.target.value);draw('ВыделВ');}
 function editQuarter(k,index=0){
@@ -289,7 +289,46 @@ function setup(){const menu=document.querySelector('#menuScreen .workspace');for
 }
 function validateRow(form,row,parent){return SOLIN_AUDIT.validations.filter(v=>v.form===form).flatMap(v=>{try{return rule(v.rule,row[v.source],{...parent,...row,__parent:parent})===false?[v.source+': '+v.rule]:[]}catch{return []}});}
 window.solinCore={checkpoint,validateBackup,commitImport,controls,rule,showControls,validateRow,filter};
-window.addEventListener('solin-refs-ready',()=>auditedRefs());
-window.addEventListener('solin-ready',()=>{try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s){validateBackup(s);D.quarters=s.quarters;if(s.lesnichestvo?.length)D.lesnichestvo=s.lesnichestvo;if(s.source)D.source=s.source;D._transferExtras=s.extraTables||{};/* V53: Do not purge pre-V53 local edits on ordinary cold boot. */refresh();}refs();loadRefs();}catch(e){toast('Не удалось восстановить копию: '+e.message)}});
+let refsNeedRender=true;
+window.solinEnsureRefsRendered=()=>{
+ const panel=document.querySelector('#friendlyRefs');
+ if(!panel||!D)return;
+ if(!refsNeedRender&&panel.childElementCount)return;
+ refsNeedRender=false;
+ if(window.SOLIN_REFS)auditedRefs();
+ else refs();
+};
+window.addEventListener('solin-refs-ready',()=>{
+ refsNeedRender=true;
+ if(document.querySelector('#refsScreen.active'))window.solinEnsureRefsRendered();
+});
+window.addEventListener('solin-ready',()=>{
+ try{
+  // The forest workspace owns startup reconciliation and backup recovery.
+  // Reapplying the same JSON checkpoint here previously cloned/re-rendered
+  // hundreds of stands a second time before main menu became responsive.
+  if(!window.SolinWorkspace){
+   const data=JSON.parse(localStorage.getItem(KEY)||'null');
+   if(data){
+    validateBackup(data);
+    D.quarters=data.quarters;
+    if(data.lesnichestvo?.length)D.lesnichestvo=data.lesnichestvo;
+    if(data.source)D.source=data.source;
+    D._transferExtras=data.extraTables||{};
+    refresh();
+   }
+   refs();
+  }
+  const launch=()=>{window.performance?.mark?.('solin-refs-load-start');void loadRefs();};
+  const afterFirstFrame=()=>{
+   if(typeof window.requestIdleCallback==='function')
+    window.requestIdleCallback(launch,{timeout:2200});
+   else setTimeout(launch,350);
+  };
+  if(window.SolinWorkspace?.ready)
+   window.SolinWorkspace.ready.then(afterFirstFrame,afterFirstFrame);
+  else afterFirstFrame();
+ }catch(e){toast('Не удалось восстановить копию: '+e.message);}
+});
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});else setup();
 })();
