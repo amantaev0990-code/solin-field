@@ -33,7 +33,7 @@ function ensureMapFileUi(){
  toolbar?.prepend(button);
  const input=document.createElement('input');
  input.id='mapFileInput';input.type='file';input.multiple=true;input.hidden=true;
- input.accept='.cmf2,.kmf2,.cmf,.kmf,.kml,.kmz,.geojson,.json,.gpx,.gpkg,.zip';
+ input.accept='.cmf2,.kmf2,.cmf,.kmf,.kml,.kmz,.geojson,.json,.gpx,.gpkg,.zip,.mbtiles';
  input.onchange=()=>window.handleMapFiles(input);
  document.body.appendChild(input);
 }
@@ -91,8 +91,10 @@ function initFieldMap(){
  fieldMap.createPane('fieldOverview').style.zIndex='190';
  fieldMap.setView([48.4,66.8],5);
  const tileOptions={updateWhenIdle:true,updateWhenZooming:false,keepBuffer:1,maxZoom:21,maxNativeZoom:19};
- baseGoogle=L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{
-  ...tileOptions,subdomains:['mt0','mt1','mt2','mt3'],attribution:'Спутниковые снимки Google'
+ // Preserve the internal name for existing map toggles; source is Sentinel-2.
+ // This provider explicitly licenses the 2016–2017 mosaic for commercial viewing.
+ baseGoogle=L.tileLayer('https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg',{
+  ...tileOptions,maxNativeZoom:14,attribution:'EOxCloudless © EOX IT Services GmbH · Sentinel-2 2016–2017 · CC BY 4.0'
  });
  baseOSM=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
   ...tileOptions,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -174,7 +176,13 @@ document.addEventListener('visibilitychange',()=>{
 });
 function openMapFilePicker(){document.getElementById('mapFileInput')?.click()}
 function mapFileKey(file){return [file.name,file.size,file.lastModified].join('|')}
-function makeGeoGroup(geo){return L.geoJSON(geo,{smoothFactor:2.5,style:styleImportedFeature,pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:5,weight:2,fillOpacity:.8}),onEachFeature:bindImportedFeature}).addTo(fieldMap)}
+let genericMapCanvas=null;
+function makeGeoGroup(geo){
+ if(!genericMapCanvas)genericMapCanvas=L.canvas({padding:0.06});
+ return L.geoJSON(geo,{renderer:genericMapCanvas,smoothFactor:3,style:styleImportedFeature,
+  pointToLayer:(f,ll)=>L.circleMarker(ll,{renderer:genericMapCanvas,radius:5,weight:2,fillOpacity:.8}),
+  onEachFeature:bindImportedFeature}).addTo(fieldMap);
+}
 function addGeoLayer(name,geo,key,format){if(!geo||geo.type!=='FeatureCollection')throw new Error('Нет векторных объектов');const group=makeGeoGroup(geo);const entry={key,name,layer:group,count:(geo.features||[]).length,visible:true,format};importedMapLayers.push(entry);return entry}
 async function handleMapFiles(input){
  const files=Array.from(input?.files||[]);
@@ -189,6 +197,13 @@ async function handleMapFiles(input){
    continue;
   }
   try{
+   if(/\.mbtiles$/i.test(file.name)){
+    setMapImportStatus('Устанавливаю офлайн-карту: '+file.name);
+    await window.SolinOfflineImagery.importFile(file);
+    accepted.add(key);
+    setMapImportStatus('Офлайн-карта установлена: '+file.name);
+    continue;
+   }
    const detected=await window.SolinMapImport?.detect(file);
    if (detected === 'zip') {
     setMapImportStatus('Открываю ZIP MapInfo: ' + file.name);
@@ -298,7 +313,7 @@ function installFieldMapTools(map) {
  const saved = L.layerGroup().addTo(map);
  const preview = L.layerGroup().addTo(map);
  const style = {color:'#ec8515',weight:4};
- const tools = L.control({position:'topright'});
+ const tools = L.control({position:'bottomleft'});
  const areaBadge=document.createElement('output');
  areaBadge.className='field-map-area';
  areaBadge.hidden=true;
@@ -493,7 +508,9 @@ function installFieldMapTools(map) {
   add('save','Сохранить',() => { void saveShape(); });
   add('cancel','Отмена',reset);
   status.setAttribute('aria-live','polite');
-  panel.append(grid,status);
+  const content = L.DomUtil.create('div','field-map-tool-content');
+  content.append(grid,status);
+  panel.append(content);
   L.DomEvent.disableClickPropagation(panel);
   L.DomEvent.disableScrollPropagation(panel);
   return panel;
@@ -536,16 +553,29 @@ function createMapInfoLayer({name, geojson, settings}, fileKey, index, count) {
  const displayOverride = /^\s*(?:Display\s+)?Override\b/im.test(settings);
  const labels = [];
  const labelLayer = L.layerGroup();
+ // Only check labels in spatial buckets intersecting the current view.
+ const labelCell=0.05,labelBuckets=new Map();
+ let visibleLabels=new Set(),labelsFrame=0;
  function syncLabels() {
+  labelsFrame=0;
   if (!fieldMap.hasLayer(group)) return;
-  const view = fieldMap.getBounds().pad(.08);
-  const shown = fieldMap.getZoom() >= (/(?:^|_)номкв$/i.test(name) ? 11 : /(?:^|_)номвыд$/i.test(name) ? 13 : 12);
-  for (const label of labels) {
-   const visible = shown && view.contains(label.getLatLng());
-   if (visible && !labelLayer.hasLayer(label)) labelLayer.addLayer(label);
-   if (!visible && labelLayer.hasLayer(label)) labelLayer.removeLayer(label);
+  const view=fieldMap.getBounds().pad(.08);
+  const shown=fieldMap.getZoom() >= (/(?:^|_)номкв$/i.test(name) ? 11 : /(?:^|_)номвыд$/i.test(name) ? 13 : 12);
+  const wanted=new Set();
+  if(shown){
+   const minX=Math.floor(view.getWest()/labelCell),maxX=Math.floor(view.getEast()/labelCell);
+   const minY=Math.floor(view.getSouth()/labelCell),maxY=Math.floor(view.getNorth()/labelCell);
+   const count=(maxX-minX+1)*(maxY-minY+1);
+   if(count>2500){for(const label of labels)if(view.contains(label.getLatLng()))wanted.add(label);}
+   else for(let x=minX;x<=maxX;x++)for(let y=minY;y<=maxY;y++)
+    for(const label of labelBuckets.get(x+'/'+y)||[])
+     if(view.contains(label.getLatLng()))wanted.add(label);
   }
+  for(const label of visibleLabels)if(!wanted.has(label))labelLayer.removeLayer(label);
+  for(const label of wanted)if(!visibleLabels.has(label))labelLayer.addLayer(label);
+  visibleLabels=wanted;
  }
+ function scheduleLabels(){if(!labelsFrame)labelsFrame=requestAnimationFrame(syncLabels);}
  const globalBrush = settings.match(/^\s*Global\b[^\r\n]*?\bBrush\s*\((\d+),(\d+)/im);
  const globalSymbol = settings.match(/^\s*Global\b[^\r\n]*?\bSymbol\s*\(\d+,(\d+),(\d+)/im);
  function style(feature) {
@@ -602,15 +632,22 @@ function createMapInfoLayer({name, geojson, settings}, fileKey, index, count) {
   }
  });
  const bounds = group.getBounds();
- for (const label of labels) bounds.extend(label.getLatLng());
+ for (const label of labels){
+  const pos=label.getLatLng(),key=Math.floor(pos.lng/labelCell)+'/'+Math.floor(pos.lat/labelCell);
+  if(!labelBuckets.has(key))labelBuckets.set(key,[]);
+  labelBuckets.get(key).push(label);
+  bounds.extend(pos);
+ }
  if (labels.length) {
   group.on('add', () => {
    labelLayer.addTo(fieldMap);
-   fieldMap.on('moveend',syncLabels);
+   fieldMap.on('moveend zoomend',scheduleLabels);
    syncLabels();
   });
   group.on('remove', () => {
-   fieldMap.off('moveend',syncLabels);
+   fieldMap.off('moveend zoomend',scheduleLabels);
+   if(labelsFrame)cancelAnimationFrame(labelsFrame);
+   labelsFrame=0;visibleLabels.clear();
    labelLayer.clearLayers();
    labelLayer.remove();
   });
