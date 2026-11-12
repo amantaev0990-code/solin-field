@@ -1,0 +1,22 @@
+name: V58 Transfer MDB two-taxator merge
+on:
+  push:
+    branches: [feat/v58-mdb-team-handoff]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  transfer-mdb:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: JS syntax and 35+35 forest merge
+        run: |
+          node --check solin-workspace.js
+          node --check solin-apk-mdb.js
+          node --check solin-transfer-merge.js
+          node scripts/test-v58-mdb-team-handoff.cjs
+          node scripts/test-v52-card-merge.cjs
