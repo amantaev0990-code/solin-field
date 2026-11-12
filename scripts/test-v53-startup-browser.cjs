@@ -32,15 +32,25 @@ const server=http.createServer(async(req,res)=>{
   });
   assert.ok(first.id&&first.forests>=1&&first.stands>0,'Existing bundled/selected forest loaded on first launch');
   assert.equal(first.active,'mainScreen','Cold boot must display the main menu, not forestry chooser');
-  const switcher=page.locator('#solin-switch-forest');
-  assert.equal(await switcher.count(),1,'Visible forest chooser must exist in main menu');
-  assert.ok(await switcher.isVisible(),'Forest chooser must be visible');
-  await switcher.click();
+  assert.equal(await page.locator('#solin-switch-forest').count(),0,
+   'V54 must not add duplicate green forestry button');
+  const picker=page.locator('#mainScreen .field-context select');
+  assert.equal(await picker.count(),1,'Original forestry dropdown must be present');
+  assert.ok(await picker.isVisible(),'Original dropdown must be visible');
+  assert.equal(await picker.inputValue(),first.id,'Selected forest must appear immediately');
+  assert.ok(await picker.locator('option').count()>=2,'Saved forests must be actual options');
+  const header=page.locator('.topbar .solin-active-forest-caption');
+  assert.ok(await header.isVisible(),'Forest label must be visible beneath logo');
+  assert.match(await header.innerText(),/Бугетсайское|лесничество/i);
+  // The original "Данные → Лесовладельцы" action must retain access to list.
+  const ownerRoute=page.locator('#mainScreen [data-field-route="homeScreen"]');
+  await ownerRoute.click();
   await page.waitForFunction(()=>document.querySelector('#homeScreen.active'));
   const options=page.locator('#forestList .forest-entry > .forest-option');
   assert.ok(await options.count()>=1,'Saved forestry workspaces must appear in selector');
   await options.first().click();
   await page.waitForFunction(()=>document.querySelector('#mainScreen.active'));
+  assert.equal(await picker.inputValue(),first.id);
   assert.equal(await page.evaluate(()=>window.SolinWorkspace.activeId),first.id);
   // Exercise a real main-menu route with a genuine pointer event; a guarded
   // click must never bounce the user back to the owner/forestry chooser.
