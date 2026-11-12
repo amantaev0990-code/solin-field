@@ -29,7 +29,9 @@ const server=http.createServer((req,res)=>{try{
   });
   await page.waitForFunction(()=>!!window.fieldMap);
   assert.equal(await page.locator('#offlineBtn').isDisabled(),true,'Offline mode unavailable before import');
-  assert.equal(await page.locator('#offlineImportBtn').count(),1);
+  assert.equal(await page.locator('#offlineImportBtn').count(),0,'Import action must not obstruct the top toolbar');
+  assert.equal(await page.locator('.field-map-tools button').filter({hasText:'Импорт офлайн-карты'}).count(),1,'Import remains in bottom map tools');
+  assert.equal(await page.locator('.leaflet-bottom.leaflet-left .field-map-tools').count(),1,'Map tools must be anchored below the map');
   const pack=await page.evaluate(async()=>{
    const sql=await initSqlJs({locateFile:name=>'./vendor/'+name});
    const db=new sql.Database();
@@ -81,6 +83,8 @@ const server=http.createServer((req,res)=>{try{
     db.run('INSERT INTO tiles VALUES (5,?,?,?)',[16+dx,31-(10+dy),bytes]);
    }
    const bytes=db.export();db.close();const p=await SolinOfflineImagery.importFile(new File([bytes],'detail-only.mbtiles'));
+   if(p.minZoom!==5||p.pyramidVersion)throw Error('Import must be ready without an expensive overview build');
+   await SolinOfflineImagery.ensurePyramid(p); // explicit preparation remains available
    const blob=await SolinOfflineImagery.readTile(p.id,4,8,5),image=await createImageBitmap(blob),c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');g.drawImage(image,0,0);image.close();
    const pixels=[[64,64],[192,64],[64,192],[192,192]].map(([x,y])=>Array.from(g.getImageData(x,y,1,1).data));
    return {pixels,bounds:p.bounds,min:p.minZoom,max:p.maxZoom,version:p.pyramidVersion,overviews:p.overviewCount,cache:SolinOfflineImagery.cacheStats};
@@ -106,7 +110,7 @@ const server=http.createServer((req,res)=>{try{
   await page.evaluate(()=>{fieldMap.setView([50.1025,59.204],9);});
   await page.waitForFunction(()=>__labelFixture.labelLayers.stands.getLayers().length===0&&__labelFixture.labelLayers.quarters.getLayers().length===0);
   assert.deepEqual(errors,[]);
-  console.log('OFFLINE_IMAGERY_OK: import raster MBTiles, store tile in IndexedDB, restore after reload, forestry isolation, offline/online switch, four-quadrant overview pyramid, bounded cache, 1000-feature label culling');
+  console.log('OFFLINE_IMAGERY_OK: nonblocking MBTiles import, bottom controls, restore/offline switch, optional four-quadrant overview pyramid, bounded cache, label culling');
   await ctx.close();
  }finally{if(browser)await browser.close();await new Promise(done=>server.close(done));}
 })().catch(err=>{console.error(err);process.exitCode=1;});
