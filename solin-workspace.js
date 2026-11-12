@@ -560,9 +560,21 @@ function bind(){
    void importFile(file);
  };
  const homeButton=document.querySelector('#homeButton');
- if(homeButton)homeButton.onclick=()=>activeId?show(document.getElementById('mainScreen')?'mainScreen':'quartersScreen'):home().catch(e=>toast(e.message));
+ if(homeButton){
+  homeButton.onclick=()=>activeId?show(document.getElementById('mainScreen')?'mainScreen':'quartersScreen'):home().catch(e=>toast(e.message));
+  // The old .ghost media rule hid the only Back-to-main control on tablets.
+  homeButton.classList.remove('ghost');
+  homeButton.style.setProperty('min-height','42px');
+ }
  ensureForestSelectorButton();
- const old=window.show;window.show=function(id){if(!initialized&&id!=='homeScreen'){return old('homeScreen');}document.body.classList.toggle('workspace-home',id==='homeScreen');old(id);};
+ const old=window.show;
+ window.show=function(id){
+  if(!initialized&&id!=='homeScreen')return old('homeScreen');
+  const chooser=id==='homeScreen';
+  document.body.classList.toggle('workspace-home',chooser);
+  if(homeButton)homeButton.style.setProperty('display',chooser?'none':'inline-flex','important');
+  old(id);
+ };
  window.addEventListener('solin-saved',()=>persist().catch(e=>toast('Не удалось сохранить лесничество: '+e.message)));
  const prevBackup=window.solinCore.commitImport;window.solinCore.commitImport=function(x){if(x.lesnichestvo?.[0]&&idOf(x.lesnichestvo[0])!==activeId)throw Error('Эта копия относится к другому лесничеству. Загрузите её через главное окно');const result=prevBackup(x);persist().catch(e=>toast(e.message));return result;};
 }
