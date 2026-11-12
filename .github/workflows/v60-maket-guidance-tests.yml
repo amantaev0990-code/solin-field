@@ -1,0 +1,35 @@
+name: V60 KU31 mandatory maket guidance checks
+on:
+  push:
+    branches: [fix/v60-maket-guidance-source-truth]
+    paths:
+      - 'solin-quick-card.js'
+      - 'solin-quick-card.css'
+      - 'solin-category-rules.js'
+      - 'scripts/test-v60-maket-guidance.cjs'
+      - 'scripts/test-v60-maket-guidance-browser.cjs'
+      - '.github/workflows/v60-maket-guidance-tests.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ku31-source-rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Check source, syntax and category flags
+        run: |
+          node --check solin-quick-card.js
+          node --check solin-category-rules.js
+          node scripts/test-v60-maket-guidance.cjs
+          node scripts/test-v52-card-merge.cjs
+      - name: Install browser
+        run: |
+          npm install --no-audit --no-fund
+          npm install --no-save --no-audit --no-fund playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Test road category on actual card
+        run: node scripts/test-v60-maket-guidance-browser.cjs .
