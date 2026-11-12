@@ -91,12 +91,13 @@ jobs:
           npm install --no-save --no-audit --no-fund playwright@1.56.1
           # V53 is a surgical fix on top of the VERIFIED V52 APK.
           # Never overwrite V52's tested app.js, maps, MDB plugins, or HTML.
-          cp solin-workspace.js www/solin-workspace.js
+          cp solin-workspace.js solin-field-core.js www/
           test -s www/solin-transfer-merge.js
           node --check www/solin-workspace.js
+          node --check www/solin-field-core.js
           grep -q 'solin-transfer-merge.js' www/index.html
           grep -q 'solin-workspace.js' www/index.html
-          sed -i -E 's/(solin-workspace\\.js)(\\?v=[^" ]+)?"/\\1?v=53"/g' www/index.html
+          sed -i -E 's/((solin-workspace|solin-field-core)\\.js)(\\?v=[^" ]+)?"/\\1?v=53"/g' www/index.html
           node scripts/test-v42-stock.cjs
           npx playwright install --with-deps chromium
           # V38 old mainScreen-only test no longer matches V52 chooser. Check actual tablet navigation instead.
@@ -150,7 +151,7 @@ jobs:
           [[ "$built" -eq 1 ]] || exit 1
           APK=app/build/outputs/apk/release/app-release-unsigned.apk
           test -s "$APK"
-          for file in app.js index.html solin-card-editor.js solin-apk-mdb.js solin-mdb-bridge.js solin-v37-ui.js solin-v35-features.js solin-quick-card.js solin-quick-card.css solin-transfer-merge.js solin-workspace.js; do
+          for file in app.js index.html solin-field-core.js solin-card-editor.js solin-apk-mdb.js solin-mdb-bridge.js solin-v37-ui.js solin-v35-features.js solin-quick-card.js solin-quick-card.css solin-transfer-merge.js solin-workspace.js; do
             unzip -p "$APK" "assets/public/$file" | cmp - "../www/$file"
           done
           # Verify Android actually packaged the installer callback; otherwise
