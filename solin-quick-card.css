@@ -130,6 +130,11 @@
  color:#46545d;font:12px/1.35 system-ui,Arial,sans-serif}
 #modal.ce-modal #ce-required-makets[hidden]{display:none!important}
 #modal.ce-modal #ce-required-makets strong{font-weight:650;color:#39464b}
+#modal.ce-modal #ce-required-makets .ce-source-required-maket{
+ min-height:31px;padding:4px 10px;border-radius:7px;
+ border:1px solid #5d9974;background:#eaf5ee;color:#175d35;
+ font:700 12px system-ui,Arial,sans-serif;cursor:pointer
+}
 #modal.ce-modal #ce-required-makets small{color:#66727b;flex:1 1 350px;font:12px/1.35 system-ui,Arial,sans-serif}
 #modal.ce-modal #quick-card-base .dt-cell[data-dt-cell="M3TLU"]{grid-column:1/-1}
 @media(max-width:700px){.quick-card-form #quick-card-base .quick-card-forest-type .dt-input{grid-template-columns:minmax(115px,36%) minmax(0,1fr)}}
