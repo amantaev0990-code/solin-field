@@ -30,3 +30,16 @@
 .field-area-handle:active{cursor:grabbing}
 .mapinfo-label .mapinfo-important-label{font-size:14px;font-weight:800!important;color:#17251d!important;background:#fff;line-height:1;
  padding:2px 4px;border-radius:3px;box-shadow:0 1px 3px #0007;text-shadow:none!important}
+
+/* V57: full-width field map and tools expandable above the lower-left edge. */
+#mapScreen .mapWorkspace{width:100%!important;max-width:none!important;min-width:0;box-sizing:border-box}
+#mapScreen .mapWrap,#mapScreen .mapWrap #fieldMap{width:100%;min-width:0}
+#mapScreen .mapLayerPanel{top:66px}
+#mapScreen .leaflet-bottom.leaflet-left{bottom:30px;left:12px;pointer-events:none}
+#mapScreen .field-map-tools{position:relative;margin:0;max-width:none;min-width:150px;background:#fff;color:#23432e;border:1px solid #b7cdbb;border-radius:11px;box-shadow:0 5px 19px #0003;pointer-events:auto}
+#mapScreen .field-map-tools>summary{padding:4px 11px;min-height:35px;line-height:27px;white-space:nowrap;cursor:pointer}
+#mapScreen .field-map-tool-content{display:none;position:absolute;left:0;bottom:calc(100% + 7px);width:min(270px,80vw);max-height:min(66dvh,350px);overflow-y:auto;background:#fff;border:1px solid #bbccbc;border-radius:12px;padding:9px;box-shadow:0 9px 28px #0005}
+#mapScreen .field-map-tools[open]>.field-map-tool-content{display:block}
+#mapScreen .field-map-tools output{color:#365143;font:12px/1.4 system-ui}
+#mapScreen.mapFullscreenMode .leaflet-bottom.leaflet-left{bottom:max(30px,calc(env(safe-area-inset-bottom) + 20px))}
+#mapScreen.mapFullscreenMode .mapLayerPanel{top:max(68px,calc(env(safe-area-inset-top) + 65px))!important}
