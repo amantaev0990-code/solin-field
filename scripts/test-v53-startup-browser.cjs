@@ -74,7 +74,7 @@ const server=http.createServer(async(req,res)=>{
   await emptyPage.evaluate(async()=>await window.SolinWorkspace.ready);
   assert.equal(await emptyPage.evaluate(()=>document.querySelector('.screen.active')?.id),
    'homeScreen','No saved forest must show meaningful recovery screen');
-  assert.equal(await emptyPage.locator('#forestList .forest-option').count(),0,'No fake saved forests');
+  assert.equal(await emptyPage.locator('#forestList .forest-entry').count(),0,'No fake saved forests');
   const restore=emptyPage.locator('#solin-restore-source-forest');
   assert.ok(await restore.isVisible(),'Recovery from included offline dataset must be offered');
   await restore.click();
