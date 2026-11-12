@@ -490,6 +490,36 @@ async function importFile(file){if(!file)return;openModal('Чтение Transfer
     }catch(error){console.warn('Не удалось сохранить исходный MDB для экспорта:',error);}
   }
   closeModal();toast('Загружено лесничеств: '+groups.length)}catch(e){document.querySelector('#transferError').textContent=e.message;b.disabled=false}};}catch(e){openModal('Не удалось загрузить Transfer','<p>'+html(e.message)+'</p><button onclick="closeModal()">Закрыть</button>')}}
+function bindMainMenuRoutes(){
+ const main=document.getElementById('mainScreen');
+ if(!main||main.dataset.solinRoutesBound==='1')return;
+ main.dataset.solinRoutesBound='1';
+ // V52 contains visible data-field-route buttons with NO working onclick.
+ // Use one stable delegated handler even when V33 rearranges the menu DOM.
+ main.addEventListener('click',event=>{
+  const button=event.target.closest?.('button[data-field-route]');
+  if(!button||!main.contains(button))return;
+  const route=button.dataset.fieldRoute;
+  event.preventDefault();event.stopImmediatePropagation();
+  if(route==='homeScreen'){
+   home().catch(e=>toast('Не удалось выбрать лесничество: '+e.message));return;
+  }
+  if(!activeId){
+   toast('Сначала выберите рабочее лесничество');
+   home().catch(e=>toast(e.message));return;
+  }
+  try{
+   if(route==='control'){window.solinCore?.showControls?.();return;}
+   if(route==='filter'){window.solinCore?.filter?.();return;}
+   if(route==='calculationRefs'&&!document.getElementById(route)?.classList.contains('screen')){
+    show('refsScreen');return;
+   }
+   const screen=document.getElementById(route);
+   if(screen?.classList.contains('screen'))show(route);
+   else toast('Раздел «'+(button.textContent||route).trim()+'» не доступен в этой сборке');
+  }catch(error){console.error('Ошибка кнопки меню',route,error);toast('Не удалось открыть раздел: '+error.message);}
+ },true);
+}
 function ensureForestSelectorButton(){
  // V51+ main menu is assembled separately from the forestry chooser.
  // Keep a guaranteed, clickable route to the local list of workspaces.
@@ -506,6 +536,7 @@ function ensureForestSelectorButton(){
  host.append(button);
 }
 function bind(){
+ bindMainMenuRoutes();
  const actions=document.querySelector('#menuScreen .workspace');
  if(actions&&!document.getElementById('solin-forest-transfer')){
   const transfer=document.createElement('button');
