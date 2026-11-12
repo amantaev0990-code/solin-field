@@ -4,7 +4,7 @@ const REGISTRY='SOLIN_WORKSPACES_V1',CHECKPOINT='solin_field_checkpoint_v2',ACTI
 const copy=x=>JSON.parse(JSON.stringify(x));
 const html=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const idOf=r=>String(r.POS)+'::'+String(r.LESN);
-let activeId=null,opened=false,tail=Promise.resolve(),initialized=false;const dirtyFields=new Set();
+let activeId=null,opened=false,tail=Promise.resolve(),initialized=false,sourceFallback=null;const dirtyFields=new Set();
 function openDB(){return new Promise((resolve,reject)=>{const r=indexedDB.open(REGISTRY,2);r.onupgradeneeded=()=>{for(const name of ['forests','source-recovery-backups'])if(!r.result.objectStoreNames.contains(name))r.result.createObjectStore(name,{keyPath:'id'});};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});}
 async function restoreSourceFields(forests){
  const recovery=window.SolinControlSourceRecovery;if(!recovery)return forests;const out=[];
@@ -66,7 +66,8 @@ async function repairAddressCodes(forest){
 }
 function snapshot(){return {id:activeId,org:copy(D.lesnichestvo[0]),quarters:copy(D.quarters),source:copy(D.source||{}),extraTables:copy(D._transferExtras||{}),updatedAt:new Date().toISOString(),history:JSON.parse(localStorage.getItem(CHECKPOINT)||'{}').history||[]};}
 async function persist(){if(!initialized||!activeId)return;const next=snapshot();tail=tail.catch(()=>{}).then(()=>putMany([next]));await tail;return next;}
-function legacyClear(){for(const key of ['solin_field_audited_work_v1','solin_user_data_v1','solin_field_overrides_v3'])localStorage.removeItem(key);}
+// Never erase earlier users' local cards merely because a new workspace version is installed.
+function legacyClear(){/* legacy saves are kept until the taxator explicitly exports/deletes them */}
 function checkpointFor(forest){return {format:'SOLIN-Field-Backup-v2',at:new Date().toISOString(),quarters:forest.quarters,lesnichestvo:[forest.org],source:forest.source,extraTables:forest.extraTables||{},history:forest.history||[]};}
 // Offline cross-device handoff. Use the same SOLIN-Field-Backup-v2
 // understood by SolinTransferReader on iOS, Android and GitHub Pages.
@@ -96,10 +97,28 @@ async function activate(id){await window.__solinMapImportPromise?.catch(()=>{});
  // Recover only missing fields with a proven source row. Never rewrite
  // explicit imported MDB values or infer Klxr from a region/owner alone.
  await repairAddressCodes(forest);
- localStorage.setItem(CHECKPOINT,JSON.stringify(checkpointFor(forest)));legacyClear();clearMap();activeId=id;D.lesnichestvo=[copy(forest.org)];D.quarters=copy(forest.quarters);D._transferExtras=copy(forest.extraTables||{});D.source={...copy(forest.source||{}),forestDistrict:forest.org.NOS,year:forest.org.GodT};current=null;gps=null;opened=true;localStorage.setItem(ACTIVE,id);heading();refresh();show('quartersScreen');window.dispatchEvent(new Event('solin-forest-changed'));return forest;}
+ localStorage.setItem(CHECKPOINT,JSON.stringify(checkpointFor(forest)));legacyClear();clearMap();activeId=id;D.lesnichestvo=[copy(forest.org)];D.quarters=copy(forest.quarters);D._transferExtras=copy(forest.extraTables||{});D.source={...copy(forest.source||{}),forestDistrict:forest.org.NOS,year:forest.org.GodT};current=null;gps=null;opened=true;localStorage.setItem(ACTIVE,id);heading();refresh();show(document.getElementById('mainScreen')?'mainScreen':'quartersScreen');ensureForestSelectorButton();window.dispatchEvent(new Event('solin-forest-changed'));return forest;}
 function showHome(){opened=false;show('homeScreen');heading();return renderHome();}
 async function home(){await persist();return showHome();}
-async function renderHome(){const forests=await list(),host=document.querySelector('#forestList');host.innerHTML=forests.length?'':'<p class="home-empty">Добавьте лесничество из Transfer или создайте новое.</p>';for(const f of forests){const qs=Object.values(f.quarters),rows=qs.flatMap(q=>q.compartments||[]),area=rows.reduce((n,r)=>n+(Number(r.PLV)||0),0);const b=document.createElement('button');b.className='forest-option';b.dataset.forest=f.id;b.innerHTML='<span class="forest-option-icon">♧</span><span><strong>'+html(f.org.NOS)+'</strong><small>'+html(f.org.NLX||'Лесовладелец не указан')+'</small><span class="forest-summary">'+qs.length+' кварталов · '+rows.length+' выделов · '+num(area)+' га</span></span><span class="forest-option-open">Открыть →</span>';b.onclick=()=>activate(f.id).catch(e=>toast(e.message));const entry=document.createElement('div');entry.className='forest-entry';const remove=document.createElement('button');remove.type='button';remove.className='forest-delete';remove.innerHTML=window.solinDeleteIcon||'🗑';remove.title='Удалить лесничество';remove.setAttribute('aria-label','Удалить лесничество «'+f.org.NOS+'»');remove.onclick=()=>openDeleteForest(f.id).catch(e=>toast(e.message));entry.append(b,remove);host.append(entry);}document.querySelector('#forestListStatus').textContent=forests.length?'Сохранено на этом устройстве: '+forests.length:'Готово к началу работы';}
+async function renderHome(){const forests=await list(),host=document.querySelector('#forestList');host.innerHTML=forests.length?'':'<p class="home-empty">Добавьте лесничество из Transfer или создайте новое.</p>';for(const f of forests){const qs=Object.values(f.quarters),rows=qs.flatMap(q=>q.compartments||[]),area=rows.reduce((n,r)=>n+(Number(r.PLV)||0),0);const b=document.createElement('button');b.className='forest-option';b.dataset.forest=f.id;b.innerHTML='<span class="forest-option-icon">♧</span><span><strong>'+html(f.org.NOS)+'</strong><small>'+html(f.org.NLX||'Лесовладелец не указан')+'</small><span class="forest-summary">'+qs.length+' кварталов · '+rows.length+' выделов · '+num(area)+' га</span></span><span class="forest-option-open">Открыть →</span>';b.onclick=()=>activate(f.id).catch(e=>toast(e.message));const entry=document.createElement('div');entry.className='forest-entry';const remove=document.createElement('button');remove.type='button';remove.className='forest-delete';remove.innerHTML=window.solinDeleteIcon||'🗑';remove.title='Удалить лесничество';remove.setAttribute('aria-label','Удалить лесничество «'+f.org.NOS+'»');remove.onclick=()=>openDeleteForest(f.id).catch(e=>toast(e.message));entry.append(b,remove);host.append(entry);}const status=document.querySelector('#forestListStatus');
+if(status)status.textContent=forests.length?'Сохранено на этом устройстве: '+forests.length:
+ 'Список лесничеств пуст. Сохранённые данные не удалены. Можно загрузить Transfer или восстановить исходное лесничество.';
+if(!forests.length&&sourceFallback?.org&&Object.keys(sourceFallback.quarters||{}).length){
+ const restore=document.createElement('button');
+ restore.type='button';restore.className='forest-option';restore.id='solin-restore-source-forest';
+ restore.innerHTML='<strong>Восстановить лесничество из исходного комплекта</strong> <small>'+html(sourceFallback.org.NOS||'')+' · '+Object.keys(sourceFallback.quarters).length+' кварталов</small>';
+ restore.onclick=async()=>{
+  restore.disabled=true;
+  try{
+   const backup=copy(sourceFallback);
+   const found=(await list()).find(x=>x.id===backup.id);
+   if(!found)await putMany([backup]); // preserve any concurrent new data
+   await activate(backup.id);
+  }catch(e){restore.disabled=false;toast('Не удалось восстановить лесничество: '+e.message);}
+ };
+ host.append(restore);
+}
+}
 
  // Both confirmations must be completed before any stored data is changed.
  async function openDeleteForest(id){
@@ -471,6 +490,21 @@ async function importFile(file){if(!file)return;openModal('Чтение Transfer
     }catch(error){console.warn('Не удалось сохранить исходный MDB для экспорта:',error);}
   }
   closeModal();toast('Загружено лесничеств: '+groups.length)}catch(e){document.querySelector('#transferError').textContent=e.message;b.disabled=false}};}catch(e){openModal('Не удалось загрузить Transfer','<p>'+html(e.message)+'</p><button onclick="closeModal()">Закрыть</button>')}}
+function ensureForestSelectorButton(){
+ // V51+ main menu is assembled separately from the forestry chooser.
+ // Keep a guaranteed, clickable route to the local list of workspaces.
+ const root=document.querySelector('#mainScreen');
+ if(!root||document.getElementById('solin-switch-forest'))return;
+ const host=root.querySelector('.field-context')||root.querySelector('.workspace');
+ if(!host)return;
+ const button=document.createElement('button');
+ button.type='button';button.id='solin-switch-forest';button.className='menuRow solin-switch-forest';
+ button.textContent='Выбрать или сменить лесничество';
+ button.title='Показать все лесничества, сохранённые на этом планшете';
+ button.style.cssText='display:block;width:100%;min-height:44px;margin:10px 0;padding:9px;border:1px solid #9eb4a0;border-radius:8px;background:#f8fcf8;color:#155138;cursor:pointer;font-weight:700';
+ button.onclick=()=>home().catch(e=>toast(e.message));
+ host.append(button);
+}
 function bind(){
  const actions=document.querySelector('#menuScreen .workspace');
  if(actions&&!document.getElementById('solin-forest-transfer')){
@@ -481,28 +515,87 @@ function bind(){
   const before=actions.querySelector('#solin-mdb-export');
   if(before)before.before(transfer);else actions.append(transfer);
  }
- document.querySelector('#newForestButton').onclick=newForest;// A real full-size file input sits over the visual Transfer button.
+ const newButton=document.querySelector('#newForestButton');if(newButton)newButton.onclick=newForest;// A real full-size file input sits over the visual Transfer button.
  // This avoids iOS/Safari rejecting a scripted click on a hidden input.
  const nativePicker=document.querySelector('#transferForestInput');
  // The native input is inside the styled label. The physical tap goes to the input,
  // so no synthetic click is needed (and no duplicate chooser can be opened).
- nativePicker.onchange=e=>{
+ if(nativePicker)nativePicker.onchange=e=>{
    const file=e.currentTarget.files?.[0];
    e.currentTarget.value=''; // selecting the same MDB again must still fire change
    if(!file)return; // Cancelled the native picker: never import stale data.
    const status=document.querySelector('#forestListStatus');
    if(status)status.textContent='Выбран файл: '+file.name+'. Проверяю Transfer…';
    void importFile(file);
- };document.querySelector('#homeButton').onclick=()=>home().catch(e=>toast(e.message));const old=window.show;window.show=function(id){if(!initialized&&id!=='homeScreen'){return old('homeScreen');}document.body.classList.toggle('workspace-home',id==='homeScreen');old(id);};
+ };
+ const homeButton=document.querySelector('#homeButton');
+ if(homeButton)homeButton.onclick=()=>activeId?show(document.getElementById('mainScreen')?'mainScreen':'quartersScreen'):home().catch(e=>toast(e.message));
+ ensureForestSelectorButton();
+ const old=window.show;window.show=function(id){if(!initialized&&id!=='homeScreen'){return old('homeScreen');}document.body.classList.toggle('workspace-home',id==='homeScreen');old(id);};
  window.addEventListener('solin-saved',()=>persist().catch(e=>toast('Не удалось сохранить лесничество: '+e.message)));
  const prevBackup=window.solinCore.commitImport;window.solinCore.commitImport=function(x){if(x.lesnichestvo?.[0]&&idOf(x.lesnichestvo[0])!==activeId)throw Error('Эта копия относится к другому лесничеству. Загрузите её через главное окно');const result=prevBackup(x);persist().catch(e=>toast(e.message));return result;};
 }
-async function init(){try{bind();let forests=await list();const recovery=JSON.parse(localStorage.getItem(CHECKPOINT)||'null');if(recovery?.lesnichestvo?.[0]&&recovery.quarters){const org=recovery.lesnichestvo[0],id=idOf(org),stored=forests.find(f=>f.id===id);if(!stored||Date.parse(recovery.at||0)>Date.parse(stored.updatedAt||0)){await putMany([{id,org,quarters:recovery.quarters,extraTables:recovery.extraTables||{},source:recovery.source||{},history:recovery.history||[],updatedAt:recovery.at||new Date().toISOString()}]);forests=await list();}}
- if(!forests.length&&!localStorage.getItem(INITIALIZED)){activeId=idOf(D.lesnichestvo[0]);initialized=true;await persist();forests=await list();}
+async function init(){
+ try{
+  bind();
+  // Retain a read-only recovery candidate BEFORE changing any loaded records.
+  // This is the bundled/reference forest, not a replacement for user edits.
+  if(D?.lesnichestvo?.[0]&&Object.keys(D.quarters||{}).length){
+   const org=copy(D.lesnichestvo[0]);
+   sourceFallback={id:idOf(org),org,quarters:copy(D.quarters),
+    source:copy(D.source||{}),extraTables:copy(D._transferExtras||{}),
+    history:[],updatedAt:new Date().toISOString()};
+  }
+  let forests=await list();
+  // Recover a genuine V50–V52 checkpoint first; never overwrite a newer
+  // IndexedDB forest with an older localStorage record.
+  let recovery=null;
+  try{recovery=JSON.parse(localStorage.getItem(CHECKPOINT)||'null');}catch(e){
+   console.warn('Не удалось прочитать контрольную копию лесничества',e);
+  }
+  if(recovery?.lesnichestvo?.[0]&&recovery.quarters){
+   const org=recovery.lesnichestvo[0],id=idOf(org),stored=forests.find(f=>f.id===id);
+   if(!stored||Date.parse(recovery.at||0)>Date.parse(stored.updatedAt||0)){
+    await putMany([{id,org:copy(org),quarters:copy(recovery.quarters),
+     extraTables:copy(recovery.extraTables||{}),source:copy(recovery.source||{}),
+     history:copy(recovery.history||[]),updatedAt:recovery.at||new Date().toISOString()}]);
+    forests=await list();
+   }
+  }
+  // First installation: preserve original bundled forest and save its
+  // full address and quarter dataset. Do NOT re-seed after intentional delete.
+  if(!forests.length&&!localStorage.getItem(INITIALIZED)&&sourceFallback){
+   await putMany([copy(sourceFallback)]);
+   forests=await list();
+  }
   localStorage.setItem(INITIALIZED,'1');
-  if(!forests.length){activeId=null;initialized=true;opened=false;localStorage.removeItem(ACTIVE);localStorage.removeItem(CHECKPOINT);legacyClear();D.lesnichestvo=[];D.quarters={};D._transferExtras={};D.source={};refresh();await showHome();window.dispatchEvent(new Event('solin-workspaces-ready'));return;}
- try{forests=await restoreSourceFields(forests);}catch(e){if(window.SolinControlSourceRecovery)window.SolinControlSourceRecovery.lastError=e?.message||String(e);forests=await list();}
- activeId=null;initialized=true;const last=forests.find(r=>r.id===localStorage.getItem(ACTIVE))||forests[0];localStorage.setItem(CHECKPOINT,JSON.stringify(checkpointFor(last)));legacyClear();D.lesnichestvo=[copy(last.org)];D.quarters=copy(last.quarters);D._transferExtras=copy(last.extraTables||{});D.source=copy(last.source||{});activeId=last.id;refresh();await showHome();window.dispatchEvent(new Event('solin-workspaces-ready'));}catch(e){document.querySelector('#forestListStatus').textContent='Ошибка локального хранилища: '+e.message;throw e;}}
+  initialized=true;
+  if(!forests.length){
+   activeId=null;opened=false;
+   // Never remove checkpoint/legacy storage or clear D on a failed migration.
+   await showHome();
+   window.dispatchEvent(new Event('solin-workspaces-ready'));
+   document.dispatchEvent(new Event('solin-workspaces-ready'));
+   return;
+  }
+  try{forests=await restoreSourceFields(forests);}catch(e){
+   console.warn('Восстановление полей пропущено без удаления рабочих данных',e);
+   forests=await list();
+  }
+  const last=forests.find(r=>r.id===localStorage.getItem(ACTIVE))||forests[0];
+  activeId=null; // prevent persisting loaded starter data over the workspace
+  await activate(last.id);
+  // Startup should land on the real main menu, not the forestry chooser.
+  window.dispatchEvent(new Event('solin-workspaces-ready'));
+  document.dispatchEvent(new Event('solin-workspaces-ready'));
+ }catch(e){
+  console.error('Не удалось запустить лесничество',e);
+  const status=document.querySelector('#forestListStatus');
+  if(status)status.textContent='Ошибка запуска: '+e.message+'. Сохранённые данные не удалялись.';
+  initialized=true;
+  throw e;
+ }
+}
 let readyResolve,readyReject;const ready=new Promise((r,j)=>{readyResolve=r;readyReject=j});
 window.SolinWorkspace={list,activate,create,deleteForest,deleteQuarter,deleteStand,previewTransfer,importTransfer,persist,exportForest,home,importFile,downloadSourceRecoveryBackup,repairAddressCodes,get activeId(){return activeId},ready};
 window.addEventListener('solin-ready',()=>init().then(readyResolve,readyReject),{once:true});
