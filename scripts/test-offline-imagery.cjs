@@ -102,15 +102,17 @@ const server=http.createServer((req,res)=>{try{
    }
    const layer=makeGeoGroup({type:'FeatureCollection',features});
    const entry={cmf2:true,name:'performance-fixture',geometryEntries:[{source:'ВыдПород',layer}]};importedMapLayers.push(entry);window.__labelFixture=entry;
-   fieldMap.setView([50.1025,59.204],17);SolinCmfLabelLayerV5.buildLabels(entry);
+   fieldMap.stop().setView([50.1025,59.204],17,{animate:false});
+   if(fieldMap.getZoom()!==17)throw Error('Map zoom clamped to '+fieldMap.getZoom()+' (maximum '+fieldMap.getMaxZoom()+')');
+   SolinCmfLabelLayerV5.buildLabels(entry);
   });
   await page.waitForFunction(()=>window.__labelFixture.labelLayers.stands.getLayers().length>0,null,{timeout:8000}).catch(async()=>{
-   const detail=await page.evaluate(()=>({zoom:fieldMap.getZoom(),center:fieldMap.getCenter(),bounds:fieldMap.getBounds().toBBoxString(),group:fieldMap.hasLayer(__labelFixture.labelLayers.stands),count:__labelFixture.labelLayers.vCount,visible:__labelFixture.labelLayers.stands.getLayers().length,items:__labelFixture.labelLayers.standsItems.length,first:__labelFixture.labelLayers.standsItems[0]?.bounds?.toBBoxString()}));
+   const detail=await page.evaluate(()=>({zoom:fieldMap.getZoom(),center:fieldMap.getCenter(),maxZoom:fieldMap.getMaxZoom(),bounds:fieldMap.getBounds().toBBoxString(),group:fieldMap.hasLayer(__labelFixture.labelLayers.stands),count:__labelFixture.labelLayers.vCount,visible:__labelFixture.labelLayers.stands.getLayers().length,items:__labelFixture.labelLayers.standsItems.length,first:__labelFixture.labelLayers.standsItems[0]?.bounds?.toBBoxString()}));
    throw Error('CMF label fixture failed: '+JSON.stringify(detail));
   });
   const labels=await page.evaluate(()=>({visible:__labelFixture.labelLayers.stands.getLayers().length,source:__labelFixture.labelLayers.vCount,geometry:__labelFixture.geometryEntries[0].layer.getLayers().length}));
   assert.equal(labels.source,1000);assert.equal(labels.geometry,1000);assert(labels.visible<=220);
-  await page.evaluate(()=>{fieldMap.setView([50.1025,59.204],9);});
+  await page.evaluate(()=>{fieldMap.stop().setView([50.1025,59.204],9,{animate:false});});
   await page.waitForFunction(()=>__labelFixture.labelLayers.stands.getLayers().length===0&&__labelFixture.labelLayers.quarters.getLayers().length===0);
   // Large MapInfo geometry must be cullable without losing the real full extent.
   const mapinfo=await page.evaluate(async()=>{
@@ -120,12 +122,12 @@ const server=http.createServer((req,res)=>{try{
     features.push({type:'Feature',properties:{Nвыд:y*40+x+1},geometry:{type:'Polygon',
      coordinates:[[[lon,lat],[lon+.002,lat],[lon+.002,lat+.002],[lon,lat+.002],[lon,lat]]]}});
    }
-   fieldMap.setView([50.11,59.22],15);
+   fieldMap.stop().setView([50.11,59.22],15,{animate:false});
    const entry=createMapInfoLayer({name:'213_1_ВыдПл',geojson:{type:'FeatureCollection',features},settings:''},'v57-test',0,1);
    const b=entry.layer.getBounds();entry.layer.addTo(fieldMap);
    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
    const near=entry.layer.getLayers().length;
-   fieldMap.setZoom(8);
+   fieldMap.stop().setZoom(8,{animate:false});
    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
    const far=entry.layer.getLayers().length;
    fieldMap.removeLayer(entry.layer);
