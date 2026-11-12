@@ -158,7 +158,7 @@ function regionForForest(org){
 }
 window.SolinForestRegionName=regionForForest;
 
-async function syncForestContext(){
+async function syncForestContext(preloadedForests){
  // The original desktop-style field-context SELECT is the only forest picker.
  // Do not add an extra button and do not show a blank default when a forest
  // is already active. Use the same IndexedDB list as the working chooser.
@@ -177,7 +177,7 @@ async function syncForestContext(){
  const forestBlock=section('лесничество');
  const picker=forestBlock?.querySelector('select')||context.querySelector('select');
  if(!picker)return;
- const forests=await list();
+ const forests=preloadedForests||await list();
  // Another forest selection may finish while a previous asynchronous read
  // is pending; read activeId only AFTER the IndexedDB request completes.
  const selected=activeId;
@@ -209,11 +209,11 @@ async function syncForestContext(){
  }
 }
 
-async function activate(id){await window.__solinMapImportPromise?.catch(()=>{});await persist();const forest=(await list()).find(r=>r.id===id);if(!forest)throw Error('Лесничество не найдено');
+async function activate(id,preloadedForest=null,knownForests=null){await window.__solinMapImportPromise?.catch(()=>{});await persist();const forest=preloadedForest?.id===id?preloadedForest:(await list()).find(r=>r.id===id);if(!forest)throw Error('Лесничество не найдено');
  // Recover only missing fields with a proven source row. Never rewrite
  // explicit imported MDB values or infer Klxr from a region/owner alone.
  await repairAddressCodes(forest);
- localStorage.setItem(CHECKPOINT,JSON.stringify(checkpointFor(forest)));legacyClear();clearMap();activeId=id;D.lesnichestvo=[copy(forest.org)];D.quarters=copy(forest.quarters);D._transferExtras=copy(forest.extraTables||{});D.source={...copy(forest.source||{}),forestDistrict:forest.org.NOS,year:forest.org.GodT};current=null;gps=null;opened=true;localStorage.setItem(ACTIVE,id);heading();refresh();await syncForestContext();show(document.getElementById('mainScreen')?'mainScreen':'quartersScreen');window.dispatchEvent(new Event('solin-forest-changed'));return forest;}
+ localStorage.setItem(CHECKPOINT,JSON.stringify(checkpointFor(forest)));legacyClear();clearMap();activeId=id;D.lesnichestvo=[copy(forest.org)];D.quarters=copy(forest.quarters);D._transferExtras=copy(forest.extraTables||{});D.source={...copy(forest.source||{}),forestDistrict:forest.org.NOS,year:forest.org.GodT};current=null;gps=null;opened=true;localStorage.setItem(ACTIVE,id);heading();refresh();await syncForestContext(knownForests);show(document.getElementById('mainScreen')?'mainScreen':'quartersScreen');window.dispatchEvent(new Event('solin-forest-changed'));return forest;}
 function showHome(){opened=false;show('homeScreen');heading();return renderHome();}
 async function home(){await persist();return showHome();}
 async function renderHome(){const forests=await list(),host=document.querySelector('#forestList');host.innerHTML=forests.length?'':'<p class="home-empty">Добавьте лесничество из Transfer или создайте новое.</p>';for(const f of forests){const qs=Object.values(f.quarters),rows=qs.flatMap(q=>q.compartments||[]),area=rows.reduce((n,r)=>n+(Number(r.PLV)||0),0);const b=document.createElement('button');b.className='forest-option';b.dataset.forest=f.id;b.innerHTML='<span class="forest-option-icon">♧</span><span><strong>'+html(f.org.NOS)+'</strong><small>'+html(f.org.NLX||'Лесовладелец не указан')+'</small><span class="forest-summary">'+qs.length+' кварталов · '+rows.length+' выделов · '+num(area)+' га</span></span><span class="forest-option-open">Открыть →</span>';b.onclick=()=>activate(f.id).catch(e=>toast(e.message));const entry=document.createElement('div');entry.className='forest-entry';const remove=document.createElement('button');remove.type='button';remove.className='forest-delete';remove.innerHTML=window.solinDeleteIcon||'🗑';remove.title='Удалить лесничество';remove.setAttribute('aria-label','Удалить лесничество «'+f.org.NOS+'»');remove.onclick=()=>openDeleteForest(f.id).catch(e=>toast(e.message));entry.append(b,remove);host.append(entry);}const status=document.querySelector('#forestListStatus');
@@ -681,15 +681,15 @@ function bind(){
 async function init(){
  try{
   bind();
-  // Retain a read-only recovery candidate BEFORE changing any loaded records.
-  // This is the bundled/reference forest, not a replacement for user edits.
-  if(D?.lesnichestvo?.[0]&&Object.keys(D.quarters||{}).length){
+  // On a returning taxator's device, do not clone the entire bundled
+  // reference forest before knowing whether a recovery copy is required.
+  let forests=await list();
+  if(!forests.length&&D?.lesnichestvo?.[0]&&Object.keys(D.quarters||{}).length){
    const org=copy(D.lesnichestvo[0]);
    sourceFallback={id:idOf(org),org,quarters:copy(D.quarters),
     source:copy(D.source||{}),extraTables:copy(D._transferExtras||{}),
     history:[],updatedAt:new Date().toISOString()};
   }
-  let forests=await list();
   // Recover a genuine V50–V52 checkpoint first; never overwrite a newer
   // IndexedDB forest with an older localStorage record.
   let recovery=null;
@@ -727,7 +727,8 @@ async function init(){
   }
   const last=forests.find(r=>r.id===localStorage.getItem(ACTIVE))||forests[0];
   activeId=null; // prevent persisting loaded starter data over the workspace
-  await activate(last.id);
+  await activate(last.id,last,forests);
+  window.performance?.mark?.('solin-v56-main-ready');
   // Startup should land on the real main menu, not the forestry chooser.
   window.dispatchEvent(new Event('solin-workspaces-ready'));
   document.dispatchEvent(new Event('solin-workspaces-ready'));
