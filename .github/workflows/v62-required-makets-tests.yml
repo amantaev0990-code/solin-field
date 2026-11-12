@@ -30,7 +30,15 @@ jobs:
       - name: Prepare Android WebView browser regression assets
         run: |
           npm install --no-audit --no-fund
-          npm run build
+          GH_TOKEN=${{ github.token }} gh release download solin-field-v230041 --repo amantaev0990-code/solin-field --pattern SOLIN-Field-update.apk --dir "$RUNNER_TEMP/v61"
+          unzip -q "$RUNNER_TEMP/v61/SOLIN-Field-update.apk" 'assets/public/*' -d "$RUNNER_TEMP/v61"
+          mv "$RUNNER_TEMP/v61/assets/public" www
+          cp solin-quick-card.js solin-category-rules.js www/
+          node --input-type=module <<'NODE'
+          import {readFileSync,writeFileSync} from 'node:fs';
+          const p='www/index.html';const s=readFileSync(p,'utf8');
+          writeFileSync(p,s.replace(/(solin-quick-card\.js|solin-category-rules\.js)(\?v=[^"]*)?"/g,'$1?v=62"'));
+          NODE
           npm install --no-save --no-audit --no-fund playwright@1.56.1
           npx playwright install --with-deps chromium
       - name: Test mandatory Maket popups in tablet editor
