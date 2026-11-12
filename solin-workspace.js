@@ -122,6 +122,42 @@ function heading(){
   subtitle.style.setProperty('color','#42634e','important');
  }
 }
+// Province names are a PRESENTATION lookup for KTO from original KUch.
+// Do not rewrite POS/LESN/KTO or infer present-day provincial borders from
+// a taxator's stored historical administrative code.
+const regionNames=Object.freeze({
+  100000000:'Область Абай',
+  110000000:'Акмолинская область',
+  150000000:'Актюбинская область',
+  190000000:'Алматинская область',
+  230000000:'Атырауская область',
+  270000000:'Западно-Казахстанская область',
+  310000000:'Жамбылская область',
+  330000000:'Область Жетісу',
+  350000000:'Карагандинская область',
+  390000000:'Костанайская область',
+  430000000:'Кызылординская область',
+  470000000:'Мангистауская область',
+  510000000:'Южно-Казахстанская область (исходный код КТО 51)',
+  550000000:'Павлодарская область',
+  590000000:'Северо-Казахстанская область',
+  610000000:'Туркестанская область',
+  620000000:'Область Ұлытау',
+  630000000:'Восточно-Казахстанская область'
+});
+function regionForForest(org){
+ const regionValue=String(org?.Область||org?.oblast||D?.source?.region||'').trim();
+ // SOLI-N transfers commonly carry KTO but NO human readable province name.
+ const sourceKTO=window.SolinAddressContext?.originalKTO?.(org?.POS,org?.LESN);
+ const n=Number(org?.KTO)>0?Number(org.KTO):Number(sourceKTO);
+ const top=Number.isSafeInteger(n)&&n>0?Math.floor(n/10000000)*10000000:0;
+ if(top&&regionNames[top])return regionNames[top];
+ if(regionValue&&!/^\\d+$/.test(regionValue))return regionValue;
+ if(top)return 'Код области КТО: '+top;
+ return 'Область не определена';
+}
+window.SolinForestRegionName=regionForForest;
+
 async function syncForestContext(){
  // The original desktop-style field-context SELECT is the only forest picker.
  // Do not add an extra button and do not show a blank default when a forest
@@ -135,7 +171,7 @@ async function syncForestContext(){
  const ownerBlock=section('лесовладелец');
  const ownerText=ownerBlock?.querySelector('dd');
  if(ownerText)ownerText.textContent=activeId?(org.NLX||'Не указан'):'—';
- const region=String(org.Область||org.oblast||D?.source?.region||'').trim();
+ const region=regionForForest(org);
  const regionText=section('область')?.querySelector('dd');
  if(regionText)regionText.textContent=region||'—';
  const forestBlock=section('лесничество');
@@ -145,7 +181,10 @@ async function syncForestContext(){
  // Another forest selection may finish while a previous asynchronous read
  // is pending; read activeId only AFTER the IndexedDB request completes.
  const selected=activeId;
- picker.replaceChildren(new Option(forests.length?'Выбрать лесничество':'Нет сохранённых лесничеств',''));
+ // The Android picker treated the decorative placeholder as a FIFTH
+ // selectable forestry row. Show ONLY real forests in an initialized list.
+ picker.replaceChildren();
+ if(!forests.length)picker.add(new Option('Нет сохранённых лесничеств',''));
  for(const forest of forests){
   const code=[forest.org?.POS,forest.org?.LESN].filter(x=>x!==null&&x!==undefined&&x!=='').join('/');
   const label=String(forest.org?.NOS||'Без названия')+(code?' ('+code+')':'');
