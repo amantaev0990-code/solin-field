@@ -1,0 +1,40 @@
+name: V57 map performance and offline browser tests
+on:
+  push:
+    branches: [fix/v57-map-controls-offline-entry]
+    paths:
+      - 'map.js'
+      - 'map.css'
+      - 'index.html'
+      - 'solin-offline-imagery.js'
+      - 'scripts/test-offline-imagery.cjs'
+      - '.github/workflows/v57-map-tests.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  map-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Check map JavaScript syntax and offline UI contract
+        run: |
+          node --check map.js
+          node --check solin-offline-imagery.js
+          node --check scripts/test-offline-imagery.cjs
+          test "$(grep -o 'id="offlineImportBtn"' index.html | wc -l)" -eq 0
+          grep -Fq "Импорт офлайн-карты" map.js
+          grep -Fq "position:'bottomleft'" map.js
+      - name: Install browser
+        run: |
+          npm install --no-audit --no-fund
+          npm install --no-save --no-audit --no-fund playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Test offline imagery, zoom levels, and large MapInfo viewport
+        env:
+          PLAYWRIGHT_PATH: playwright
+          BROWSER_CHANNEL: chromium
+        run: node scripts/test-offline-imagery.cjs
