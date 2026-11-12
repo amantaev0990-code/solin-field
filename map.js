@@ -523,6 +523,31 @@ function installFieldMapTools(map) {
  void open();
 }
 
+// A compact spatial index keeps large MapInfo datasets out of the Leaflet DOM
+// until their geometry is actually visible on the tablet.
+function indexMapInfoFeatures(features){
+ const whole=L.latLngBounds([]);
+ const indexed=features.map((feature,id)=>{
+  let west=Infinity,south=Infinity,east=-Infinity,north=-Infinity;
+  function coords(value){
+   if(!Array.isArray(value)||!value.length)return;
+   if(typeof value[0]==='number'){
+    const lng=value[0],lat=value[1];
+    if(Number.isFinite(lng)&&Number.isFinite(lat)&&Math.abs(lat)<=90&&Math.abs(lng)<=180){
+     west=Math.min(west,lng);east=Math.max(east,lng);
+     south=Math.min(south,lat);north=Math.max(north,lat);
+    }
+   }else for(const child of value)coords(child);
+  }
+  function geometry(g){if(!g)return;if(g.type==='GeometryCollection')for(const child of g.geometries||[])geometry(child);else coords(g.coordinates);}
+  geometry(feature.geometry);
+  if(!Number.isFinite(west))return null;
+  whole.extend([south,west]);whole.extend([north,east]);
+  return {id,feature,west,south,east,north};
+ }).filter(Boolean);
+ return {indexed,whole};
+}
+
 let mapInfoPaneId = 0;
 function createMapInfoLayer({name, geojson, settings}, fileKey, index, count) {
  const pane = 'mapinfo-' + (++mapInfoPaneId);
@@ -581,7 +606,8 @@ function createMapInfoLayer({name, geojson, settings}, fileKey, index, count) {
    fillOpacity: globalBrush?.[1] === '1' ? 0 : 0.35
   };
  }
- const group = L.geoJSON(geojson, {
+ const viewport=geojson.features?.length>350?indexMapInfoFeatures(geojson.features):null;
+ const group = L.geoJSON(viewport?{type:'FeatureCollection',features:[]} :geojson, {
   pane, renderer, smoothFactor:1.25, style, interactive:isStandLayer,
   filter(feature) {
    if (feature.geometry?.type !== 'Point') return true;
@@ -619,9 +645,37 @@ function createMapInfoLayer({name, geojson, settings}, fileKey, index, count) {
    });
   }
  });
- const bounds = group.getBounds();
+ const bounds = viewport?viewport.whole:group.getBounds();
  for (const label of labels) bounds.extend(label.getLatLng());
- if (labels.length) {
+ if(viewport){
+  // Keep detailed data in memory but draw only nearby features. Reuse the
+  // existing group so layer toggles, clicks and export bindings are unchanged.
+  let lastSignature='';
+  const redrawViewport=()=>{
+   if(!fieldMap.hasLayer(group))return;
+   const zoom=fieldMap.getZoom(),b=fieldMap.getBounds().pad(.12);
+   const minZoom=isStandLayer?11:importantLabel?(/(?:^|_)номкв$/i.test(name)?11:13):0;
+   const maxShapes=zoom<11?700:zoom<13?1600:4000;
+   const visible=[];
+   if(zoom>=minZoom)for(const item of viewport.indexed){
+    if(item.east<b.getWest()||item.west>b.getEast()||item.north<b.getSouth()||item.south>b.getNorth())continue;
+    visible.push(item);
+    if(visible.length>=maxShapes)break;
+   }
+   const signature=visible.map(item=>item.id).join(',');
+   if(signature===lastSignature)return;
+   lastSignature=signature;
+   labels.length=0;labelLayer.clearLayers();
+   group.clearLayers();
+   if(visible.length)group.addData({type:'FeatureCollection',features:visible.map(item=>item.feature)});
+   syncLabels();
+  };
+  group.on('add',()=>{fieldMap.on('moveend',redrawViewport);redrawViewport();});
+  group.on('remove',()=>{fieldMap.off('moveend',redrawViewport);lastSignature='';});
+  // Full bounds are retained for initial zoom-to-layer even while offscreen.
+  group.getBounds=()=>bounds;
+ }
+ if (labels.length || viewport) {
   group.on('add', () => {
    labelLayer.addTo(fieldMap);
    fieldMap.on('moveend',syncLabels);
