@@ -238,7 +238,7 @@
         '<p>Файл <b>'+esc(actualName)+'</b> сохранён в '+esc(result.folder||'выбранной папке')+'.</p>'+
         '<p><b>Размер: '+size+' КБ.</b> Файл повторно считан и проверен.</p>'+
         '<p><b>Записи:</b> '+counts.quarters+' кварталов, '+counts.stands+' выделов, '+counts.maket10+' строк Макета 10.</p>'+
-        '<p>Перед использованием в работе откройте его на настольном SOLI-N в тестовой базе.</p>'+
+        '<p>Для передачи начальнику отправьте именно этот файл .mdb. На его планшете выберите «Загрузить Transfer», затем «Добавить данные в лесничество».</p>'+
         '<button type="button" onclick="closeModal()">Готово</button>');
     }catch(e){
       modal('MDB не создан',
@@ -249,7 +249,7 @@
   }
   function install(){
     const b=button();if(!b)return;
-    b.textContent='Экспорт MDB';
+    b.innerHTML='<span><b>Экспорт Transfer MDB</b><small>Для планшета начальника или настольного SOLI-N</small></span><span>⇩</span>';
     b.type='button';b.onclick=exportMDB;
   }
   window.SolinOfflineMDB={exportMDB,readStored,saveStored,deleteStored};
