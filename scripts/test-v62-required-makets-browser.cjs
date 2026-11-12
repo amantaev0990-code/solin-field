@@ -49,7 +49,21 @@ const server=http.createServer(async(req,res)=>{
     const node=document.querySelector('#ce-required-makets');
     const buttons=[...(node?.querySelectorAll('.ce-source-required-maket')||[])].map(x=>x.textContent.trim());
     return buttons.join(',')===args.wanted.join(',')&&node?.hidden===!args.wanted.length;
-   },{wanted});
+   },{wanted},{timeout:9000}).catch(async err=>{
+    const details=await page.evaluate(()=>{
+     const form=document.querySelector('#ce-form');
+     const node=document.querySelector('#ce-required-makets');
+     const ku=form?.querySelector('[data-ce-scope="base"][data-ce-field="KU"]')?.value;
+     const glf=form?.querySelector('[aria-label="Категория ГЛФ, код"]')?.value;
+     const fzona=form?.querySelector('[data-ce-scope="base"][data-ce-field="Fzona"]')?.value;
+     const ref=window.SOLIN_REFS?.tables?.SKU;
+     return {ku,glf,fzona,buttons:[...(node?.querySelectorAll('button')||[])].map(x=>x.textContent),
+      hint:node?.textContent,hidden:node?.hidden,step:form?.dataset.quickStep,
+      formConnected:form?.isConnected,refRow:ref?.find(x=>String(x.KU)===String(ku)),
+      requirements:window.SolinCategoryRules?.maketRequirements?.(ku,window.SOLIN_REFS?.tables,{KGLF:glf,Fzona:fzona})};
+    });
+    throw Error('KU '+ku+' expected '+wanted.join(',')+' but saw '+JSON.stringify(details));
+   });
    const actual=await hint.locator('button').allInnerTexts();
    assert.deepEqual(actual,wanted,'Wrong on-screen mandatory makets for category '+ku);
    assert.equal(await hint.isVisible(),wanted.length>0,'Banner visible for KU '+ku);
