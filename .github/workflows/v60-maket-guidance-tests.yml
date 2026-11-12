@@ -29,7 +29,8 @@ jobs:
       - name: Install browser
         run: |
           npm install --no-audit --no-fund
+          npm run build
           npm install --no-save --no-audit --no-fund playwright@1.56.1
           npx playwright install --with-deps chromium
       - name: Test road category on actual card
-        run: node scripts/test-v60-maket-guidance-browser.cjs .
+        run: node scripts/test-v60-maket-guidance-browser.cjs www
