@@ -102,7 +102,7 @@ jobs:
           # V38 old mainScreen-only test no longer matches V54 chooser. Check actual tablet navigation instead.
           node scripts/test-v52-navigation-browser.cjs
           node scripts/test-v39-card-browser.cjs
-          node scripts/test-v54-startup-browser.cjs
+          node scripts/test-v53-startup-browser.cjs
           node scripts/test-v54-forest-context-browser.cjs
           # This asset is reinserted byte-for-byte in the original signing stage.
           rm www/solin-private-refs.packed.bin
