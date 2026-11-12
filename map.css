@@ -30,3 +30,10 @@
 .field-area-handle:active{cursor:grabbing}
 .mapinfo-label .mapinfo-important-label{font-size:14px;font-weight:800!important;color:#17251d!important;background:#fff;line-height:1;
  padding:2px 4px;border-radius:3px;box-shadow:0 1px 3px #0007;text-shadow:none!important}
+
+/* V57: tools stay below the map, clear of fullscreen and layers controls. */
+#fieldMap .leaflet-bottom.leaflet-left{bottom:max(12px,env(safe-area-inset-bottom));left:10px;z-index:750}
+#fieldMap .leaflet-bottom .field-map-tools{margin:0;max-width:min(290px,calc(100vw - 28px));border-radius:12px;box-shadow:0 4px 18px #0003}
+#fieldMap .field-map-tools[open]{max-height:min(58dvh,400px);overflow-y:auto;overscroll-behavior:contain}
+#fieldMap .field-map-tools summary{padding:2px 8px;min-height:34px;display:flex;align-items:center}
+#mapScreen.mapFullscreenMode #fieldMap .leaflet-bottom.leaflet-left{bottom:max(16px,env(safe-area-inset-bottom))}
