@@ -14,14 +14,36 @@ function show(id) {
   $$('.sectionTab').forEach(tab => tab.classList.toggle('active', tab.dataset.s === id));
   if (id !== 'mapScreen') next.scrollTo({top: 0, left: 0, behavior: 'instant'});
   window.scrollTo({top: 0, left: 0, behavior: 'instant'});
+  // Keep hidden quarter, stand and reference lists unmounted during boot.
+  // Populate them on the first real visit, after the new screen is visible.
+  if(id==='quartersScreen')requestAnimationFrame(()=>{
+    if(next.classList.contains('active'))renderQuarters($('#qSearch input')?.value||'');
+  });
+  if(id==='allCompsScreen')requestAnimationFrame(()=>{
+    if(next.classList.contains('active'))renderAllComps($('#vSearch input')?.value||'');
+  });
+  if(id==='refsScreen')requestAnimationFrame(()=>{
+    if(next.classList.contains('active')){
+      if(typeof window.solinEnsureRefsRendered==='function')window.solinEnsureRefsRendered();
+      else renderFriendlyRefs();
+    }
+  });
 }
 function lookup(k,v){const maps=D?.fieldLookups||{};const aliases={M3Pr:'POR',PORP:'POR',P15:'POR',PRP1:'POR',PRP2:'POR',PRP3:'POR',PLP1:'POR',PLP2:'POR',PLP3:'POR'};const m=maps[k]||maps[aliases[k]];return m?.[String(v)]??v}
 function landName(v){return lookup('KU',v)||''}function speciesName(v){return lookup('POR',v)||''}
 function saveLocal(){const obj={quarters:{}};for(const[k,q]of Object.entries(D.quarters))if(q._local||q.compartments.some(x=>x._local))obj.quarters[k]={_local:q._local||false,meta:q.meta||{},compartments:q.compartments.filter(x=>x._local)};localStorage.setItem('solin_user_data_v1',JSON.stringify(obj))}
 function mergeLocal(){try{const L=JSON.parse(localStorage.getItem('solin_user_data_v1')||'{}');for(const[k,q]of Object.entries(L.quarters||{})){if(!D.quarters[k])D.quarters[k]={meta:q.meta||{},compartments:[],_local:true};for(const r of q.compartments||[]){if(!D.quarters[k].compartments.some(x=>String(x.VD)===String(r.VD)&&x._local))D.quarters[k].compartments.push(r)}}}catch(e){console.warn(e)}}
-async function boot(){try{const mf=await getJSON('./data-manifest.json');D=await getJSON('./data-meta.json');const chunks=await Promise.all(mf.quarterChunks.map(f=>getJSON('./'+f)));D.quarters=Object.assign({},...chunks);D.references=D.references||{};mergeLocal();refresh();renderFriendlyRefs();renderDb();window.dispatchEvent(new Event('solin-ready'))}catch(e){console.error(e);toast('Ошибка загрузки данных: '+e.message);document.querySelector('#quarters').innerHTML='<button class="widePrimary" onclick="boot()">Повторить загрузку</button>'}}
+async function boot(){try{const mf=await getJSON('./data-manifest.json');D=await getJSON('./data-meta.json');const chunks=await Promise.all(mf.quarterChunks.map(f=>getJSON('./'+f)));D.quarters=Object.assign({},...chunks);D.references=D.references||{};mergeLocal();refresh();if(!window.SolinWorkspace&&!window.solinEnsureRefsRendered)renderFriendlyRefs();renderDb();window.dispatchEvent(new Event('solin-ready'))}catch(e){console.error(e);toast('Ошибка загрузки данных: '+e.message);document.querySelector('#quarters').innerHTML='<button class="widePrimary" onclick="boot()">Повторить загрузку</button>'}}
 function totals(){const qs=Object.values(D.quarters),comps=qs.flatMap(q=>q.compartments||[]);return{q:qs.length,v:comps.length,a:comps.reduce((s,r)=>s+(+r.PLV||0),0)}}
-function refresh(){const t=totals();$('#qcount').textContent=t.q;$('#vcount').textContent=t.v;$('#area').textContent=num(t.a);$('#rcount').textContent=D.stats?.referenceTables||132;$('#qheadCount').textContent='('+t.q+')';$('#vheadCount').textContent='('+t.v+')';renderQuarters();renderAllComps()}
+function refresh(){
+ const t=totals();
+ $('#qcount').textContent=t.q;$('#vcount').textContent=t.v;
+ $('#area').textContent=num(t.a);$('#rcount').textContent=D.stats?.referenceTables||132;
+ $('#qheadCount').textContent='('+t.q+')';$('#vheadCount').textContent='('+t.v+')';
+ // Data totals still update immediately, but only the visible list is rebuilt.
+ if($('#quartersScreen').classList.contains('active'))renderQuarters();
+ if($('#allCompsScreen').classList.contains('active'))renderAllComps();
+}
 function renderQuarters(filter=''){$('#quartersScreen').classList.remove('field-quarter-open');const box=$('#quarters');box.innerHTML='';Object.keys(D.quarters).sort((a,b)=>+a-+b).filter(k=>!filter||k.includes(filter.trim())).forEach(k=>{const q=D.quarters[k],rs=q.compartments||[],a=rs.reduce((sum,r)=>sum+(+r.PLV||0),0);const b=document.createElement('button');b.type='button';b.className='quarterCard';b.innerHTML=`<span class="quarterNo">${esc(k)}</span><span class="quarterText"><b>Квартал ${esc(k)}</b><small>Выделов: ${rs.length}</small><small>Площадь: ${num(a)} га</small></span><span class="arrow">›</span>`;b.onclick=()=>openQuarter(k);const entry=document.createElement('div');entry.className='record-entry';const remove=document.createElement('button');remove.type='button';remove.className='record-delete';remove.innerHTML=SOLIN_DELETE_ICON;remove.title='Удалить квартал '+k;remove.setAttribute('aria-label','Удалить квартал '+k);remove.onclick=()=>openDeleteQuarter(k);entry.append(b,remove);box.appendChild(entry)});if(!box.children.length)box.innerHTML='<div class="empty">Кварталы не найдены</div>'}
 // The desktop "Список кварталов" selects a row by KV + KGLF.
 // A quarter can span multiple KGLF rows; group at the user-interface layer only.
