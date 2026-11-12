@@ -1,4 +1,4 @@
-/* Cross-platform forestry handoff: export one real SOLI-N Field backup in
+/* Legacy JSON backup recovery regression (not a user-visible field handoff): export an archived backup in
  * iOS-style web, import it through native APK's Transfer input in a fresh
  * isolated browser profile. Then compare forest, stands, Maket10. */
 'use strict';
@@ -37,7 +37,7 @@ function serve(dir,port){
   await original.evaluate(()=>show('menuScreen'));
   const [dl]=await Promise.all([
    original.waitForEvent('download'),
-   original.locator('#solin-forest-transfer').click()
+   original.evaluate(()=>SolinWorkspace.exportForest())
   ]);
   assert.match(dl.suggestedFilename(),/^SOLIN-Field-\d+-\d+-/);
   const bytes=fs.readFileSync(await dl.path()),backup=JSON.parse(bytes.toString('utf8'));
@@ -69,7 +69,7 @@ function serve(dir,port){
   assert.equal(imported.count,baseline.count);
   assert.equal(imported.stands,baseline.stands);
   assert.deepEqual(imported.rows,originalRows,'Every stand, source species, bonitet and Maket10 row must survive web → APK migration');
-  console.log('FOREST_TO_ANDROID_OK: real download from iPhone-style web, Transfer JSON upload into APK, all quarters/stands and Maket10 survive');
+  console.log('LEGACY_JSON_RECOVERY_OK: hidden backup compatibility preserved; all quarters/stands and Maket10 survive');
   await source.close();await target.close();
  }finally{await browser?.close();for(const s of [a,b])if(s)await new Promise(r=>s.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1;});
