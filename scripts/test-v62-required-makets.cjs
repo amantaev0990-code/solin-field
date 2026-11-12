@@ -55,7 +55,7 @@ for(const r of rows){
  else {assert.equal(got.required,null);assert.equal(got.status,'unverified');}
  assert.equal(got.complete,false);
 }
-assert.equal(withRequired,40,'Exactly 40 category codes have category-specific confirmed forms');
+assert.equal(withRequired,38,'38 existing category codes have category-specific confirmed forms (SKU codes 3 and 8 are absent)');
 const road=rules.maketRequirements(31,{SKU:[{KU:31,NKU:'Дорога'}]});
 assert.deepEqual(Array.from(road.required||[],r=>r.number),[13],'Compact original SKU must retain PM13 evidence');
 assert.deepEqual(Array.from(rules.maketRequirements(43,{SKU:[{KU:43}]}).required||[],r=>r.number),[25]);
