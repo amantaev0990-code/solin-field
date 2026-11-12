@@ -460,8 +460,14 @@
    '<p>Источник: Sentinel-2, съёмка 2016–2017. Для более свежих снимков можно импортировать свой MBTiles.</p>'+
    '<p id="mapDownloadEstimate" role="status"></p><p id="mapDownloadProgress" role="status"></p>'+
    '<div class="formActions"><button type="button" id="mapDownloadStart" class="primary">Скачать</button><button type="button" id="mapDownloadCancel">Закрыть</button></div>'+
-   '<div id="mapDownloadedPackages">'+saved.map((p,i)=>'<p>'+html(p.name)+' · '+p.count+(p.total?' / '+p.total:'')+' фрагментов'+(p.status==='ready'?' · готово':' · не завершено')+
-    (p.status!=='ready'&&p.source===SOURCE.url?' <button type="button" data-resume-map="'+i+'">Продолжить</button>':'')+'</p>').join('')+'</div>');
+   '<h3>Мои карты</h3><div id="mapDownloadedPackages">'+
+   (saved.length?saved.map((p,i)=>'<div class="mapSavedPack"><b>'+html(p.name)+'</b><small>'+
+    p.count+(p.total?' / '+p.total:'')+' фрагментов · '+
+    (p.status==='ready'?'сохранена полностью':'загрузка не завершена')+'</small><div class="mapSavedActions">'+
+    (p.status==='ready'?'<button type="button" data-use-map="'+i+'">Открыть</button>':'')+
+    (p.status!=='ready'&&p.source===SOURCE.url?'<button type="button" data-resume-map="'+i+'">Продолжить</button>':'')+
+    '<button type="button" data-remove-map="'+i+'">Удалить</button></div></div>').join(''):'<p>Сохранённых карт пока нет.</p>')+
+   '</div><button type="button" id="mapImportPack">Открыть файл карты (.mbtiles)</button>');
   const start=document.getElementById('mapDownloadStart'),cancel=document.getElementById('mapDownloadCancel'),
    area=document.getElementById('mapDownloadArea'),zoom=document.getElementById('mapDownloadZoom'),estimate=document.getElementById('mapDownloadEstimate'),progress=document.getElementById('mapDownloadProgress');
   const chosen=()=>area.value==='vectors'?vectors:visible;
@@ -482,6 +488,19 @@
   start.onclick=()=>run();
   cancel.onclick=()=>{if(loading){cancelDownload();cancel.disabled=true;}else closeModal();};
   for(const b of document.querySelectorAll('[data-resume-map]'))b.onclick=()=>run(saved[Number(b.dataset.resumeMap)]);
+  document.getElementById('mapImportPack').onclick=()=>{closeModal();pick();};
+  for(const b of document.querySelectorAll('[data-use-map]'))b.onclick=async()=>{
+   const pack=saved[Number(b.dataset.useMap)];
+   if(!pack||pack.status!=='ready')return;
+   try{await select(pack);await showStored();closeModal();}
+   catch(e){setStatus('Не удалось открыть карту: '+e.message);}
+  };
+  for(const b of document.querySelectorAll('[data-remove-map]'))b.onclick=async()=>{
+   const pack=saved[Number(b.dataset.removeMap)];
+   if(!pack||!window.confirm('Удалить сохранённую карту «'+pack.name+'» с устройства?'))return;
+   try{await remove(pack.id);await openDownload();}
+   catch(e){setStatus('Не удалось удалить карту: '+e.message);}
+  };
  }
  function setup(){
   const input=document.getElementById('offlineImageryInput');
