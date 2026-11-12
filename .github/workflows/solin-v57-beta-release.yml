@@ -94,7 +94,8 @@ jobs:
           # Measure the exact V55 APK first, then check the optimized V56 overlay.
           npx playwright install --with-deps chromium
           node scripts/test-v57-map-smoke.cjs
-          cp map.js map.css solin-offline-imagery.js index.html sw.js www/
+          cp map.js map.css solin-offline-imagery.js sw.js www/
+          node scripts/patch-v57-map-shell.cjs www/index.html
           test -s www/solin-transfer-merge.js
           node --check www/solin-workspace.js
           node --check www/app.js
