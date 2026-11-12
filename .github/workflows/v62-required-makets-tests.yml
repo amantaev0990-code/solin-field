@@ -1,0 +1,37 @@
+name: V62 required Makets by original KU and KGLF
+on:
+  push:
+    branches: [feat/v62-source-verified-required-makets]
+    paths:
+      - 'solin-category-rules.js'
+      - 'solin-quick-card.js'
+      - 'scripts/test-v62-required-makets.cjs'
+      - 'scripts/test-v62-required-makets-browser.cjs'
+      - '.github/workflows/v62-required-makets-tests.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verified-required-makets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Source rule test all 123 SKU categories
+        run: |
+          node --check solin-category-rules.js
+          node --check solin-quick-card.js
+          node --check scripts/test-v62-required-makets.cjs
+          node --check scripts/test-v62-required-makets-browser.cjs
+          node scripts/test-v62-required-makets.cjs
+          node scripts/test-v52-card-merge.cjs
+      - name: Prepare Android WebView browser regression assets
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+          npm install --no-save --no-audit --no-fund playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Test mandatory Maket popups in tablet editor
+        run: node scripts/test-v62-required-makets-browser.cjs www
