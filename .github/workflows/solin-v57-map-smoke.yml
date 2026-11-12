@@ -1,0 +1,38 @@
+name: SOLI-N Field V57 offline map smoke
+on:
+  push:
+    branches: [v57-carrymap-offline-map]
+    paths:
+      - 'map.js'
+      - 'map.css'
+      - 'index.html'
+      - 'sw.js'
+      - 'solin-offline-imagery.js'
+      - 'scripts/test-v57-map-smoke.cjs'
+      - '.github/workflows/solin-v57-map-smoke.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  map-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check JavaScript and map controls
+        run: |
+          node --check map.js
+          node --check solin-offline-imagery.js
+          node scripts/test-v57-map-smoke.cjs
+      - name: Verify files packaged in Android web assets
+        run: |
+          node scripts/build-mobile.mjs
+          cmp map.js www/map.js
+          cmp map.css www/map.css
+          cmp solin-offline-imagery.js www/solin-offline-imagery.js
+          cmp index.html www/index.html
+          node --check www/map.js
+          node --check www/solin-offline-imagery.js
