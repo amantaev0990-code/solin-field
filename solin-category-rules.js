@@ -39,6 +39,16 @@
    reason:group==null?'Из SKU известна категория, но не загружена исходная группа ярусов P10':
      'Источник: SKU.P10; возможные ярусы уточняются через SIAR/PIAP'};
  }
+ // SKU.P31, SKU.PF1, SKU.P10 and GrMak encode source flags/groups.
+ // They are NOT a verified per-category mandatory-maket table.
+ // Do not display makets as mandatory without an independently verified
+ // desktop rule for that exact KU and form. Unknown != no requirements.
+ function maketRequirements(ku,given){
+  const p=profile(ku,given);
+  if(p.code==null)return {status:'waiting',required:null,reason:'Сначала выберите категорию угодий.'};
+  return {status:'unverified',code:p.code,categoryName:p.name,required:null,
+   reason:'Обязательные макеты для этой категории пока не сверены с исходными проверками настольного SOLI-N. Признаки SKU.P31/PF1/P10 не являются списком обязательных макетов.'};
+ }
  // Only interpretation confirmed independently by the original Access rule
  // Макет10.POL >=0 AND <=1 OR >25 AND <101 and explicit KU=19 observation.
  // The other 122 categories must NOT inherit a guessed "survival" semantics.
@@ -120,5 +130,5 @@
   return 'Категория '+p.code+' — '+p.name+'. '+layers+'; '+makets+'. '+meaning+
    '. Другие обязательные макеты и поля проверяются по оригинальному SOLI-N.';
  }
- return Object.freeze({profile,field,validatePol,guide,zoneAttribute});
+ return Object.freeze({profile,maketRequirements,field,validatePol,guide,zoneAttribute});
 });
