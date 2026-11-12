@@ -11,7 +11,7 @@
     if (!Number.isSafeInteger(n) || n <= 0) throw new Error('Неверный ' + label + '. Проверьте адрес лесничества.');
     return n;
   };
-  function snapshot() {
+  function snapshot(quarterSelection=null) {
     if (typeof D === 'undefined' || !D?.transfSchema || !D?.quarters) throw new Error('Сначала откройте лесничество.');
     const owner = D.lesnichestvo?.[0];
     if (!owner) throw new Error('Не выбрано лесничество.');
@@ -20,12 +20,23 @@
       LESN: safeNumber(owner.LESN, 'номер лесничества'),
       GodT: safeNumber(owner.GodT, 'год таксации')
     };
+    // Export an explicit subset of quarters without mutating the live forest.
+    // The same full forest may be installed on two tablets, but only each
+    // taxator's assigned quarters belong in their Transfer MDB.
+    const selected = quarterSelection == null ? null : new Set(
+      Array.from(quarterSelection, n => Number(n)));
+    if (selected) {
+      const present = new Set(Object.keys(D.quarters).map(n=>Number(n)));
+      if (!selected.size || [...selected].some(n=>!Number.isSafeInteger(n)||n<1||!present.has(n)))
+        throw new Error('Выберите существующие кварталы для экспорта Transfer MDB.');
+    }
     const schema = clone(D.transfSchema);
     for (const name of PRIMARY) if (!Array.isArray(schema[name])) throw new Error('Нет исходной схемы «' + name + '».');
     const tables = Object.fromEntries(Object.keys(schema).map(name => [name, []]));
     const make = (name, row) => Object.fromEntries(schema[name].map(field => [field, row?.[field] ?? null]));
     tables['Лесничество'] = (D.lesnichestvo || []).map(row => make('Лесничество', row));
     for (const [kv, quarter] of Object.entries(D.quarters)) {
+      if (selected && !selected.has(Number(kv))) continue;
       const rows = quarter.quarterRows?.length ? quarter.quarterRows : [quarter.meta || {}];
       for (const qr of rows) {
         const fullQuarter = { ...owner, ...quarter.meta, ...qr, KV: Number(kv) };
@@ -79,7 +90,21 @@
       if (!Array.isArray(rows)) throw new Error('Повреждена дополнительная таблица «' + name + '».');
       if (!rows.length) continue;
       if (!/^[\p{L}\p{N}_\-]+$/u.test(name)) throw new Error('Недопустимое имя таблицы «' + name + '».');
-      const values = clone(rows);
+      const values = clone(selected ? rows.filter(row=>{
+        // Global forest records without KV belong to either export.
+        // A per-stand record without KV is ambiguous and must never be silently
+        // omitted or included in a selected-quarter handoff.
+        if (row?.KV == null || String(row.KV).trim()==='') {
+          if (row?.VD != null && String(row.VD).trim()!=='')
+            throw new Error('Таблица «'+name+'»: запись выдела без номера квартала. Частичный экспорт отменён.');
+          return true;
+        }
+        const kv=Number(row.KV);
+        if (!Number.isSafeInteger(kv)||kv<1)
+          throw new Error('Таблица «'+name+'»: неверный номер квартала. Частичный экспорт отменён.');
+        return selected.has(kv);
+      }) : rows);
+      if (!values.length) continue;
       if (values.some(x => !x || typeof x !== 'object' || Array.isArray(x))) throw new Error('Некорректные строки «' + name + '».');
       schema[name] = [...new Set(values.flatMap(row => Object.keys(row)))];
       tables[name] = values;
