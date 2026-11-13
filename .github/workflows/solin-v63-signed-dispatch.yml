@@ -1,0 +1,78 @@
+name: SOLI-N Field V63 — verify and dispatch permanent signed update
+on:
+  push:
+    branches:
+      - release/v63-examples-20261113
+    paths:
+      - '.github/workflows/solin-v63-signed-dispatch.yml'
+permissions:
+  contents: read
+  actions: write
+concurrency:
+  group: solin-v63-signed-dispatch
+  cancel-in-progress: false
+jobs:
+  verify-and-dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify V63 source requirements and original V62 behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check solin-reference-examples.js
+          node --check solin-card-editor.js
+          node --check solin-card-calculations.js
+          node --check solin-workflow.js
+          node --check solin-dependent-rules.js
+          node scripts/test-v63-reference-examples.cjs
+          node scripts/test-v62-required-makets.cjs
+          node scripts/test-v60-maket-guidance.cjs
+          node scripts/test-card-calculations.cjs
+          node scripts/test-maket5-stock-breakdown.cjs
+          node scripts/test-category-layer-dependencies.cjs
+          node scripts/test-stand-quick-makets.cjs
+          node scripts/test-github-updates.cjs
+          node scripts/test-update-contract.cjs
+      - name: Build V63 APK web assets and protect source package
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund
+          npm run build
+          node scripts/test-apk-web-parity.cjs
+          test -s www/solin-reference-examples.js
+          test -s www/solin-updates.js
+          test -s www/solin-category-rules.js
+          test ! -e www/solin-private-refs.packed.bin
+          grep -q 'solin-reference-examples.js' www/index.html
+          grep -q 'solin-updates.js' www/index.html
+      - name: Start standard signed V63 release on main
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$REPO" == 'amantaev0990-code/solin-field' ]]
+          [[ "${{ github.ref_name }}" == 'release/v63-examples-20261113' ]]
+          LATEST="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name')"
+          [[ "$LATEST" == 'solin-field-v230042' ]] || {
+            echo "::error::Release changed from V62 ($LATEST): manual rebase and new versionCode needed"
+            exit 1
+          }
+          if gh release view solin-field-v230043 --repo "$REPO" >/dev/null 2>&1; then
+            echo "::error::V63 tag already published"
+            exit 1
+          fi
+          gh workflow run solin-auto-release.yml --repo "$REPO" --ref main \
+            -f source_ref="$COMMIT" -f version_code=230043 -f publish=true
+          echo "Dispatched standard release workflow using verified SHA $COMMIT."
+          echo "Only that workflow can sign with the permanent certificate, verify assets and publish."
