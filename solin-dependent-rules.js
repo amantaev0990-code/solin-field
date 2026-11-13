@@ -437,5 +437,18 @@ function currentIsAllowed(value,result){
  if(code(value)==='0'&&!result.zeroIsValue&&!result.items.some(r=>same(r.value,0)))return null;
  return result.items.some(r=>same(r.value,value));
 }
-window.SolinDependentRules={forestTypes,options,currentIsAllowed,applySelect,treeDependencies,validateTransition,kto,region,speciesGroup,suggestedOrigin,landCategory,allowedLayers,functionalZones};
+// Original Maket10 is a sequence of species grouped by IAR (not one row per tier).
+// Never merge, drop or copy any species/stock data; stable sorting preserves row identity.
+function orderMaket10Rows(rows){
+ if(!Array.isArray(rows))return [];
+ const order=row=>{
+  const codeValue=row?.IAR;
+  if(codeValue===null||codeValue===undefined||String(codeValue).trim()==='')return Infinity;
+  const value=Number(codeValue);
+  return Number.isInteger(value)&&value>=1&&value<=8?value:Infinity;
+ };
+ return rows.map((row,index)=>({row,index,rank:order(row)}))
+  .sort((a,b)=>a.rank-b.rank||a.index-b.index).map(item=>item.row);
+}
+window.SolinDependentRules={forestTypes,options,currentIsAllowed,applySelect,treeDependencies,validateTransition,kto,region,speciesGroup,suggestedOrigin,landCategory,allowedLayers,functionalZones,orderMaket10Rows};
 })();
