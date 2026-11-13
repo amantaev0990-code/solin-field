@@ -75,7 +75,14 @@ if((DECIMAL.has(key)||['IAR','LET','VNUM','PRA','PRkol','MTC','G15','GZ','PH','P
 obj[key]=DECIMAL.has(key)||['IAR','LET','VNUM','PRA','PRkol','MTC','G15','GZ','PH','PD2','ZAP','POL'].includes(key)?Number(raw.replace(',','.')):raw;
 }return obj;}
 function maketsOf(r){return r?Object.keys(r._children||{}):[];}
-function rowsOf(r,m){const rows=r?._children?.[m];return Array.isArray(rows)?rows:[];}
+function rowsOf(r,m){
+ const rows=r?._children?.[m];
+ if(!Array.isArray(rows))return [];
+ // Both overview and edit/delete indices use exactly this ordering.
+ // Do not mutate stored/imported MDB rows until an explicit Save.
+ return m==='Макет10'&&window.SolinDependentRules?.orderMaket10Rows?
+   window.SolinDependentRules.orderMaket10Rows(rows):rows;
+}
 function maketSummary(r,m){const rows=rowsOf(r,m),length=rows.length;
  if(m==='Макет10'&&length){const summed=rows.reduce((s,v)=>s+(Number(v.ZAP)||0),0);return length+' записей · Σ ZAP '+summed.toLocaleString('ru-RU')+' (справочно)';}
  return length?length+' записей':'Нет данных';

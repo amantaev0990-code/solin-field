@@ -408,5 +408,18 @@ function currentIsAllowed(value,result){
  if(code(value)==='0' && !result.items.some(r=>same(r.value,0)))return null;
  return result.items.some(r=>same(r.value,value));
 }
-window.SolinDependentRules={forestTypes,options,currentIsAllowed,applySelect,treeDependencies,validateTransition,kto,region,speciesGroup,suggestedOrigin,landCategory,allowedLayers};
+// Presentation order of Maket 10 rows: keep all species of the same IAR together.
+// Stable by design: existing species and their MDB fields are NEVER merged, rebuilt or changed.
+// Unset/unknown tier codes appear last, so a partly filled new row is still editable.
+function orderMaket10Rows(rows){
+ if(!Array.isArray(rows))return [];
+ const rank=row=>{
+  const raw=code(row?.IAR),value=raw?Number(raw):null;
+  return Number.isInteger(value)&&value>=1&&value<=8?value:Number.POSITIVE_INFINITY;
+ };
+ return rows.map((row,index)=>({row,index,rank:rank(row)}))
+  .sort((a,b)=>a.rank-b.rank||a.index-b.index)
+  .map(item=>item.row);
+}
+window.SolinDependentRules={forestTypes,options,currentIsAllowed,applySelect,treeDependencies,validateTransition,kto,region,speciesGroup,suggestedOrigin,landCategory,allowedLayers,orderMaket10Rows};
 })();
