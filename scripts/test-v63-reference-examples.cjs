@@ -16,7 +16,7 @@ assert.equal(E.forKU(1).length,9,'Nine forested cases with KU=1');
 assert.equal(E.forKU(9).length,2,'Both cases under canopy');
 assert.equal(E.forKU(99999).length,0,'No guessed examples for unknown KU');
 assert.equal(E.forKU(null).length,0,'Unknown category is not zero');
-const refs=JSON.parse(zlib.gunzipSync(fs.readFileSync('refs-audit.json.gz'))).toString('utf8')).tables;
+const refs=JSON.parse(zlib.gunzipSync(fs.readFileSync('refs-audit.json.gz')).toString('utf8')).tables;
 assert.ok(refs.SKU.length>=120&&refs.SIAR.length>=30);
 for(const item of E.examples){
  const entry=refs.SKU.find(x=>String(x.KU)===String(item.ku));
