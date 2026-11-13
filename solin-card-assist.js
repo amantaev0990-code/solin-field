@@ -33,14 +33,15 @@
    return;
   }
   const list=el.tagName==='SELECT'?[...el.options].map(o=>({value:o.value,name:o.value===''?'Не указано':SolinHuman.value(el.dataset.ceForm,el.dataset.ceField,o.value)})):null;state={mode:'field',el,returnRow,list,sequence};
+  const searchable=!!list&&list.filter(x=>x.value!=='').length>=5;
   const caption=locationName(el)+' · '+fieldLabel(el)+(sequence?' · '+(sequence.indexOf(el)+1)+'/'+sequence.length:'');
-  if(list){mount(caption,'<p class="ce-assist-tip">Найдите значение по шифру или названию. Исходный код сохранится без изменения.</p><label class="ce-assist-searchlabel">Поиск по коду или названию<input id="ce-assist-query" type="search" autocomplete="off" placeholder="Например: 22 или пастбище"></label><div id="ce-assist-options" class="ce-assist-options" role="listbox"></div>',returnRow!=null);filterOptions('');}
+  if(list){mount(caption,(searchable?'<p class="ce-assist-tip">Найдите значение по коду или названию. Сохранится исходный код.</p><label class="ce-assist-searchlabel">Поиск по коду или названию<input id="ce-assist-query" type="search" autocomplete="off" placeholder="Например: 22 или пастбище"></label>':'<p class="ce-assist-tip">Выберите значение из списка.</p>')+'<div id="ce-assist-options" class="ce-assist-options" role="listbox"></div>',returnRow!=null);filterOptions('');}
   else{const val=el.value,mode=el.inputMode==='decimal'?'decimal':'text';mount(caption,'<p class="ce-assist-tip">Изменения остаются в черновике. Карточка запишется после «Сохранить».</p><label class="ce-assist-searchlabel">'+h(fieldLabel(el))+'<input id="ce-assist-value" type="text" inputmode="'+mode+'" enterkeyhint="next"'+(el.dataset.phantomZero==='1'?' data-phantom-zero="1" placeholder="0"':'')+' autocomplete="off" value="'+h(val)+'"></label><div class="ce-assist-error" id="ce-assist-error" role="alert"></div>'+(!sequence?'<div class="ce-assist-actions"><button type="button" data-ce-assist-apply>Применить</button></div>':''),!!returnRow);}
   // Android tablets need the card search popup, regardless of viewport width.
   // Focus from the active user gesture, not from a delayed timer, so the
   // system keyboard reliably appears when a field is opened.
   if(window.Capacitor?.getPlatform?.()==='android'){
-   const input=document.getElementById(list?'ce-assist-query':'ce-assist-value');
+   const input=document.getElementById(list?(searchable?'ce-assist-query':'ce-assist-no-keyboard'):'ce-assist-value');
    input?.focus({preventScroll:true});
    if(input?.selectionStart!=null)input.setSelectionRange(input.value.length,input.value.length);
   }
