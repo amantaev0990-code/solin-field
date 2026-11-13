@@ -35,6 +35,22 @@ const midpoint={...k59Card,_children:{Макет10:[{...k59Card._children.Мак
 assert.equal(calc.stockPerHectare(midpoint,stockRefs,{KTO:150000000}).expected,30,
  'K59_1 rounds Szap.v6 * 0.5 = 29.5 up to 30');
 assert.equal(original.index,0);
+// Solim.M10 physical invariant: KOEF=0 is a plus species (3–5%).
+// It is in the SAME IAR, has no numbered share, and cannot block original K59.
+const plusSpecies={...k59Card._children.Макет10[0],POR:'С',KOEF:0,PH:12,POL:null,ZAP:0};
+const withPlus={...k59Card,_children:{Макет10:[k59Card._children.Макет10[0],plusSpecies]}};
+assert.equal(calc.stockPerHectare(withPlus,stockRefs,{KTO:150000000}).status,'complete');
+assert.equal(calc.stockPerHectare(withPlus,stockRefs,{KTO:150000000}).expected,35,
+ 'KOEF=0 plus species do not influence weighted K59 height');
+assert.equal(calc.standStock(withPlus).expectedPerHa,99,
+ 'plus species must not add a second leading ZAP');
+const missingCoefficient={...withPlus,_children:{Макет10:[k59Card._children.Макет10[0],{...plusSpecies,KOEF:null}]}};
+assert.equal(calc.stockPerHectare(missingCoefficient,stockRefs,{KTO:150000000}).status,'waiting',
+ 'a blank unknown coefficient must not silently become KOEF=0');
+const wrongPlusStock={...withPlus,_children:{Макет10:[k59Card._children.Макет10[0],{...plusSpecies,ZAP:8}]}};
+assert.equal(calc.companionStockIssues(wrongPlusStock).length,1,
+ 'a plus companion with independent ZAP would double count the stand');
+
 const cascaded=calc.corrections(k59Card,stockRefs,{KTO:150000000});
 assert.deepEqual(Array.from(cascaded.issues,x=>x.field),['ZAP','STUR1','STUR']);
 assert.deepEqual(Array.from(cascaded.issues,x=>x.expected),[35,35,70]);
