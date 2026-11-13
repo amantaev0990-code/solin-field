@@ -91,6 +91,9 @@ function bonitet(record,refs,quarterRow=null){
 // It is NOT a claim that the single-row source K59 stock TABLE formula
 // has been validated for a mixed layer.
 const LIVE_LAYERS=new Set([1,2,3,4,5,6]);
+// Composition is independently validated for ALL Maket10 IAR 1..8,
+// including isolated trees and fresh deadwood (but not their stock totals).
+const COMPOSITION_LAYERS=new Set([1,2,3,4,5,6,7,8]);
 // SOLI-N keeps the TOTAL stock of a layer in the dominant species row.
 // Select that row by composition, not by whichever row happens to contain
 // a manually entered ZAP/POL. Stable tie-break: main species, then row order.
@@ -133,7 +136,7 @@ function compositionAudit(record){
  for(const [index,row] of (record?._children?.Макет10||[]).entries()){
   if(!childMatches(record,row))continue;
   const iar=n(row.IAR);
-  if(!LIVE_LAYERS.has(iar))continue;
+  if(!COMPOSITION_LAYERS.has(iar))continue;
   if(!groups.has(iar))groups.set(iar,[]);
   groups.get(iar).push({index,row});
  }
@@ -142,14 +145,16 @@ function compositionAudit(record){
   const known=supplied.every(v=>v!==null),sum=known?supplied.reduce((a,b)=>a+b,0):null;
   const named=rows.map(x=>String(x.row.POR??'').trim());
   const lead=layerLead(rows,record);
-  if(named.some(x=>!x))issues.push({status:'bad',layer:iar,field:'POR',
-   message:'Ярус '+iar+': не указана порода в одной из строк древостоя.'});
-  if(supplied.some(v=>v!==null&&(v<0||v>10)))issues.push({status:'bad',layer:iar,field:'KOEF',
-   message:'Ярус '+iar+': числовые коэффициенты должны быть 1–10; для плюсовой породы (3–5%) допускается 0.'});
-  else if(!known)issues.push({status:'warn',layer:iar,field:'KOEF',
-   message:'Ярус '+iar+': заполните коэффициент состава у каждой породы.'});
-  else if(Math.abs(sum-10)>0.000001)issues.push({status:'warn',layer:iar,field:'KOEF',
-   message:'Ярус '+iar+': сумма коэффициентов состава равна '+sum+' вместо 10. Проверьте состав до расчёта запаса.'});
+  const invalidAt=supplied.findIndex(v=>v!==null&&(!Number.isInteger(v)||v<0||v>10));
+  const missingAt=supplied.findIndex(v=>v===null),namelessAt=named.findIndex(v=>!v);
+  if(namelessAt>=0)issues.push({status:'bad',layer:iar,field:'POR',index:rows[namelessAt].index,
+   message:'Ярус '+iar+': не указана порода в одной из строк макета 10.'});
+  if(invalidAt>=0)issues.push({status:'bad',layer:iar,field:'KOEF',index:rows[invalidAt].index,
+   message:'Ярус '+iar+': коэффициенты отдельных пород должны быть целыми числами от 0 до 10.'});
+  else if(missingAt>=0)issues.push({status:'bad',layer:iar,field:'KOEF',index:rows[missingAt].index,
+   message:'Ярус '+iar+': заполните коэффициент у каждой породы; 0 допускается для плюсовой породы.'});
+  else if(sum!==10)issues.push({status:'bad',layer:iar,field:'KOEF',index:rows[0].index,
+   message:'Ярус '+iar+': сумма коэффициентов должна быть ровно 10 (сейчас '+sum+'). Коэффициент 0 разрешён у отдельной породы в любом ярусе.'});
   if(rows.length>1){
    const companions=rows.filter(x=>x!==lead&&n(x.row.ZAP)!==null&&n(x.row.ZAP)!==0);
    if(companions.length)issues.push({status:'warn',layer:iar,field:'ZAP',
@@ -158,7 +163,7 @@ function compositionAudit(record){
   layers.push({iar,rows:rows.length,coefficientSum:sum,leadingSpecies:lead?.row.POR??null,
    leadingStock:n(lead?.row.ZAP),species:named});
  }
- return {status:issues.length?'attention':groups.size?'complete':'empty',layers,issues};
+ return {status:issues.some(x=>x.status==='bad')?'invalid':issues.length?'attention':groups.size?'complete':'empty',layers,issues};
 }
 /** Validation across the same source rows used by Макет 5/10/16/31/32.
  * Do not classify NULL optional fields as zero, or auto-edit a saved stand. */
