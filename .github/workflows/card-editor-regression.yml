@@ -3,6 +3,8 @@ on:
   push:
     paths:
       - 'solin-card-editor.js'
+      - 'solin-reference-examples.js'
+      - 'scripts/test-v63-reference-examples.cjs'
       - 'solin-card-editor.css'
       - 'solin-card-assist.js'
       - 'solin-card-assist.css'
@@ -20,7 +22,11 @@ jobs:
           node-version: '22'
       - name: Check exact original quarter rows and navigator
         run: node scripts/card-editor-quarter-test.cjs
+      - name: Verify 35 photo examples and original composition
+        run: node scripts/test-v63-reference-examples.cjs
       - name: Check card JavaScript syntax
         run: |
           node --check solin-card-editor.js
+          node --check solin-reference-examples.js
+          node --check solin-card-calculations.js
           node --check solin-card-assist.js
