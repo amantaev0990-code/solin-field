@@ -59,14 +59,6 @@ function findLookups(field,form){
  return mapping?database?.fieldLookups?.[mapping]:null;
 }
 function fieldInput(name,value='',prefix='wf',form='ВыделВ'){
- if(form==='Макет10'&&name==='KOEF'){
-  const chosen=value===null||value===undefined?'':String(value),id=prefix+'_KOEF';
-  const options=[['','—'],['0','Плюсовая порода (3–5%, без коэффициента)'],
-   ...Array.from({length:10},(_,i)=>[String(i+1),String(i+1)])];
-  return '<label class="wf-field"><span>Коэффициент состава</span><select id="'+h(id)+'" data-wffield="KOEF">'+
-   options.map(([v,text])=>'<option value="'+h(v)+'"'+(chosen===v?' selected':'')+'>'+h(text)+'</option>').join('')+
-   '</select></label>';
- }
  if(window.SolinHuman?.input)return SolinHuman.input(name,value,prefix,form);
  const label=window.SolinHuman?.label(form,name)||LABELS[name]||FORM_LABELS[name]||db()?.fieldLabels?.[name]||name;
  const id=prefix+'_'+name,lookup=findLookups(name,form),str=String(value??'');
