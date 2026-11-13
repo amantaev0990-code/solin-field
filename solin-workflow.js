@@ -136,18 +136,33 @@ openModal((index===rowsOf(r,m).length?'Новая запись · ':'Измен�
 '<div class="wf-form-note">Данные сохраняются только в SOLI-N Field. Оригинальные базы SOLI-N не изменяются.</div>'+
 (m==='Макет10'?'<div class="wf-form-note" id="wfM10LayerContext"><label class="wf-field"><span>Категория угодий выдела (KU)</span><select id="wfM10KU" aria-describedby="wfM10LayerHint"></select></label><p id="wfM10LayerHint" role="status" aria-live="polite">Проверяю допустимые ярусы по исходным SKU, SIAR и PIAP…</p><small>Категория относится ко всему выделу, а не только к строке древостоя. Если изменить её здесь, новое значение будет сохранено вместе с древостоем только после подтверждения.</small></div>':'')+
 '<div class="formGrid wf-formgrid">'+humanInputs(fields,existing,'wf',m)+'</div>'+
+(m==='Макет10'?'<label class="wf-field" title="Доля 3–5%; KOEF=0 в исходном MDB, без числового коэффициента"><input type="checkbox" id="wfM10Plus"> Плюсовая порода (3–5%, без коэффициента)</label>':'')+
 (m==='Макет10'?'<div id="wfBonitetLive" class="wf-bonitet-status" role="status" aria-live="polite"></div>':'')+
 '<div class="formActions"><button class="secondary" onclick="closeModal()">Отмена</button><button class="primary" id="wfSaveMaket">Сохранить</button></div>');
 // One Access RowSource engine for ALL individual Maket editors.
 const rules=window.SolinDependentRules,modalBody=document.querySelector('#modalBody');
 const treeCategory=m==='Макет10'?document.getElementById('wfM10KU'):null;
+const plusToggle=m==='Макет10'?document.getElementById('wfM10Plus'):null;
+const plusCoefficient=m==='Макет10'?document.getElementById('wf_KOEF'):null;
+if(plusToggle&&plusCoefficient){
+ plusToggle.checked=existing.KOEF!==null&&existing.KOEF!==undefined&&String(existing.KOEF)!==''&&Number(existing.KOEF)===0;
+ if(plusToggle.checked){plusCoefficient.value='';plusCoefficient.disabled=true;}
+ plusToggle.addEventListener('change',()=>{
+  plusCoefficient.value='';plusCoefficient.disabled=plusToggle.checked;
+  if(!plusToggle.checked)plusCoefficient.focus();
+ });
+}
 const categoryCode=()=>treeCategory?treeCategory.value:String(r.KU??'');
 const categoryCard=()=>treeCategory?{...r,KU:categoryCode()}:r;
 if(rules){
- const collect=()=>({...existing,...Object.fromEntries(fields.map(field=>{
-  const el=document.getElementById('wf_'+field);
-  return [field,el?(el.value===''?null:el.value):existing[field]];
- }))});
+ const collect=()=>{
+  const row={...existing,...Object.fromEntries(fields.map(field=>{
+   const el=document.getElementById('wf_'+field);
+   return [field,el?(el.value===''?null:el.value):existing[field]];
+  }))};
+  if(plusToggle?.checked)row.KOEF=0;
+  return row;
+ };
  const populateTreeCategory=()=>{
   if(!treeCategory)return;
   const references=window.SOLIN_REFS?.tables;
@@ -223,6 +238,7 @@ if(m==='Макет10'){
    const el=document.getElementById('wf_'+field),value=el?.value;
    return [field,el?(value===''?null:value):existing[field]];
   }));
+  if(plusToggle?.checked)selected.KOEF=0;
   const row={...existing,...selected};
   if(row.PROI==null&&row.POR!=null){
    const suggested=rules?.suggestedOrigin?.(row.POR,window.SOLIN_REFS?.tables);
@@ -253,7 +269,7 @@ if(m==='Макет10'){
  modalBody.addEventListener('change',refreshBonitet);
  refreshBonitet();
 }
-document.querySelector('#wfSaveMaket').onclick=()=>{const container=document.querySelector('#modalBody');let values;try{values=bindInputs(container,fields,'wf',existing);}catch(e){notify(e.message);return;}
+document.querySelector('#wfSaveMaket').onclick=()=>{const container=document.querySelector('#modalBody');let values;try{values=bindInputs(container,fields,'wf',existing);if(plusToggle?.checked)values.KOEF=0;}catch(e){notify(e.message);return;}
 const dependent=window.SolinDependentRules,referenceTables=window.SOLIN_REFS?.tables;
  const desiredKU=treeCategory?treeCategory.value.trim():String(r.KU??'').trim();
  const kuChanged=!!treeCategory&&desiredKU!==String(r.KU??'').trim();
