@@ -347,7 +347,7 @@ function editComposition({add=false}={}){
   const layerCoefficients=new Map();
   for(const [i,row]of rows.entries()){
    if(!row.POR||!Number(row.IAR)||row.KOEF===null||row.KOEF===undefined||String(row.KOEF).trim()===''){notify('Порода '+(i+1)+': выберите ярус, породу и коэффициент или отметьте плюсовую породу');return;}
-   if(!Number.isInteger(Number(row.KOEF))||Number(row.KOEF)<0||Number(row.KOEF)>10){notify('Порода '+(i+1)+': коэффициент 1–10; 0 только для плюсовой породы (3–5%)');return;}
+   if(!Number.isInteger(Number(row.KOEF))||Number(row.KOEF)<0||Number(row.KOEF)>10){notify('Порода '+(i+1)+': коэффициент должен быть целым числом от 0 до 10; 0 допустим для плюсовой породы в любом ярусе.');return;}
    const layer=String(row.IAR),total=(layerCoefficients.get(layer)||0)+Number(row.KOEF);
    layerCoefficients.set(layer,total);
    const policy=window.SolinCategoryRules?.validatePol(desiredKU,row.POL,ref);
@@ -356,7 +356,14 @@ function editComposition({add=false}={}){
    const issues=window.solinCore?.validateRow?.(name,row,{...r,KU:Number(desiredKU)})||[];
    if(issues.length){notify('Порода '+(i+1)+': '+issues[0]);return;}
   }
-  for(const [layer,total]of layerCoefficients){if(total!==10){notify('Ярус '+layer+': сумма коэффициентов должна составлять 10, сейчас '+total);return;}}
+  // Each IAR is independent, including 7 and 8. Coefficient-free rows (0)
+  // are allowed, but a group of all zeros must fail (total 0 != 10).
+  for(const [layer,total]of layerCoefficients){if(total!==10){notify('Ярус '+layer+': сумма коэффициентов должна составлять ровно 10, сейчас '+total);return;}}
+  if(typeof window.SolinCardCalculations?.compositionAudit==='function'){
+   const candidate={...r,KU:Number(desiredKU),_children:{...r._children,Макет10:rows}};
+   const issue=window.SolinCardCalculations.compositionAudit(candidate).issues.find(x=>x.status==='bad'&&['KOEF','POR'].includes(x.field));
+   if(issue){notify(issue.message);return;}
+  }
   const main=rows.filter(x=>Number(x.IAR)===1).sort((a,b)=>Number(b.KOEF)-Number(a.KOEF))[0]||rows[0];
   const proposedSpecies=main?.POR||r.M3Pr;
   const chosenForest=String(forestSelect.value??'');
