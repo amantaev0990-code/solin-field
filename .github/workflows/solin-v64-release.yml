@@ -89,7 +89,7 @@ jobs:
           node scripts/test-v64-plus-and-search.cjs
           gh release download solin-field-v230043 --repo amantaev0990-code/solin-field --pattern SOLIN-Field-update.apk --dir "$RUNNER_TEMP/v61"
           BASE="$RUNNER_TEMP/v61/SOLIN-Field-update.apk"
-          printf '%s  %s\n' 'c40355241a213144d9a8337673f874e36d1984b0f4a2e8aa87f9ca8fc2e54342' "$BASE" | sha256sum -c -
+          printf '%s  %s\n' 'fc0e53b755a106e3c78e92ca6f32b4d3b1ba445a5fea535cc118cd09a8cf7148' "$BASE" | sha256sum -c -
           unzip -q "$BASE" 'assets/public/*' -d "$RUNNER_TEMP/v61"
           mv "$RUNNER_TEMP/v61/assets/public" www
           rm -f www/maps/213-1.cmf2 www/maps/213-2.cmf2
