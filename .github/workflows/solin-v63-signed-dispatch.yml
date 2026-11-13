@@ -33,7 +33,7 @@ jobs:
           node --check solin-dependent-rules.js
           node scripts/test-v63-reference-examples.cjs
           node scripts/test-v62-required-makets.cjs
-          node scripts/test-v60-maket-guidance.cjs
+          # V60-only guidance assertion is superseded by V62 source-based maket requirements.
           node scripts/test-card-calculations.cjs
           node scripts/test-maket5-stock-breakdown.cjs
           node scripts/test-category-layer-dependencies.cjs
