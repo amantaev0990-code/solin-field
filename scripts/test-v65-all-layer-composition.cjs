@@ -60,6 +60,6 @@ lead.KOEF=9;assert.throws(validate,x=>x.field==='KOEF'&&/Ярус 1.*9/.test(x.m
 lead.KOEF=10;single.KOEF=9;assert.throws(validate,x=>x.field==='KOEF'&&/Ярус 7.*9/.test(x.message));
 single.KOEF=10;plus.KOEF=null;assert.throws(validate,x=>x.field==='KOEF'&&/Ярус 1/.test(x.message));
 plus.KOEF=0;assert.doesNotThrow(validate,'Restoring KOEF=0 must unblock Save');
-session.draft._children.Макет10=[row(1,0)];assert.throws(validate,x=>x.field==='KOEF'&&/0/.test(x.message));
+session.draft._children.Макет10=[{...row(1,0),ZAP:77}];assert.throws(validate,x=>x.field==='KOEF'&&/0/.test(x.message));
 assert.match(load('solin-workflow.js'),/layerCoefficients/,'Quick stand composition checks layer total');
 console.log('V65_ALL_IAR_COMPOSITION_OK: 1..8 allow 0 per species, every group sum=10, Save rejects 9/11/blank/0-only');
