@@ -12,7 +12,7 @@ assert.ok(E&&rules&&C,'Guidance, original dependency rules and stock audit avail
 assert.equal(E.examples.length,35,'All 35 printed card examples exist');
 assert.equal(new Set(E.examples.map(x=>x.id)).size,35,'Each example is unique');
 assert.equal(new Set(E.examples.map(x=>x.ku)).size,22,'22 distinct land categories');
-assert.equal(E.forKU(1).length,12,'Forested case count');
+assert.equal(E.forKU(1).length,9,'Nine forested cases with KU=1');
 assert.equal(E.forKU(9).length,2,'Both cases under canopy');
 assert.equal(E.forKU(99999).length,0,'No guessed examples for unknown KU');
 assert.equal(E.forKU(null).length,0,'Unknown category is not zero');
