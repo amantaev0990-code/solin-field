@@ -177,6 +177,12 @@ function input(form,field,value,scope,index){
    el.placeholder=rule.kind==='survival'?'1–100 %':'Исходное значение POL';
   }
  }
+ if(form==='Макет10'&&field==='KOEF'){
+  const plus=value!==null&&value!==undefined&&String(value)!==''&&Number(value)===0;
+  // Desktop Solim.M10 physically stores KOEF=0 as an unnumbered plus species.
+  label.insertAdjacentHTML('beforeend','<span class="ce-plus-choice" title="Плюсовая порода: доля запаса 3–5%, без числового коэффициента"><input type="checkbox" data-ce-plus="'+h(id)+'" aria-label="Плюсовая порода (3–5%)"'+(plus?' checked':'')+'>Плюсовая · 3–5%</span>');
+  if(plus){el.value='';el.disabled=true;}
+ }
  return label.outerHTML;
 }
 function fields(form,names,values,scope){return names.map(f=>cell(f,values[f],scope,form,{label:SolinHuman.isTechnical(form,f)?D.fieldLabels?.[f]||f:title(form,f),split:!!SolinHuman.lookup(form,f)})).join('');}
@@ -972,6 +978,19 @@ function open(record,options={}){if(!record)return;
  form.addEventListener('input',e=>{capture(e.target);if(e.target.matches('[data-ce-field]')&&!['ZAP','STUR','STUR1'].includes(e.target.dataset.ceField)){clearTimeout(stockTimer);const el=e.target;stockTimer=setTimeout(()=>{if(el.isConnected)recalculateEditedField(el);},160);}if(e.target.dataset.ceScope?.startsWith('Макет'))session.changedMakets.add(e.target.dataset.ceScope);if(session.entryTouched?.has(e.target.dataset.ceScope+':'+e.target.dataset.ceField))refreshEntryChecks()});
  form.addEventListener('focusout',e=>{if(!session||!e.target.matches('[data-ce-field]'))return;clearTimeout(stockTimer);recalculateEditedField(e.target);(session.entryTouched??=new Set()).add(e.target.dataset.ceScope+':'+e.target.dataset.ceField);refreshEntryChecks();});
  form.addEventListener('change',e=>{
+  if(e.target.matches('[data-ce-plus]')){
+   const input=document.getElementById(e.target.dataset.cePlus);
+   if(!input)return;
+   input.disabled=false;
+   input.value=e.target.checked?'0':'';
+   capture(input);
+   session.changedMakets.add('Макет10');
+   session.dirty=true;scheduleDraft();
+   document.querySelector('#ce-status').textContent='Есть несохранённые изменения';
+   if(e.target.checked){input.value='';input.disabled=true;}else input.focus();
+   recalculateEditedField(input);refreshEntryChecks();
+   return;
+  }
   if(e.target.matches('.dt-maket-select')){const n=e.target.value;e.target.value='';if(n==='10'||n==='31'||n==='32')showMain(n);else if(n)showExtra('Макет'+n);return;}
   capture(e.target);
   if(e.target.dataset.ceScope==='base'&&e.target.dataset.ceField==='KU'){
