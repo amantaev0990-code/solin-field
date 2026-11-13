@@ -124,6 +124,11 @@ function input(form,field,value,scope,index){
       : '—';
  }
  else{el.placeholder=numeric.has(field)?'0':'';if(numeric.has(field))el.inputMode='decimal';}
+ if(form==='Макет10'&&field==='KOEF'){
+  const plus=value!==null&&value!==undefined&&String(value)!==''&&Number(value)===0;
+  label.insertAdjacentHTML('beforeend','<span style="display:flex;align-items:center;gap:2px;font-size:10px;white-space:nowrap" title="Доля 3–5%. В исходном MDB KOEF=0, в формуле состава без коэффициента"><input type="checkbox" data-ce-plus="'+h(id)+'" aria-label="Плюсовая порода (3–5%)"'+(plus?' checked':'')+'>Плюс. 3–5%</span>');
+  if(plus){el.value='';el.disabled=true;}
+ }
  return label.outerHTML;
 }
 function fields(form,names,values,scope){return names.map(f=>cell(f,values[f],scope,form,{label:SolinHuman.isTechnical(form,f)?D.fieldLabels?.[f]||f:title(form,f),split:!!SolinHuman.lookup(form,f)})).join('');}
@@ -742,6 +747,17 @@ function open(record,options={}){if(!record)return;
  form.addEventListener('input',e=>{capture(e.target);if(e.target.matches('[data-ce-field]')&&!['ZAP','STUR','STUR1'].includes(e.target.dataset.ceField)){clearTimeout(stockTimer);const el=e.target;stockTimer=setTimeout(()=>{if(el.isConnected)recalculateEditedField(el);},160);}if(e.target.dataset.ceScope?.startsWith('Макет'))session.changedMakets.add(e.target.dataset.ceScope);if(session.entryTouched?.has(e.target.dataset.ceScope+':'+e.target.dataset.ceField))refreshEntryChecks()});
  form.addEventListener('focusout',e=>{if(!e.target.matches('[data-ce-field]'))return;clearTimeout(stockTimer);recalculateEditedField(e.target);(session.entryTouched??=new Set()).add(e.target.dataset.ceScope+':'+e.target.dataset.ceField);refreshEntryChecks();});
  form.addEventListener('change',e=>{
+  if(e.target.matches('[data-ce-plus]')){
+   const field=document.getElementById(e.target.dataset.cePlus);
+   if(!field)return;
+   field.disabled=false;
+   field.value=e.target.checked?'0':'';
+   capture(field);
+   session.changedMakets.add('Макет10');
+   if(e.target.checked){field.value='';field.disabled=true;}else field.focus();
+   recalculateEditedField(field);refreshEntryChecks();
+   return;
+  }
   if(e.target.matches('.dt-maket-select')){const n=e.target.value;e.target.value='';if(n==='10'||n==='31'||n==='32')showMain(n);else if(n)showExtra('Макет'+n);return;}
   capture(e.target);
   if(e.target.dataset.ceScope?.startsWith('Макет'))session.changedMakets.add(e.target.dataset.ceScope);
