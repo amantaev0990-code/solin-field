@@ -109,7 +109,7 @@ function companionStockIssues(record){
   groups.get(iar).push({row,index});
  }
  for(const [iar,rows] of groups){
-  if(rows.length<2||rows.some(x=>!defined(x.row.POR)||!(n(x.row.KOEF)>0)))continue;
+  if(rows.length<2||rows.some(x=>!defined(x.row.POR)||n(x.row.KOEF)===null||n(x.row.KOEF)<0))continue;
   const dominant=layerLead(rows,record);
   for(const entry of rows){
    if(entry===dominant||!defined(entry.row.ZAP)||n(entry.row.ZAP)===0)continue;
@@ -144,8 +144,8 @@ function compositionAudit(record){
   const lead=layerLead(rows,record);
   if(named.some(x=>!x))issues.push({status:'bad',layer:iar,field:'POR',
    message:'Ярус '+iar+': не указана порода в одной из строк древостоя.'});
-  if(supplied.some(v=>v!==null&&(v<=0||v>10)))issues.push({status:'bad',layer:iar,field:'KOEF',
-   message:'Ярус '+iar+': коэффициент состава каждой породы должен быть больше 0 и не превышать 10.'});
+  if(supplied.some(v=>v!==null&&(v<0||v>10)))issues.push({status:'bad',layer:iar,field:'KOEF',
+   message:'Ярус '+iar+': числовые коэффициенты должны быть 1–10; для плюсовой породы (3–5%) допускается 0.'});
   else if(!known)issues.push({status:'warn',layer:iar,field:'KOEF',
    message:'Ярус '+iar+': заполните коэффициент состава у каждой породы.'});
   else if(Math.abs(sum-10)>0.000001)issues.push({status:'warn',layer:iar,field:'KOEF',
@@ -343,12 +343,12 @@ function stockPerHectare(record,refs,org,quarterRow=null,targetLayer=null){
    eligible.find(x=>same(x.row.POR,record.M3Pr))?.row.IAR;
  const sameLayer=all.filter(r=>childMatches(record,r)&&same(r.IAR,layer));
  if(!sameLayer.length)return status('К59: сначала заполните состав яруса','waiting');
- if(sameLayer.some(r=>!defined(r.POR)||n(r.KOEF)===null||n(r.KOEF)<=0||n(r.PH)===null||n(r.PH)<=0))
+ if(sameLayer.some(r=>!defined(r.POR)||n(r.KOEF)===null||n(r.KOEF)<0||n(r.PH)===null||n(r.PH)<=0))
   return status('К59: укажите породу, коэффициент и высоту каждой строки яруса '+layer,'waiting');
  if(new Set(sameLayer.map(r=>String(r.POR).trim())).size!==sameLayer.length)
   return status('К59: повторные группы одной породы в ярусе требуют проверки','ambiguous');
  const coefficient=sameLayer.reduce((sum,r)=>sum+n(r.KOEF),0);
- if(sameLayer.length>1&&Math.abs(coefficient-10)>0.00001)
+ if(Math.abs(coefficient-10)>0.00001)
   return status('К59: сумма коэффициентов состава яруса '+layer+' должна быть 10 (сейчас '+coefficient+')','waiting');
  const candidates=eligible.filter(x=>same(x.row.IAR,layer));
  const dominant=layerLead(candidates,record);
