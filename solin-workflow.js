@@ -150,7 +150,7 @@ if(m==='Макет10'&&window.SolinCardCalculations){
 }
 if(!rs.length)html+='<div class="wf-empty">Здесь пока нет записей. Добавьте первую.</div>';
 rs.forEach((row,i)=>{
- const renderValue=k=>row[k]!==null&&row[k]!==undefined&&row[k]!==''?'<div class="wf-kv"><span>'+h(window.SolinHuman?.label(m,k)||LABELS[k]||FORM_LABELS[k]||k)+'</span><b>'+h(window.SolinHuman?SolinHuman.value(m,k,row[k],row):findLookups(k,m)?.[String(row[k])]||fmt(row[k]))+'</b></div>':'';const values=fields.filter(k=>!window.SolinHuman?.isTechnical(m,k)).map(renderValue).filter(Boolean).join('');const raw=fields.filter(k=>window.SolinHuman?.isTechnical(m,k)).map(renderValue).filter(Boolean).join('');
+ const renderValue=k=>row[k]!==null&&row[k]!==undefined&&row[k]!==''?'<div class="wf-kv"><span>'+h(window.SolinHuman?.label(m,k)||LABELS[k]||FORM_LABELS[k]||k)+'</span><b>'+h(m==='Макет10'&&k==='KOEF'&&Number(row.KOEF)===0?'Плюсовая (3–5%)':window.SolinHuman?SolinHuman.value(m,k,row[k],row):findLookups(k,m)?.[String(row[k])]||fmt(row[k]))+'</b></div>':'';const values=fields.filter(k=>!window.SolinHuman?.isTechnical(m,k)).map(renderValue).filter(Boolean).join('');const raw=fields.filter(k=>window.SolinHuman?.isTechnical(m,k)).map(renderValue).filter(Boolean).join('');
  html+='<article class="wf-row"><div class="wf-rowhead"><b>Запись '+(i+1)+'</b><span><button data-edit="'+i+'">Изменить</button><button class="wf-danger" data-del="'+i+'">Удалить</button></span></div><div class="wf-grid">'+(values||'<div class="wf-muted">Запись без заполненных полей</div>')+(raw?'<details class="human-source"><summary>Служебные данные</summary>'+raw+'</details>':'')+'</div></article>';
 });
 html+='</div>';wrap.innerHTML=html;
@@ -219,6 +219,20 @@ function editComposition({add=false}={}){
   card.innerHTML='<div class="wf-rowhead"><b>Порода '+(cards.length+1)+'</b><button type="button" class="wf-danger" data-wf-remove>Удалить породу</button></div>'+
    '<div class="formGrid wf-formgrid">'+humanInputs(fields,original,prefix,name,{...r,KU:cat.value||r.KU})+'</div>';
   host.append(card);const item={token,prefix,card,original,lastSpecies:original.POR};cards.push(item);
+  // KOEF=0 is physically stored for a plus species (3–5%). Never use a
+  // fake extra IAR or a missing/null coefficient to represent it.
+  card.insertAdjacentHTML('beforeend','<label class="wf-field wf-plus-species"><input type="checkbox" data-wf-plus> Плюсовая порода (3–5%, без коэффициента)</label>');
+  const plusBox=card.querySelector('[data-wf-plus]'),coefficient=card.querySelector('#'+prefix+'_KOEF');
+  if(plusBox&&coefficient){
+   plusBox.checked=original.KOEF!==null&&original.KOEF!==undefined&&String(original.KOEF)!==''&&Number(original.KOEF)===0;
+   coefficient.closest('label').hidden=plusBox.checked;
+   if(plusBox.checked)coefficient.value='0';
+   plusBox.addEventListener('change',()=>{
+    coefficient.value=plusBox.checked?'0':'';
+    coefficient.closest('label').hidden=plusBox.checked;
+    refresh();
+   });
+  }
   card.querySelector('[data-wf-remove]').onclick=()=>{if(cards.length===1)return notify('Оставьте хотя бы одну породу');
    const pos=cards.indexOf(item);if(pos>=0)cards.splice(pos,1);card.remove();renumber();refresh();};
   for(const field of fields){const el=card.querySelector('#'+prefix+'_'+field);if(!el)continue;
@@ -332,8 +346,8 @@ function editComposition({add=false}={}){
   }
   const layerCoefficients=new Map();
   for(const [i,row]of rows.entries()){
-   if(!row.POR||!Number(row.IAR)||!Number(row.KOEF)){notify('Порода '+(i+1)+': выберите ярус, породу и коэффициент');return;}
-   if(!Number.isInteger(Number(row.KOEF))||Number(row.KOEF)<1||Number(row.KOEF)>10){notify('Порода '+(i+1)+': коэффициент должен быть от 1 до 10');return;}
+   if(!row.POR||!Number(row.IAR)||row.KOEF===null||row.KOEF===undefined||String(row.KOEF).trim()===''){notify('Порода '+(i+1)+': выберите ярус, породу и коэффициент или отметьте плюсовую породу');return;}
+   if(!Number.isInteger(Number(row.KOEF))||Number(row.KOEF)<0||Number(row.KOEF)>10){notify('Порода '+(i+1)+': коэффициент 1–10; 0 только для плюсовой породы (3–5%)');return;}
    const layer=String(row.IAR),total=(layerCoefficients.get(layer)||0)+Number(row.KOEF);
    layerCoefficients.set(layer,total);
    const policy=window.SolinCategoryRules?.validatePol(desiredKU,row.POL,ref);
