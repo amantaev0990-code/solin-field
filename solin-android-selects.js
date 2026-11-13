@@ -62,13 +62,16 @@
   cleanup(false);
   selection=select;previousFocus=document.activeElement;
   values=[...select.options].map((o,i)=>({idx:i,value:o.value,text:o.textContent?.trim()||o.value,disabled:o.disabled})).filter(o=>!o.disabled);
+  // Five or more options: search by name or code; small lists need no keyboard.
+  const searchable=values.filter(o=>o.value!=='').length>=5;
   overlay=document.createElement('div');overlay.id='solin-android-picker';overlay.className='solin-android-picker';
   const disabled=select.disabled;
   const reason=select.title||select.dataset.dependentStatus||'';
   overlay.innerHTML='<div class="sap-backdrop"></div><section class="sap-sheet" role="dialog" aria-modal="true" aria-label="'+h(label(select))+'">'+
    '<header class="sap-head"><b>'+h(label(select))+'</b><button type="button" class="sap-close">Закрыть</button></header>'+
    (disabled?'<p class="sap-help">Поле пока недоступно. '+h(reason||'Проверьте связанные значения карточки и загрузку справочников.')+'</p>':
-    '<input id="sap-search" type="search" autocomplete="off" spellcheck="false" placeholder="Введите код или название…" aria-label="Поиск по коду или названию">')+
+    searchable?'<input id="sap-search" type="search" autocomplete="off" spellcheck="false" placeholder="Введите код или название…" aria-label="Поиск по коду или названию">':
+    '<p class="sap-help">Выберите значение из списка.</p>')+
    '<div id="sap-count" class="sap-count"></div><div id="sap-options" class="sap-options" role="listbox"></div></section>';
   document.body.append(overlay);
   viewport();
@@ -170,5 +173,5 @@
  window.addEventListener('pointerup',onPointerUp,true);
  window.addEventListener('pointercancel',onPointerCancel,true);
  window.addEventListener('click',onClick,true);
- window.SolinAndroidSelects={open,close:cleanup};
+ window.SolinAndroidSelects={open,close:cleanup,searchThreshold:5};
 })();
