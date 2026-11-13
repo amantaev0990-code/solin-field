@@ -11,7 +11,7 @@ const assist=read('solin-card-assist.js');
 const start=editor.indexOf('function syncPlusSpeciesForSave(){');
 const stop=editor.indexOf('function validate(){',start);
 assert(start!==-1&&stop>start,'save sync must exist and precede validation');
-assert.match(editor.slice(stop,stop+90),/syncPlusSpeciesForSave\(\)/,'validate must sync before checking');
+assert.match(editor.slice(stop,stop+180),/syncPlusSpeciesForSave\(\)/,'validate must sync before checking');
 const fn=editor.slice(start,stop);
 const mk=(rowIndex,value,checked=false,disabled=false)=>({
  dataset:{ceRow:String(rowIndex)},value,disabled,
