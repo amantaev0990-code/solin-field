@@ -823,7 +823,7 @@ function syncPlusSpeciesForSave(){
  }
 }
 function validate(){
- syncPlusSpeciesForSave();
+ if(typeof syncPlusSpeciesForSave==='function')syncPlusSpeciesForSave();
  const originalRegion=String(session.originalQuarter?.Raion??'');
  const chosenRegion=String(session.quarter?.Raion??'');
  if(originalRegion!==chosenRegion){
