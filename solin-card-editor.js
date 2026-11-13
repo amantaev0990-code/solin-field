@@ -869,6 +869,16 @@ function validate(){
   for(const [index,row] of (session.draft._children.Макет10||[]).entries())
    if(row.ZAP!=null&&Number(row.ZAP)!==0)
     throw {message:'Для несомкнувшихся лесных культур (KU 19) запас не проставляется: проверьте Макет 10, ZAP должен быть 0.',form:'Макет10',scope:'Макет10',field:'ZAP',index};
+ // Coefficient 0 is valid for a plus species in ANY IAR, but no populated
+ // layer can be saved unless every row has a coefficient and that layer sums 10.
+ // Apply on new or edited Maket10 only; never rewrite old unedited MDB records.
+ if((session.isNew||session.changedMakets.has('Макет10'))&&
+    typeof window.SolinCardCalculations?.compositionAudit==='function'){
+  const audit=window.SolinCardCalculations.compositionAudit(session.draft);
+  const issue=audit.issues.find(x=>x.status==='bad'&&['KOEF','POR'].includes(x.field));
+  if(issue)throw {message:issue.message,form:'Макет10',scope:'Макет10',
+   field:issue.field,index:issue.index};
+ }
  for(const form of session.changedMakets)for(const row of session.draft._children[form]||[])check(form,row,session.baselines.get(row));
 }
 function cleanup(){if(!session)return;clearTimeout(draftTimer);const s=session;session=null;const modal=document.querySelector('#modal');modal.classList.remove('ce-modal');modal.removeAttribute('role');modal.removeAttribute('aria-modal');modal.removeAttribute('aria-labelledby');
