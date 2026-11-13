@@ -805,7 +805,25 @@ function showChecks(group=''){
 function preview(print){const popup=window.open('','_blank');if(!popup)return toast('Разрешите открытие окна карточки');const paper=document.querySelector('.dt-board').cloneNode(true);paper.querySelector('#ce-main').hidden=false;paper.querySelectorAll('#ce-extra,#ce-action-panel,.ce-other').forEach(e=>e.remove());for(const el of paper.querySelectorAll('input,select')){const span=document.createElement('output');span.textContent=el.tagName==='SELECT'?el.selectedOptions[0]?.textContent||'':el.value;el.replaceWith(span);}paper.querySelectorAll('button').forEach(b=>b.disabled=true);paper.style.transform='none';const css=new URL('solin-card-editor.css?v=20261023-6',location.href).href;popup.document.write('<!doctype html><html lang="ru"><meta charset="utf-8"><title>Карточка таксации — КТ</title><link rel="stylesheet" href="'+h(css)+'"><style>body{margin:8px;background:#eee}.ce-print{display:block;position:static}.ce-print .dt-board{position:relative}.print-action{margin-bottom:8px}</style><button class="print-action" onclick="print()">Печать</button><div class="ce-modal ce-print">'+paper.outerHTML+'</div><p style="font:11px Arial">Предварительный просмотр карточки. Официальное таксационное описание формируется в настольной SOLI-N.</p></html>');popup.document.close();if(print)popup.addEventListener('load',()=>popup.print(),{once:true});}
 function newCard(e){const previous=session.draft,kv=previous.KV;if(!save(e))return;const q=D.quarters[kv],org=D.lesnichestvo?.[0]||{},r=Object.fromEntries((D.transfSchema['Выдел']||[]).map(f=>[f,null]));for(const f of numeric)if(f in r)r[f]=0;for(const f of ['CR','OZU','ErV','ErCt','M2PM1','M22','M23','PLG'])r[f]=0;Object.assign(r,{POS:previous.POS??org.POS,LESN:previous.LESN??org.LESN,KV:kv,KGLF:previous.KGLF,VD:nextStandNumber(q.compartments.filter(x=>same(x.POS,previous.POS)&&same(x.LESN,previous.LESN)&&same(x.KGLF,previous.KGLF))),PLV:1,KU:null,Fzona:previous.Fzona,KlxrVD:previous.KlxrVD,_children:{},_local:true});window.SolinAddressContext?.enrichStand(r,q,org);open(r,{isNew:true});}
 function updateBadges(form){const n=session.draft._children[form]?.length||0;document.querySelectorAll('[data-ce-badge="'+form+'"]').forEach(b=>b.textContent=n||'');}
+// Android can submit before the last input/change event. Preserve explicit
+// KOEF=0 from the plus checkbox OR a user-typed zero; do not turn blanks into 0.
+function syncPlusSpeciesForSave(){
+ const rows=session?.draft?._children?.Макет10;
+ if(!Array.isArray(rows))return;
+ for(const input of document.querySelectorAll('#ce-form [data-ce-scope="Макет10"][data-ce-field="KOEF"]')){
+  const index=Number(input.dataset.ceRow),row=rows[index];
+  if(!row)continue;
+  const checked=input.closest('label')?.querySelector('[data-ce-plus]')?.checked===true;
+  const typedZero=!input.disabled&&String(input.value??'').trim()==='0';
+  if((checked||typedZero)&&row.KOEF!==0){
+   row.KOEF=0;
+   session.changedMakets.add('Макет10');
+   session.dirty=true;
+  }
+ }
+}
 function validate(){
+ syncPlusSpeciesForSave();
  const originalRegion=String(session.originalQuarter?.Raion??'');
  const chosenRegion=String(session.quarter?.Raion??'');
  if(originalRegion!==chosenRegion){
@@ -830,6 +848,9 @@ function validate(){
  const year=session.quarter.GodT;if(year!=null&&(!Number.isInteger(Number(year))||Number(year)<1900||Number(year)>2200))throw {message:'Укажите год таксации от 1900 до 2200.',el:document.querySelector('[data-ce-field="GodT"]')};
  const check=(form,row,before)=>{const failed=(solinCore.validateRow(form,row,session.draft)||[]).filter(m=>{
   const f=m.split(':')[0];
+  // In Solim.M10 coefficient 0 means "plus" (3–5%), not a missing value.
+  if(form==='Макет10'&&f==='KOEF'&&row.KOEF!==null&&
+     row.KOEF!==undefined&&Number(row.KOEF)===0)return false;
   if(form==='Макет10'&&m==='ZAP: Is Not Null'&&
      !leadingMaket10Row(session.draft._children.Макет10,
        session.draft._children.Макет10.indexOf(row),session.draft))return false;
