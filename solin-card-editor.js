@@ -106,14 +106,22 @@ const desktopLabels={IAR:'Ярус',KOEF:'Коэфф.',POR:'Порода',LET:'�
 function input(form,field,value,scope,index){
  const id='ce_'+scope+'_'+(index??'base')+'_'+field,fragment=document.createElement('div');
  const shown=numeric.has(field)&&typeof value==='number'?value.toLocaleString('ru-RU',{useGrouping:false,maximumFractionDigits:6}):value;
- fragment.innerHTML=SolinHuman.input(field,shown??'',id,form);
+ if(form==='Макет10'&&field==='KOEF'){
+  // Original Solim.M10 stores KOEF=0 for plus species (3–5%).
+  // Blank remains distinct: do not silently convert a forgotten coefficient into plus.
+  const chosen=value===null||value===undefined?'':String(value);
+  const options=[['','—'],['0','Плюсовая порода (3–5%)'],
+   ...Array.from({length:10},(_,i)=>[String(i+1),String(i+1)])];
+  fragment.innerHTML='<label><span>Коэфф.</span><select id="'+h(id)+'" title="Плюсовая порода: без коэффициента">'+
+   options.map(([v,label])=>'<option value="'+h(v)+'"'+(chosen===v?' selected':'')+'>'+h(label)+'</option>').join('')+'</select></label>';
+ }else fragment.innerHTML=SolinHuman.input(field,shown??'',id,form);
  const label=fragment.firstElementChild,el=label.querySelector('input,select');
  const caption=SolinHuman.isTechnical(form,field)?D.fieldLabels?.[field]||field:title(form,field);
  label.className='ce-field';label.querySelector('span').textContent=caption;
  el.id=id;el.dataset.ceField=field;el.dataset.ceScope=scope;el.dataset.ceForm=form;
  el.setAttribute('aria-label',caption);el.removeAttribute('data-wffield');
  if(index!=null)el.dataset.ceRow=index;
- if(el.tagName==='SELECT')for(const option of el.options){
+ if(el.tagName==='SELECT'&&!(form==='Макет10'&&field==='KOEF'))for(const option of el.options){
    const description=option.textContent.trim();
    option.title=description;
    // In original Access the expanded list shows a code *and* its meaning.
