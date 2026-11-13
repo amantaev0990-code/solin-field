@@ -731,7 +731,16 @@ function showMaketNavigator(){
  const others=[{n:'10',label:'Основные данные · древостой',kind:'table'},
    ...extras.map(n=>({n:String(n),label:SolinHuman.formName('Макет'+n),kind:'table'}))];
  const items=[...standard,...others].sort((a,b)=>Number(a.n)-Number(b.n));
- const html='<div class="ce-maket-nav">'+items.map(item=>{
+ const matches=window.SolinReferenceExamples?.forKU(session.draft.KU)||[];
+ // Study cases are read-only examples, never a normative list of mandatory makets.
+ // Keep examples collapsed; fast field entry remains uncluttered.
+ const examplesHTML=matches.length?'<details class="ce-reference-examples"><summary>Образцы заполнения · '+matches.length+'</summary>'+
+  '<p class="ce-maket-guide">Учебные примеры 2009 года. Наличие макета в образце не делает его обязательным. Сверяйтесь с исходным контролем SOLI-N.</p>'+
+  matches.map(example=>'<article class="ce-reference-case"><b>№ '+example.id+' · '+h(example.title)+'</b>'+
+   '<p>Ярусы в примере: '+h(example.iar.length?example.iar.join(', '):'не заполнены')+
+   ' · Макеты: '+h(example.makets.length?example.makets.join(', '):'не заполнены')+'</p>'+
+   '<small>'+h(example.note)+'</small></article>').join('')+'</details>':'';
+ const html=examplesHTML+'<div class="ce-maket-nav">'+items.map(item=>{
    const form='Макет'+item.n;
    const count=item.kind==='table'?(session.draft._children?.[form]?.length||0):null;
    return '<button type="button" class="ce-maket-nav-item" data-ce-nav-maket="'+h(item.n)+'">'+
