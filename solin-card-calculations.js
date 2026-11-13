@@ -90,7 +90,9 @@ function companionStockIssues(record){
   groups.get(iar).push({row,index});
  }
  for(const [iar,rows] of groups){
-  if(rows.length<2||rows.some(x=>!defined(x.row.POR)||!(n(x.row.KOEF)>0)))continue;
+  // KOEF=0 is the original Solim.M10 code for a plus species (3–5%).
+   // It has no numeric share, but is still a companion in its original layer.
+   if(rows.length<2||rows.some(x=>!defined(x.row.POR)||n(x.row.KOEF)===null||n(x.row.KOEF)<0))continue;
   const dominant=layerLead(rows,record);
   for(const entry of rows){
    if(entry===dominant||n(entry.row.ZAP)===0)continue;
@@ -232,12 +234,12 @@ function stockPerHectare(record,refs,org,quarterRow=null,targetLayer=null){
    eligible.find(x=>same(x.row.POR,record.M3Pr))?.row.IAR;
  const sameLayer=all.filter(r=>childMatches(record,r)&&same(r.IAR,layer));
  if(!sameLayer.length)return status('К59: сначала заполните состав яруса','waiting');
- if(sameLayer.some(r=>!defined(r.POR)||n(r.KOEF)===null||n(r.KOEF)<=0||n(r.PH)===null||n(r.PH)<=0))
+ if(sameLayer.some(r=>!defined(r.POR)||n(r.KOEF)===null||n(r.KOEF)<0||n(r.PH)===null||n(r.PH)<=0))
   return status('К59: укажите породу, коэффициент и высоту каждой строки яруса '+layer,'waiting');
  if(new Set(sameLayer.map(r=>String(r.POR).trim())).size!==sameLayer.length)
   return status('К59: повторные группы одной породы в ярусе требуют проверки','ambiguous');
  const coefficient=sameLayer.reduce((sum,r)=>sum+n(r.KOEF),0);
- if(sameLayer.length>1&&Math.abs(coefficient-10)>0.00001)
+ if(Math.abs(coefficient-10)>0.00001)
   return status('К59: сумма коэффициентов состава яруса '+layer+' должна быть 10 (сейчас '+coefficient+')','waiting');
  const candidates=eligible.filter(x=>same(x.row.IAR,layer));
  const dominant=layerLead(candidates,record);
