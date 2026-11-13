@@ -630,8 +630,10 @@ function save(e){e?.preventDefault();if(!session||session.pendingRecovery)return
  // Direct Save/quick-entry can submit before the last change event.
  // Recalculate only cards whose stock-related fields actually changed.
  const stockFields=['PLV','KU','M3Pr','M3B','STUR','STUR1'];
+ const orderedM10=rows=>window.SolinDependentRules?.orderMaket10Rows?.(rows)||rows;
  const changedStock=stockFields.some(k=>!same(s.draft[k],s.original[k]))||
-   JSON.stringify(s.draft._children?.Макет10||[])!==JSON.stringify(s.original._children?.Макет10||[]);
+   JSON.stringify(orderedM10(s.draft._children?.Макет10||[]))!==
+   JSON.stringify(orderedM10(s.original._children?.Макет10||[]));
  if(changedStock){
   const el=document.querySelector('#ce-form [data-ce-scope="base"][data-ce-field="PLV"]');
   if(el)recalculateEditedField(el);
@@ -720,6 +722,8 @@ function open(record,options={}){if(!record)return;
  if(recovery){session.baselines=new WeakMap();for(const [form,rows]of Object.entries(session.draft._children))rows.forEach((row,i)=>{const before=recovery.baselines?.[form]?.[i];if(before)session.baselines.set(row,before);});}
  // Do not reorder baselines: they are mapped by row identity before sorting.
  orderMaket10Draft();
+ // The first visible sorted row should be selected when opening a card.
+ (session.selected??={}).Макет10=0;
  if(session.quarter.GodT==null)session.quarter.GodT=D.lesnichestvo?.[0]?.GodT??null;
  openModal('Карточка таксации',markup());const modal=document.querySelector('#modal');modal.classList.add('ce-modal');modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');modal.setAttribute('aria-labelledby','modalTitle');document.body.style.overflow='hidden';session.supportGrid=document.querySelector('.ce-other .ce-grid');setZoom('actual');
  modal.querySelector('.close').onclick=cancel;
