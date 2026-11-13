@@ -1,13 +1,13 @@
 {
-  "tag_name": "solin-field-v230043",
+  "tag_name": "solin-field-v230044",
   "draft": false,
   "prerelease": false,
   "assets": [
     {
       "name": "SOLIN-Field-update.apk",
       "size": 36972925,
-      "digest": "sha256:fc0e53b755a106e3c78e92ca6f32b4d3b1ba445a5fea535cc118cd09a8cf7148",
-      "browser_download_url": "https://github.com/amantaev0990-code/solin-field/releases/download/solin-field-v230043/SOLIN-Field-update.apk"
+      "digest": "sha256:2bf0b6bfe5904da671c3825ca403cac902341009021dc4f9ed36c89792a48367",
+      "browser_download_url": "https://github.com/amantaev0990-code/solin-field/releases/download/solin-field-v230044/SOLIN-Field-update.apk"
     }
   ]
 }
