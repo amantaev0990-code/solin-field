@@ -83,7 +83,12 @@ if((DECIMAL.has(key)||['IAR','LET','VNUM','PRA','PRkol','MTC','G15','GZ','PH','P
 obj[key]=DECIMAL.has(key)||['IAR','LET','VNUM','PRA','PRkol','MTC','G15','GZ','PH','PD2','ZAP','POL'].includes(key)?Number(raw.replace(',','.')):raw;
 }return obj;}
 function maketsOf(r){return r?Object.keys(r._children||{}):[];}
-function rowsOf(r,m){const rows=r?._children?.[m];return Array.isArray(rows)?rows:[];}
+function rowsOf(r,m){
+ const rows=r?._children?.[m];
+ if(!Array.isArray(rows))return [];
+ return m==='Макет10'&&window.SolinDependentRules?.orderMaket10Rows?
+  window.SolinDependentRules.orderMaket10Rows(rows):rows;
+}
 function maketSummary(r,m){const rows=rowsOf(r,m),length=rows.length;
  if(m==='Макет10'&&length){const summed=rows.reduce((s,v)=>s+(Number(v.ZAP)||0),0);return length+' записей · Σ ZAP '+summed.toLocaleString('ru-RU')+' (справочно)';}
  return length?length+' записей':'Нет данных';
@@ -195,6 +200,19 @@ function editComposition({add=false}={}){
  let serial=0;
  const nextId=()=>++serial;
  const cards=[];
+ // Stable row order keeps all species and MDB fields intact.
+ const reorderCards=()=>{
+  const rank=item=>{
+   const code=item.card.querySelector('#'+item.prefix+'_IAR')?.value;
+   const n=code===undefined||code===null||code===''?null:Number(code);
+   return Number.isInteger(n)&&n>=1&&n<=8?n:Infinity;
+  };
+  const ordered=cards.map((item,index)=>({item,index,rank:rank(item)}))
+   .sort((a,b)=>a.rank-b.rank||a.index-b.index).map(x=>x.item);
+  cards.splice(0,cards.length,...ordered);
+  for(const item of cards)host.append(item.card);
+  renumber();
+ };
  const renderOne=(original)=>{
   const token=nextId();const prefix='wf20_'+token;
   const card=document.createElement('section');card.className='wf-composition-card';card.dataset.compToken=String(token);
@@ -219,10 +237,12 @@ function editComposition({add=false}={}){
      }
      item.lastSpecies=por?.value;
     }
+    if(field==='IAR')reorderCards();
     refresh();
    });
   }
-  setupRowOptions(item);renumber();refresh();
+  setupRowOptions(item);reorderCards();refresh();
+  return item;
  };
  const renumber=()=>cards.forEach((x,i)=>{const title=x.card.querySelector('.wf-rowhead b');if(title)title.textContent='Порода '+(i+1)});
  const setupRowOptions=(item)=>{
@@ -301,8 +321,8 @@ function editComposition({add=false}={}){
  });
  root.querySelector('#wfCompAdd').onclick=()=>{if(cards.length>=12)return notify('Максимум 12 пород за одно редактирование');
   const last=cards[cards.length-1],layer=last?.card.querySelector('#'+last.prefix+'_IAR')?.value||'1';
-  renderOne({IAR:layer,KOEF:null,POR:null,LET:null,PH:null,PD2:null,KT:null,PROI:null,POL:null,ZAP:null});
-  const target=cards[cards.length-1].card.querySelector('[data-wffield="POR"]');target?.focus();};
+  const added=renderOne({IAR:layer,KOEF:null,POR:null,LET:null,PH:null,PD2:null,KT:null,PROI:null,POL:null,ZAP:null});
+  const target=added.card.querySelector('[data-wffield="POR"]');target?.focus();};
  root.querySelector('#wfCompCancel').onclick=closeModal;
  function saveComposition(destination){
   let rows;try{rows=readRows();}catch(e){notify(e.message);return;}
