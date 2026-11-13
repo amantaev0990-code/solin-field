@@ -85,3 +85,11 @@
 .ce-v23-species>.dt-cell{flex:1 1 280px!important;min-width:210px;min-height:40px}
 .ce-v23-species .dt-input{width:100%;min-width:0}
 .ce-v23-species input,.ce-v23-species select{max-width:100%;min-height:34px}
+/* V63: compact optional teaching examples and coefficient-free plus species. */
+.ce-reference-examples{margin:10px 0 14px;border-top:1px solid #d9e1dc;padding:10px 2px;font-size:12px}
+.ce-reference-examples summary{cursor:pointer;font-weight:600;line-height:1.6}
+.ce-reference-examples .ce-reference-case{padding:8px 0;border-bottom:1px solid #e9eeeb;line-height:1.4}
+.ce-reference-examples .ce-reference-case p{margin:3px 0}
+.ce-reference-examples .ce-reference-case small{color:#4a6458}
+.ce-plus-choice{display:inline-flex;align-items:center;gap:4px;font-size:10px;white-space:nowrap;margin-top:2px}
+.ce-plus-choice input[type="checkbox"]{width:14px;height:14px;min-width:14px;padding:0;margin:0}
