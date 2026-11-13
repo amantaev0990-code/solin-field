@@ -187,12 +187,27 @@ function cell(field,value,scope='base',form='ВыделВ',opts={}){const name=o
 function fixed(label,value,width,opts={}){return '<div class="dt-fixed'+(opts.inline?' dt-inline':'')+'"'+(width?' style="width:'+width+'px"':'')+'>'+(label?'<span>'+h(label)+'</span>':'')+'<input readonly aria-label="'+h(label||opts.aria||'')+'" value="'+h(value??'')+'"'+(opts.unavailable?' title="Поле пока недоступно для редактирования"':'')+'></div>';}
 function maket(n,body){return '<section class="dt-section" id="ce-section-'+n+'" aria-label="Макет '+n+'"><b class="dt-maket">'+(n==='31'?'Подрост<br>':n==='32'?'Подлесок<br>':'')+'Макет '+n+'</b><div class="dt-fields">'+body+'</div></section>';}
 function block(number,name,body){return '<section class="dt-section" id="ce-section-'+number+'" aria-label="Макет '+number+'">'+body+'</section>';}
-function newTableRow(form){
+function initialMaket10Iar(preferred){
+ const choices=window.SolinDependentRules?.allowedLayers(session.draft,window.SOLIN_REFS?.tables)?.items||[];
+ const chosen=choices.find(x=>String(x.value)===String(preferred));
+ return Number(chosen?.value??choices[0]?.value??0)||null;
+}
+function orderMaket10Draft(activeRow){
+ const rows=session?.draft?._children?.Макет10;
+ if(!Array.isArray(rows)||!rows.length)return -1;
+ const selected=activeRow||rows[session.selected?.Макет10??0]||rows[0];
+ const ordered=window.SolinDependentRules?.orderMaket10Rows?.(rows)||rows;
+ if(ordered.some((row,i)=>row!==rows[i]))session.draft._children.Макет10=ordered;
+ const index=ordered.indexOf(selected);
+ (session.selected??={}).Макет10=Math.max(0,index);
+ return Math.max(0,index);
+}
+function newTableRow(form,preferredIar=null){
  // Blank Maket 10 cells are not real zeros. Keep origin=0 only when actually
  // selected/suggested and preserve existing saved zeros without coercion.
  return Object.fromEntries((D.transfSchema[form]||[]).map(f=>[f,
   keys.includes(f)?session.draft[f]??null:
-  form==='Макет10'?(f==='IAR'?Number(window.SolinDependentRules?.allowedLayers(session.draft,window.SOLIN_REFS?.tables)?.items?.[0]?.value??0)||null:
+  form==='Макет10'?(f==='IAR'?initialMaket10Iar(preferredIar):
    f==='ZAP'&&Number(session.draft.KU)===19?0:null):
   form==='Макет16'?null:isNumeric(form,f)?0:null]));
 }
@@ -846,8 +861,10 @@ function save(e){e?.preventDefault();if(!session||session.pendingRecovery)return
  // Direct Save/quick-entry can submit before the last change event.
  // Recalculate only cards whose stock-related fields actually changed.
  const stockFields=['PLV','KU','M3Pr','M3B','STUR','STUR1'];
+ const sortedM10=rows=>window.SolinDependentRules?.orderMaket10Rows?.(rows)||rows;
  const changedStock=stockFields.some(k=>!same(s.draft[k],s.original[k]))||
-   JSON.stringify(s.draft._children?.Макет10||[])!==JSON.stringify(s.original._children?.Макет10||[]);
+   JSON.stringify(sortedM10(s.draft._children?.Макет10||[]))!==
+   JSON.stringify(sortedM10(s.original._children?.Макет10||[]));
  if(changedStock){
   const el=document.querySelector('#ce-form [data-ce-scope="base"][data-ce-field="PLV"]');
   if(el)recalculateEditedField(el);
@@ -893,13 +910,25 @@ function click(e){const b=e.target.closest('button');if(!b)return;
  if(b.classList.contains('ce-table-toggle')){const table=b.closest('.ce-section').querySelector('.ce-table-wrap');table.classList.toggle('ce-table-mode');b.setAttribute('aria-pressed',table.classList.contains('ce-table-mode'));b.textContent=table.classList.contains('ce-table-mode')?'Строками':'Таблица';return;}
  const form=b.dataset.ceAdd||b.dataset.ceDelete;if(!form)return;
  if(b.dataset.ceDelete&&!session.draft._children[form]?.length)return;
- if(b.dataset.ceAdd){(session.draft._children[form]??=[]).push(newTableRow(form));}
- else{if(!confirm('Удалить запись '+(Number(b.dataset.ceIndex)+1)+' макета '+form.replace('Макет','')+'? Изменения применятся после сохранения карточки.'))return;session.draft._children[form].splice(Number(b.dataset.ceIndex),1);}
+ if(b.dataset.ceAdd){
+  const rows=(session.draft._children[form]??=[]);
+  const current=rows[session.selected?.[form]??0];
+  const added=newTableRow(form,form==='Макет10'?current?.IAR:null);
+  rows.push(added);
+  if(form==='Макет10')orderMaket10Draft(added);
+  else (session.selected??={})[form]=rows.length-1;
+ }else{
+  if(!confirm('Удалить запись '+(Number(b.dataset.ceIndex)+1)+' макета '+form.replace('Макет','')+'? Изменения применятся после сохранения карточки.'))return;
+  const rows=session.draft._children[form],index=Number(b.dataset.ceIndex);
+  rows.splice(index,1);
+  (session.selected??={})[form]=Math.max(0,Math.min(index,rows.length-1));
+ }
  session.changedMakets.add(form);session.dirty=true;scheduleDraft();document.querySelector('#ce-status').textContent='Есть несохранённые изменения';rerenderTable(form);updateBadges(form);
  if(form==='Макет10')recalculateEditedField({dataset:{ceScope:'Макет10',ceField:'IAR'},getAttribute:()=>null});
  if(b.dataset.ceAdd){
-  selectRecord(form,'last');
-  document.getElementById('ce-table-'+form).querySelector('tbody tr:last-child input:not([disabled]),tbody tr:last-child select:not([disabled])')?.focus();
+  const selected=session.selected?.[form]??0;
+  selectRecord(form,selected);
+  document.getElementById('ce-table-'+form)?.querySelectorAll('tbody tr')?.[selected]?.querySelector('input:not([disabled]),select:not([disabled])')?.focus();
  }
 }
 function selectRecord(form,value){const rows=session.draft._children[form]||[],table=document.getElementById('ce-table-'+form);let selected=session.selected?.[form]||0;selected=value==='first'?0:value==='last'?rows.length-1:value==='next'?selected+1:value==='previous'?selected-1:Number(value);selected=Math.max(0,Math.min(Math.max(0,rows.length-1),selected));(session.selected??={})[form]=selected;table.querySelectorAll('tbody tr').forEach((tr,i)=>{tr.classList.toggle('dt-selected',i===selected);tr.querySelector('th').textContent=i===selected?'►':'';});table.querySelector('[data-ce-delete]').dataset.ceIndex=selected;table.querySelector('[data-ce-count]').textContent=rows.length?(selected+1)+' из '+rows.length:'Новая';}
@@ -925,6 +954,9 @@ function open(record,options={}){if(!record)return;
  if(recovery){session.draft=clone(recovery.draft);session.quarter=clone(recovery.quarter);session.changedMakets=new Set(recovery.changedMakets||[]);session.entryTouched=new Set(recovery.entryTouched||[]);session.dirty=true;session.recoveryRevision=recovery.revision;}
  session.baselines=new WeakMap();for(const [form,children]of Object.entries(session.draft._children))children.forEach((row,i)=>session.baselines.set(row,session.original._children?.[form]?.[i]));
  if(recovery){session.baselines=new WeakMap();for(const [form,rows]of Object.entries(session.draft._children))rows.forEach((row,i)=>{const before=recovery.baselines?.[form]?.[i];if(before)session.baselines.set(row,before);});}
+ // Row baseline weak references were set before draft sorting.
+ orderMaket10Draft();
+ (session.selected??={}).Макет10=0;
  if(session.quarter.GodT==null)session.quarter.GodT=D.lesnichestvo?.[0]?.GodT??null;
  openModal('Карточка таксации',markup());const modal=document.querySelector('#modal');modal.classList.add('ce-modal');modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');modal.setAttribute('aria-labelledby','modalTitle');document.body.style.overflow='hidden';session.supportGrid=document.querySelector('.ce-other .ce-grid');setZoom('actual');
  modal.querySelector('.close').onclick=cancel;
@@ -953,8 +985,13 @@ function open(record,options={}){if(!record)return;
   // A changed layer/composition can change which species is leading.
   // Rebuild only on the completed change event (not every keystroke),
   // so the accessory POL/ZAP inputs appear/disappear without stealing typing.
-  if(e.target.dataset.ceScope==='Макет10'&&['IAR','KOEF','POR'].includes(e.target.dataset.ceField))
+  if(e.target.dataset.ceScope==='Макет10'&&['IAR','KOEF','POR'].includes(e.target.dataset.ceField)){
+   const oldIndex=Number(e.target.dataset.ceRow);
+   const row=session.draft._children?.Макет10?.[oldIndex];
+   const index=e.target.dataset.ceField==='IAR'&&row?orderMaket10Draft(row):oldIndex;
    rerenderTable('Макет10');
+   if(row)selectRecord('Макет10',Math.max(0,index));
+  }
  });
  form.addEventListener('click',e=>{
   const jump=e.target.closest('[data-ce-entry-issue]');
