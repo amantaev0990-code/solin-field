@@ -59,6 +59,14 @@ function findLookups(field,form){
  return mapping?database?.fieldLookups?.[mapping]:null;
 }
 function fieldInput(name,value='',prefix='wf',form='ВыделВ'){
+ if(form==='Макет10'&&name==='KOEF'){
+  const chosen=value===null||value===undefined?'':String(value),id=prefix+'_KOEF';
+  const options=[['','—'],['0','Плюсовая порода (3–5%, без коэффициента)'],
+   ...Array.from({length:10},(_,i)=>[String(i+1),String(i+1)])];
+  return '<label class="wf-field"><span>Коэффициент состава</span><select id="'+h(id)+'" data-wffield="KOEF">'+
+   options.map(([v,text])=>'<option value="'+h(v)+'"'+(chosen===v?' selected':'')+'>'+h(text)+'</option>').join('')+
+   '</select></label>';
+ }
  if(window.SolinHuman?.input)return SolinHuman.input(name,value,prefix,form);
  const label=window.SolinHuman?.label(form,name)||LABELS[name]||FORM_LABELS[name]||db()?.fieldLabels?.[name]||name;
  const id=prefix+'_'+name,lookup=findLookups(name,form),str=String(value??'');
@@ -121,7 +129,7 @@ if(m==='Макет10'&&window.SolinCardCalculations){
 }
 if(!rs.length)html+='<div class="wf-empty">Здесь пока нет записей. Добавьте первую.</div>';
 rs.forEach((row,i)=>{
- const renderValue=k=>row[k]!==null&&row[k]!==undefined&&row[k]!==''?'<div class="wf-kv"><span>'+h(window.SolinHuman?.label(m,k)||LABELS[k]||FORM_LABELS[k]||k)+'</span><b>'+h(window.SolinHuman?SolinHuman.value(m,k,row[k],row):findLookups(k,m)?.[String(row[k])]||fmt(row[k]))+'</b></div>':'';const values=fields.filter(k=>!window.SolinHuman?.isTechnical(m,k)).map(renderValue).filter(Boolean).join('');const raw=fields.filter(k=>window.SolinHuman?.isTechnical(m,k)).map(renderValue).filter(Boolean).join('');
+ const renderValue=k=>row[k]!==null&&row[k]!==undefined&&row[k]!==''?'<div class="wf-kv"><span>'+h(window.SolinHuman?.label(m,k)||LABELS[k]||FORM_LABELS[k]||k)+'</span><b>'+h(m==='Макет10'&&k==='KOEF'&&Number(row.KOEF)===0?'Плюсовая порода (без коэффициента)':window.SolinHuman?SolinHuman.value(m,k,row[k],row):findLookups(k,m)?.[String(row[k])]||fmt(row[k]))+'</b></div>':'';const values=fields.filter(k=>!window.SolinHuman?.isTechnical(m,k)).map(renderValue).filter(Boolean).join('');const raw=fields.filter(k=>window.SolinHuman?.isTechnical(m,k)).map(renderValue).filter(Boolean).join('');
  html+='<article class="wf-row"><div class="wf-rowhead"><b>Запись '+(i+1)+'</b><span><button data-edit="'+i+'">Изменить</button><button class="wf-danger" data-del="'+i+'">Удалить</button></span></div><div class="wf-grid">'+(values||'<div class="wf-muted">Запись без заполненных полей</div>')+(raw?'<details class="human-source"><summary>Служебные данные</summary>'+raw+'</details>':'')+'</div></article>';
 });
 html+='</div>';wrap.innerHTML=html;
