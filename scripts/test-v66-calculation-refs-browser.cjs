@@ -46,8 +46,7 @@ const server=http.createServer(async(req,res)=>{
   assert.ok(codeNames.some(name=>name.includes('SSHB')),'K58 bonitet norm must be listed');
   assert.ok(codeNames.some(name=>name.includes('Szap')),'K59 stock norm must be listed');
   await page.locator('#calcRefsList details.refCard').first().locator('summary').click();
-  assert.ok(await page.locator('#calcRefsList details.refCard').first().locator('.wf-check').count()>0,
-    'Calculation reference data must be rendered');
+  await page.locator('#calcRefsList details.refCard').first().locator('.wf-check').first().waitFor({state:'attached',timeout:5000});
   await page.locator('#calcRefsSearch').fill('НесуществующийКод987654');
   assert.match(await page.locator('#calcRefsStatus').innerText(),/Совпадений не найдено/);
   await page.locator('#calcRefsSearch').fill('');
