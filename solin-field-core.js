@@ -298,8 +298,8 @@ window.solinEnsureRefsRendered=()=>{
  // Restore original Russian descriptions and code pairings. Previously the
  // technical raw table renderer replaced the human directory on every visit.
  const q=document.querySelector('#refsScreen input')?.value||'';
- if(typeof window.SolinHuman?.refs==='function')window.SolinHuman.refs(q);
- else if(window.SOLIN_REFS)auditedRefs(q);
+ if(window.SOLIN_REFS?.tables&&typeof window.SolinHuman?.refs==='function')window.SolinHuman.refs(q);
+ else if(window.SOLIN_REFS?.tables)auditedRefs(q);
  else refs(q);
 };
 window.addEventListener('solin-refs-ready',()=>{
