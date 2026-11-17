@@ -95,22 +95,24 @@ jobs:
           mv "$RUNNER_TEMP/v61/assets/public" www
           rm -f www/maps/213-1.cmf2 www/maps/213-2.cmf2
           npm install --no-save --no-audit --no-fund playwright@1.56.1
-          # Keep the verified V65 signed APK as baseline. Preserve all
-          # card values, MDB, maps and native code without changes.
+          # Use the verified V66 signed APK as baseline. Preserve MDB, maps, and native code.
           npx playwright install --with-deps chromium
           node scripts/test-v56-startup-performance.cjs www --baseline
           # V67 is an in-place update over exact signed V66 assets.
-          # Overlay only the new read-only references UI; maps, MDB, updater and refs stay.
+          # Overlay only the corrected card editor; calculation references, MDB, maps and updater stay intact.
           cp solin-calculation-refs.js solin-card-editor.js www/
+          # V66 already includes the independent calculation reference screen.
+          # Only bump the card editor's asset version to avoid cached V66 code.
           node --input-type=module <<'NODE'
           import {readFileSync,writeFileSync} from 'node:fs';
           const file='www/index.html';
           let html=readFileSync(file,'utf8');
-          const marker='</body></html>';
-          if (!html.includes(marker) || html.includes('solin-calculation-refs.js')) {
-            throw Error('Unexpected V65 HTML: cannot install standalone calculation directory');
+          const re=/(solin-card-editor\.js)(?:\?v=[^"]*)?"/g;
+          const matches=[...html.matchAll(re)];
+          if(matches.length!==1 || !html.includes('solin-calculation-refs.js')) {
+            throw Error('Unexpected V66 HTML assets');
           }
-          html=html.replace(marker,'<script src="solin-calculation-refs.js?v=66"></script>'+marker);
+          html=html.replace(re,'$1?v=67"');
           writeFileSync(file,html);
           NODE
           node --check www/solin-card-editor.js
