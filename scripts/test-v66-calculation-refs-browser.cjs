@@ -23,6 +23,9 @@ const server=http.createServer(async(req,res)=>{
   const context=await browser.newContext({...devices['Pixel 7'],viewport:{width:1067,height:667}});
   const page=await context.newPage();
   await page.route(u=>u.hostname!=='127.0.0.1',route=>route.abort());
+  // Test extracted Android assets in native mode: the bundled original
+  // directory is refs-audit.packed.bin, not the optional browser JSON.
+  await page.addInitScript(()=>window.Capacitor={isNativePlatform:()=>true,getPlatform:()=> 'android',Plugins:{}});
   await page.goto('http://127.0.0.1:'+server.address().port+'/',{waitUntil:'domcontentloaded'});
   await page.evaluate(async()=>await window.SolinWorkspace.ready);
   assert.ok(await page.locator('#mainScreen [data-field-route="refsScreen"]').count());
