@@ -96,13 +96,37 @@ function referenceUsage(name){return [...new Set(sources().filter(x=>x.table===n
  if(/^Макет\d+$/.test(form))return form.replace('Макет','Макет ')+' — '+dict.formNames[form]+' · '+caption;
  return (form==='Квартал'?'Квартал':form==='Лесничество'?'Лесничество':null)?.concat(' · ',caption);
  }).filter(Boolean))];}
-function referenceRows(name,rows,q,host){const spec=specForTable(name);let count=0;function more(){const slice=rows.slice(count,count+60);count+=slice.length;host.insertAdjacentHTML('beforeend',slice.map(row=>{const nameValue=member(row,spec.label||''),code=member(row,spec.code||'');const primary=nameValue!=null&&clean(nameValue)!==''?text(nameValue):'Без наименования';const known=Object.entries(row).filter(([k,v])=>v!=null&&v!==''&&columnTitles[k]&&!/код/i.test(columnTitles[k])&&k!==spec.code&&k!==spec.label);return '<article class="human-ref-row"><div><b>'+h(primary)+'</b>'+(code!=null?'<small>Шифр '+h(code)+'</small>':'')+'</div>'+(known.length?'<dl>'+known.map(([k,v])=>'<div><dt>'+h(columnTitles[k])+'</dt><dd>'+h(text(v))+'</dd></div>').join('')+'</dl>':'')+'</article>';}).join(''));host.querySelector('.refMore')?.remove();if(count<rows.length){const b=document.createElement('button');b.className='refMore';b.textContent='Показать ещё '+Math.min(60,rows.length-count);b.onclick=more;host.append(b);}}more();}
+function usableReferenceRow(row,spec){
+ return [spec.code,spec.label].some(key=>key&&clean(member(row,key))!=='');
+}
+function referenceRows(name,rows,q,host){
+ const spec=specForTable(name);let count=0;
+ function more(){
+  const slice=rows.slice(count,count+60);count+=slice.length;
+  host.insertAdjacentHTML('beforeend',slice.map(row=>{
+   const nameValue=member(row,spec.label||''),code=member(row,spec.code||'');
+   const primary=nameValue!=null&&clean(nameValue)!==''?text(nameValue):'Название отсутствует в исходном справочнике';
+   const known=Object.entries(row).filter(([k,v])=>v!=null&&v!==''&&columnTitles[k]&&!/код/i.test(columnTitles[k])&&k!==spec.code&&k!==spec.label);
+   return '<article class="human-ref-row"><div><b>'+h(primary)+'</b>'+
+    (clean(code)!==''?'<small>Шифр '+h(code)+'</small>':'')+'</div>'+
+    (known.length?'<dl>'+known.map(([k,v])=>'<div><dt>'+h(columnTitles[k])+'</dt><dd>'+h(text(v))+'</dd></div>').join('')+'</dl>':'')+
+    '</article>';
+  }).join(''));
+  host.querySelector('.refMore')?.remove();
+  if(count<rows.length){
+   const b=document.createElement('button');b.className='refMore';
+   b.textContent='Показать ещё '+Math.min(60,rows.length-count);
+   b.onclick=more;host.append(b);
+  }
+ }
+ more();
+}
 function refs(q=''){const box=document.querySelector('#friendlyRefs');if(!box)return;const tables=window.SOLIN_REFS?.tables;if(!tables){box.innerHTML='<p class="wf-muted">Справочники загружаются…</p>';return;}q=clean(q).toLowerCase();box.innerHTML='';let matched=0;
  for(const [name,table] of Object.entries(tables).sort(([a],[b])=>tableTitle(a).localeCompare(tableTitle(b),'ru'))){
  if(!referenceTitles[name])continue;
  const title=tableTitle(name),usage=referenceUsage(name),spec=specForTable(name);
  if(!spec.code||!spec.label)continue;
- const whole=(title+' '+usage.join(' ')).toLowerCase().includes(q),rows=!q||whole?table:table.filter(r=>[member(r,spec.label),member(r,spec.code)].some(v=>String(v??'').toLowerCase().includes(q)));if(!rows.length)continue;matched++;
+ const whole=(title+' '+usage.join(' ')).toLowerCase().includes(q),filtered=!q||whole?table:table.filter(r=>[member(r,spec.label),member(r,spec.code)].some(v=>String(v??'').toLowerCase().includes(q))),rows=filtered.filter(r=>usableReferenceRow(r,spec));if(!rows.length)continue;matched++;
  const d=document.createElement('details');d.className='refCard';d.dataset.reference=name;d.innerHTML='<summary><span><b>'+h(title)+'</b><small>'+rows.length+' значений</small></span><span aria-hidden="true">⌄</span></summary>';
  d.addEventListener('toggle',()=>{if(d.open&&!d.querySelector('.human-ref-list')){const host=document.createElement('div');host.className='human-ref-list';if(usage.length)host.innerHTML='<div class="human-ref-usage"><b>Где используется</b>'+usage.map(x=>'<p>'+h(x)+'</p>').join('')+'</div>';d.append(host);referenceRows(name,rows,q,host);}});box.append(d);}
  if(!matched)box.innerHTML='<div class="empty">Значения не найдены. Попробуйте название, макет или шифр.</div>';
