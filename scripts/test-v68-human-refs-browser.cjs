@@ -45,7 +45,7 @@ const server=http.createServer(async(req,res)=>{
   assert.match(human,/Шифр\s*\S+/,'A clear original code must appear alongside Russian description');
   assert.ok(!human.includes('NDP:'),'Ordinary user should not see raw column identifiers instead of names');
   // Confirm search uses Russian name or source code, not just technical table names.
-  const search=page.locator('#refsScreen input');
+  const search=page.locator('#refsScreen input[oninput*="renderFriendlyRefs"]');
   await search.fill('Осина');
   assert.ok(await page.locator('#friendlyRefs details[data-reference="SDP"]').count(),
     'Search by the Russian species name must show relevant dictionary');
