@@ -338,6 +338,10 @@ function refreshLinked(){
 // Local draft-only correction: do not persist a replacement without Save.
 function refreshStockPanel(){
  if(!session)return;
+ // Android can display the selected plus species before its last input
+ // event is committed. Reconcile the visible 0/plus checkbox first so
+ // the live V21 audit and the eventual Save use the same draft.
+ syncPlusSpeciesForSave();
  const calc=window.SolinCardCalculations;
  if(!calc?.standStock||!calc?.stockBreakdown)return;
  const d=calc.stockBreakdown(session.draft),stock=session.stockTouched?calc.corrections(session.draft,window.SOLIN_REFS?.tables,linkedOrg(),session.quarter).standStock:calc.standStock(session.draft);
@@ -813,9 +817,12 @@ function syncPlusSpeciesForSave(){
  for(const input of document.querySelectorAll('#ce-form [data-ce-scope="Макет10"][data-ce-field="KOEF"]')){
   const index=Number(input.dataset.ceRow),row=rows[index];
   if(!row)continue;
-  const checked=input.closest('label')?.querySelector('[data-ce-plus]')?.checked===true;
+  const checkbox=document.querySelector('[data-ce-plus="'+input.id+'"]');
+  const checked=checkbox?.checked===true;
   const typedZero=!input.disabled&&String(input.value??'').trim()==='0';
-  if((checked||typedZero)&&row.KOEF!==0){
+  // Never coerce an empty coefficient into 0: only an explicitly selected
+  // plus checkbox or a literal 0 is a plus species.
+  if((checked||typedZero)&&(row.KOEF===null||row.KOEF===undefined||String(row.KOEF).trim()==='')){
    row.KOEF=0;
    session.changedMakets.add('Макет10');
    session.dirty=true;
@@ -1019,7 +1026,7 @@ function open(record,options={}){if(!record)return;
    session.dirty=true;scheduleDraft();
    document.querySelector('#ce-status').textContent='Есть несохранённые изменения';
    if(e.target.checked){input.value='';input.disabled=true;}else input.focus();
-   recalculateEditedField(input);refreshEntryChecks();
+   recalculateEditedField(input);refreshStockPanel();refreshEntryChecks();
    return;
   }
   if(e.target.matches('.dt-maket-select')){const n=e.target.value;e.target.value='';if(n==='10'||n==='31'||n==='32')showMain(n);else if(n)showExtra('Макет'+n);return;}
