@@ -54,7 +54,7 @@ function input(name,v='',prefix='wf',form='ВыделВ'){
   return '<label class="wf-field" title="Поле исходной базы: POL"><span>Полнота</span>'+
    '<select id="'+h(id)+'" data-wffield="POL" data-solin-form="Макет10" data-solin-initial="'+h(str)+'" inputmode="none">'+choices+'</select></label>';
  }
- const phantom=form==='Макет10'&&['KOEF','LET','PH','PD2','KT','POL','SPS','ZAP'].includes(name);
+ const phantom=form==='Макет10'&&['LET','PH','PD2','KT','POL','SPS','ZAP'].includes(name);
  let control;
  if(list){
   const current=normalize(v),entries=Object.entries(list).filter(([k])=>k!=='');

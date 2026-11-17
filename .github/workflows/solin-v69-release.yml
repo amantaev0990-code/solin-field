@@ -1,0 +1,175 @@
+name: SOLI-N Field - signed V69 plus species and Access tables
+
+on:
+  push:
+    branches: [release/v69-plus-and-access-tables-20261117]
+
+permissions:
+  contents: read
+concurrency:
+  group: solin-automatic-release
+  cancel-in-progress: false
+
+env:
+  CODE: '230049'
+  TAG: solin-field-v230049
+  BASE_TAG: solin-field-v230048
+  BASE_SHA: 7d8bb88913c3e57cc7da2f1c3d78719ed22baae293d023d8a6a5650a65f426c8
+  CERT_SHA: 5a1c2e2bf2efe5aa7382674b651533a11d2b93c802a1c09adc72656c5a29ed7e
+  REFS_SHA: c2705bf1ecfa98b007fdbecd1b8f7be908b73591ee2eccae327cf88629bb60e5
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: app
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: release-config
+          sparse-checkout: scripts/prepare-v23-release.mjs
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '21'}
+      - uses: android-actions/setup-android@v3
+        with: {packages: platform-tools}
+
+      - name: Verify composition and Access datasheets against the installed APK assets
+        working-directory: app
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release download "$BASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern SOLIN-Field-update.apk --dir "$RUNNER_TEMP/base"
+          BASE="$RUNNER_TEMP/base/SOLIN-Field-update.apk"
+          printf '%s  %s\n' "$BASE_SHA" "$BASE" | sha256sum -c -
+          unzip -q "$BASE" 'assets/public/*' -d "$RUNNER_TEMP/base"
+          mv "$RUNNER_TEMP/base/assets/public" www
+          node scripts/patch-v69-assets.cjs www
+          npm install --no-audit --no-fund
+          npm install --no-save --no-audit --no-fund playwright@1.56.1
+          npx playwright install --with-deps chromium --only-shell
+          node scripts/test-card-calculations.cjs
+          node scripts/test-maket5-stock-breakdown.cjs
+          node scripts/test-v64-plus-and-search.cjs
+          node scripts/test-v65-all-layer-composition.cjs
+          node scripts/test-github-updates.cjs
+          node scripts/test-maket10-plus-browser.cjs www
+          node scripts/test-v66-calculation-refs-browser.cjs www
+          node scripts/test-v68-human-refs-browser.cjs www
+          rm www/solin-private-refs.packed.bin
+
+      - name: Build the unsigned Android update and verify the packaged changes
+        working-directory: app
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx cap add android
+          SOLIN_GITHUB_UPDATES=1 node scripts/install-android-mdb.mjs
+          npx cap sync android
+          SOLIN_RELEASE_VERSION_CODE="$CODE" node ../release-config/scripts/prepare-v23-release.mjs
+          sed -i 's#<string name="app_name">[^<]*</string>#<string name="app_name">SOLI-N Field</string>#' \
+            android/app/src/main/res/values/strings.xml
+          grep -q 'registerPlugin(SolinUpdatePlugin.class)' android/app/src/main/java/kz/solin/field/MainActivity.java
+          grep -q 'REQUEST_INSTALL_PACKAGES' android/app/src/main/AndroidManifest.xml
+          sed -i 's#distributionUrl=.*#distributionUrl=https\://mirrors.huaweicloud.com/gradle/gradle-8.14.3-bin.zip#; s#networkTimeout=10000#networkTimeout=120000#' \
+            android/gradle/wrapper/gradle-wrapper.properties
+          printf '\ndistributionSha256Sum=bd71102213493060956ec229d946beee57158dbd89d0e62b91bca0fa2c5f3531\n' >> \
+            android/gradle/wrapper/gradle-wrapper.properties
+          chmod +x android/gradlew
+          (cd android && ./gradlew --no-daemon assembleRelease)
+          APK=android/app/build/outputs/apk/release/app-release-unsigned.apk
+          for asset in index.html solin-calculation-refs.js solin-card-calculations.js solin-card-editor.css solin-card-editor.js solin-readable.css solin-readable.js solin-updates.js refs-audit.packed.bin; do
+            unzip -p "$APK" "assets/public/$asset" | cmp - "www/$asset"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: solin-unsigned-${{ env.CODE }}
+          path: app/android/app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
+          retention-days: 7
+
+  sign-and-publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions: {contents: write}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          sparse-checkout: signing
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: solin-unsigned-${{ env.CODE }}
+          path: unsigned
+      - uses: android-actions/setup-android@v3
+        with: {packages: platform-tools}
+
+      - name: Sign with the existing update certificate and verify Android identity
+        env:
+          SOLIN_V23_KEYSTORE_PASSWORD: ${{ secrets.SOLIN_V23_KEYSTORE_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$SOLIN_V23_KEYSTORE_PASSWORD"
+          KEY="$RUNNER_TEMP/solin-v23.p12"
+          base64 --decode signing/solin-v23-encrypted.p12.b64 > "$KEY"
+          printf '%s  %s\n' "$(jq -r .keystoreSha256 signing/certificate.json)" "$KEY" | sha256sum -c -
+          base64 --decode signing/solin-v23-refs.enc.b64 > "$RUNNER_TEMP/refs.enc"
+          mkdir -p stage/assets/public release
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 250000 -in "$RUNNER_TEMP/refs.enc" \
+            -out stage/assets/public/solin-private-refs.packed.bin -pass env:SOLIN_V23_KEYSTORE_PASSWORD
+          printf '%s  %s\n' "$REFS_SHA" stage/assets/public/solin-private-refs.packed.bin | sha256sum -c -
+          cp unsigned/app-release-unsigned.apk stage/base.apk
+          (cd stage && zip -q -0 base.apk assets/public/solin-private-refs.packed.bin)
+          TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$TOOLS/zipalign" -f -p 4 stage/base.apk "$RUNNER_TEMP/aligned.apk"
+          APK=release/SOLIN-Field-update.apk
+          "$TOOLS/apksigner" sign --ks "$KEY" --ks-type PKCS12 --ks-key-alias solin-cloud-lab \
+            --ks-pass env:SOLIN_V23_KEYSTORE_PASSWORD --v4-signing-enabled false \
+            --out "$APK" "$RUNNER_TEMP/aligned.apk"
+          "$TOOLS/apksigner" verify --verbose --print-certs "$APK" > "$RUNNER_TEMP/apk-cert.txt"
+          grep -iq "certificate SHA-256 digest: $CERT_SHA$" "$RUNNER_TEMP/apk-cert.txt"
+          "$TOOLS/aapt" dump badging "$APK" > "$RUNNER_TEMP/apk-badging.txt"
+          grep -F "package: name='kz.solin.field.v23build' versionCode='$CODE'" "$RUNNER_TEMP/apk-badging.txt"
+          [[ "$(unzip -p "$APK" assets/public/solin-private-refs.packed.bin | sha256sum | cut -d' ' -f1)" == "$REFS_SHA" ]]
+          (cd release && sha256sum SOLIN-Field-update.apk > SHA256SUMS.txt)
+          rm -f "$KEY" "$RUNNER_TEMP/refs.enc"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SOLIN-Field-SIGNED-${{ env.CODE }}
+          path: release/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish the verified APK and update the in-app fallback channel
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          [[ "$repo" == amantaev0990-code/solin-field ]]
+          [[ "$(gh api "repos/$repo/releases/latest" --jq .tag_name)" == "$BASE_TAG" ]]
+          gh release create "$TAG" release/SOLIN-Field-update.apk release/SHA256SUMS.txt \
+            --repo "$repo" --target "$GITHUB_SHA" --latest \
+            --title 'SOLI-N Field V69 — плюсовые породы и таблицы Access' \
+            --notes 'Макет 10 сохраняет коэффициент 0 при вводе с клавиатуры и по кнопке «+». Для состава 10 ОС + Б запас рассчитывается по ведущей породе. Расчётные справочники отображают строки и исходные колонки Microsoft Access.'
+          gh api "repos/$repo/releases/tags/$TAG" | jq '{
+            tag_name, draft, prerelease,
+            assets: [.assets[] | select(.name == "SOLIN-Field-update.apk") | {name, size, digest, browser_download_url}]
+          }' > release/latest.json
+          EXPECTED="sha256:$(cut -d' ' -f1 release/SHA256SUMS.txt)"
+          [[ "$(jq -r '.assets[0].digest' release/latest.json)" == "$EXPECTED" ]]
+          SHA="$(gh api "repos/$repo/contents/latest.json?ref=updater-channel" --jq .sha)"
+          gh api --method PUT "repos/$repo/contents/latest.json" \
+            -f branch=updater-channel -f sha="$SHA" -f message="Publish verified metadata for $TAG" \
+            -f content="$(base64 -w0 release/latest.json)" --silent

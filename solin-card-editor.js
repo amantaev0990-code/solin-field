@@ -132,9 +132,17 @@ function maket10InputCell(form,field,row,index,rows){
   return '<td class="ce-companion-cell" title="Полнота и общий запас — только у ведущей породы">'+
    (legacy?'<span title="Сохранённое значение не изменено: '+h(row[field])+'">Ранее: '+h(row[field])+'</span>':'<span>—</span>')+'</td>';
  }
- return '<td>'+input(form,field,row[field],form,index)+'</td>';
+ const control=input(form,field,row[field],form,index);
+ if(form==='Макет10'&&field==='KOEF'){
+  const id='ce_Макет10_'+index+'_KOEF';
+  return '<td><div class="ce-coefficient">'+control+'<button type="button" data-ce-plus="'+id+
+   '" aria-label="Плюсовая порода" title="Плюсовая порода (коэффициент 0)" aria-pressed="'+
+   isPlusCoefficient(row.KOEF)+'">+</button></div></td>';
+ }
+ return '<td>'+control+'</td>';
 }
 
+function isPlusCoefficient(value){return String(value??'').trim()!==''&&Number(value)===0;}
 function isNumeric(form,field){const t=window.SolinFieldTypes;return t?.type(form,field)?t.numeric(form,field):numeric.has(field);}
 function input(form,field,value,scope,index){
  const id='ce_'+scope+'_'+(index??'base')+'_'+field,fragment=document.createElement('div');
@@ -178,10 +186,8 @@ function input(form,field,value,scope,index){
   }
  }
  if(form==='Макет10'&&field==='KOEF'){
-  const plus=value!==null&&value!==undefined&&String(value)!==''&&Number(value)===0;
-  // Desktop Solim.M10 physically stores KOEF=0 as an unnumbered plus species.
-  label.insertAdjacentHTML('beforeend','<span class="ce-plus-choice" title="Плюсовая порода: доля запаса 3–5%, без числового коэффициента"><input type="checkbox" data-ce-plus="'+h(id)+'" aria-label="Плюсовая порода (3–5%)"'+(plus?' checked':'')+'>Плюсовая · 3–5%</span>');
-  if(plus){el.value='';el.disabled=true;}
+  el.placeholder='—';
+  el.inputMode='numeric';
  }
  return label.outerHTML;
 }
@@ -338,10 +344,6 @@ function refreshLinked(){
 // Local draft-only correction: do not persist a replacement without Save.
 function refreshStockPanel(){
  if(!session)return;
- // Android can display the selected plus species before its last input
- // event is committed. Reconcile the visible 0/plus checkbox first so
- // the live V21 audit and the eventual Save use the same draft.
- syncPlusSpeciesForSave();
  const calc=window.SolinCardCalculations;
  if(!calc?.standStock||!calc?.stockBreakdown)return;
  const d=calc.stockBreakdown(session.draft),stock=session.stockTouched?calc.corrections(session.draft,window.SOLIN_REFS?.tables,linkedOrg(),session.quarter).standStock:calc.standStock(session.draft);
@@ -622,6 +624,9 @@ function capture(el){if(!session||!el.matches('[data-ce-field]'))return;
   }
   el.removeAttribute('aria-invalid');el.setCustomValidity('');}
  catch(e){el.setAttribute('aria-invalid','true');el.setCustomValidity(e.message);}
+ if(scope==='Макет10'&&field==='KOEF')
+  el.closest('.ce-coefficient')?.querySelector('[data-ce-plus]')?.setAttribute('aria-pressed',
+   String(!el.hasAttribute('aria-invalid')&&isPlusCoefficient(target.KOEF)));
  if(!document.querySelector('#ce-form [aria-invalid="true"]'))document.querySelector('#ce-error').textContent='';
  if(scope==='base'&&field==='M3Pr'&&String(previous??'')!==String(target[field]??'')){
   syncMainSpecies(previous,target[field]);
@@ -809,28 +814,17 @@ function showChecks(group=''){
 function preview(print){const popup=window.open('','_blank');if(!popup)return toast('Разрешите открытие окна карточки');const paper=document.querySelector('.dt-board').cloneNode(true);paper.querySelector('#ce-main').hidden=false;paper.querySelectorAll('#ce-extra,#ce-action-panel,.ce-other').forEach(e=>e.remove());for(const el of paper.querySelectorAll('input,select')){const span=document.createElement('output');span.textContent=el.tagName==='SELECT'?el.selectedOptions[0]?.textContent||'':el.value;el.replaceWith(span);}paper.querySelectorAll('button').forEach(b=>b.disabled=true);paper.style.transform='none';const css=new URL('solin-card-editor.css?v=20261023-6',location.href).href;popup.document.write('<!doctype html><html lang="ru"><meta charset="utf-8"><title>Карточка таксации — КТ</title><link rel="stylesheet" href="'+h(css)+'"><style>body{margin:8px;background:#eee}.ce-print{display:block;position:static}.ce-print .dt-board{position:relative}.print-action{margin-bottom:8px}</style><button class="print-action" onclick="print()">Печать</button><div class="ce-modal ce-print">'+paper.outerHTML+'</div><p style="font:11px Arial">Предварительный просмотр карточки. Официальное таксационное описание формируется в настольной SOLI-N.</p></html>');popup.document.close();if(print)popup.addEventListener('load',()=>popup.print(),{once:true});}
 function newCard(e){const previous=session.draft,kv=previous.KV;if(!save(e))return;const q=D.quarters[kv],org=D.lesnichestvo?.[0]||{},r=Object.fromEntries((D.transfSchema['Выдел']||[]).map(f=>[f,null]));for(const f of numeric)if(f in r)r[f]=0;for(const f of ['CR','OZU','ErV','ErCt','M2PM1','M22','M23','PLG'])r[f]=0;Object.assign(r,{POS:previous.POS??org.POS,LESN:previous.LESN??org.LESN,KV:kv,KGLF:previous.KGLF,VD:nextStandNumber(q.compartments.filter(x=>same(x.POS,previous.POS)&&same(x.LESN,previous.LESN)&&same(x.KGLF,previous.KGLF))),PLV:1,KU:null,Fzona:previous.Fzona,KlxrVD:previous.KlxrVD,_children:{},_local:true});window.SolinAddressContext?.enrichStand(r,q,org);open(r,{isNew:true});}
 function updateBadges(form){const n=session.draft._children[form]?.length||0;document.querySelectorAll('[data-ce-badge="'+form+'"]').forEach(b=>b.textContent=n||'');}
-// Android can submit before the last input/change event. Preserve explicit
-// KOEF=0 from the plus checkbox OR a user-typed zero; do not turn blanks into 0.
-function syncPlusSpeciesForSave(){
- const rows=session?.draft?._children?.Макет10;
- if(!Array.isArray(rows))return;
+// Android can submit before the last coefficient edit has emitted an event.
+function capturePendingCoefficients(){
+ const rows=session.draft._children?.Макет10;
  for(const input of document.querySelectorAll('#ce-form [data-ce-scope="Макет10"][data-ce-field="KOEF"]')){
-  const index=Number(input.dataset.ceRow),row=rows[index];
-  if(!row)continue;
-  const checkbox=document.querySelector('[data-ce-plus="'+input.id+'"]');
-  const checked=checkbox?.checked===true;
-  const typedZero=!input.disabled&&String(input.value??'').trim()==='0';
-  // Never coerce an empty coefficient into 0: only an explicitly selected
-  // plus checkbox or a literal 0 is a plus species.
-  if((checked||typedZero)&&(row.KOEF===null||row.KOEF===undefined||String(row.KOEF).trim()==='')){
-   row.KOEF=0;
-   session.changedMakets.add('Макет10');
-   session.dirty=true;
-  }
+  const row=rows?.[Number(input.dataset.ceRow)];
+  if(input.value.trim()===String(row?.KOEF??'').trim())continue;
+  capture(input);
+  session.changedMakets.add('Макет10');
  }
 }
 function validate(){
- if(typeof syncPlusSpeciesForSave==='function')syncPlusSpeciesForSave();
  const originalRegion=String(session.originalQuarter?.Raion??'');
  const chosenRegion=String(session.quarter?.Raion??'');
  if(originalRegion!==chosenRegion){
@@ -901,7 +895,7 @@ function onKey(e){if(!session)return;if(e.key==='Escape'){e.preventDefault();ret
  if(e.key==='Tab'){const visible=[...document.querySelectorAll('.ce-modal button,.ce-modal input,.ce-modal select,.ce-modal summary,[role="dialog"] [tabindex="0"]')].filter(el=>el.getClientRects().length&&!el.disabled&&!el.closest('[inert]')),first=visible[0],last=visible.at(-1);if(e.shiftKey&&document.activeElement===first){last?.focus();e.preventDefault();}else if(!e.shiftKey&&document.activeElement===last){first?.focus();e.preventDefault();}}
 }
 function save(e){e?.preventDefault();if(!session||session.pendingRecovery)return false;const s=session;
- try{validate();
+ try{capturePendingCoefficients();validate();
  // Direct Save/quick-entry can submit before the last change event.
  // Recalculate only cards whose stock-related fields actually changed.
  const stockFields=['PLV','KU','M3Pr','M3B','STUR','STUR1'];
@@ -1016,19 +1010,6 @@ function open(record,options={}){if(!record)return;
  form.addEventListener('input',e=>{capture(e.target);if(e.target.matches('[data-ce-field]')&&!['ZAP','STUR','STUR1'].includes(e.target.dataset.ceField)){clearTimeout(stockTimer);const el=e.target;stockTimer=setTimeout(()=>{if(el.isConnected)recalculateEditedField(el);},160);}if(e.target.dataset.ceScope?.startsWith('Макет'))session.changedMakets.add(e.target.dataset.ceScope);if(session.entryTouched?.has(e.target.dataset.ceScope+':'+e.target.dataset.ceField))refreshEntryChecks()});
  form.addEventListener('focusout',e=>{if(!session||!e.target.matches('[data-ce-field]'))return;clearTimeout(stockTimer);recalculateEditedField(e.target);(session.entryTouched??=new Set()).add(e.target.dataset.ceScope+':'+e.target.dataset.ceField);refreshEntryChecks();});
  form.addEventListener('change',e=>{
-  if(e.target.matches('[data-ce-plus]')){
-   const input=document.getElementById(e.target.dataset.cePlus);
-   if(!input)return;
-   input.disabled=false;
-   input.value=e.target.checked?'0':'';
-   capture(input);
-   session.changedMakets.add('Макет10');
-   session.dirty=true;scheduleDraft();
-   document.querySelector('#ce-status').textContent='Есть несохранённые изменения';
-   if(e.target.checked){input.value='';input.disabled=true;}else input.focus();
-   recalculateEditedField(input);refreshStockPanel();refreshEntryChecks();
-   return;
-  }
   if(e.target.matches('.dt-maket-select')){const n=e.target.value;e.target.value='';if(n==='10'||n==='31'||n==='32')showMain(n);else if(n)showExtra('Макет'+n);return;}
   capture(e.target);
   if(e.target.dataset.ceScope==='base'&&e.target.dataset.ceField==='KU'){
@@ -1042,15 +1023,33 @@ function open(record,options={}){if(!record)return;
   // A changed layer/composition can change which species is leading.
   // Rebuild only on the completed change event (not every keystroke),
   // so the accessory POL/ZAP inputs appear/disappear without stealing typing.
-  if(e.target.dataset.ceScope==='Макет10'&&['IAR','KOEF','POR'].includes(e.target.dataset.ceField)){
+  if(e.target.dataset.ceScope==='Макет10'&&['IAR','KOEF','POR'].includes(e.target.dataset.ceField)&&
+     !e.target.hasAttribute('aria-invalid')){
    const oldIndex=Number(e.target.dataset.ceRow);
-   const row=session.draft._children?.Макет10?.[oldIndex];
+   const rows=session.draft._children.Макет10;
+   const row=rows?.[oldIndex];
+   // Keep the coefficient control in place when the leading row stays the same.
+   // Replacing it on blur can consume the following tap on the plus button.
+   if(e.target.dataset.ceField==='KOEF'&&rows?.every((item,index)=>{
+    const hasFullness=!!document.getElementById('ce_Макет10_'+index+'_POL');
+    return hasFullness===leadingMaket10Row(rows,index,session.draft);
+   }))return;
    const index=e.target.dataset.ceField==='IAR'&&row?orderMaket10Draft(row):oldIndex;
    rerenderTable('Макет10');
    if(row)selectRecord('Макет10',Math.max(0,index));
   }
  });
  form.addEventListener('click',e=>{
+  const plus=e.target.closest('[data-ce-plus]');
+  if(plus){
+   const input=document.getElementById(plus.dataset.cePlus);
+   if(input){
+    input.value=isPlusCoefficient(input.value)?'':'0';
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+    document.querySelector('[data-ce-plus="'+input.id+'"]')?.focus({preventScroll:true});
+   }
+   return;
+  }
   const jump=e.target.closest('[data-ce-entry-issue]');
   if(jump){const issue=session.entryIssues?.[Number(jump.dataset.ceEntryIssue)];if(issue)focusControlIssue({form:issue.scope==='base'?'ВыделВ':issue.scope,field:issue.field,row:issue.index});return;}
   if(e.target.closest('[data-ce-calc-close]')){const notice=document.getElementById('ce-calc-notice');if(notice)notice.hidden=true;return;}

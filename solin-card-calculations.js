@@ -348,14 +348,17 @@ function stockPerHectare(record,refs,org,quarterRow=null,targetLayer=null){
    eligible.find(x=>same(x.row.POR,record.M3Pr))?.row.IAR;
  const sameLayer=all.filter(r=>childMatches(record,r)&&same(r.IAR,layer));
  if(!sameLayer.length)return status('К59: сначала заполните состав яруса','waiting');
- if(sameLayer.some(r=>!defined(r.POR)||n(r.KOEF)===null||n(r.KOEF)<0||n(r.PH)===null||n(r.PH)<=0))
-  return status('К59: укажите породу, коэффициент и высоту каждой строки яруса '+layer,'waiting');
+ const coefficients=sameLayer.map(r=>n(r.KOEF));
+ if(sameLayer.some(r=>!defined(r.POR))||coefficients.some(value=>!Number.isInteger(value)||value<0||value>10))
+  return status('К59: укажите породу и коэффициент от 0 до 10 в каждой строке яруса '+layer,'waiting');
  if(new Set(sameLayer.map(r=>String(r.POR).trim())).size!==sameLayer.length)
   return status('К59: повторные группы одной породы в ярусе требуют проверки','ambiguous');
- const coefficient=sameLayer.reduce((sum,r)=>sum+n(r.KOEF),0);
- if(Math.abs(coefficient-10)>0.00001)
+ const coefficient=coefficients.reduce((sum,value)=>sum+value,0);
+ if(coefficient!==10)
   return status('К59: сумма коэффициентов состава яруса '+layer+' должна быть 10 (сейчас '+coefficient+')','waiting');
  const candidates=eligible.filter(x=>same(x.row.IAR,layer));
+ if(candidates.some(({row})=>!(n(row.PH)>0)))
+  return status('К59: укажите высоту пород с положительным коэффициентом в ярусе '+layer,'waiting');
  const dominant=layerLead(candidates,record);
  if(!dominant||!(n(dominant.row.POL)>0))
   return status('К59: укажите полноту у ведущей породы яруса '+layer,'waiting');
@@ -365,7 +368,7 @@ function stockPerHectare(record,refs,org,quarterRow=null,targetLayer=null){
  // Original К59_2: Sum(Макет10Выб!KOEF*Макет10Выб!PH)/10,
  // joined on the complete address AND IAR. Companion species matter even
  // when POL and ZAP are stored only on the leading row.
- const weighted=sameLayer.reduce((sum,r)=>sum+n(r.KOEF)*n(r.PH),0)/10;
+ const weighted=candidates.reduce((sum,{row})=>sum+n(row.KOEF)*n(row.PH),0)/10;
  const height=k59Round(weighted,0);
  if(height===null||height<1||height>39)return status('К59: неоднозначная или недоступная высота в таблице Szap','ambiguous');
  const specie=String(row.POR).trim();

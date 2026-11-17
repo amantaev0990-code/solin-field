@@ -8,40 +8,40 @@ const editor=read('solin-card-editor.js');
 const android=read('solin-android-selects.js');
 const assist=read('solin-card-assist.js');
 
-const start=editor.indexOf('function syncPlusSpeciesForSave(){');
+const start=editor.indexOf('function capturePendingCoefficients(){');
 const stop=editor.indexOf('function validate(){',start);
 assert(start!==-1&&stop>start,'save sync must exist and precede validation');
-assert.match(editor.slice(stop,stop+180),/syncPlusSpeciesForSave\(\)/,'validate must sync before checking');
+assert.match(editor,/try\{capturePendingCoefficients\(\);validate\(\);/,'Save must capture before validating');
 const fn=editor.slice(start,stop);
-const mk=(rowIndex,value,checked=false,disabled=false)=>({
- dataset:{ceRow:String(rowIndex)},value,disabled,
- id:'ce_Макет10_'+rowIndex+'_KOEF',checkbox:{checked},
- closest:()=>({querySelector:()=>({checked})})
-});
+const mk=(rowIndex,value)=>({dataset:{ceRow:String(rowIndex)},value});
+const typesContext={window:{}};
+vm.runInNewContext(read('solin-field-types.js'),typesContext);
 function run(rows,controls){
- const session={draft:{_children:{Макет10:rows}},changedMakets:new Set(),dirty:false};
- const document={querySelectorAll:()=>controls,querySelector:selector=>{
-  const id=selector.match(/data-ce-plus="([^"]+)"/)?.[1];
-  return controls.find(x=>x.id===id)?.checkbox||null;
- }};
- vm.runInNewContext(fn+'\nsyncPlusSpeciesForSave();',{session,document});
+ const session={draft:{_children:{Макет10:rows}},changedMakets:new Set()};
+ const document={querySelectorAll:()=>controls};
+ function capture(input){
+  rows[Number(input.dataset.ceRow)].KOEF=typesContext.window.SolinFieldTypes.parse('Макет10','KOEF',input.value);
+ }
+ vm.runInNewContext(fn+'\ncapturePendingCoefficients();',{session,document,capture});
  return session;
 }
 const row1={IAR:1,POR:'ОС',KOEF:10,ZAP:77};
 const row2={IAR:1,POR:'Б',KOEF:null,ZAP:0};
 const row7={IAR:7,POR:'ОС',KOEF:10,ZAP:5};
-let session=run([row1,row2,row7],[mk(1,'',true,true)]);
-assert.equal(row2.KOEF,0,'checked plus must persist 0, not blank');
+let session=run([row1,row2,row7],[mk(1,'0')]);
+assert.equal(row2.KOEF,0,'immediate typed 0 must persist');
 assert.equal(row1.KOEF,10,'regular species unchanged');
 assert.equal(row7.KOEF,10,'single trees unchanged');
 assert(session.changedMakets.has('Макет10'),'flag M10 to save');
-row2.KOEF=null;session=run([row1,row2,row7],[mk(1,'0',false,false)]);
-assert.equal(row2.KOEF,0,'immediate typed 0 must persist');
-row2.KOEF=null;session=run([row1,row2,row7],[mk(1,'',false,false)]);
+session=run([row1,row2,row7],[mk(1,'')]);
+assert.equal(row2.KOEF,null,'cleared zero is a blank');
+session=run([row1,row2,row7],[mk(1,'')]);
 assert.equal(row2.KOEF,null,'blank coefficient must NOT become plus species');
 assert.equal(session.changedMakets.size,0,'untouched blank must not trigger write');
-row2.KOEF=null;session=run([row1,row2,row7],[mk(1,'10',false,false)]);
-assert.equal(row2.KOEF,null,'other coefficients use ordinary capture instead of forced zero');
+session=run([row1,row2,row7],[mk(1,'3')]);
+assert.equal(row2.KOEF,3,'pending nonzero coefficient uses ordinary capture');
+session=run([row1,row2,row7],[mk(1,'0')]);
+assert.equal(row2.KOEF,0,'pending zero can replace a nonzero coefficient');
 
 const ctx={window:{}};
 vm.runInNewContext(read('solin-access-expression.js'),ctx);

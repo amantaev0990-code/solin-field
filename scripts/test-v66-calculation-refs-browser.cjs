@@ -19,7 +19,7 @@ const server=http.createServer(async(req,res)=>{
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  let browser;
  try{
-  browser=await chromium.launch();
+  browser=await chromium.launch({executablePath:process.env.SOLIN_CHROMIUM_PATH});
   const context=await browser.newContext({...devices['Pixel 7'],viewport:{width:1067,height:667}});
   const page=await context.newPage();
   await page.route(u=>u.hostname!=='127.0.0.1',route=>route.abort());
@@ -45,8 +45,27 @@ const server=http.createServer(async(req,res)=>{
   const codeNames=await page.locator('#calcRefsList details.refCard summary').allInnerTexts();
   assert.ok(codeNames.some(name=>name.includes('SSHB')),'K58 bonitet norm must be listed');
   assert.ok(codeNames.some(name=>name.includes('Szap')),'K59 stock norm must be listed');
-  await page.locator('#calcRefsList details.refCard').first().locator('summary').click();
-  await page.locator('#calcRefsList details.refCard').first().locator('.wf-check').first().waitFor({state:'attached',timeout:5000});
+  const sshb=page.locator('[data-table="SSHB"]');
+  await sshb.locator('summary').click();
+  const table=sshb.getByRole('table');
+  await table.waitFor();
+  const columns=['Происх','Возр','ВозрН','ВозрК','Н1б','Н1а','Н1','Н2','Н3','Н4','Н5','Н5а','Н5б'];
+  assert.deepEqual(await table.locator('thead th').allTextContents(),columns);
+  const sourceRow=await page.evaluate(fields=>fields.map(field=>String(window.SOLIN_REFS.tables.SSHB[0][field])),columns);
+  assert.deepEqual(await table.locator('tbody tr').first().locator('td').allTextContents(),sourceRow);
+  assert.equal(sourceRow[0],'0','Numeric zero must be displayed as a value');
+  assert.equal(await table.locator('tbody tr').count(),60);
+  await sshb.getByRole('button',{name:/Ещё 60/}).click();
+  assert.equal(await table.locator('tbody tr').count(),120);
+  const szap=page.locator('[data-table="Szap"]');
+  await szap.locator('summary').click();
+  await szap.getByRole('table').waitFor();
+  assert.deepEqual(await szap.locator('thead th').allTextContents(),[
+   'Obl','LXZ','KUL','p1',...Array.from({length:39},(_,i)=>'v'+(i+1)),'Prior'
+  ]);
+  assert.ok(await szap.locator('.calc-refs-scroll').evaluate(el=>el.scrollWidth>el.clientWidth),'Wide tables scroll horizontally');
+  await page.locator('#calcRefsSearch').fill('SSHB');
+  assert.deepEqual(await page.locator('#calcRefsList details').evaluateAll(rows=>rows.map(row=>row.dataset.table)),['SSHB']);
   await page.locator('#calcRefsSearch').fill('НесуществующийКод987654');
   assert.match(await page.locator('#calcRefsStatus').innerText(),/Совпадений не найдено/);
   await page.locator('#calcRefsSearch').fill('');

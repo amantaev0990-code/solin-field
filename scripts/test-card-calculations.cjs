@@ -28,6 +28,16 @@ const k59Snapshot=JSON.stringify(k59Card);
 const original=calc.stockPerHectare(k59Card,stockRefs,{KTO:150000000});
 assert.equal(original.status,'complete');
 assert.equal(original.expected,35);
+const mixture=(koef,height)=>({...k59Card,_children:{Макет10:[
+ ...k59Card._children.Макет10,{IAR:1,POR:'Б',KOEF:koef,PH:height}
+]}});
+for(const height of [null,10]){
+ const withPlus=calc.stockPerHectare(mixture(0,height),stockRefs,{KTO:150000000});
+ assert.equal(withPlus.status,'complete');
+ assert.equal(withPlus.expected,35,'A zero-weight species cannot change the layer stock');
+ assert.equal(withPlus.weightedHeight,6);
+}
+assert.equal(calc.stockPerHectare(mixture(null,10),stockRefs,{KTO:150000000}).status,'waiting');
 assert.equal(calc.k59Round(29.5),30,'K59 explicitly rounds 0.5 upward');
 assert.equal(calc.accessRound(29.5),30,'Jet Round 29.5 = 30');
 assert.equal(calc.accessRound(30.5),30,'Jet Round 30.5 = 30');

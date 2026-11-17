@@ -91,5 +91,7 @@
 .ce-reference-examples .ce-reference-case{padding:8px 0;border-bottom:1px solid #e9eeeb;line-height:1.4}
 .ce-reference-examples .ce-reference-case p{margin:3px 0}
 .ce-reference-examples .ce-reference-case small{color:#4a6458}
-.ce-plus-choice{display:inline-flex;align-items:center;gap:4px;font-size:10px;white-space:nowrap;margin-top:2px}
-.ce-plus-choice input[type="checkbox"]{width:14px;height:14px;min-width:14px;padding:0;margin:0}
+.ce-coefficient{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:stretch;gap:3px}
+.dt-board .ce-coefficient .ce-field{min-width:0}
+.dt-board .ce-coefficient button{width:30px;padding:0;border:1px solid #a9b7ad;border-radius:4px;background:#f1f6f1;color:#264f37;font:bold 16px/1 Arial,sans-serif}
+.dt-board .ce-coefficient button[aria-pressed="true"]{border-color:#1f6747;background:#1f6747;color:white}
