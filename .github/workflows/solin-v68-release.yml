@@ -100,22 +100,26 @@ jobs:
           node scripts/test-v56-startup-performance.cjs www --baseline
           # V68 is an in-place update over exact signed V67 assets.
           # Overlay only the original Russian reference router; plus species, calculation refs, MDB, maps and updater stay intact.
-          cp solin-field-core.js www/
+          cp solin-field-core.js solin-readable.js www/
           # V66 already includes the independent calculation reference screen.
           # Only bump the human-readable reference router to avoid cached V67 code.
           node --input-type=module <<'NODE'
           import {readFileSync,writeFileSync} from 'node:fs';
           const file='www/index.html';
           let html=readFileSync(file,'utf8');
-          const re=/(solin-field-core\.js)(?:\?v=[^"]*)?"/g;
-          const matches=[...html.matchAll(re)];
-          if(matches.length!==1 || !html.includes('solin-calculation-refs.js')) {
-            throw Error('Unexpected V67 HTML assets');
+          if (!html.includes('solin-calculation-refs.js')) {
+            throw Error('Unexpected V67 HTML: separate calculation references missing');
           }
-          html=html.replace(re,'$1?v=68"');
+          for(const asset of ['solin-field-core.js','solin-readable.js']){
+            const escaped=asset.replaceAll('.', '\\.');
+            const re=new RegExp('('+escaped+')(?:\\?v=[^"]*)?"','g');
+            if([...html.matchAll(re)].length!==1)throw Error('Unexpected V67 reference asset '+asset);
+            html=html.replace(re,'$1?v=68"');
+          }
           writeFileSync(file,html);
           NODE
           node --check www/solin-field-core.js
+          node --check www/solin-readable.js
           node --check www/solin-card-editor.js
           node --check www/solin-calculation-refs.js
           node --check www/solin-card-calculations.js
