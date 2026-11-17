@@ -295,8 +295,12 @@ window.solinEnsureRefsRendered=()=>{
  if(!panel||!D)return;
  if(!refsNeedRender&&panel.childElementCount)return;
  refsNeedRender=false;
- if(window.SOLIN_REFS)auditedRefs();
- else refs();
+ // Restore original Russian descriptions and code pairings. Previously the
+ // technical raw table renderer replaced the human directory on every visit.
+ const q=document.querySelector('#refsScreen input')?.value||'';
+ if(typeof window.SolinHuman?.refs==='function')window.SolinHuman.refs(q);
+ else if(window.SOLIN_REFS)auditedRefs(q);
+ else refs(q);
 };
 window.addEventListener('solin-refs-ready',()=>{
  refsNeedRender=true;
