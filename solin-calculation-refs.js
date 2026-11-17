@@ -132,13 +132,13 @@
   ensure();
   window.SolinCalculationRefs = Object.freeze({ensure, render, tableCodes:CATALOG.map(item => item.code)});
 
-  // Capture before SolinWorkspace's main-menu handler. That handler sees
-  // #calculationRefs.screen and calls show('calculationRefs') instead of
-  // falling back to show('refsScreen'). Render only after that navigation.
-  document.addEventListener('click', event => {
-    if (event.target.closest?.('button[data-field-route="calculationRefs"]'))
-      queueMicrotask(() => { if (root.classList.contains('active')) render(); });
-  }, true);
+  // SolinWorkspace sees #calculationRefs.screen and routes to it.
+  // Observe the actual screen switch: document capture listeners can run
+  // BEFORE the workspace's click handler, so a queued render on click
+  // alone can fire too early and leave the directory empty.
+  new MutationObserver(() => {
+    if (root.classList.contains('active')) render();
+  }).observe(root, {attributes:true, attributeFilter:['class']});
   window.addEventListener('solin-refs-ready', () => {
     if (root.classList.contains('active')) render();
   });
