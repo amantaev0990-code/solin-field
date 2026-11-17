@@ -15,11 +15,15 @@ assert.match(editor.slice(stop,stop+180),/syncPlusSpeciesForSave\(\)/,'validate 
 const fn=editor.slice(start,stop);
 const mk=(rowIndex,value,checked=false,disabled=false)=>({
  dataset:{ceRow:String(rowIndex)},value,disabled,
+ id:'ce_Макет10_'+rowIndex+'_KOEF',checkbox:{checked},
  closest:()=>({querySelector:()=>({checked})})
 });
 function run(rows,controls){
  const session={draft:{_children:{Макет10:rows}},changedMakets:new Set(),dirty:false};
- const document={querySelectorAll:()=>controls};
+ const document={querySelectorAll:()=>controls,querySelector:selector=>{
+  const id=selector.match(/data-ce-plus="([^"]+)"/)?.[1];
+  return controls.find(x=>x.id===id)?.checkbox||null;
+ }};
  vm.runInNewContext(fn+'\nsyncPlusSpeciesForSave();',{session,document});
  return session;
 }
