@@ -1,0 +1,30 @@
+name: SOLI-N Field security gate
+
+on:
+  push:
+    branches:
+      - main
+      - 'security/**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  security-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout without persistent Git credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Scan tracked files and common credential formats
+        run: node scripts/security-gate.cjs

@@ -17,3 +17,27 @@ android/app/build/
 *.keystore
 *.jks
 .DS_Store
+
+# SOLI-N Field: never commit signing keys, raw field data or private archives
+*.p12
+*.pfx
+*.pem
+*.key
+*.p8
+*.kdbx
+*.ovpn
+*.apk
+*.aab
+*.zip
+*.7z
+*.rar
+*.sqlite
+*.sqlite3
+*.db
+*.mbtiles
+*.cmf2
+**/signing-private.json
+**/credentials.json
+**/service-account*.json
+**/google-services.json
+**/*PRIVATE*BACKUP*
